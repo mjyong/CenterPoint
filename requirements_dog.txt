@@ -1,0 +1,20 @@
+# dog_perception: core
+numpy
+scipy
+numba
+torch
+# det3d detectors (CenterPoint-Pillar works without spconv; CenterPoint-Voxel needs a CUDA build of spconv)
+torchvision
+easydict
+addict
+terminaltables
+pycocotools
+protobuf
+tqdm
+nuscenes-devkit
+# optional tools
+rosbags          # tools/dog/rosbag_to_sequence.py (no ROS install needed)
+onnx
+onnxruntime      # tools/dog/export_pillar_onnx.py --check
+matplotlib       # tools/dog/run_sim_demo.py --plot
+pytest

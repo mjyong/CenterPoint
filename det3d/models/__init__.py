@@ -1,4 +1,4 @@
-import importlib
+import importlib.util
 spconv_spec = importlib.util.find_spec("spconv")
 found = spconv_spec is not None
 if found:
@@ -26,7 +26,11 @@ from .registry import (
     READERS,
 )
 from .second_stage import * 
-from .roi_heads import * 
+try:
+    from .roi_heads import *
+except ImportError:
+    # roi heads (two-stage refinement) need the compiled iou3d_nms CUDA op.
+    print("iou3d_nms not built, two-stage roi heads disabled!")
 
 __all__ = [
     "READERS",

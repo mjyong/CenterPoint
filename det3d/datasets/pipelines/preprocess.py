@@ -35,6 +35,7 @@ class Preprocess(object):
             self.global_rotation_noise = cfg.global_rot_noise
             self.global_scaling_noise = cfg.global_scale_noise
             self.global_translate_std = cfg.get('global_translate_std', 0)
+            self.global_pitch_roll_noise = cfg.get('global_pitch_roll_noise', 0.0)
             self.class_names = cfg.class_names
             if cfg.db_sampler != None:
                 self.db_sampler = build_dbsampler(cfg.db_sampler)
@@ -54,7 +55,7 @@ class Preprocess(object):
                 points = res["lidar"]["combined"]
             else:
                 points = res["lidar"]["points"]
-        elif res["type"] in ["NuScenesDataset"]:
+        elif res["type"] in ["NuScenesDataset", "DogDataset"]:
             points = res["lidar"]["combined"]
         else:
             raise NotImplementedError
@@ -133,6 +134,9 @@ class Preprocess(object):
             )
             gt_dict["gt_boxes"], points = prep.global_translate_(
                 gt_dict["gt_boxes"], points, noise_translate_std=self.global_translate_std
+            )
+            gt_dict["gt_boxes"], points = prep.global_pitch_roll(
+                gt_dict["gt_boxes"], points, self.global_pitch_roll_noise
             )
         elif self.no_augmentation:
             gt_boxes_mask = np.array(
@@ -359,7 +363,7 @@ class AssignLabel(object):
                 hm = np.zeros((len(class_names_by_task[idx]), feature_map_size[1], feature_map_size[0]),
                               dtype=np.float32)
 
-                if res['type'] == 'NuScenesDataset':
+                if res['type'] in ('NuScenesDataset', 'DogDataset'):
                     # [reg, hei, dim, vx, vy, rots, rotc]
                     anno_box = np.zeros((max_objs, 10), dtype=np.float32)
                 elif res['type'] == 'WaymoDataset':
@@ -407,7 +411,7 @@ class AssignLabel(object):
                         ind[new_idx] = y * feature_map_size[0] + x
                         mask[new_idx] = 1
 
-                        if res['type'] == 'NuScenesDataset': 
+                        if res['type'] in ('NuScenesDataset', 'DogDataset'): 
                             vx, vy = gt_dict['gt_boxes'][idx][k][6:8]
                             rot = gt_dict['gt_boxes'][idx][k][8]
                             anno_box[new_idx] = np.concatenate(
@@ -432,7 +436,7 @@ class AssignLabel(object):
             boxes = flatten(gt_dict['gt_boxes'])
             classes = merge_multi_group_label(gt_dict['gt_classes'], num_classes_by_task)
 
-            if res["type"] == "NuScenesDataset":
+            if res["type"] in ("NuScenesDataset", "DogDataset"):
                 gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)
             elif res['type'] == "WaymoDataset":
                 gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)

@@ -937,6 +937,23 @@ def box_collision_test(boxes, qboxes, clockwise=True):
     return ret
 
 
+def global_pitch_roll(gt_boxes, points, max_angle):
+    """Small random tilt about x / y (radians). Boxes stay upright: only their
+    centers (and velocities) are rotated. Covers residual gravity-alignment
+    error and sloped ground for gravity-aligned inputs (robot dog)."""
+    if max_angle <= 0:
+        return gt_boxes, points
+    pitch, roll = np.random.uniform(-max_angle, max_angle, 2)
+    cp, sp, cr, sr = np.cos(pitch), np.sin(pitch), np.cos(roll), np.sin(roll)
+    rot = np.array([[cp, 0, sp], [0, 1, 0], [-sp, 0, cp]]) @ np.array([[1, 0, 0], [0, cr, -sr], [0, sr, cr]])
+    points[:, :3] = points[:, :3] @ rot.T
+    gt_boxes[:, :3] = gt_boxes[:, :3] @ rot.T
+    if gt_boxes.shape[1] > 7:
+        vel = np.concatenate([gt_boxes[:, 6:8], np.zeros((len(gt_boxes), 1))], axis=1) @ rot.T
+        gt_boxes[:, 6:8] = vel[:, :2]
+    return gt_boxes, points
+
+
 def global_translate_(gt_boxes, points, noise_translate_std):
     """
     Apply global translation to gt_boxes and points.

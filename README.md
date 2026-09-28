@@ -18,6 +18,14 @@
     }
 
 
+## Robot dog (Hesai XT32) four-stage pipeline
+
+`dog_perception/` adds a deployable lidar perception stack for a wheel-legged robot dog on top of this repo:
+per-point deskew with IMU-rate poses, self-filtering, gravity-aligned multi-sweep input, CenterPoint-Pillar /
+CenterPoint-Voxel behind one interface (plus BPU/ONNX export of the pillar model), an IMM tracker in the LIO world
+frame, and two tiers of trajectory prediction (IMM rollout, learned multi-modal predictor). Design review, usage and
+simulation results (Chinese): [docs/DOG_PIPELINE.md](docs/DOG_PIPELINE.md). Tests: `python -m pytest tests/dog`.
+
 ## NEWS
 
 [2021-12-27] We release a multimodal fusion approach for 3D detection [MVP](https://github.com/tianweiy/MVP). 

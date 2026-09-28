@@ -9,7 +9,8 @@ from tqdm import tqdm
 
 dataset_name_map = {
     "NUSC": "NuScenesDataset",
-    "WAYMO": "WaymoDataset"
+    "WAYMO": "WaymoDataset",
+    "DOG": "DogDataset",
 }
 
 
@@ -50,7 +51,7 @@ def create_groundtruth_database(
 
     root_path = Path(data_path)
 
-    if dataset_class_name in ["WAYMO", "NUSC"]: 
+    if dataset_class_name in ["WAYMO", "NUSC", "DOG"]: 
         if db_path is None:
             if virtual:
                 db_path = root_path / f"gt_database_{nsweeps}sweeps_withvelo_virtual"

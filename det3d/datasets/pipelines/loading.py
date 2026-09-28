@@ -176,6 +176,11 @@ class LoadPointCloudFromFile(object):
                 res["lidar"]["points"] = points
                 res["lidar"]["times"] = times
                 res["lidar"]["combined"] = np.hstack([points, times])
+        elif self.type == "DogDataset":
+            # frames are stored already accumulated (N sweeps + dt channel)
+            points = np.load(str(res["metadata"]["image_prefix"] / info["lidar_path"])).astype(np.float32)
+            res["lidar"]["points"] = points
+            res["lidar"]["combined"] = points
         else:
             raise NotImplementedError
 
@@ -197,6 +202,13 @@ class LoadPointCloudAnnotations(object):
                 "names": info["gt_names"],
                 "tokens": info["gt_boxes_token"],
                 "velocities": info["gt_boxes_velocity"].astype(np.float32),
+            }
+        elif res["type"] == "DogDataset" and "gt_boxes" in info:
+            gt_boxes = info["gt_boxes"].astype(np.float32)
+            gt_boxes[np.isnan(gt_boxes)] = 0
+            res["lidar"]["annotations"] = {
+                "boxes": gt_boxes,
+                "names": np.asarray(info["gt_names"]),
             }
         elif res["type"] == 'WaymoDataset' and "gt_boxes" in info:
             res["lidar"]["annotations"] = {
