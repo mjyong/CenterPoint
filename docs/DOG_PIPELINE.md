@@ -143,6 +143,8 @@ CPU  解码 + circle NMS                     detection/decode.py
 
 ## 2. 模块与文件对应
 
+逐函数的调用链路和每一步的数据 shape（在样例 bag 上实测）见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md)。
+
 ```
 LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
                           ▼                   ▼              ▼
