@@ -13,6 +13,26 @@ _COLORS = {
 }
 _MAX_POINTS = 20000
 
+# Foxglove only turns the base64 `data` string into a byte buffer when the JSON
+# schema says contentEncoding=base64. A bare {"type":"object"} leaves `data` as
+# text, and the 3D panel then has no points to draw.
+_POINT_CLOUD_SCHEMA = json.dumps({
+    "title": "foxglove.PointCloud",
+    "type": "object",
+    "properties": {
+        "timestamp": {"type": "object", "properties": {
+            "sec": {"type": "integer"}, "nsec": {"type": "integer"}}},
+        "frame_id": {"type": "string"},
+        "pose": {"type": "object"},
+        "point_stride": {"type": "integer"},
+        "fields": {"type": "array", "items": {"type": "object", "properties": {
+            "name": {"type": "string"},
+            "offset": {"type": "integer"},
+            "type": {"type": "integer"}}}},
+        "data": {"type": "string", "contentEncoding": "base64"},
+    },
+}).encode()
+
 
 def _stamp(t):
     sec = int(np.floor(t))
@@ -43,10 +63,10 @@ class McapViz:
         self._fh = open(path, "wb")
         self._w = Writer(self._fh)
         self._w.start(profile="", library="dog_perception.mcap_viz")
-        schema = json.dumps({"type": "object"}).encode()
-        cloud = self._w.register_schema("foxglove.PointCloud", "jsonschema", schema)
-        scene = self._w.register_schema("foxglove.SceneUpdate", "jsonschema", schema)
-        pose = self._w.register_schema("foxglove.PoseInFrame", "jsonschema", schema)
+        other = json.dumps({"type": "object"}).encode()
+        cloud = self._w.register_schema("foxglove.PointCloud", "jsonschema", _POINT_CLOUD_SCHEMA)
+        scene = self._w.register_schema("foxglove.SceneUpdate", "jsonschema", other)
+        pose = self._w.register_schema("foxglove.PoseInFrame", "jsonschema", other)
         self._cloud = self._w.register_channel("/lidar", "json", cloud)
         self._scene = self._w.register_channel("/detections", "json", scene)
         self._pose = self._w.register_channel("/pose", "json", pose)
