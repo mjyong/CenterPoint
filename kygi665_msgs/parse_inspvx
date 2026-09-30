@@ -1,0 +1,34 @@
+ sub_kygi665_ins_ = node_->create_subscription<kygi665_msgs::msg::INSPVAX>(
+            kygi665_ins_topic_, qos, [this](kygi665_msgs::msg::INSPVAX::SharedPtr msg) {
+                double ins_time = ToSec(msg->header.stamp) + time_offset;
+                {
+                    double now_sec = std::chrono::duration<double>(
+                        std::chrono::steady_clock::now().time_since_epoch()).count();
+                    if (last_ins_recv_time_ > 0) {
+                        double interval = now_sec - last_ins_recv_time_;
+                        if (interval > 0.1) {
+                            LOG(ERROR) << "INS 回调间隔过大: " << interval << " 秒，可能被阻塞";
+                        }
+                    }
+                    last_ins_recv_time_ = now_sec;
+                }
+
+                // 解析 INS 状态 (kygi665 pos_type.data 归一化为 novatel 常量值)
+                // 要求 ins_status 为 INS_SOLUTION_GOOD(3) 才可用
+                INSPtr ins = std::make_shared<Ins>();
+                bool ins_solution_good = (msg->ins_status.data == 3);
+                uint32_t pos_type = NormalizeKygi665PosType(msg->pos_type.data);
+                if (ins_solution_good && pos_type == INS_POS_TYPE_RTK_FIXED) {
+                    ins->state = INS_VALID;
+                } else {
+                    ins->state = INS_INVALID;
+                }
+
+                // 转换为 ENU 坐标
+                Eigen::Vector3d lla(msg->latitude, msg->longitude, msg->height);
+                Eigen::Vector3d enu = lla_to_enu(lla, geo_converter_);
+                double azimuth_rad = (- msg->azimuth +180) * M_PI / 180.0;
+                Eigen::Matrix3d rotation = (Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
+                                            Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
+                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ())).toRotationMatrix();
+                SE3 pose = SE3(rotation, enu);

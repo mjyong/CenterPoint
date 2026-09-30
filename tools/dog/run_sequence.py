@@ -20,7 +20,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+from dog_perception.geometry import transform_points  # noqa: E402
 from dog_perception.io import SequenceReader  # noqa: E402
+from dog_perception.mcap_viz import McapViz  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
 from dog_perception.prediction.dataset import TrackLogger  # noqa: E402
 from dog_perception.preprocess import DetFrameConfig, PreprocessConfig  # noqa: E402
@@ -45,6 +47,7 @@ def main():
     ap.add_argument("--no-deskew", action="store_true")
     ap.add_argument("--odom-latency", type=float, default=0.0)
     ap.add_argument("--save-frames", action="store_true")
+    ap.add_argument("--mcap", default=None, help="Foxglove MCAP of the first detector: cloud, boxes, pose")
     ap.add_argument("--device", default=None)
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
@@ -66,6 +69,7 @@ def main():
     logs = {n: TrackLogger() for n in names}
     if args.save_frames:
         os.makedirs(os.path.join(args.out, "frames"), exist_ok=True)
+    viz = McapViz(args.mcap) if args.mcap else None
 
     for ev in reader.events(odom_latency=args.odom_latency):
         if ev[0] == "imu":
@@ -80,6 +84,7 @@ def main():
             continue
         if args.save_frames:
             np.save(os.path.join(args.out, "frames", "%.6f.npy" % frame.stamp), frame.points)
+        shown = None
         for n in names:
             d = dets[n](frame.points, frame.stamp)
             out = run_back_half(pipes[n], frame, d)
@@ -87,6 +92,13 @@ def main():
                                    T_world_body=frame.T_world_body, detections=d, tracks=out[0],
                                    predictions=out[1], timings=dict(frame.timings, **dets[n].last_timing)))
             logs[n].add(frame.stamp, out[0], frame.T_world_body, out[1])
+            if n == names[0]:
+                shown = d
+        if viz is not None and shown is not None:
+            cur = frame.points[frame.points[:, -1] == 0]
+            xyz_w = transform_points(frame.T_world_det, cur[:, :3]) if len(cur) else np.zeros((0, 3))
+            viz.add(frame.stamp, xyz_w, cur[:, 3] if len(cur) else np.zeros(0),
+                    shown.transform(frame.T_world_det, "world"), frame.T_world_body)
         if len(results[names[0]]) % 20 == 0:
             print("frame %d  " % len(results[names[0]]) +
                   "  ".join("%s: %d dets %.1f ms" % (n, len(results[n][-1]["detections"]),
@@ -100,6 +112,9 @@ def main():
         logs[n].save(os.path.join(d, "track_log.npz"))
         lat = [r["timings"].get("network_ms", np.nan) for r in results[n][1:]]
         print("[%s] %d frames, network %.1f ms (median)" % (n, len(results[n]), np.nanmedian(lat) if lat else np.nan))
+    if viz is not None:
+        viz.close()
+        print("mcap %s  %d frames" % (args.mcap, viz.frames))
 
 
 def run_back_half(pipe, frame, dets):

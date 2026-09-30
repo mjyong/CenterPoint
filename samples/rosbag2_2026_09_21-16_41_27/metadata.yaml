@@ -1,0 +1,46 @@
+rosbag2_bagfile_information:
+  compression_format: ''
+  compression_mode: ''
+  custom_data: null
+  duration:
+    nanoseconds: 2812149344
+  files:
+  - duration:
+      nanoseconds: 2812149344
+    message_count: 595
+    path: rosbag2_2026_09_21-16_41_27.db3
+    starting_time:
+      nanoseconds_since_epoch: 1789980087992922144
+  message_count: 595
+  relative_file_paths:
+  - rosbag2_2026_09_21-16_41_27.db3
+  ros_distro: rosbags
+  starting_time:
+    nanoseconds_since_epoch: 1789980087992922144
+  storage_identifier: sqlite3
+  topics_with_message_count:
+  - message_count: 29
+    topic_metadata:
+      name: /robot/topic/rdap/top_point_cloud2
+      offered_qos_profiles: []
+      serialization_format: cdr
+      type: sensor_msgs/msg/PointCloud2
+      type_description_hash: 
+        RIHS01_9198cabf7da3796ae6fe19c4cb3bdd3525492988c70522628af5daa124bae2b5
+  - message_count: 283
+    topic_metadata:
+      name: /rte/rdap/rtk/imus/data_raw
+      offered_qos_profiles: []
+      serialization_format: cdr
+      type: sensor_msgs/msg/Imu
+      type_description_hash: 
+        RIHS01_7d9a00ff131080897a5ec7e26e315954b8eae3353c3f995c55faf71574000b5b
+  - message_count: 283
+    topic_metadata:
+      name: /rte/rdap/rtk/inspvax
+      offered_qos_profiles: []
+      serialization_format: cdr
+      type: kygi665_msgs/msg/INSPVAX
+      type_description_hash: 
+        RIHS01_bd77f1ef6af342c970eede99bdf49e4060e1dab7a2ae909f35892bcb3791937b
+  version: 9

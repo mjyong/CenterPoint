@@ -8,8 +8,10 @@ venv/
 *.idea/
 *.so
 *.yaml
+!samples/**/metadata.yaml
 *.sh 
 *.pth
+!work_dirs/pretrained/nusc_pp.pth
 *.pkl
 *.zip
 *.bin
