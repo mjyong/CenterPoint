@@ -219,6 +219,10 @@ python tools/dog/export_pillar_onnx.py --config configs/dog/dog_centerpoint_pp_x
 python tools/dog/train_predictor.py --logs "work_dirs/rec_*/pillar/track_log.npz" \
     --val-logs work_dirs/rec_009/pillar/track_log.npz --encoder gru --out work_dirs/pred/gru.pt
 
+# 录制的 bag 直接出 Foxglove 可视化（点云 / 上报检测 / 轨迹 / 位姿），配置由权重自动选择
+python tools/dog/run_bag_mcap.py --bag samples/rosbag2_2026_09_21-16_41_27 \
+    --ckpt work_dirs/pretrained/nusc_pp.pth --mcap work_dirs/sample.mcap
+
 # 在线（ROS 2）
 python3 tools/dog/ros2_node.py --ros-args -p detector:=dog_pillar -p checkpoint:=pp.pth \
     -p predictor_model:=work_dirs/pred/gru.pt -p extrinsic_t:="[0.2,0.0,0.15]" -p base_height:=0.45
@@ -305,3 +309,51 @@ python -m pytest tests/dog -q
 - BPU 量化（OpenExplorer / hb_mapper）没有做，流程只到 ONNX 为止。PFN 中的 max-pool 和 concat 是否被 Nash 工具链完全支持，需要在 S100P 上确认。
 - 预处理、跟踪和预测是 Python 参考实现。在 x86 4 核上实测：预处理约 21 ms（5 帧、约 22 万点），跟踪约 4 ms，IMM 预测约 15 ms（16 个目标）。上板时建议把预处理用 C++/CUDA 重写，目标在 5 ms 以内。
 - 仿真中的目标没有社交交互，所以第二档在真实数据上的收益（主要来自对机器人的避让等交互）需要用实车日志重新评估。
+
+## 7. 实车样例 bag：检测框过多的原因与修复
+
+样例是 `samples/rosbag2_2026_09_21-16_41_27`，共 2.8 s，包含 29 帧 XT32 点云、100 Hz IMU 和 100 Hz INSPVAX。机器人在整段数据中**静止不动**。检测用 nuScenes 预训练的 Pillar 权重 `work_dirs/pretrained/nusc_pp.pth`。
+
+![before/after](dog_bag_before_after.png)
+
+| 每帧平均 | 修复前（MCAP 画的就是这个） | 修复后 |
+|---|---|---|
+| 网络输出（分数 ≥0.1） | 102 | 102 |
+| 几何过滤后 | – | 52.8 |
+| 上报的检测（按类别阈值） | 102 | **16.4** |
+| 确认轨迹 | 25–28，且持续增长 | **16.8** |
+
+### 7.1 原因
+
+1. **把给跟踪器用的低分框画了出来。** 检测器有意保留分数 ≥0.1 的框，因为跟踪器的第二阶段要用低分框延续已有轨迹。但 `run_bag_mcap.py` 和 `run_sequence.py --mcap` 直接把这些框画进了 MCAP。分数 <0.3 的框里绝大多数是误检。
+2. **域差异造成的误检。** 这台机器人的雷达离地只有约 0.31 m，nuScenes 是 1.84 m。在灌木、树干和墙边会冒出大量低分的 cyclist / pedestrian 框，其中有的框点数 ≤3，有的底面悬空 0.8–1.7 m。另外，同一个物体上还会出现不同类别的重复框（car 头和 bicycle 头各出一个）。
+3. **权重与配置不匹配时不会报错。** `run_bag_mcap.py` 默认用的是 **Voxel** 配置，而仓库里只提交了 **Pillar** 权重。det3d 的 `load_checkpoint` 遇到不匹配只打印警告：485 个参数中只有 293 个加载成功，整个稀疏 3D 主干都是随机初始化，输出几乎全是垃圾框。
+4. **地面高度偏差。** 地面高度估计用的是 `-P10(z)`，而且下限被截断在 0.4 m。实际值约 0.31 m，导致检测系里的地面偏高 11 cm。
+5. **双回波重复点。** 每帧 12.8 万个点里，约 2 万个坐标全为 0，约 3.3 万个落在传感器 0.4 m 以内的无效回波（被 `min_range` 滤掉）。双回波模式下同一坐标会重复出现，10.8 万个非零点去重后只剩 5.3 万。重复点对检测框数量影响不大，但让输入密度偏离了训练分布，计算量也翻倍。
+
+### 7.2 修复
+
+| 位置 | 改动 |
+|---|---|
+| `detection/filters.py` | 几何过滤，对所有分数都生效：当前帧点数要达到下限（车 5 / 人 3 / 骑行 3），框底相对地面不能悬空超过 0.7 m 或下沉超过 1.2 m，并做跨类别去重（中心落在更高分的其他类框内即删除）。另定义 `DEFAULT_SCORE_THRESHOLDS`（车 0.35 / 人 0.3 / 骑行 0.4），用于上报检测和新建轨迹 |
+| `Detections.above()` | 按类别阈值取出应上报的检测 |
+| `tracking/tracker.py` | 新建轨迹的门槛改为按类别；低分框只能延续轨迹。平滑分数低于 `output_min_score` 的轨迹不再输出，也不做预测，但内部保留，ID 不断 |
+| `detection/centerpoint.py` | 加载权重前检查是否与配置匹配，不匹配直接报错，并提示权重实际对应哪种模型 |
+| `tools/dog/run_bag_mcap.py` | 根据权重自动选择配置；外参可通过参数传入；使用统一的地面高度估计并开启 `auto_ground`；跑完整流水线（含跟踪）；MCAP 中 `/detections` 只画达到阈值的检测，新增 `/tracks`（显示 ID、类别、速度） |
+| `preprocess` | `dedup_returns` 去掉双回波重复点；`estimate_base_height` 取代截断在 0.4 m 的 P10 估计 |
+
+### 7.3 这次代码更新的评审意见（`7560387`、`da7e428`）
+
+- **INSPVAX 的姿态约定**：`yaw = 180° − azimuth`，并丢弃 roll/pitch（与车上的解析器一致）。按 ENU 标准，车头朝向应为 `90° − azimuth`，所以这个 "body" 系的 x 轴与前进方向相差 90°。雷达外参在代码里默认为单位阵，只有当点云坐标系恰好和这个约定一致时才对。样例 bag 中机器人静止，**无法验证这一点**。机器人一旦运动，这个约定错了会让多帧拼接出现拖影和重影。请先拿一段直线行驶加转弯的数据核对；如需要，我可以写一个扫描外参 yaw、使多帧对齐最好的检查工具。
+- **丢弃 roll/pitch 的影响**：INS 给出 roll 1.1°、pitch 0.7°。在检测系里拟合出的地面仍有约 0.6° 倾斜，30 m 处约 ±0.25 m。目前影响不大；以后如果远处框的高度出问题，再考虑用 INS 的 roll/pitch 或地面平面拟合做找平。
+- **大文件进 git**：`.db3` 有 97 MB，已接近 GitHub 单文件 100 MB 的上限；`nusc_pp.pth` 有 72 MB。建议改用 Git LFS。另外 nuScenes 权重的许可是非商业用途。
+- `checkpoint.py` 中加上 `weights_only=False` 是必要的（torch ≥2.6 的默认值会拒绝加载旧 checkpoint）。本次提交也同步修改了 `convert_nusc_ckpt.py` 和预测模型加载处的同样问题。
+
+### 7.4 可调参数
+
+- `DEFAULT_SCORE_THRESHOLDS`：上报阈值和新建轨迹阈值。召回不够就调低；误检多就调高，优先调骑行者。
+- `DetectionFilterConfig`：`min_points`、`max_float`、`max_sink`、`cross_class_nms`。
+- `TrackerConfig.output_min_score`：轨迹输出所需的平滑分数下限。
+
+这些都是针对 nuScenes 预训练权重的临时措施。根本的解决办法仍然是用自采数据微调（第 3 节步骤 3）。
+

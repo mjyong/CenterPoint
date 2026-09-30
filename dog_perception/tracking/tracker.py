@@ -20,7 +20,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..detection.boxes import CLASSES
+from ..detection.boxes import CLASSES, score_threshold_array
+from ..detection.filters import DEFAULT_SCORE_THRESHOLDS
 from ..geometry import wrap_angle
 from .association import match
 from .imm import IMM, build_model
@@ -48,12 +49,17 @@ DEFAULT_CLASS_PARAMS = {
 @dataclass
 class TrackerConfig:
     class_params: dict = field(default_factory=lambda: dict(DEFAULT_CLASS_PARAMS))
-    high_score: float = 0.35
+    # score needed to start a track (float or {class: score}); below it, down to
+    # low_score, detections only continue existing confirmed tracks
+    high_score: object = field(default_factory=lambda: dict(DEFAULT_SCORE_THRESHOLDS))
     low_score: float = 0.1
     matching: str = "greedy"             # or "hungarian"
     use_velocity: bool = True            # CenterPoint velocity head as a measurement
     tentative_max_age: float = 0.15      # [s]; at 10 Hz a tentative track survives one missed frame
     output_coasting: bool = True
+    # tracks are kept alive by low-score detections (stage 2); only report those
+    # whose smoothed score is still at least this (float or {class: score})
+    output_min_score: object = field(default_factory=lambda: {"vehicle": 0.3, "pedestrian": 0.25, "cyclist": 0.3})
     history: float = 3.0                 # [s] kept for the predictors
     size_alpha: float = 0.2
     z_alpha: float = 0.3
@@ -211,8 +217,9 @@ class MultiObjectTracker:
             t.predict(stamp)
 
         keep = dets.labels >= 0
-        high = np.nonzero(keep & (dets.scores >= cfg.high_score))[0]
-        low = np.nonzero(keep & (dets.scores >= cfg.low_score) & (dets.scores < cfg.high_score))[0]
+        hi_thr = score_threshold_array(dets.labels, cfg.high_score)
+        high = np.nonzero(keep & (dets.scores >= hi_thr))[0]
+        low = np.nonzero(keep & (dets.scores >= cfg.low_score) & (dets.scores < hi_thr))[0]
 
         all_trk = np.arange(len(self.tracks))
         m1 = self._associate(dets, high, all_trk)
@@ -245,12 +252,19 @@ class MultiObjectTracker:
                        or (not t.confirmed and t.time_since_update <= cfg.tentative_max_age)]
         return self.outputs()
 
-    def outputs(self):
+    def reported_tracks(self):
+        """Tracks that are reported (and predicted): confirmed, coasting only if
+        ``output_coasting``, smoothed score >= ``output_min_score``."""
         out = []
         for t in self.tracks:
             if not t.confirmed:
                 continue
             if t.time_since_update > 1e-6 and not self.cfg.output_coasting:
                 continue
-            out.append(t.to_state())
+            if t.score < score_threshold_array([t.label], self.cfg.output_min_score)[0]:
+                continue
+            out.append(t)
         return out
+
+    def outputs(self):
+        return [t.to_state() for t in self.reported_tracks()]

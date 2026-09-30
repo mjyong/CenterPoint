@@ -22,8 +22,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from dog_perception.geometry import make_T, quat_to_R, rot_zyx  # noqa: E402
+from dog_perception.geometry import make_T, quat_to_R, rot_zyx, transform_points  # noqa: E402
 from dog_perception.io import odom_row, write_sequence  # noqa: E402
+from dog_perception.preprocess import estimate_base_height  # noqa: E402
 from dog_perception.ros_utils import scan_from_msg, stamp_of  # noqa: E402
 
 def main():
@@ -42,6 +43,9 @@ def main():
     ap.add_argument("--extrinsic-t", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     ap.add_argument("--extrinsic-rpy", type=float, nargs=3, default=[0.0, 0.0, 0.0], help="radians")
     ap.add_argument("--base-height", type=float, default=0.45)
+    ap.add_argument("--estimate-base-height", action="store_true",
+                    help="replace --base-height by the ground height seen in the first sweep "
+                         "(always done with --inspvax-topic)")
     ap.add_argument("--max-scans", type=int, default=None)
     args = ap.parse_args()
     if not args.odom_topic and not args.inspvax_topic:
@@ -106,11 +110,11 @@ def main():
     meta = dict(T_body_lidar=T_bl, base_height=args.base_height, lidar="XT32", source=str(args.bag))
     if origin is not None:
         meta.update(lat0=origin.lat, lon0=origin.lon, h0=origin.h, inspvax_pos_type=pos_types)
-        xyz = scans[0].xyz
-        r = np.hypot(xyz[:, 0], xyz[:, 1])
-        band = (r > 4.0) & (r < 30.0) & np.isfinite(xyz[:, 2])
-        if band.sum() > 1000:
-            meta["base_height"] = float(np.clip(-np.percentile(xyz[band, 2], 10), 0.4, 3.0))
+    if (args.estimate_base_height or origin is not None) and scans:
+        xyz = scans[0].xyz[np.isfinite(scans[0].xyz).all(1)]
+        h = estimate_base_height(transform_points(T_bl, xyz))
+        if h is not None:
+            meta["base_height"] = h
     odom = np.asarray(odom, np.float64).reshape(-1, 11)
     print("odom t %.3f .. %.3f  span %.1fs  pos_type %s  base_height %.2f" % (
         odom[0, 0], odom[-1, 0], odom[-1, 0] - odom[0, 0], pos_types or "-", meta["base_height"]))

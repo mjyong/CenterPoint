@@ -20,6 +20,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+from dog_perception.detection import DEFAULT_SCORE_THRESHOLDS  # noqa: E402
 from dog_perception.geometry import transform_points  # noqa: E402
 from dog_perception.io import SequenceReader  # noqa: E402
 from dog_perception.mcap_viz import McapViz  # noqa: E402
@@ -47,7 +48,8 @@ def main():
     ap.add_argument("--no-deskew", action="store_true")
     ap.add_argument("--odom-latency", type=float, default=0.0)
     ap.add_argument("--save-frames", action="store_true")
-    ap.add_argument("--mcap", default=None, help="Foxglove MCAP of the first detector: cloud, boxes, pose")
+    ap.add_argument("--mcap", default=None,
+                    help="Foxglove MCAP of the first detector: cloud, reported detections, tracks, pose")
     ap.add_argument("--device", default=None)
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
@@ -93,12 +95,12 @@ def main():
                                    predictions=out[1], timings=dict(frame.timings, **dets[n].last_timing)))
             logs[n].add(frame.stamp, out[0], frame.T_world_body, out[1])
             if n == names[0]:
-                shown = d
+                shown = (d.above(DEFAULT_SCORE_THRESHOLDS), out[0])
         if viz is not None and shown is not None:
             cur = frame.points[frame.points[:, -1] == 0]
             xyz_w = transform_points(frame.T_world_det, cur[:, :3]) if len(cur) else np.zeros((0, 3))
             viz.add(frame.stamp, xyz_w, cur[:, 3] if len(cur) else np.zeros(0),
-                    shown.transform(frame.T_world_det, "world"), frame.T_world_body)
+                    shown[0].transform(frame.T_world_det, "world"), frame.T_world_body, shown[1])
         if len(results[names[0]]) % 20 == 0:
             print("frame %d  " % len(results[names[0]]) +
                   "  ".join("%s: %d dets %.1f ms" % (n, len(results[n][-1]["detections"]),

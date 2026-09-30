@@ -52,7 +52,7 @@ def main():
     ap.add_argument("--src", required=True)
     ap.add_argument("--dst", required=True)
     args = ap.parse_args()
-    ckpt = torch.load(args.src, map_location="cpu")
+    ckpt = torch.load(args.src, map_location="cpu", weights_only=False)   # det3d checkpoints hold numpy meta
     sd = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
     sd = {k[7:] if k.startswith("module.") else k: v for k, v in sd.items()}
     new = convert_state_dict(sd)

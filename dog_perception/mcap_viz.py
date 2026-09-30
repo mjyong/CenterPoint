@@ -1,4 +1,4 @@
-"""Write a Foxglove-readable MCAP: map-frame cloud, detection cubes, ego pose."""
+"""Write a Foxglove-readable MCAP: map-frame cloud, detection cubes, tracks, ego pose."""
 import base64
 import json
 
@@ -69,11 +69,17 @@ class McapViz:
         pose = self._w.register_schema("foxglove.PoseInFrame", "jsonschema", other)
         self._cloud = self._w.register_channel("/lidar", "json", cloud)
         self._scene = self._w.register_channel("/detections", "json", scene)
+        self._tracks = self._w.register_channel("/tracks", "json", scene)
         self._pose = self._w.register_channel("/pose", "json", pose)
         self.frames = 0
 
-    def add(self, stamp, xyz, intensity, detections, T_world_body):
-        """xyz (N, 3) and boxes are already in the map / world frame."""
+    def add(self, stamp, xyz, intensity, detections, T_world_body, tracks=None):
+        """xyz (N, 3), boxes and tracks are already in the map / world frame.
+
+        ``detections`` are drawn as given: pass ``dets.above(DEFAULT_SCORE_THRESHOLDS)``,
+        not the raw detector output (which keeps scores down to 0.1 for the tracker).
+        ``tracks``: TrackState list; confirmed tracks are drawn on /tracks with id,
+        class and speed, coasting ones faded."""
         xyz = np.asarray(xyz, np.float32)
         intensity = np.asarray(intensity, np.float32).reshape(-1)
         if len(xyz) > _MAX_POINTS:
@@ -110,6 +116,26 @@ class McapViz:
             "lifetime": {"sec": 0, "nsec": 150000000},
             "frame_locked": False, "cubes": cubes,
         }]}
+        track_scene = {"deletions": [], "entities": [{
+            "timestamp": ts, "frame_id": "map", "id": "tracks",
+            "lifetime": {"sec": 0, "nsec": 150000000},
+            "frame_locked": False, "cubes": [], "texts": [],
+        }]}
+        for t in tracks or ():
+            r, g, b, _ = _COLORS.get(int(t.label), (1, 1, 1, 0.5))
+            pos = {"x": float(t.position[0]), "y": float(t.position[1]), "z": float(t.position[2])}
+            track_scene["entities"][0]["cubes"].append({
+                "pose": {"position": pos, "orientation": _yaw_quat(t.yaw)},
+                "size": {"x": float(t.size[0]), "y": float(t.size[1]), "z": float(t.size[2])},
+                "color": {"r": r, "g": g, "b": b, "a": 0.25 if t.coasting else 0.6},
+            })
+            track_scene["entities"][0]["texts"].append({
+                "pose": {"position": dict(pos, z=pos["z"] + float(t.size[2]) / 2 + 0.3),
+                         "orientation": {"x": 0, "y": 0, "z": 0, "w": 1}},
+                "billboard": True, "font_size": 14, "scale_invariant": True,
+                "color": {"r": 1, "g": 1, "b": 1, "a": 1},
+                "text": "%s %d %.1fm/s" % (t.name[:3], t.track_id, float(np.hypot(*t.velocity))),
+            })
         p = T_world_body[:3, 3]
         pose = {"timestamp": ts, "frame_id": "map", "pose": {
             "position": {"x": float(p[0]), "y": float(p[1]), "z": float(p[2])},
@@ -119,6 +145,7 @@ class McapViz:
         payload = (
             (self._cloud, cloud),
             (self._scene, scene),
+            (self._tracks, track_scene),
             (self._pose, pose),
         )
         for channel, msg in payload:

@@ -36,7 +36,7 @@ class LearnedPredictor:
     @torch.no_grad()
     def __call__(self, tracker, ego_hist=None, obstacles_xy=None):
         t0 = time.perf_counter()
-        tracks = [t for t in tracker.tracks if t.confirmed]
+        tracks = tracker.reported_tracks()
         if not tracks:
             return []
         stamp = tracks[0].stamp

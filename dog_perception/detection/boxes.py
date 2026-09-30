@@ -52,6 +52,10 @@ class Detections:
         return Detections(self.boxes[mask], self.velocities[mask], self.scores[mask],
                           self.labels[mask], self.frame, self.stamp)
 
+    def above(self, thresholds):
+        """Detections worth reporting: score >= a float or a {class_name: score} dict."""
+        return self.select(self.scores >= score_threshold_array(self.labels, thresholds))
+
     def transform(self, T_new_old, frame):
         """Move into another gravity-aligned frame (yaw-only rotation + translation)."""
         R = T_new_old[:3, :3]
@@ -71,6 +75,13 @@ class Detections:
             np.concatenate([d.boxes for d in dets]), np.concatenate([d.velocities for d in dets]),
             np.concatenate([d.scores for d in dets]), np.concatenate([d.labels for d in dets]),
             dets[0].frame, dets[0].stamp)
+
+
+def score_threshold_array(labels, thresholds):
+    """Per-detection threshold from a float or a {class_name: score} dict."""
+    if isinstance(thresholds, dict):
+        return np.array([thresholds.get(CLASSES[l], 0.0) for l in labels], dtype=np.float64)
+    return np.full(len(labels), float(thresholds))
 
 
 def det3d_to_standard(box9):

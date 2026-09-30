@@ -40,6 +40,22 @@ class LidarScan:
             self.stamp = float(np.max(self.point_times))
 
 
+def dedup_returns(scan, resolution=1e-3):
+    """Remove repeated points (same xyz on a ``resolution`` grid, first one kept)
+    and non-finite points (they would be dropped right after anyway)."""
+    fin = np.nonzero(np.isfinite(scan.xyz).all(axis=1))[0]
+    lim = (1 << 20) - 1                       # 21 bits per axis: +-1 km at 1 mm
+    q = np.clip(np.round(scan.xyz[fin] / resolution), -lim, lim).astype(np.int64) + lim
+    key = (q[:, 0] << 42) | (q[:, 1] << 21) | q[:, 2]
+    _, first = np.unique(key, return_index=True)
+    if len(first) == len(scan.xyz):
+        return scan
+    idx = np.sort(fin[first])
+    return LidarScan(xyz=scan.xyz[idx], intensity=np.asarray(scan.intensity)[idx],
+                     point_times=None if scan.point_times is None else np.asarray(scan.point_times)[idx],
+                     stamp=scan.stamp)
+
+
 @dataclass
 class PreprocessConfig:
     T_body_lidar: np.ndarray = field(default_factory=lambda: make_T(t=[0.2, 0.0, 0.15]))
@@ -47,6 +63,10 @@ class PreprocessConfig:
     max_time_span: float = 0.55
     deskew: bool = True
     time_resolution: float = 1e-4
+    # dual-return mode (Hesai "last + strongest") repeats a point whenever both
+    # returns coincide; drop exact duplicates (1 mm grid) so point density
+    # matches the single-return data the model was trained on
+    dedup_returns: bool = True
     intensity_scale: float = 1.0    # nuScenes models expect raw 0..255 intensity
     self_filter: SelfFilterConfig = field(default_factory=SelfFilterConfig)
     det_frame: DetFrameConfig = field(default_factory=DetFrameConfig)
@@ -77,6 +97,8 @@ class Preprocessor:
     def sweep_to_body(self, scan, dynamic_boxes=None):
         """Self-filter + deskew one sweep. Returns (xyz_body@stamp, intensity)."""
         cfg = self.cfg
+        if cfg.dedup_returns:
+            scan = dedup_returns(scan)
         finite = np.isfinite(scan.xyz).all(axis=1)
         keep = finite.copy()
         keep[finite] = self.self_filter(scan.xyz[finite], dynamic_boxes)

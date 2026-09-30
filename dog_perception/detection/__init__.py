@@ -1,5 +1,6 @@
 from .boxes import (CLASSES, NUSC_TO_DOG, Detections, circle_nms, class_index, classwise_circle_nms,
-                    det3d_to_standard, standard_to_det3d)
+                    det3d_to_standard, score_threshold_array, standard_to_det3d)
+from .filters import DEFAULT_SCORE_THRESHOLDS, DetectionFilterConfig, filter_detections
 from .frame_adapter import NUSC_LIDAR_HEIGHT, ModelFrame
 from .oracle import OracleDetector, OracleNoise
 

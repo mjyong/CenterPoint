@@ -19,6 +19,7 @@ from det3d.torchie import Config
 from det3d.torchie.trainer import load_checkpoint
 
 from .boxes import CLASSES, NUSC_TO_DOG, Detections, class_index, classwise_circle_nms, det3d_to_standard
+from .filters import DetectionFilterConfig, filter_detections
 from .frame_adapter import ModelFrame
 
 # center-distance NMS radii (squared meters, det3d convention), per class
@@ -69,12 +70,55 @@ def configure_for_dog(cfg, xy_range=40.8, score_threshold=0.1):
     return cfg
 
 
+def _load_state_dict(path):
+    ckpt = torch.load(path, map_location="cpu", weights_only=False)   # trusted local file
+    sd = ckpt["state_dict"] if isinstance(ckpt, dict) and "state_dict" in ckpt else ckpt
+    return {k[7:] if k.startswith("module.") else k: v for k, v in sd.items()}
+
+
+def checkpoint_arch(path):
+    """'pillar' / 'voxel' / None, from the parameter names of a det3d checkpoint."""
+    keys = _load_state_dict(path).keys()
+    if any(k.startswith("reader.pfn_layers") for k in keys):
+        return "pillar"
+    if any(k.startswith("backbone.conv_input") for k in keys):
+        return "voxel"
+    return None
+
+
+def check_checkpoint(net, path, arch=""):
+    """Refuse checkpoints that do not fit the network.
+
+    det3d's ``load_checkpoint`` only *warns* on missing / mismatched weights,
+    so e.g. pillar weights with a VoxelNet config silently leave the sparse
+    backbone random and the detector outputs a flood of garbage boxes.
+    (Element counts are compared so spconv 1.x -> 2.x transposes still pass.)
+    """
+    sd = _load_state_dict(path)
+    own = {k: v for k, v in net.state_dict().items() if "num_batches_tracked" not in k}
+    missing = [k for k in own if k not in sd]
+    bad = [k for k in own if k in sd and sd[k].numel() != own[k].numel()]
+    if missing or bad:
+        found = checkpoint_arch(path)
+        raise ValueError(
+            "checkpoint %s does not match the %s config: %d/%d weights missing, %d with wrong shape (e.g. %s). "
+            "The checkpoint looks like a %s model; pass the matching config (PRESET_CONFIGS in "
+            "dog_perception/detection/__init__.py)." % (path, arch, len(missing), len(own), len(bad),
+                                                        (missing + bad)[0], found or "unknown"))
+
+
 class CenterPointDetector:
     def __init__(self, config, checkpoint=None, device=None, frame=None, z_range=(-1.0, 3.0),
-                 xy_range=40.8, score_threshold=0.1, class_map=None, merged_nms=None, tta=False):
+                 xy_range=40.8, score_threshold=0.1, class_map=None, merged_nms=None, tta=False,
+                 filter_cfg="default"):
+        """``score_threshold`` stays low (0.1) on purpose: the tracker uses low-score
+        boxes to continue tracks. Report with ``Detections.above(DEFAULT_SCORE_THRESHOLDS)``.
+        ``filter_cfg``: DetectionFilterConfig, "default", or None to disable the
+        geometric filters (point count, ground support, cross-class duplicates)."""
         cfg = Config.fromfile(config) if isinstance(config, str) else copy.deepcopy(config)
         configure_for_dog(cfg, xy_range, score_threshold)
         self.cfg = cfg
+        self.filter_cfg = DetectionFilterConfig() if filter_cfg == "default" else filter_cfg
         self.frame = frame or ModelFrame()
         self.z_range = z_range
         self.tta = tta
@@ -90,6 +134,7 @@ class CenterPointDetector:
 
         self.net = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
         if checkpoint:
+            check_checkpoint(self.net, checkpoint, self.arch)
             load_checkpoint(self.net, checkpoint, map_location="cpu")
         self.net = self.net.to(self.device).eval()
 
@@ -152,6 +197,9 @@ class CenterPointDetector:
         t2 = time.perf_counter()
         dets = self.postprocess(out["box3d_lidar"].float().cpu().numpy(), out["scores"].float().cpu().numpy(),
                                 out["label_preds"].cpu().numpy(), stamp)
+        self.last_raw_count = len(dets)
+        if self.filter_cfg is not None:
+            dets = filter_detections(dets, points_det, self.filter_cfg)
         t3 = time.perf_counter()
         self.last_timing = {"voxelize_ms": 1e3 * (t1 - t0), "network_ms": 1e3 * (t2 - t1),
                             "post_ms": 1e3 * (t3 - t2)}

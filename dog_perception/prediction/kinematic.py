@@ -69,7 +69,7 @@ class IMMPredictor:
         return Prediction(track_id, label, stamp, r["times"], means, probs, covs, "imm")
 
     def __call__(self, tracker):
-        return [self.predict_imm(t.imm, t.id, t.label, t.stamp) for t in tracker.tracks if t.confirmed]
+        return [self.predict_imm(t.imm, t.id, t.label, t.stamp) for t in tracker.reported_tracks()]
 
 
 def constant_velocity(position, velocity, times):

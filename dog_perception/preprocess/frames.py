@@ -50,3 +50,19 @@ class GroundHeightEstimator:
         self.offset = float(np.clip(self.offset + cfg.ground_alpha * residual,
                                     -cfg.ground_max_correction, cfg.ground_max_correction))
         return self.offset
+
+
+def estimate_base_height(xyz_body, ring=(2.0, 15.0), limits=(0.1, 3.0)):
+    """Body-origin height above the ground from one (roughly level) sweep.
+
+    The ground is the densest low surface around the robot: take the points
+    close to the 5th z-percentile inside a ring and use their median. Returns
+    None when the ring holds too few points.
+    """
+    r = np.hypot(xyz_body[:, 0], xyz_body[:, 1])
+    z = xyz_body[(r > ring[0]) & (r < ring[1]) & np.isfinite(xyz_body[:, 2]), 2]
+    if len(z) < 500:
+        return None
+    z5 = np.percentile(z, 5)
+    ground = np.median(z[(z > z5 - 0.1) & (z < z5 + 0.25)])
+    return float(np.clip(-ground, *limits))
