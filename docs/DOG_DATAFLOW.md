@@ -126,6 +126,8 @@ Preprocessor.process(scan)
 
 ### 4.3 检测 `CenterPointDetector.__call__`（`detection/centerpoint.py:186`）
 
+网络内部逐层的结构、参数量、计算量和解码细节见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)。
+
 ```
 CenterPointDetector.__call__(points_det, stamp)
 ├─ _crop               检测系 z ∈ [−1, 3] m                               :149
