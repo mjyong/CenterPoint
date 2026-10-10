@@ -108,7 +108,7 @@ def check_checkpoint(net, path, arch=""):
 
 
 class CenterPointDetector:
-    def __init__(self, config, checkpoint=None, device=None, frame=None, z_range=(-1.0, 3.0),
+    def __init__(self, config, checkpoint=None, device=None, frame=None, z_range=(-1.0, 5.0),
                  xy_range=40.8, score_threshold=0.1, class_map=None, merged_nms=None, tta=False,
                  filter_cfg="default"):
         """``score_threshold`` stays low (0.1) on purpose: the tracker uses low-score
