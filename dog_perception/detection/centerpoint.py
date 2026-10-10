@@ -71,7 +71,10 @@ def configure_for_dog(cfg, xy_range=40.8, score_threshold=0.1):
 
 
 def _load_state_dict(path):
-    ckpt = torch.load(path, map_location="cpu", weights_only=False)   # trusted local file
+    try:
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)   # trusted local file
+    except TypeError:  # torch < 1.13 (older JetPack wheels) has no weights_only
+        ckpt = torch.load(path, map_location="cpu")
     sd = ckpt["state_dict"] if isinstance(ckpt, dict) and "state_dict" in ckpt else ckpt
     return {k[7:] if k.startswith("module.") else k: v for k, v in sd.items()}
 

@@ -59,7 +59,7 @@ def test_center_distance_ap():
 
 @requires_det3d
 def test_decoder_matches_det3d_predict():
-    """NumPy decoder (BPU/ONNX path) == CenterHead.predict on peaked random maps."""
+    """NumPy decoder (ONNX / TensorRT path) == CenterHead.predict on peaked random maps."""
     import torch
     from det3d.torchie import Config
     from det3d.models import build_detector
@@ -118,8 +118,15 @@ def test_pillar_export_parity_and_detector(sim_frames):
         ref_canvas = net.backbone(torch.from_numpy(ref), torch.from_numpy(np.pad(c, ((0, 0), (1, 0)))), 1,
                                   det.voxel_generator.grid_size).numpy()
         assert np.abs(canvas - ref_canvas).max() < 1e-4
-        outs = RPNHeadExport(net).eval()(torch.from_numpy(canvas))
+        export = RPNHeadExport(net).eval()
+        outs = export(torch.from_numpy(canvas))
         assert len(outs) == len(HEAD_ORDER) * len(net.bbox_head.tasks)
+        # ZeroPad2d is folded into the conv padding on a copy; the detector's own neck is untouched
+        assert not any(isinstance(m, torch.nn.ZeroPad2d) for m in export.neck.modules())
+        assert any(isinstance(m, torch.nn.ZeroPad2d) for m in net.neck.modules())
+        preds, _ = net.bbox_head(net.neck(torch.from_numpy(canvas)))
+        ref_outs = [t[k] for t in preds for k in HEAD_ORDER if k in t]
+        assert max(float((a - b).abs().max()) for a, b in zip(outs, ref_outs)) < 1e-4
 
 
 @requires_det3d

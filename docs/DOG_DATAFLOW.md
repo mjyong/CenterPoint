@@ -235,11 +235,13 @@ for t in tracker.reported_tracks():
 | 去畸变（含去重、自体滤除） | 30.0 | Python 参考实现，上板应改用 C++/CUDA |
 | 多帧拼接 | 7.5 | |
 | 体素化 | 13.1 | numba 实现 |
-| 网络 | 488.9 | **CPU 上的数字**；GPU 或 BPU 上是另一个量级，需上板实测 |
+| 网络 | 488.9 | **CPU 上的数字**；Orin 上用 TensorRT FP16 是另一个量级，需上板实测 |
 | 后处理（解码映射 + 过滤） | 17.2 | |
 | 跟踪 | 5.6 | 16 条轨迹 |
 | IMM 预测 | 16.6 | 16 条轨迹 |
 | **合计** | 578.9 | 其中网络占 85% |
+
+部署在 Orin 上时，网络会交给 TensorRT，剩下约 90 ms 的 Python 部分反而成了瓶颈，因为 ARM 核比这里的 x86 慢。迁移顺序见 [DOG_PIPELINE.md](DOG_PIPELINE.md) 第 8.3 节。
 
 ---
 
@@ -256,15 +258,17 @@ for t in tracker.reported_tracks():
 | shared_conv | `(1,64,136,136)` |
 | 各 head | 136×136，0.6 m/格；解码及之后的流程与 Pillar 相同 |
 
-**BPU / ONNX 部署**（`pillar_export.py`，`tools/dog/export_pillar_onnx.py`）：
+**Orin / TensorRT 部署**（`pillar_export.py`，`tools/dog/export_pillar_onnx.py`）：
 
 ```
-CPU  体素化 → decorate_pillars (V,20,10) → pad_pillars → (1,10,P_max=30000,20)
-NPU  pfn.onnx        (1,10,30000,20) → (1,64,30000,1)
-CPU  scatter_pillars → (1,64,408,408)
-NPU  rpn_head.onnx   (1,64,408,408) → 36 张图（6 task × [reg, height, dim, rot, vel, hm]），每张 (1,C,102,102)
-CPU  decode_centerpoint → box9 (D,9) → 与 4.3 节后半段相同
+主机/GPU   体素化 → decorate_pillars (V,20,10) → pad_pillars → (1,10,P_max=30000,20)
+TensorRT   pfn.engine       (1,10,30000,20) → (1,64,30000,1)
+主机/GPU   scatter_pillars → (1,64,408,408)
+TensorRT   rpn_head.engine  (1,64,408,408) → 36 张图（6 task × [reg, height, dim, rot, vel, hm]），每张 (1,C,102,102)
+主机/GPU   decode_centerpoint → box9 (D,9) → 与 4.3 节后半段相同
 ```
+
+"主机/GPU" 这几步目前是 numpy 参考实现，上板后要搬到 GPU。样例帧实际用了 9663 个柱（P_max 的 1/3）。
 
 **训练数据**（`export_dataset.py` → `DogDataset`）：
 

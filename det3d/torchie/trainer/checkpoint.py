@@ -205,7 +205,10 @@ def load_checkpoint(model, filename, map_location='cpu', strict=False, logger=No
     else:
         if not osp.isfile(filename):
             raise IOError("{} is not a checkpoint file".format(filename))
-        checkpoint = torch.load(filename, map_location=map_location, weights_only=False)
+        try:
+            checkpoint = torch.load(filename, map_location=map_location, weights_only=False)
+        except TypeError:  # torch < 1.13 (older JetPack wheels) has no weights_only
+            checkpoint = torch.load(filename, map_location=map_location)
     # get state_dict from checkpoint
     if isinstance(checkpoint, OrderedDict):
         state_dict = checkpoint

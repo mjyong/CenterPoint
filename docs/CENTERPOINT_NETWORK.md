@@ -72,11 +72,13 @@ return self.bbox_head.predict(example, preds, self.test_cfg)               # ret
 
 第二层的输入既有逐点特征，也有整柱的全局特征，所以能学到"这个点相对整柱处在什么位置"。这一部分参数只有 5k，计算量正比于 柱数 × 20。
 
-部署到 BPU 时（`pillar_export.PFNExport`）的改写：
+导出给 TensorRT 时（`pillar_export.PFNExport`）的改写：
 - Linear 改成 1×1 Conv2d，作用在 `(1,10,P_max,20)` 上；
 - BN1d 改成 BN2d；
 - 取 max 改成 `max_pool2d(kernel=(1,20))`；
-- 输出为 `(1,64,P_max,1)`，已验证与原网络等价。
+- 输出为 `(1,64,P_max,1)`，已验证与原网络等价（样例帧上相对误差 2e-5）。
+
+这样改是为了得到静态形状、只含稠密算子的图：柱数 V 每帧都在变，补齐到固定的 P_max 之后，TensorRT 引擎就不需要动态形状。
 
 ## 3. backbone：`PointPillarsScatter`（`readers/pillar_encoder.py:182`）
 
@@ -87,7 +89,7 @@ canvas[:, indices] = voxel_features.T
 canvas.view(B, 64, ny, nx)                   # (1, 64, 408, 408)：高度方向是 y，宽度方向是 x
 ```
 
-这一步没有参数，只做"索引写入"，把稀疏的柱子铺成一张 0.2 m/格的伪图像，空柱的位置全是 0。从这里开始就是纯 2D CNN，这也是 Pillar 路线能部署到 BPU 的原因。scatter 本身依赖数据决定写入位置，所以部署时放在 CPU 上做（`scatter_pillars`）。
+这一步没有参数，只做"索引写入"，把稀疏的柱子铺成一张 0.2 m/格的伪图像，空柱的位置全是 0。从这里开始就是纯 2D CNN，所以后面整段都能做成一个静态形状的 TensorRT 引擎。scatter 本身依赖数据决定写入位置，所以部署时放在引擎外面做（`scatter_pillars`，参考实现是 numpy，上板应换成 CUDA）。
 
 ## 4. neck：`RPN`（`necks/rpn.py`）
 
@@ -175,12 +177,14 @@ keep = circle_nms(按中心距离, 半径为本 task 的 min_radius)[:83]
 - 不同 task 之间不做 NMS，所以 car 和 truck 两组可能在同一辆车上各出一个框。我们的 `postprocess` 在映射到 3 类之后，会再做一次类内合并（`classwise_circle_nms`）。
 - 打开双翻转 TTA 时，`predict` 先把 4 份结果翻回原方向，对 hm、reg、dim、rot、vel 取平均，再解码。
 
-## 7. 与部署（BPU）的对应关系
+## 7. 与部署（Orin / TensorRT）的对应关系
 
 | 部分 | 运行位置 | 实现 |
 |---|---|---|
-| 体素化、点特征装饰、补齐到固定柱数 | CPU | `VoxelGenerator`、`decorate_pillars`、`pad_pillars` |
-| PFN | NPU | `pfn.onnx`：(1,10,30000,20) → (1,64,30000,1) |
-| Scatter | CPU | `scatter_pillars` → (1,64,408,408) |
-| RPN + shared_conv + SepHead | NPU | `rpn_head.onnx`：只有 Conv、BN、ReLU、ConvTranspose；输出 36 张图 |
-| 解码 + circle NMS | CPU | `decode.py`，与 `CenterHead.predict` 逐框一致（有单测） |
+| 体素化、点特征装饰、补齐到固定柱数 | 主机 → 上板改 GPU | `VoxelGenerator`、`decorate_pillars`、`pad_pillars` |
+| PFN | TensorRT | `pfn.onnx`：(1,10,30000,20) → (1,64,30000,1) |
+| Scatter | 主机 → 上板改 GPU | `scatter_pillars` → (1,64,408,408) |
+| RPN + shared_conv + SepHead | TensorRT | `rpn_head.onnx`：只有 Conv、BN、ReLU、ConvTranspose、Concat；输出 36 张图 |
+| 解码 + circle NMS | 主机（阈值和 top-k 可放 GPU） | `decode.py`，与 `CenterHead.predict` 逐框一致（有单测） |
+
+RPN 每个下采样块开头的 `ZeroPad2d(1) + Conv(padding=0)` 在导出时被合并成 `Conv(padding=1)`，结果完全相同，但 ONNX 里不再有运行时计算 pads 的 Pad 子图，老版本 TensorRT 解析器也能接受。完整的上板步骤见 [DOG_PIPELINE.md](DOG_PIPELINE.md) 第 8 节。

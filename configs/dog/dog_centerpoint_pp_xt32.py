@@ -3,7 +3,7 @@
 Input: 5 sweeps @10 Hz from dog_perception.preprocess, mapped to the virtual
 nuScenes lidar frame (ModelFrame), so z priors from nuScenes still hold.
 Warm start: tools/dog/convert_nusc_ckpt.py on the nuScenes pillar weights.
-Deployment: dense 2D convs only -> tools/dog/export_pillar_onnx.py (BPU / TRT).
+Deployment (Orin): dense 2D convs only -> tools/dog/export_pillar_onnx.py -> two TensorRT engines.
 """
 import itertools
 import logging

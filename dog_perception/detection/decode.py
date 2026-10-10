@@ -1,8 +1,9 @@
-"""NumPy CenterHead decoder for exported (ONNX / BPU) models.
+"""NumPy CenterHead decoder for exported (ONNX / TensorRT) models.
 
-Mirrors ``CenterHead.predict`` + circle NMS so the deployed graph can stop
-at the raw head maps and everything data-dependent (top-k, NMS) runs on the
-ARM cores, which is how BPU/TensorRT deployments are usually split.
+Mirrors ``CenterHead.predict`` + circle NMS so the engines can stop at the
+raw head maps and everything data-dependent (thresholding, top-k, NMS) runs
+outside them. This is the reference / host implementation; on Orin the same
+steps can run on the GPU.
 """
 import numpy as np
 
@@ -18,7 +19,7 @@ def decode_task(maps, pc_range_xy, voxel_size_xy, out_size_factor, score_thresho
     maps: dict of (C, H, W) arrays with keys ``HEAD_ORDER`` (``vel`` optional),
     ``hm`` given as logits. Returns (box9 (K, 9 or 7), scores (K,), labels (K,)).
     """
-    hm = 1.0 / (1.0 + np.exp(-maps["hm"]))
+    hm = 1.0 / (1.0 + np.exp(-np.clip(maps["hm"], -60.0, 60.0)))
     C, H, W = hm.shape
     hm = hm.reshape(C, -1)
     scores = hm.max(axis=0)

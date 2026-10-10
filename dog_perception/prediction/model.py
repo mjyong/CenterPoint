@@ -124,7 +124,10 @@ def save_model(model, path, feature_cfg=None):
 
 
 def load_model(path, map_location="cpu"):
-    ckpt = torch.load(path, map_location=map_location, weights_only=False)
+    try:
+        ckpt = torch.load(path, map_location=map_location, weights_only=False)
+    except TypeError:  # torch < 1.13 has no weights_only
+        ckpt = torch.load(path, map_location=map_location)
     model = TrajectoryPredictor(ModelConfig(**ckpt["model_cfg"]))
     model.load_state_dict(ckpt["state_dict"])
     return model.eval(), ckpt.get("feature_cfg")

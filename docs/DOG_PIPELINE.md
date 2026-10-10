@@ -2,7 +2,9 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（39 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（46 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+
+**部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
 ---
 
@@ -59,19 +61,21 @@
 
 ### 1.2 检测
 
-**BPU 部署切分**（`detection/pillar_export.py`、`tools/dog/export_pillar_onnx.py`）。scatter 和 top-k/NMS 都是数据相关的操作，不适合放进 NPU 图。切分方式如下：
+**Orin 部署切分**（`detection/pillar_export.py`、`tools/dog/export_pillar_onnx.py`）。scatter、top-k 和 NMS 的输出位置或数量都取决于数据，不放进 TensorRT 引擎。网络切成两个静态形状的引擎，和社区 CenterPoint-Pillar TensorRT 移植（pfe + rpn）的切法相同：
 
 ```
-CPU  体素化 + pillar 特征装饰(10维)      numpy
-NPU  PFN (Linear/BN1d 改写为 1x1 Conv/BN2d, 静态形状 1x10xP_maxxN_max)   pfn.onnx
-CPU  scatter 到 BEV                       numpy
-NPU  RPN neck + CenterHead (纯稠密 2D 卷积)                              rpn_head.onnx
-CPU  解码 + circle NMS                     detection/decode.py
+GPU/主机   体素化 + pillar 特征装饰(10维)      本仓库是 numpy 参考实现，上板放 GPU
+TensorRT   PFN (Linear/BN1d 改写为 1x1 Conv/BN2d, 静态形状 1x10xP_maxxN_max)   pfn.onnx
+GPU/主机   scatter 到 BEV                       本仓库是 numpy 参考实现，上板放 GPU
+TensorRT   RPN neck + CenterHead (纯稠密 2D 卷积)                              rpn_head.onnx
+GPU/主机   解码 + circle NMS                     detection/decode.py
 ```
 
-验证结果：ONNX（onnxruntime）与 PyTorch 在全部 head 特征图上的最大误差为 4.8e-7；NumPy 解码器与 det3d 原版 `CenterHead.predict` 的结果逐框一致（有单测覆盖）。
+导出时，RPN 里每一组 `ZeroPad2d(1) + Conv(padding=0)` 都被合并成一个 `Conv(padding=1)`，结果完全相同。不合并的话，ONNX 里会有一个 Pad 节点，它的 pads 由 Shape/Slice/Cast 子图在运行时算出，较老的 TensorRT ONNX 解析器不接受。合并后 `rpn_head.onnx` 只剩 Conv、BN、ReLU、ConvTranspose、Concat 五种算子。
 
-**NMS。** 使用中心距离的 circle NMS，替代原来依赖 CUDA 编译算子的旋转 IoU NMS。它可以直接在 ARM 上运行，CenterPoint 官方的 nuScenes 提交用的也是这种方式。
+验证结果（样例 bag 中一帧 5 帧累积的点云，22.3 万点、9663 个柱）：onnxruntime 与 PyTorch 逐段比较，相对误差为 PFN 2.0e-5、BEV 2.0e-5、head 特征图 4.5e-5。两边都经过同样的检测过滤，最终都是 8 个框，分数最大差 2.5e-6，中心最大差 1.2e-5 m。NumPy 解码器与 det3d 原版 `CenterHead.predict` 逐框一致（有单测覆盖）。TensorRT 引擎本身还没有在 Orin 上跑过，见第 8 节。
+
+**NMS。** 使用中心距离的 circle NMS，替代原来依赖 CUDA 编译算子的旋转 IoU NMS。CenterPoint 官方的 nuScenes 提交用的也是这种方式。Orin 有 CUDA，旋转 NMS 也能编译，但 circle NMS 更便宜，而且每个 task 只剩几十个框，在 CPU 上做就够了，所以保留。
 
 **范围与 z。** Pillar 只有一个 z 柱，z 范围只起裁剪作用，可以自由调整。Voxel 模型的 z 网格必须保持 [-5, 3]，也就是 41 格；否则稀疏主干输出的 BEV 通道数和预训练 neck 对不上。因此代码对点云做 z 裁剪，但网格本身不变。
 
@@ -89,7 +93,11 @@ CPU  解码 + circle NMS                     detection/decode.py
 - 增加 ±2° 的俯仰/横滚增强（`global_pitch_roll_noise`，新加到 det3d 的 `Preprocess` 中）。
 - 训练数据直接保存**预处理后的多帧点云**，与线上使用同一份预处理代码，从源头保证训练和部署一致。
 
-**Pillar 与 Voxel 的对比方法。** 把同一份预处理输出同时喂给两个模型（`run_sequence.py --detectors pillar,voxel`），然后在人工校正过的标注上，按 0–10 / 10–20 / 20–40 m 分段比较 AP、ATE、AVE 和延迟（`compare_detectors.py`）。**不要用 Voxel 教师自己生成的标签去评估 Voxel。** 建议的定位：线上用 Pillar，因为它能部署到 BPU、延迟可控；Voxel 做离线教师，并提供精度上限作为参照。
+**Pillar 与 Voxel 的对比方法。** 把同一份预处理输出同时喂给两个模型（`run_sequence.py --detectors pillar,voxel`），然后在人工校正过的标注上，按 0–10 / 10–20 / 20–40 m 分段比较 AP、ATE、AVE 和延迟（`compare_detectors.py`）。**不要用 Voxel 教师自己生成的标签去评估 Voxel。** 建议的定位（Orin 前提）：
+
+- **线上默认用 Pillar。** 两个稠密 TensorRT 引擎，工具链简单；同一块 GPU 还要跑预处理（见 8.3），可能还有其他任务。官方在 TITAN RTX 上的测速：Pillar 31 FPS，Voxel 0.1 m 16 FPS，我们用的 0.075 m 更慢。
+- **Voxel 在 Orin 上能部署，只是更贵。** 如果在自己的标注上，Voxel 在 0–20 m 的行人上明显更好，并且 Orin 上实测的端到端延迟放得下，就可以换成线上模型，路线见 8.2。
+- 不管线上用哪个，Voxel 都继续做离线教师，并提供精度上限作为参照。
 
 ### 1.3 标注
 
@@ -166,7 +174,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `dog_perception/pose_buffer.py` | IMU 频率位姿缓冲（SLERP），LIO + 陀螺积分传播 |
 | `dog_perception/preprocess/` | 去畸变、自体滤除、检测系、地面高度估计、多帧累积、`Preprocessor` |
 | `dog_perception/detection/centerpoint.py` | det3d Pillar/Voxel 统一封装，支持范围/NMS 配置和双翻转 TTA |
-| `dog_perception/detection/pillar_export.py`, `decode.py` | BPU/ONNX 切分和 NumPy 解码 |
+| `dog_perception/detection/pillar_export.py`, `decode.py` | Orin/TensorRT 两段切分和 NumPy 解码 |
 | `dog_perception/detection/evaluate.py` | 中心距离 AP（含分距离段）、ATE、AVE |
 | `dog_perception/tracking/` | IMM、贪心/匈牙利匹配、多目标跟踪器 |
 | `dog_perception/prediction/` | 第一档 IMM 外推、特征构造、自监督数据、模型、训练/评估 |
@@ -180,7 +188,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/auto_label.py`, `export_dataset.py` | 教师自动标注，导出为 DogDataset 并建 GT 库 |
 | `tools/dog/compare_detectors.py` | Pillar 与 Voxel 对比（AP、分段 AP、延迟、轨迹碎片化） |
 | `tools/dog/convert_nusc_ckpt.py` | nuScenes 10 类到 3 类的 head 权重迁移 |
-| `tools/dog/export_pillar_onnx.py` | 导出 BPU/TRT 用的两段 ONNX 并校验 |
+| `tools/dog/export_pillar_onnx.py` | 导出给 TensorRT 用的两段 ONNX，逐段校验，并打印上板建引擎的 `trtexec` 命令 |
 | `tools/dog/train_predictor.py` | 第二档训练，与 CV/IMM 对比 |
 | `tools/dog/ros2_node.py` | 在线 ROS 2 节点（MarkerArray 可视化） |
 | `tools/dog/run_sim_demo.py` | 仿真端到端演示，输出各段指标 |
@@ -213,9 +221,12 @@ python tools/dog/convert_nusc_ckpt.py --src nusc_pp.pth --dst work_dirs/dog_pp_i
 python -m torch.distributed.launch --nproc_per_node=4 tools/train.py configs/dog/dog_centerpoint_pp_xt32.py
 python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir work_dirs/dog_pp --checkpoint work_dirs/dog_centerpoint_pp_xt32/latest.pth
 
-# 4) 部署 Pillar：导出两段 ONNX 并与 PyTorch 对齐校验（之后交给 OpenExplorer / TensorRT）
+# 4) 部署 Pillar：导出两段 ONNX 并与 PyTorch 逐段校验；把 deploy/ 拷到 Orin 上建 FP16 引擎（见第 8 节）
 python tools/dog/export_pillar_onnx.py --config configs/dog/dog_centerpoint_pp_xt32.py \
     --checkpoint work_dirs/dog_centerpoint_pp_xt32/latest.pth --out deploy/ --check frame.npy
+# 在 Orin 上
+trtexec --onnx=deploy/pfn.onnx --saveEngine=deploy/pfn.engine --fp16
+trtexec --onnx=deploy/rpn_head.onnx --saveEngine=deploy/rpn_head.engine --fp16
 
 # 5) 第二档预测：用多段录制的跟踪日志训练，并与 IMM 比较
 python tools/dog/train_predictor.py --logs "work_dirs/rec_*/pillar/track_log.npz" \
@@ -301,6 +312,7 @@ python -m pytest tests/dog -q
 - `det3d/models/__init__.py`、`backbones/__init__.py`：`import importlib.util`（Python 3.11 下 `importlib.util` 不会被隐式导入）；缺少 iou3d 编译算子时，two-stage 的 roi_heads 改为可选导入。
 - `det3d/torchie/trainer/checkpoint.py`：spconv 改为可选依赖，Pillar 模型不再需要它。
 - `det3d/solver/*.py`、`torchie/parallel/collate.py`：`collections.Iterable/Sequence/Mapping` 改为 `collections.abc`，这些名字在 Python 3.10 中已被移除，而 Ubuntu 22.04 / JetPack 6 自带的就是 3.10。
+- `torch.load` 的四处调用（`det3d/torchie/trainer/checkpoint.py`、`detection/centerpoint.py`、`prediction/model.py`、`tools/dog/convert_nusc_ckpt.py`）：显式传 `weights_only=False`（新版 torch 默认值改成了 True，会拒绝加载这些权重）；遇到不认识该参数的老版本 torch（JetPack 5 上常见）时，自动退回不带该参数的调用。
 - `det3d/core/bbox/geometry.py: points_in_convex_polygon_jit`：新版 numba（nopython 默认开启）不再支持列表花式索引，改写为显式循环，已对照原公式验证。GT-sampling 的碰撞检测依赖这个函数。
 
 ## 6. 已知局限（没有在本环境中验证的部分）
@@ -308,8 +320,8 @@ python -m pytest tests/dog -q
 - **没有真实 XT32 数据和 nuScenes 预训练权重**（官方权重托管在 OneDrive，本环境无法下载）。所有检测相关的数字只验证了管线和一致性，Pillar 与 Voxel 的精度和延迟对比需要在你的机器上用步骤 1–2 实测。
 - Voxel 模型的前向需要 CUDA 版 spconv（CPU 版 spconv 不支持带 bias 的卷积），本环境只验证了模型构建和网格尺寸。
 - 本环境没有 ROS，`ros2_node.py` 没有实际运行过。bag 转换器已用合成的 ROS2 bag 测试。
-- BPU 量化（OpenExplorer / hb_mapper）没有做，流程只到 ONNX 为止。PFN 中的 max-pool 和 concat 是否被 Nash 工具链完全支持，需要在 S100P 上确认。
-- 预处理、跟踪和预测是 Python 参考实现。在 x86 4 核上实测：预处理约 21 ms（5 帧、约 22 万点），跟踪约 4 ms，IMM 预测约 15 ms（16 个目标）。上板时建议把预处理用 C++/CUDA 重写，目标在 5 ms 以内。
+- 本环境没有 Orin 和 TensorRT。导出的 ONNX 只用 onnxruntime 验证过；TensorRT 引擎的构建、FP16 精度和板上延迟都要在 Orin 上确认（第 8 节）。
+- 预处理、跟踪和预测是 Python 参考实现。在 x86 上实测，网络以外的部分合计约 90 ms（见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md) 第 5 节）。Orin 的 ARM 核会更慢，所以上板时预处理必须搬到 GPU，见 8.3。
 - 仿真中的目标没有社交交互，所以第二档在真实数据上的收益（主要来自对机器人的避让等交互）需要用实车日志重新评估。
 
 ## 7. 实车样例 bag：检测框过多的原因与修复
@@ -359,3 +371,98 @@ python -m pytest tests/dog -q
 
 这些都是针对 nuScenes 预训练权重的临时措施。根本的解决办法仍然是用自采数据微调（第 3 节步骤 3）。
 
+
+---
+
+## 8. Orin 部署
+
+部署平台定为 NVIDIA Jetson Orin，推理用 TensorRT。本节说明换平台后哪些结论变了，以及上板的做法和顺序。本环境没有 Orin，以下延迟和精度结论都要上板实测确认。
+
+### 8.1 换平台后改了哪些结论
+
+| 项 | 按 BPU 时的结论 | Orin 下的结论 |
+|---|---|---|
+| 线上检测器 | 只能用 Pillar，稀疏 3D 卷积上不了 BPU | 默认仍是 Pillar，但理由变成延迟和工具链；Voxel 也能上，见 8.2 |
+| 推理精度 | 以 INT8 为主，有掉点风险 | 先用 FP16，不需要校准；INT8 是后续优化，要用实车帧校准 |
+| 算子支持 | PFN 的 max-pool 和 concat 待确认 | 两个 ONNX 只含 TensorRT 原生支持的算子；Pad 子图在导出时已消掉（1.2 节） |
+| 编译 | 主机上用工具链编译模型 | 在 Orin 上用 `trtexec` 构建引擎。引擎绑定 GPU 型号和 TensorRT 版本，不能在 x86 上建好再拷过去 |
+| 预处理 | 跑在 CPU 上，改写成 C++ 即可 | ARM 核是瓶颈，要搬到 GPU，见 8.3 |
+| NMS | circle NMS，在 CPU 上 | 不变 |
+| 运行环境 | Python ≥3.10 | `dog_perception/` 和 `tools/dog/` 最低 Python 3.7（vermin 检查），兼容 torch <1.13，JetPack 5 和 6 都能直接跑 |
+
+### 8.2 检测器：Pillar 与 Voxel 在 Orin 上的路线
+
+- **Pillar**：`export_pillar_onnx.py` 导出两段 ONNX，在 Orin 上构建两个 FP16 引擎（8.4）。前后处理先沿用现在的 numpy 实现，再按 8.3 搬到 GPU。
+- **Voxel** 有两条路：
+  1. PyTorch + spconv 2.x（CUDA）直接跑 det3d 模型。改动最小，适合上板先测精度和延迟。spconv 要装与 JetPack 的 CUDA 版本对应的包，有的版本需要源码编译。
+  2. NVIDIA [Lidar_AI_Solution](https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution) 里的 CUDA-CenterPoint：用 libspconv 加 TensorRT 的 C++ 实现，针对的正是 nuScenes 的 CenterPoint-Voxel 0.075 m 模型。我们的网格是 1088×1088（官方 1440×1440），并且是 3 类、3 个 task，需要用它的工具重新导出并修改解码，可行性待验证。
+- **决策顺序**：先用 `compare_detectors.py` 在人工校正的标注上比精度。只有 Voxel 明显更好时，才在 Orin 上测路线 1 的延迟，再决定是否投入路线 2。
+
+### 8.3 延迟预算：瓶颈在 ARM 核
+
+雷达是 10 Hz，每帧必须在 100 ms 内处理完，还要给 LIO、运动控制等留余量。下表是 x86 上实测的网络以外各段（[DOG_DATAFLOW.md](DOG_DATAFLOW.md) 第 5 节）以及上板后的去处：
+
+| 段 | x86 实测 ms | Orin 上的去处 |
+|---|---|---|
+| 去畸变（含去重、自体滤除） | 30.0 | GPU。每个点按时间桶取位姿再做变换，完全可以并行 |
+| 多帧拼接 | 7.5 | GPU。历史帧常驻显存，每帧只对它们做一次 4×4 变换 |
+| 体素化 | 13.1 | GPU。体素化、特征装饰、scatter 都写成 CUDA kernel，可参考 Lidar_AI_Solution 里的现成实现 |
+| 后处理（解码映射 + 过滤） | 17.2 | 阈值和 top-k 放 GPU；NMS 和几何过滤在 CPU（框只有几十个），过滤里逐框数点改成用网格索引 |
+| 跟踪 | 5.6 | CPU，之后移植 C++ |
+| IMM 预测 | 16.6 | CPU，向量化或移植 C++ |
+| **合计** | **90.0** | |
+
+Orin 的 Cortex-A78AE 跑 numpy 一般比桌面 x86 慢，照搬现在的 Python 实现，网络以外的部分就会超过 100 ms。所以要先上板测出每段的实际时间，再按占比从大到小迁移。建议目标：网络以外合计 <15 ms，端到端 <50 ms。
+
+Orin 的 CPU 和 GPU 共用同一块 DRAM，一帧 5 帧累积点云约 4 MB，拷贝本身不贵；主要收益来自并行计算，而不是省掉拷贝。
+
+### 8.4 TensorRT 引擎
+
+```bash
+# x86 上导出并逐段校验（不需要 GPU）
+python tools/dog/export_pillar_onnx.py --config configs/dog/dog_centerpoint_pp_xt32.py \
+    --checkpoint work_dirs/dog_centerpoint_pp_xt32/latest.pth --out deploy/ --check frame.npy
+
+# Orin 上：最高功耗模式并锁频后再测，否则数字偏大而且不稳定
+sudo nvpmodel -q          # 查看当前模式，切到该型号的最高模式
+sudo jetson_clocks
+trtexec --onnx=deploy/pfn.onnx --saveEngine=deploy/pfn.engine --fp16
+trtexec --onnx=deploy/rpn_head.onnx --saveEngine=deploy/rpn_head.engine --fp16
+
+# 冒烟测试：TensorRT FP16 与 onnxruntime 对比（随机输入，只用来发现明显错误）
+polygraphy run deploy/rpn_head.onnx --trt --fp16 --onnxrt --atol 1e-2 --rtol 1e-2
+```
+
+- `trtexec` 输出里的 GPU Compute Time 就是引擎本身的延迟，先用它判断检测网络占多少预算。
+- **P_max = 30000**：样例帧有 9663 个柱，余量约 3 倍。PFN 的计算量正比于 P_max。统计完所有录制数据的最大柱数后，可以用 `--max-pillars` 适当调小；超出时导出脚本会报警。
+- **FP16 验收要在检测层面做**：在同一批录制帧上，比较 TensorRT 引擎和 PyTorch 的检测结果（分数差、中心差、AP），只看特征图不够。这需要一个 TensorRT 版的检测后端（8.6 第 1 阶段）。
+- **INT8**：`trtexec --int8` 在没有校准缓存时用的是假的 scale，只能用来测速度。真要用 INT8，需要拿几百帧实车数据做 PTQ 校准；hm 分支对量化敏感，必要时 head 保持 FP16（混合精度）。FP16 的延迟够用就不做。
+- **DLA**：AGX Orin 和 Orin NX 有 DLA，Orin Nano 没有。`rpn_head` 只有 Conv/BN/ReLU/ConvTranspose/Concat，理论上可以放到 DLA（`--useDLACore=0 --allowGPUFallback`），给 GPU 腾出算力。但 DLA 通常比 GPU 慢，只在 GPU 被其他任务占满时再考虑。
+
+### 8.5 软件环境
+
+| | JetPack 5.1.x | JetPack 6.x |
+|---|---|---|
+| Ubuntu / Python | 20.04 / 3.8 | 22.04 / 3.10 |
+| CUDA / TensorRT | 11.4 / 8.5 | 12.x / 8.6（6.0）或 10.x（6.1 起） |
+| ROS 2 | Foxy 已停止维护；Humble 要源码编译 | Humble 有官方二进制包 |
+
+建议用 JetPack 6。PyTorch 要用 NVIDIA 为 JetPack 发布的 aarch64 wheel，PyPI 上的 torch 在 Jetson 上没有 CUDA。numba 和 llvmlite 有 aarch64 wheel。Pillar 路线不需要 det3d 的 C++/CUDA 编译算子：circle NMS 在 det3d 里用 numba 实现，我们的解码器里是 numpy 实现。spconv 只有 Voxel 需要。
+
+为兼容 JetPack 5 的老版本 torch，本次把 `torch.load(..., weights_only=False)` 改成：老版本没有该参数时自动退回。ONNX 导出在 torch ≥2.5 上会强制使用 TorchScript 导出器，因为 dynamo 导出器生成的图不一样，也没有验证过。
+
+### 8.6 落地步骤
+
+| 阶段 | 内容 | 验收 |
+|---|---|---|
+| 0 上板跑通 | JetPack 6 + NVIDIA 的 torch wheel。现有 Python 流水线不改代码，检测器在有 CUDA 时自动用 GPU 跑 PyTorch 模型（`run_bag_mcap.py`、`ros2_node.py`） | 样例 bag 结果与 x86 一致；拿到 Orin 上各段的实测延迟 |
+| 1 TensorRT 检测 | 构建 FP16 引擎；给 `CenterPointDetector` 加 TensorRT 后端，复用现有的解码和过滤 | 录制帧上与 PyTorch 检测一致；测出网络延迟 |
+| 2 预处理上 GPU | 去畸变、拼接、体素化、特征装饰、scatter 用 CUDA 实现（可先用 torch 张量运算过渡） | 与 numpy 参考实现逐点一致（复用现有单测）；网络以外 <15 ms |
+| 3 C++ 节点 | ROS 2 C++ 节点，零拷贝接收点云，用 CUDA stream 串起各段；跟踪和预测移植 C++；定义给规划的 ObjectArray 消息 | 端到端 <50 ms，10 Hz 稳定不丢帧 |
+| 4 可选 | INT8 校准、DLA、Voxel 线上化（8.2） | 按需 |
+
+### 8.7 需要确认的信息
+
+- **Orin 型号**（AGX Orin 64/32 GB、Orin NX 16/8 GB、Orin Nano）：决定 GPU 算力、有没有 DLA，以及 Voxel 值不值得考虑。
+- **JetPack / TensorRT 版本**：TensorRT 8.x 和 10.x 的 Python 运行时接口不同，第 1 阶段的后端要按实际版本写。
+- **同一块 Orin 上还跑什么**（LIO、建图、运动控制、其他网络）：决定感知能分到多少 CPU 和 GPU。

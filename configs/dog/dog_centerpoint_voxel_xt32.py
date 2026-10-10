@@ -1,7 +1,8 @@
 """CenterPoint-Voxel (0.075 m, sparse 3D conv) fine-tuned on robot-dog XT32 data.
 
-Higher accuracy / offline teacher for auto-labelling; needs spconv, so it
-runs on a GPU (Orin / workstation), not on the BPU.
+Higher accuracy / offline teacher for auto-labelling. Needs sparse conv
+(spconv, or libspconv in NVIDIA's CUDA-CenterPoint), so on the Orin it is
+an online option only if its measured latency fits next to the rest.
 Warm start: tools/dog/convert_nusc_ckpt.py on nusc_centerpoint_voxelnet_0075voxel_fix_bn_z.
 z range must stay [-5, 3] (41 z cells -> 256-channel BEV expected by the neck).
 """
