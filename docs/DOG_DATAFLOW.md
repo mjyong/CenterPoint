@@ -125,9 +125,9 @@ Preprocessor.process(scan)
 | `build` | 5 帧 | **`points (198690,5) f32`**，列为 `[x, y, z, intensity, dt]`（检测系） | 最新帧在前；dt ∈ {0, 0.1, …, 0.4} |
 | 输出 `PreprocessedFrame` | | `points (198690,5)`、`T_world_det (4,4)`、`T_world_body (4,4)`、`stamp`、`timings` | |
 
-### 4.3 检测 `CenterPointDetector.__call__`（`detection/centerpoint.py:186`）
+### 4.3 检测 `CenterPointDetector.__call__`（`detection/centerpoint.py:189`）
 
-网络内部逐层的结构、参数量、计算量和解码细节见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)。
+网络内部逐层的结构、参数量、计算量和解码细节见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)；从 61 224 个候选到最终检测的每一步（含真实数据的例子）见 [DETECTION_POSTPROCESS.md](DETECTION_POSTPROCESS.md)。
 
 ```
 CenterPointDetector.__call__(points_det, stamp)
@@ -142,7 +142,7 @@ CenterPointDetector.__call__(points_det, stamp)
 │   │   └─ neck      RPN                    3 级下采样 + 上采样拼接          necks/rpn.py:150
 │   ├─ bbox_head.forward   shared_conv + 6 个 SepHead                      bbox_heads/center_head.py:236
 │   └─ bbox_head.predict   sigmoid、解码、中心点 circle NMS                  :294 / :451
-├─ postprocess(box9, scores, labels)                                      :208
+├─ postprocess(box9, scores, labels)                                      :211
 │   ├─ label_map：nuScenes 10 类 → 3 类（barrier、cone 映射为 −1，丢弃）
 │   ├─ det3d_to_standard   [x,y,z,w,l,h,vx,vy,r] → [x,y,z,l,w,h,yaw] + v   boxes.py:87
 │   ├─ ModelFrame.boxes_from_model   M → D                                frame_adapter.py:48
@@ -161,11 +161,13 @@ CenterPointDetector.__call__(points_det, stamp)
 | `neck` RPN | **`(1,384,102,102)`** | 3 个尺度各 128 通道拼接，输出步长 4，0.8 m/格 |
 | `shared_conv` | `(1,64,102,102)` | |
 | 6 个 SepHead，每个输出 | `reg (1,2,102,102)`、`height (1,1,…)`、`dim (1,3,…)`、`rot (1,2,…)`、`vel (1,2,…)`、`hm (1,C_t,…)` | 各 task 的 `C_t` 为 1,2,2,1,2,2（car / truck+cv / bus+trailer / barrier / moto+bike / ped+cone） |
-| `predict` | 每个 task 有 102×102=10 404 个候选，经 score>0.1、范围过滤和 circle NMS 后每 task 最多 83 个 → 合并为 `box3d_lidar (128,9) f32`、`scores (128,)`、`label_preds (128,) i64` | box9 = `[x,y,z,w,l,h,vx,vy,r]`（M 系），`r = −yaw − π/2` |
-| `postprocess` | `boxes (103,7) f64`、`velocities (103,2) f64` | 3 类，D 系，yaw 为逆时针、从 +x 起算 |
-| `filter_detections` | `(103,7)` → **`(55,7)`** | 仍保留低分框，第二阶段关联要用 |
-| 输出 `Detections` | `boxes (55,7) f64`、`velocities (55,2) f64`、`scores (55,) f64`、`labels (55,) i64`（0=vehicle，1=pedestrian，2=cyclist） | `last_raw_count = 103` |
-| `Detections.above(DEFAULT_SCORE_THRESHOLDS)` | `(15,7)` | 用于上报 / 可视化，阈值为车 0.35、人 0.3、骑行 0.4 |
+| `predict` | 每个 task 有 102×102=10 404 个候选，经 score>0.1、范围过滤和 circle NMS 后每 task 最多 83 个 → 合并为 `box3d_lidar (115,9) f32`、`scores (115,)`、`label_preds (115,) i64` | box9 = `[x,y,z,w,l,h,vx,vy,r]`（M 系），`r = −yaw − π/2` |
+| `postprocess` | `boxes (88,7) f64`、`velocities (88,2) f64` | 3 类，D 系，yaw 为逆时针、从 +x 起算 |
+| `filter_detections` | `(88,7)` → **`(59,7)`** | 仍保留低分框，第二阶段关联要用 |
+| 输出 `Detections` | `boxes (59,7) f64`、`velocities (59,2) f64`、`scores (59,) f64`、`labels (59,) i64`（0=vehicle，1=pedestrian，2=cyclist） | `last_raw_count = 88` |
+| `Detections.above(DEFAULT_SCORE_THRESHOLDS)` | `(18,7)` | 用于上报 / 可视化，阈值为车 0.35、人 0.3、骑行 0.4 |
+
+`predict` 之后的几行是当前代码在样例 bag 第 10 帧上的实测（`tools/dog/trace_postprocess.py --frame 10`）；上面几行是早先在另一帧上测的，量级相同。
 
 ### 4.4 跟踪 `MultiObjectTracker.step`（`tracking/tracker.py:212`）
 

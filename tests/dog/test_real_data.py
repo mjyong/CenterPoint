@@ -198,58 +198,8 @@ def test_sample_bag_regression(tmp_path):
 
 
 def _replay_kygi(bag, detector=None, kygi=True, max_scans=None):
-    """Stream a kygi665 bag through the pipeline. ``kygi=False`` reproduces the
-    old conventions (gyro read as rad/s, lidar axes = body axes)."""
-    from pathlib import Path
-
-    from rosbags.highlevel import AnyReader
-    from rosbags.typesys import Stores, get_typestore
-
-    from dog_perception.geometry import make_T, rot_zyx, transform_points
-    from dog_perception.inspvax import KYGI_LIDAR_RPY, EnuOrigin, gyro_from_kygi_imu, pose_from_inspvax, register_kygi
-    from dog_perception.pipeline import PerceptionPipeline
-    from dog_perception.preprocess import DetFrameConfig, PreprocessConfig
-    from dog_perception.ros_utils import scan_from_msg, stamp_of
-
-    rpy = KYGI_LIDAR_RPY if kygi else (0.0, 0.0, 0.0)
-    T_bl = make_T(rot_zyx(rpy[2], rpy[1], rpy[0]))
-    ts = register_kygi(get_typestore(Stores.ROS2_HUMBLE))
-    pipe, origin, pending, outs = None, None, [], []
-    with AnyReader([Path(bag)], default_typestore=ts) as r:
-        for c, _, raw in r.messages():
-            m = r.deserialize(raw, c.msgtype)
-            if c.msgtype.endswith("Imu"):
-                w = m.angular_velocity
-                ev = ("imu", stamp_of(m.header), gyro_from_kygi_imu(m) if kygi else (w.x, w.y, w.z))
-            elif c.msgtype.endswith("INSPVAX"):
-                if origin is None and int(m.ins_status.data) == 3:
-                    origin = EnuOrigin(m.latitude, m.longitude, m.height)
-                g = pose_from_inspvax(m, origin) if origin is not None else None
-                if g is None:
-                    continue
-                ev = ("odom",) + tuple(g)
-            else:
-                if max_scans is not None and len(outs) >= max_scans:
-                    break
-                scan = scan_from_msg(m, "timestamp", "absolute")
-                if pipe is None:
-                    h = estimate_base_height(transform_points(T_bl, scan.xyz[np.isfinite(scan.xyz).all(1)]))
-                    pipe = PerceptionPipeline(PreprocessConfig(T_body_lidar=T_bl, det_frame=DetFrameConfig(
-                        base_height=h, auto_ground=True, auto_level=kygi)), detector, predictor=None)
-                    for e in pending:
-                        (pipe.on_imu if e[0] == "imu" else pipe.on_odometry)(*e[1:])
-                if detector is None:
-                    out = pipe.pre.process(scan)
-                else:
-                    out = pipe.on_scan(scan)
-                if out is not None:
-                    outs.append(out)
-                continue
-            if pipe is None:
-                pending.append(ev)
-            else:
-                (pipe.on_imu if ev[0] == "imu" else pipe.on_odometry)(*ev[1:])
-    return outs
+    from dog_perception.bag_replay import replay_kygi
+    return replay_kygi(bag, detector=detector, kygi=kygi, max_scans=max_scans)
 
 
 def _sweep_alignment(points):

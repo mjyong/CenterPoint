@@ -177,6 +177,8 @@ keep = circle_nms(按中心距离, 半径为本 task 的 min_radius)[:83]
 - 不同 task 之间不做 NMS，所以 car 和 truck 两组可能在同一辆车上各出一个框。我们的 `postprocess` 在映射到 3 类之后，会再做一次类内合并（`classwise_circle_nms`）。
 - 打开双翻转 TTA 时，`predict` 先把 4 份结果翻回原方向，对 hm、reg、dim、rot、vel 取平均，再解码。
 
+从 61 224 个候选到最终检测的每一步，在真实数据上的数量和例子，见 [DETECTION_POSTPROCESS.md](DETECTION_POSTPROCESS.md)。
+
 ## 7. 与部署（Orin / TensorRT）的对应关系
 
 | 部分 | 运行位置 | 实现 |
