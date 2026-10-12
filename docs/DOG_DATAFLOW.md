@@ -146,7 +146,7 @@ CenterPointDetector.__call__(points_det, stamp)
 │   ├─ label_map：nuScenes 10 类 → 3 类（barrier、cone 映射为 −1，丢弃）
 │   ├─ det3d_to_standard   [x,y,z,w,l,h,vx,vy,r] → [x,y,z,l,w,h,yaw] + v   boxes.py:87
 │   ├─ ModelFrame.boxes_from_model   M → D                                frame_adapter.py:48
-│   └─ classwise_circle_nms   合并类别后的去重（例如 car 和 truck 头重复出框）  boxes.py:120
+│   └─ classwise_circle_nms   合并类别后的去重（car 和 truck 头重复出框；行人身上的第二个峰）  boxes.py:128
 └─ filter_detections   点数 / 贴地 / 跨类去重                              filters.py:77
 ```
 
@@ -162,10 +162,10 @@ CenterPointDetector.__call__(points_det, stamp)
 | `shared_conv` | `(1,64,102,102)` | |
 | 6 个 SepHead，每个输出 | `reg (1,2,102,102)`、`height (1,1,…)`、`dim (1,3,…)`、`rot (1,2,…)`、`vel (1,2,…)`、`hm (1,C_t,…)` | 各 task 的 `C_t` 为 1,2,2,1,2,2（car / truck+cv / bus+trailer / barrier / moto+bike / ped+cone） |
 | `predict` | 每个 task 有 102×102=10 404 个候选，经 score>0.1、范围过滤和 circle NMS 后每 task 最多 83 个 → 合并为 `box3d_lidar (115,9) f32`、`scores (115,)`、`label_preds (115,) i64` | box9 = `[x,y,z,w,l,h,vx,vy,r]`（M 系），`r = −yaw − π/2` |
-| `postprocess` | `boxes (88,7) f64`、`velocities (88,2) f64` | 3 类，D 系，yaw 为逆时针、从 +x 起算 |
-| `filter_detections` | `(88,7)` → **`(59,7)`** | 仍保留低分框，第二阶段关联要用 |
-| 输出 `Detections` | `boxes (59,7) f64`、`velocities (59,2) f64`、`scores (59,) f64`、`labels (59,) i64`（0=vehicle，1=pedestrian，2=cyclist） | `last_raw_count = 88` |
-| `Detections.above(DEFAULT_SCORE_THRESHOLDS)` | `(18,7)` | 用于上报 / 可视化，阈值为车 0.35、人 0.3、骑行 0.4 |
+| `postprocess` | `boxes (84,7) f64`、`velocities (84,2) f64` | 3 类，D 系，yaw 为逆时针、从 +x 起算 |
+| `filter_detections` | `(84,7)` → **`(55,7)`** | 仍保留低分框，第二阶段关联要用 |
+| 输出 `Detections` | `boxes (55,7) f64`、`velocities (55,2) f64`、`scores (55,) f64`、`labels (55,) i64`（0=vehicle，1=pedestrian，2=cyclist） | `last_raw_count = 84` |
+| `Detections.above(DEFAULT_SCORE_THRESHOLDS)` | `(17,7)` | 用于上报 / 可视化，阈值为车 0.35、人 0.3、骑行 0.4 |
 
 `predict` 之后的几行是当前代码在样例 bag 第 10 帧上的实测（`tools/dog/trace_postprocess.py --frame 10`）；上面几行是早先在另一帧上测的，量级相同。
 

@@ -23,12 +23,13 @@ python tools/dog/trace_postprocess.py --bag samples/rosbag2_2026_09_21-16_41_27 
   ▼ 合并 6 个 task，label 加偏移，得到 0–9 共 10 类        box3d_lidar (115, 9)、scores (115,)、label_preds (115,)
   │ ⑤ 10 类 → 3 类，丢掉 barrier 和 traffic_cone          96
   │ ⑥ det3d 框 → 标准框，M 系 → D 系                       96
-  │ ⑦ 合并类别后的类内 circle NMS（车 2 m，骑行者 0.9 m）   88   postprocess 的输出 (88, 7)
-  │ ⑧ 地面支撑：框底相对局部地面在 −1.2 ~ +0.7 m 之内      85
-  │ ⑨ 当前帧点数：车 ≥ 5，行人 / 骑行者 ≥ 3                 70
-  │ ⑩ 跨类去重：中心落在另一类更高分框内的，去掉           59   检测器的输出 (59, 7)
+  │ ⑦ 合并类别后的类内 circle NMS（车 2 m，骑行者 0.9 m，  84   postprocess 的输出 (84, 7)
+  │    行人 0.6 m，弱框 1.2 m）
+  │ ⑧ 地面支撑：框底相对局部地面在 −1.2 ~ +0.7 m 之内      81
+  │ ⑨ 当前帧点数：车 ≥ 5，行人 / 骑行者 ≥ 3                 66
+  │ ⑩ 跨类去重：中心落在另一类更高分框内的，去掉           55   检测器的输出 (55, 7)
   ▼
-  ⑪ 按类别阈值上报（车 0.35、行人 0.30、骑行者 0.40）：18 个上报；另外 41 个低分框只给跟踪器第二阶段用
+  ⑪ 按类别阈值上报（车 0.35、行人 0.30、骑行者 0.40）：17 个上报；另外 38 个低分框只给跟踪器第二阶段用
 ```
 
 前四步在 det3d 的 `CenterHead.predict` 里（`center_head.py:294`、`:451`），第 ⑤–⑦ 步在 `CenterPointDetector.postprocess`（`centerpoint.py:211`），第 ⑧–⑩ 步在 `filter_detections`（`filters.py`）。
@@ -142,7 +143,7 @@ NMS 后 6 个 task 共 115 个框，没有一个 task 碰到 83 的上限，整�
 
 输出 `box3d_lidar (115, 9) f32`、`scores (115,)`、`label_preds (115,) i64`。各类数量：car 24、truck 6、construction_vehicle 7、bus 5、trailer 6、barrier 6、motorcycle 21、bicycle 13、pedestrian 14、traffic_cone 13。
 
-## 7. 第五到七步：postprocess（115 → 88）
+## 7. 第五到七步：postprocess（115 → 84）
 
 `CenterPointDetector.postprocess`（`centerpoint.py:211`）。
 
@@ -165,12 +166,12 @@ NMS 后 6 个 task 共 115 个框，没有一个 task 碰到 83 的上限，整�
 
 结果是 D 系 `[16.05, 0.20, 0.395, 4.99, 2.06, 1.80, 1.591]`：车在正前方 16 m，朝向约 91°，横着停。
 
-**⑦ 合并类别后的类内 circle NMS**（`classwise_circle_nms`，`MERGED_NMS_RADIUS`）。这里的半径单位是**米**：车 2.0 m，骑行者 0.9 m，行人不做。
+**⑦ 合并类别后的类内 circle NMS**（`classwise_circle_nms`，`MERGED_NMS_RADIUS`）。这里的半径单位是**米**：车 2.0 m，骑行者 0.9 m；行人 0.6 m，另外 0.6–1.2 m 内分数不到较高框 0.6 倍的弱框也去掉。
 
 | 类别 | 之前 | 之后 |
 |---|---|---|
 | vehicle | 48 | 40 |
-| pedestrian | 14 | 14（不做） |
+| pedestrian | 14 | 10 |
 | cyclist | 34 | 34 |
 
 被去掉的 8 个车辆框，都是不同的头在同一辆车上各出了一个框：
@@ -182,15 +183,30 @@ NMS 后 6 个 task 共 115 个框，没有一个 task 碰到 83 的上限，整�
 | car 0.55 | truck 0.15 | 0.80 m | car 0.55 |
 | construction_vehicle 0.11 | bus 0.24 | 1.74 m | bus 0.24 |
 
-合并成 vehicle 以后，原来的 car / truck / bus 区分已经不重要，保留分数高的那一个即可。行人没有做这一步：在 nuScenes 片段评估中发现，它会导致同一个人身上出现两条轨迹（见 [NUSC_CLIP_EVAL.md](NUSC_CLIP_EVAL.md) 第 5 节）。
+合并成 vehicle 以后，原来的 car / truck / bus 区分已经不重要，保留分数高的那一个即可。
 
-postprocess 输出 `boxes (88, 7) f64`、`velocities (88, 2) f64`，D 系，yaw 从 +x 起逆时针为正。
+**行人**也要合并去重。det3d 在 task 5 里已经做过 0.42 m 的 NMS，但同一个人身上仍常出两个峰，相距 0.45–1.2 m。在 nuScenes mini_val 的关键帧上统计，相距 0.6 m 以内的成对行人框，182 对是同一个人，44 对是两个人。这些框留下来，第二个高分框就会在同一个人身上新建一条轨迹。只用一个更大的半径又会把并排走的两个人合成一个。规则分两档（`MERGED_NMS_RADIUS["pedestrian"] = (0.6, 1.2, 0.6)`，`circle_nms` 的 `weak_radius` / `weak_ratio`）：
+- 0.6 m 以内：总是合并，只留高分的；
+- 0.6–1.2 m：低分框不到高分框的 0.6 倍才合并。同一个人身上的第二个峰通常弱得多；并排的两个人分数差不多，都保留。
 
-## 8. 第八到十步：filter_detections（88 → 59）
+本帧去掉的 4 个行人框：
+
+| 保留 | 去掉 | 中心距离 | 分数比 | 依据 |
+|---|---|---|---|---|
+| pedestrian 0.70，(−31.0, 14.5) | 0.45，(−31.4, 14.9) | 0.55 m | 0.64 | 0.6 m 以内 |
+| pedestrian 0.31，(2.9, 18.6) | 0.26，(2.5, 18.3) | 0.47 m | 0.83 | 0.6 m 以内 |
+| 同上 | 0.18，(2.3, 18.8) | 0.60 m | 0.58 | 1.2 m 以内且分数比 ≤ 0.6 |
+| 同上 | 0.15，(3.3, 18.6) | 0.44 m | 0.48 | 0.6 m 以内 |
+
+第一行的 0.45 达到上报阈值（≥ 0.30），不合并的话会作为第二个行人上报。半径和比例是在 nuScenes mini_val 上扫出来的，与纯半径 NMS 的对比见 [NUSC_CLIP_EVAL.md](NUSC_CLIP_EVAL.md) 第 5 节。
+
+postprocess 输出 `boxes (84, 7) f64`、`velocities (84, 2) f64`，D 系，yaw 从 +x 起逆时针为正。
+
+## 8. 第八到十步：filter_detections（84 → 55）
 
 这三道过滤对所有分数一视同仁，去掉几何上不可能的框（`filters.py`）。
 
-**⑧ 地面支撑（88 → 85）**
+**⑧ 地面支撑（84 → 81）**
 
 框底（z − h/2）相对**框下方的局部地面**，必须在 −1.2 m 到 +0.7 m 之间。局部地面的求法：当前帧在每个 2 m × 2 m 格内取最低点，再取框中心周围 4 m 圆内这些格子的 10% 分位。附近没有足够的地面格子时，退回用检测系的 z = 0。
 
@@ -202,7 +218,7 @@ postprocess 输出 `boxes (88, 7) f64`、`velocities (88, 2) f64`，D 系，yaw 
 
 那辆车的情况：局部地面是 −0.48 m（那里比机器狗脚下低），框底 0.395 − 0.90 = −0.505，相对局部地面只低 2.5 cm，保留。如果还用 z = 0 作地面，它会显得沉入地下 0.5 m。本帧上报的车辆框，框底相对局部地面的中位数是 −0.21 m。
 
-**⑨ 当前帧点数（85 → 70）**
+**⑨ 当前帧点数（81 → 66）**
 
 框按 l、w、h 各放大 10% 后，统计**当前帧**（dt = 0）落在框内的点数：车要 ≥ 5，行人和骑行者要 ≥ 3。只数当前帧，是因为累积的旧帧点会让一个刚离开的物体仍显得"有点"。
 
@@ -216,27 +232,27 @@ postprocess 输出 `boxes (88, 7) f64`、`velocities (88, 2) f64`，D 系，yaw 
 
 远处的框只是点太少；而 4.4 m 处、0 个点的框是网络从周围的上下文"脑补"出来的。那辆车有 433 个点。
 
-**⑩ 跨类去重（70 → 59）**
+**⑩ 跨类去重（66 → 55）**
 
 把框按分数排序；一个框的中心如果落在另一类、分数更高的框里（边界外扩 0.2 m），就去掉它。共去掉 11 个，例如：
 - vehicle 0.21 在 (3.5, −1.5)：中心落在一个 cyclist 0.55（1.8 × 0.7 m）里，是同一个骑行者被车头又出了一个框；
 - cyclist 0.36 在 (−29.3, −9.4)：中心落在一个 12.1 × 3.2 m 的 vehicle 0.49（公交车）里，是 bicycle 头在公交车侧面误触发；
 - vehicle 0.13 和 cyclist 0.29 都落在同一个 pedestrian 0.31 里。
 
-检测器输出 `Detections`：`boxes (59, 7)`、`velocities (59, 2)`、`scores (59,)`、`labels (59,)`（0 = vehicle，1 = pedestrian，2 = cyclist）。
+检测器输出 `Detections`：`boxes (55, 7)`、`velocities (55, 2)`、`scores (55,)`、`labels (55,)`（0 = vehicle，1 = pedestrian，2 = cyclist）。
 
 ## 9. 第十一步：谁用这些框
 
 | 类别 | 检测器输出 | ≥ 上报阈值 | 上报阈值 |
 |---|---|---|---|
 | vehicle | 26 | 12 | 0.35 |
-| pedestrian | 10 | 3 | 0.30 |
+| pedestrian | 6 | 2 | 0.30 |
 | cyclist | 23 | 3 | 0.40 |
 
-- **上报 / 可视化**：只用分数达到阈值的 18 个（`Detections.above(DEFAULT_SCORE_THRESHOLDS)`）。
-- **跟踪器**（`tracker.py:212`）全部 59 个都用：
+- **上报 / 可视化**：只用分数达到阈值的 17 个（`Detections.above(DEFAULT_SCORE_THRESHOLDS)`）。
+- **跟踪器**（`tracker.py:212`）全部 55 个都用：
   - 达到阈值的高分框：参加第一阶段关联，可以新建轨迹；
-  - 0.1 到阈值之间的 41 个低分框：只参加第二阶段，只能延续已确认的轨迹，永远不新建轨迹。
+  - 0.1 到阈值之间的 38 个低分框：只参加第二阶段，只能延续已确认的轨迹，永远不新建轨迹。
 
   这样，远处或被遮挡、分数掉下来的物体，轨迹不会断。
 
@@ -248,7 +264,7 @@ postprocess 输出 `boxes (88, 7) f64`、`velocities (88, 2) f64`，D 系，yaw 
 | `post_center_limit_range` | `configure_for_dog` | 等于网格 | 设得比网格小，就只输出近处的框 |
 | `min_radius`（每 task，m²） | `CIRCLE_NMS_SQ_RADIUS` | 见第 5 节 | 太小：同一物体留多个框；太大：挨得近的两个物体被合成一个 |
 | `nms_post_max_size` | 配置 | 83 | 每 task 的上限，密集场景才会碰到 |
-| `MERGED_NMS_RADIUS` | `centerpoint.py` | 车 2.0、骑行 0.9、行人 0（m） | 行人设 0.5 m：nuScenes 上行人 MOTA +0.07，AP −0.012（[NUSC_CLIP_EVAL.md](NUSC_CLIP_EVAL.md)） |
+| `MERGED_NMS_RADIUS` | `centerpoint.py` | 车 2.0、骑行 0.9（m）；行人 (0.6, 1.2, 0.6) | 行人：第一个数调大，重复轨迹少但挨着的两人会被合并；比例调大，去重更狠，AP 降。nuScenes 上相对不合并：行人 MOTA 0.354 → 0.531，AP 0.827 → 0.790（[NUSC_CLIP_EVAL.md](NUSC_CLIP_EVAL.md)） |
 | `max_float` / `max_sink` | `DetectionFilterConfig` | 0.7 / 1.2 m | 框底相对局部地面允许的范围 |
 | `ground_cell` / `ground_ring` / `ground_percentile` | 同上 | 2 m / 4 m / 10% | 局部地面的估计方式 |
 | `min_points` | 同上 | 车 5、行人 3、骑行 3 | 调高：远处的车更容易被滤掉 |

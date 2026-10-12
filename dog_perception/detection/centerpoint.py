@@ -30,8 +30,11 @@ CIRCLE_NMS_SQ_RADIUS = {
 }
 
 # merged-class NMS after nuScenes -> dog mapping (car/truck/bus heads are
-# separate tasks and can fire on the same object)
-MERGED_NMS_RADIUS = {"vehicle": 2.0, "cyclist": 0.9, "pedestrian": 0.0}
+# separate tasks and can fire on the same object). Pedestrians: merge within
+# 0.6 m, and up to 1.2 m when the weaker box scores <= 0.6x the stronger one
+# (a weak second peak on the same person; two people next to each other both
+# score high). Chosen on nuScenes mini_val, see docs/NUSC_CLIP_EVAL.md.
+MERGED_NMS_RADIUS = {"vehicle": 2.0, "cyclist": 0.9, "pedestrian": (0.6, 1.2, 0.6)}
 
 
 def _required_divisor(model_cfg):
