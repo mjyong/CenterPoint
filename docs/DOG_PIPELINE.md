@@ -137,7 +137,7 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 
 **第一档**（`prediction/kinematic.py`）：
 - 车辆和骑行者：CV + CT 双模型 IMM。每个模态单独外推，得到"直行"和"持续转弯"两条轨迹，并附带模态概率。
-- 行人：低噪声 CV + 高噪声 CV。两条轨迹重合时按矩匹配合并，结果就是"用过程噪声膨胀表达不确定性"。
+- 行人：低噪声 CV + 高噪声 CV，分别对应"平稳行走"和"急停、变向"。两条轨迹在 3 s 内始终相距不到 0.25 m 时按矩匹配合并成一条；实际上两个滤波器的增益不同，速度估计总有差别，仿真中只有约 1/5 的帧会合并，多数时候输出两条（见 [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md) 3.2 节）。
 - 输出 3 s、步长 0.5 s 的均值和协方差。
 
 **第二档**（`prediction/model.py`、`features.py`、`dataset.py`）：
@@ -151,7 +151,7 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 
 ## 2. 模块与文件对应
 
-逐函数的调用链路和每一步的数据 shape（在样例 bag 上实测）见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md)。
+逐函数的调用链路和每一步的数据 shape（在样例 bag 上实测）见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md)；网络逐层详解见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)；跟踪、预测和 IMM 原理见 [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md)。
 
 ```
 LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐

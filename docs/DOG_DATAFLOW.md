@@ -168,6 +168,8 @@ CenterPointDetector.__call__(points_det, stamp)
 
 ### 4.4 跟踪 `MultiObjectTracker.step`（`tracking/tracker.py:212`）
 
+跟踪和预测逐函数的说明，以及 IMM、CV/CT 模型的原理，见 [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md)。
+
 ```
 dets_w = Detections.transform(T_world_det, "world")      boxes.py:59   (55,7)，速度一并旋转
 MultiObjectTracker.step(dets_w, stamp)
@@ -192,15 +194,15 @@ MultiObjectTracker.step(dets_w, stamp)
 
 ```
 for t in tracker.reported_tracks():
-    IMM.rollout(horizon=3.0, step=0.5)   → mode_means (M,6,5)、mode_covs (M,6,5,5)、mode_probs (M,)   imm.py:192
-    merge_modes(...)                     轨迹重合的模态按矩匹配合并（行人两个 CV 会合成一条）   kinematic.py:37
+    IMM.rollout(3.0, 0.5, mixed=False)  → mode_means (M,6,5)、mode_covs (M,6,5,5)、mode_probs (M,)   imm.py:192
+    merge_modes(...)                     3 s 内始终相距 <0.25 m 的模态按矩匹配合并              kinematic.py:37
     → Prediction
 ```
 
 | 字段 | shape（实测） |
 |---|---|
 | `times` | `(6,)`，取值 0.5, 1.0, …, 3.0 s |
-| `modes` | `(K,6,2)`，世界系 xy；K=1（合并后）或 2（车、骑行者的直行 / 转弯） |
+| `modes` | `(K,6,2)`，世界系 xy；K=2（车和骑行者是直行 / 转弯，行人是平稳 / 机动），两模态重合时合并为 K=1 |
 | `probs` | `(K,)` |
 | `covs` | `(K,6,2,2)` |
 
