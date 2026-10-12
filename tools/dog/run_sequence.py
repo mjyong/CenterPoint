@@ -59,7 +59,8 @@ def main():
     reader = SequenceReader(args.seq)
     base_h = args.base_height if args.base_height is not None else reader.meta.get("base_height", 0.45)
     pcfg = PreprocessConfig(T_body_lidar=reader.T_body_lidar, num_sweeps=args.num_sweeps,
-                            deskew=not args.no_deskew, det_frame=DetFrameConfig(base_height=base_h))
+                            deskew=not args.no_deskew,
+                            det_frame=DetFrameConfig(base_height=base_h, **reader.meta.get("det_frame", {})))
 
     names = args.detectors.split(",")
     dets = {n: CenterPointDetector(getattr(args, "config_" + n), getattr(args, "ckpt_" + n),

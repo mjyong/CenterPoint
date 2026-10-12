@@ -29,19 +29,29 @@ class DetectionFilterConfig:
     # boxes hallucinated from context in empty space have ~0
     min_points: dict = field(default_factory=lambda: {"vehicle": 5, "pedestrian": 3, "cyclist": 3})
     box_margin: float = 0.1          # relative enlargement of l / w / h for the point count
-    # box bottom relative to the det-frame ground (z = 0)
+    # box bottom relative to the ground under the box
     max_float: float = 0.7           # [m] above ground: boxes on vegetation / walls / awnings
     max_sink: float = 1.2            # [m] below ground
+    # ground under a box: the current sweep's lowest point per ground_cell, and
+    # a low percentile of those cells in a ring around the footprint; z = 0 of
+    # the det frame when the ring has too few cells. The det frame is only level
+    # near the robot: on the moving sample bag the ground 25-40 m away sits
+    # 0.2-0.7 m off z = 0 (slopes, non-planar lots)
+    local_ground: bool = True
+    ground_cell: float = 2.0         # [m]
+    ground_ring: float = 4.0         # [m] beyond the footprint radius
+    ground_percentile: float = 10.0  # of the cell minima (cells under objects sit higher)
+    ground_min_cells: int = 5
     cross_class_nms: bool = True
     cross_class_margin: float = 0.2  # [m] enlargement of the higher-score box
 
 
-def points_in_box_counts(xyz, boxes, margin=0.1):
+def points_in_box_counts(xyz, boxes, margin=0.1, tree=None):
     """Number of points of (N, 3) ``xyz`` inside each (M, 7) standard box."""
     counts = np.zeros(len(boxes), dtype=np.int64)
     if len(xyz) == 0 or len(boxes) == 0:
         return counts
-    tree = cKDTree(xyz[:, :2])
+    tree = tree if tree is not None else cKDTree(xyz[:, :2])
     for i, (cx, cy, cz, l, w, h, yaw) in enumerate(boxes):
         l, w, h = l * (1 + margin), w * (1 + margin), h * (1 + margin)
         idx = tree.query_ball_point([cx, cy], 0.5 * np.hypot(l, w))
@@ -53,6 +63,49 @@ def points_in_box_counts(xyz, boxes, margin=0.1):
         lx, ly = c * dx + s * dy, -s * dx + c * dy
         counts[i] = int(np.sum((np.abs(lx) <= l / 2) & (np.abs(ly) <= w / 2) & (np.abs(p[:, 2] - cz) <= h / 2)))
     return counts
+
+
+def local_ground_heights(xyz, boxes, cell=2.0, ring=4.0, percentile=10.0, min_cells=5):
+    """Ground height under each box, computed once per frame on a BEV grid:
+    the lowest point of every ``cell`` x ``cell`` column, then a low percentile
+    of those minima over a disk of radius ``ring`` around each cell. A box reads
+    the cell under its center. Cells under objects sit higher than the ground,
+    so a low percentile of the disk still lands on it (a bus covers ~40 % of
+    the disk around its center). NaN where the disk has fewer than
+    ``min_cells`` occupied cells."""
+    from scipy import ndimage
+
+    out = np.full(len(boxes), np.nan)
+    if len(xyz) == 0 or len(boxes) == 0:
+        return out
+    pad = ring + cell
+    lo, hi = boxes[:, :2].min(axis=0) - pad, boxes[:, :2].max(axis=0) + pad
+    xyz = xyz[np.all((xyz[:, :2] >= lo) & (xyz[:, :2] < hi), axis=1)]   # the cloud reaches > 100 m
+    if len(xyz) == 0:
+        return out
+    ij = np.floor((xyz[:, :2] - lo) / cell).astype(np.int64)
+    shape = tuple(np.floor((hi - lo) / cell).astype(np.int64) + 1)
+    grid = np.full(shape[0] * shape[1], np.inf)
+    np.minimum.at(grid, ij[:, 0] * shape[1] + ij[:, 1], xyz[:, 2])
+    grid = grid.reshape(shape)
+
+    r = int(np.ceil(ring / cell))
+    di, dj = np.mgrid[-r:r + 1, -r:r + 1]
+    disk = np.hypot(di, dj) * cell <= ring
+    occupied = np.isfinite(grid)
+    big = 1e6                                                   # empty cells rank last
+    ground = ndimage.percentile_filter(np.where(occupied, grid, big), percentile, footprint=disk,
+                                       mode="constant", cval=big)
+    count = ndimage.correlate(occupied.astype(np.int32), disk.astype(np.int32), mode="constant", cval=0)
+
+    bi = np.floor((boxes[:, :2] - lo) / cell).astype(np.int64)
+    inside = (bi[:, 0] >= 0) & (bi[:, 0] < shape[0]) & (bi[:, 1] >= 0) & (bi[:, 1] < shape[1])
+    k = np.nonzero(inside)[0]
+    g, n = ground[bi[k, 0], bi[k, 1]], count[bi[k, 0], bi[k, 1]]
+    # the percentile must land on an occupied cell: at least percentile % of the disk occupied
+    ok = (n >= min_cells) & (g < big / 2)
+    out[k[ok]] = g[ok]
+    return out
 
 
 def cross_class_suppress(dets, margin=0.2):
@@ -81,15 +134,21 @@ def filter_detections(dets, points_det, cfg=None):
     if len(dets) == 0:
         return dets
     keep = np.ones(len(dets), dtype=bool)
+    cur = points_det[points_det[:, -1] <= 1e-6, :3] if points_det is not None else np.zeros((0, 3))
+    tree = cKDTree(cur[:, :2]) if len(cur) else None
 
-    bottom = dets.boxes[:, 2] - dets.boxes[:, 5] / 2
+    ground = np.zeros(len(dets))
+    if cfg.local_ground and len(cur):
+        g = local_ground_heights(cur, dets.boxes, cfg.ground_cell, cfg.ground_ring, cfg.ground_percentile,
+                                 cfg.ground_min_cells)
+        ground = np.where(np.isfinite(g), g, 0.0)
+    bottom = dets.boxes[:, 2] - dets.boxes[:, 5] / 2 - ground
     keep &= (bottom <= cfg.max_float) & (bottom >= -cfg.max_sink)
 
-    if cfg.min_points and points_det is not None:
-        cur = points_det[points_det[:, -1] <= 1e-6, :3]
+    if cfg.min_points and points_det is not None:     # an empty current sweep supports nothing
         need = np.array([cfg.min_points.get(CLASSES[l], 0) for l in dets.labels])
         cand = np.nonzero(keep & (need > 0))[0]
-        counts = points_in_box_counts(cur, dets.boxes[cand], cfg.box_margin)
+        counts = points_in_box_counts(cur, dets.boxes[cand], cfg.box_margin, tree)
         keep[cand[counts < need[cand]]] = False
 
     dets = dets.select(np.nonzero(keep)[0])

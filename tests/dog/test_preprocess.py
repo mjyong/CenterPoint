@@ -150,6 +150,50 @@ def test_ground_estimator_converges():
     assert abs(est.offset - 0.12) < 0.01
 
 
+def test_auto_level_removes_ground_tilt():
+    """A 2 deg pitched / 1 deg rolled ground (yaw-only pose, tilted mounting) is levelled."""
+    cfg = DetFrameConfig(base_height=0.45, auto_ground=True, auto_level=True, ground_alpha=0.5)
+    est = GroundHeightEstimator(cfg)
+    rng = np.random.default_rng(0)
+    xy = rng.uniform(-8, 8, (4000, 2))
+    roll, pitch = np.radians(1.0), np.radians(-2.0)
+    ground_w = np.column_stack([xy, -np.tan(pitch) * xy[:, 0] + np.tan(roll) * xy[:, 1] + rng.normal(0, 0.01, 4000)])
+    clutter = np.column_stack([rng.uniform(-8, 8, (300, 2)), rng.uniform(0.0, 0.3, 300)])   # feet, curbs
+    pts_w = np.vstack([ground_w, clutter])
+    T_wb = make_T(rot_z(0.7), [3.0, -2.0, 0.45])
+    pts_w = transform_points(make_T(rot_z(0.7), [3.0, -2.0, 0.0]), pts_w)
+    for _ in range(25):
+        T_wd = det_frame_from_body(T_wb, cfg.base_height, est.offset, est.tilt)
+        est.update(transform_points(np.linalg.inv(T_wd), pts_w))
+    assert np.allclose(np.degrees(est.tilt), [1.0, -2.0], atol=0.1)
+    T_wd = det_frame_from_body(T_wb, cfg.base_height, est.offset, est.tilt)
+    g = transform_points(np.linalg.inv(T_wd), ground_w @ rot_z(0.7).T + [3.0, -2.0, 0.0])
+    assert np.abs(g[:, 2]).max() < 0.06            # flat to within the noise out to 11 m
+    assert abs(np.degrees(np.arctan2(T_wd[1, 0], T_wd[0, 0])) - np.degrees(0.7)) < 0.2   # heading kept
+
+
+def test_kygi_gyro_is_degrees_in_ins_axes():
+    from types import SimpleNamespace
+
+    from dog_perception.inspvax import gyro_from_kygi_imu
+    msg = SimpleNamespace(angular_velocity=SimpleNamespace(x=10.0, y=-20.0, z=30.0))
+    assert np.allclose(gyro_from_kygi_imu(msg), np.radians([-10.0, 20.0, 30.0]))
+
+
+def test_extrapolation_ignores_tiny_end_segment():
+    """Moving bag: an INSPVAX anchor lands 0.1 ms after an IMU sample with a
+    12 cm correction; extrapolating 6 ms on that segment alone jumped 7 m."""
+    buf = PoseBuffer()
+    for t in np.arange(0.0, 0.1001, 0.01):
+        buf.add(t, rot_z(0.5 * t), [1.0 * t, 0.0, 0.0])          # 1 m/s, 0.5 rad/s
+    buf.add(0.1001, rot_z(0.05), [0.1 - 0.12, 0.0, 0.0])         # anchor correction
+    T = buf.pose_at(0.106)
+    assert abs(T[0, 3] - (-0.02 + 0.0059 * 1.0)) < 1e-3            # from the anchor at 1 m/s, not 1200 m/s
+    assert abs(yaw_of(T[:3, :3]) - (0.05 + 0.0059 * 0.5)) < 1e-3
+    T0 = buf.pose_at(-0.01)                                        # same at the start of the buffer
+    assert abs(T0[0, 3] + 0.01) < 1e-6 and abs(yaw_of(T0[:3, :3]) + 0.005) < 1e-6
+
+
 def test_imu_propagator_ignores_stale_odometry():
     buf = PoseBuffer()
     prop = ImuPropagator(buf)

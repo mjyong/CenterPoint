@@ -15,6 +15,11 @@ read from the bag in log-time order; only the MCAP is written:
 
 The det3d config is picked from the checkpoint (pillar / voxel) unless
 ``--config`` is given; a checkpoint that does not fit the config is refused.
+
+Defaults follow the kygi665 sensor set measured on the moving sample bag
+(``dog_perception/inspvax.py``): the RTK IMU publishes deg/s in the INS axes,
+and the XT32 sits 180 deg in yaw from the INSPVAX body frame. The INS
+attitude is heading only, so the det frame is levelled on the ground.
 """
 import argparse
 import os
@@ -27,7 +32,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from dog_perception.detection import DEFAULT_SCORE_THRESHOLDS, PRESET_CONFIGS  # noqa: E402
 from dog_perception.geometry import make_T, rot_zyx, transform_points  # noqa: E402
-from dog_perception.inspvax import EnuOrigin, pose_from_inspvax, register_kygi  # noqa: E402
+from dog_perception.inspvax import (KYGI_LIDAR_RPY, EnuOrigin, gyro_from_kygi_imu, pose_from_inspvax,  # noqa: E402
+                                    register_kygi)
 from dog_perception.mcap_viz import McapViz  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
 from dog_perception.preprocess import DetFrameConfig, PreprocessConfig, estimate_base_height  # noqa: E402
@@ -45,7 +51,10 @@ def main():
                     % ", ".join(PRESET_CONFIGS))
     ap.add_argument("--extrinsic-t", type=float, nargs=3, default=[0.0, 0.0, 0.0],
                     help="lidar position in the INS/body frame [m]")
-    ap.add_argument("--extrinsic-rpy", type=float, nargs=3, default=[0.0, 0.0, 0.0], help="radians")
+    ap.add_argument("--extrinsic-rpy", type=float, nargs=3, default=list(KYGI_LIDAR_RPY),
+                    help="lidar orientation in the INSPVAX body frame, radians (default: measured, 180 deg yaw)")
+    ap.add_argument("--imu-convention", default="kygi", choices=["kygi", "ros"],
+                    help="kygi: deg/s in the INS axes (the RTK IMU); ros: rad/s already in the body frame")
     ap.add_argument("--base-height", type=float, default=None,
                     help="body origin height above ground; default: estimated from the first sweep")
     ap.add_argument("--mcap", required=True)
@@ -72,6 +81,7 @@ def main():
     origin = None
     stats = dict(scans=0, frames=0, raw=0, filtered=0, reported=0, tracks=0)
     pos_types, net_ms = {}, []
+    last_stamp, periods = None, []
 
     with AnyReader([Path(args.bag)], default_typestore=typestore) as reader:
         print("topics:")
@@ -85,8 +95,12 @@ def main():
         for conn, _, raw in reader.messages(connections=conns):
             msg = reader.deserialize(raw, conn.msgtype)
             if conn.topic == args.imu_topic:
-                w = msg.angular_velocity
-                ev = ("imu", stamp_of(msg.header), (w.x, w.y, w.z))
+                if args.imu_convention == "kygi":
+                    gyro = gyro_from_kygi_imu(msg)
+                else:
+                    w = msg.angular_velocity
+                    gyro = (w.x, w.y, w.z)
+                ev = ("imu", stamp_of(msg.header), gyro)
                 pending.append(ev) if pipe is None else pipe.on_imu(ev[1], ev[2])
                 continue
             if conn.topic == args.inspvax_topic:
@@ -109,7 +123,7 @@ def main():
                     h = estimate_base_height(transform_points(T_bl, scan.xyz[np.isfinite(scan.xyz).all(1)])) or 0.45
                 print("base_height %.2f m%s" % (h, "" if args.base_height else " (estimated from the first sweep)"))
                 cfg = PreprocessConfig(T_body_lidar=T_bl, num_sweeps=5,
-                                       det_frame=DetFrameConfig(base_height=h, auto_ground=True))
+                                       det_frame=DetFrameConfig(base_height=h, auto_ground=True, auto_level=True))
                 pipe = PerceptionPipeline(cfg, det)
                 for ev in pending:
                     (pipe.on_imu if ev[0] == "imu" else pipe.on_odometry)(*ev[1:])
@@ -118,11 +132,16 @@ def main():
             if out is None:
                 continue
             frame = out.frame
+            if last_stamp is not None and frame.stamp > last_stamp:
+                periods.append(frame.stamp - last_stamp)
+            last_stamp = frame.stamp
+            # keep boxes up until the next frame, also for logs slower than 10 Hz
+            lifetime = max(0.15, 1.5 * float(np.median(periods))) if periods else 0.15
             shown = out.detections.above(DEFAULT_SCORE_THRESHOLDS)
             cur = frame.points[frame.points[:, -1] == 0]
             xyz_w = transform_points(frame.T_world_det, cur[:, :3]) if len(cur) else np.zeros((0, 3))
             viz.add(frame.stamp, xyz_w, cur[:, 3] if len(cur) else np.zeros(0),
-                    shown.transform(frame.T_world_det, "world"), frame.T_world_body, out.tracks)
+                    shown.transform(frame.T_world_det, "world"), frame.T_world_body, out.tracks, lifetime=lifetime)
             confirmed = [t for t in out.tracks if not t.coasting]
             stats["frames"] += 1
             stats["raw"] += det.last_raw_count

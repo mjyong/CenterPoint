@@ -89,7 +89,8 @@ class Preprocessor:
         self.poses = pose_buffer
         self.self_filter = SelfFilter(cfg.self_filter, cfg.T_body_lidar)
         self.accumulator = SweepAccumulator(cfg.num_sweeps, cfg.max_time_span)
-        self.ground = GroundHeightEstimator(cfg.det_frame) if cfg.det_frame.auto_ground else None
+        dfc = cfg.det_frame
+        self.ground = GroundHeightEstimator(dfc) if (dfc.auto_ground or dfc.auto_level) else None
 
     def reset(self):
         self.accumulator.reset()
@@ -125,7 +126,8 @@ class Preprocessor:
         self.accumulator.push(scan.stamp, transform_points(T_wb, xyz_b), inten[:, None])
 
         offset = self.ground.offset if self.ground is not None else 0.0
-        T_wd = det_frame_from_body(T_wb, self.cfg.det_frame.base_height, offset)
+        tilt = self.ground.tilt if self.ground is not None else (0.0, 0.0)
+        T_wd = det_frame_from_body(T_wb, self.cfg.det_frame.base_height, offset, tilt)
         points = self.accumulator.build(T_wd, scan.stamp)
         if self.ground is not None:
             # estimate from the newest sweep only (dt == 0)

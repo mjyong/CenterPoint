@@ -25,9 +25,10 @@ class PoseBuffer:
     extrapolated up to ``max_extrapolation`` seconds.
     """
 
-    def __init__(self, max_age=3.0, max_extrapolation=0.05):
+    def __init__(self, max_age=3.0, max_extrapolation=0.05, extrapolation_window=0.02):
         self.max_age = max_age
         self.max_extrapolation = max_extrapolation
+        self.extrapolation_window = extrapolation_window
         self._t, self._R, self._p = [], [], []
         self._cache = None
 
@@ -102,7 +103,34 @@ class PoseBuffer:
         frac = (times - t[idx]) / (t[idx + 1] - t[idx])
         R_out = np.einsum("nij,njk->nik", R[idx], so3_exp(frac[:, None] * seg[idx]))
         p_out = p[idx] + frac[:, None] * (p[idx + 1] - p[idx])
+        # Outside the span, extrapolate with the motion over at least
+        # ``extrapolation_window``: the end segment alone can be 0.1 ms long (an
+        # odometry anchor right after an IMU sample), and its few cm of anchor
+        # correction would extrapolate at hundreds of m/s.
+        for side, m in ((1, times > t[-1]), (-1, times < t[0])):
+            if m.any():
+                R_out[m], p_out[m] = self._extrapolate(t, R, p, times[m], side)
         return R_out, p_out
+
+    def _extrapolate(self, t, R, p, times, side, min_segment=1e-3):
+        """Extrapolate from the end sample ``e``. The rate is measured over
+        [j, k] with k = e, or the sample before it when the end segment is
+        shorter than ``min_segment`` (two sources stamped at nearly the same
+        time: the step between them is a correction, not motion)."""
+        w, n = self.extrapolation_window, len(t)
+        e = n - 1 if side > 0 else 0
+        k = e
+        if n > 2 and abs(t[e] - t[e - side]) < min_segment:
+            k = e - side
+        if side > 0:
+            j = max(min(int(np.searchsorted(t, t[k] - w, side="right")) - 1, k - 1), 0)
+        else:
+            j = min(max(int(np.searchsorted(t, t[k] + w, side="left")), k + 1), n - 1)
+        span = t[k] - t[j]
+        v = (p[k] - p[j]) / span
+        omega = so3_log(R[j].T @ R[k]) / span        # body-frame rate
+        dt = times - t[e]
+        return np.einsum("ij,njk->nik", R[e], so3_exp(dt[:, None] * omega[None, :])), p[e] + dt[:, None] * v
 
     def pose_at(self, t):
         R, p = self.interpolate([t])

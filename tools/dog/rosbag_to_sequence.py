@@ -9,6 +9,9 @@ Needs only ``pip install rosbags`` (no ROS installation).
 Frames: "body" is the frame the LIO odometry reports (usually the IMU frame,
 e.g. FAST-LIO), so ``--extrinsic-*`` is lidar-in-body (FAST-LIO's
 extrinsic_T / extrinsic_R) and the IMU gyro must be expressed in it too.
+With ``--inspvax-topic`` (kygi665 RTK unit) the IMU is read as deg/s in the
+INS axes, the lidar extrinsic defaults to the measured 180 deg yaw and the
+sequence is marked for ground levelling (see ``dog_perception/inspvax.py``).
 Per-point time: Hesai ROS driver 2.0 publishes an absolute float64
 ``timestamp`` field (``--time-mode absolute``); drivers that publish offsets
 from the header stamp use ``relative`` (seconds) or ``relative_ns``.
@@ -41,7 +44,8 @@ def main():
     ap.add_argument("--odom-twist", default="none", choices=["none", "body", "world"],
                     help="how to read Odometry.twist (FAST-LIO leaves it empty -> none)")
     ap.add_argument("--extrinsic-t", type=float, nargs=3, default=[0.0, 0.0, 0.0])
-    ap.add_argument("--extrinsic-rpy", type=float, nargs=3, default=[0.0, 0.0, 0.0], help="radians")
+    ap.add_argument("--extrinsic-rpy", type=float, nargs=3, default=None,
+                    help="radians; default 0 0 0, or the measured kygi value with --inspvax-topic")
     ap.add_argument("--base-height", type=float, default=0.45)
     ap.add_argument("--estimate-base-height", action="store_true",
                     help="replace --base-height by the ground height seen in the first sweep "
@@ -50,11 +54,15 @@ def main():
     args = ap.parse_args()
     if not args.odom_topic and not args.inspvax_topic:
         ap.error("need --odom-topic or --inspvax-topic")
+    kygi = bool(args.inspvax_topic)
 
     from rosbags.highlevel import AnyReader
     from rosbags.typesys import Stores, get_typestore
 
-    from dog_perception.inspvax import EnuOrigin, pose_from_inspvax, register_kygi  # noqa: E402
+    from dog_perception.inspvax import KYGI_LIDAR_RPY, EnuOrigin, gyro_from_kygi_imu, pose_from_inspvax, register_kygi
+
+    if args.extrinsic_rpy is None:
+        args.extrinsic_rpy = list(KYGI_LIDAR_RPY) if kygi else [0.0, 0.0, 0.0]
 
     typestore = get_typestore(Stores.ROS2_HUMBLE)
     if args.inspvax_topic:
@@ -81,7 +89,8 @@ def main():
                 scans.append(scan_from_msg(msg, args.time_field, args.time_mode))
             elif conn.topic == args.imu_topic:
                 w = msg.angular_velocity
-                imu.append((stamp_of(msg.header), w.x, w.y, w.z))
+                g = gyro_from_kygi_imu(msg) if kygi else (w.x, w.y, w.z)
+                imu.append((stamp_of(msg.header), g[0], g[1], g[2]))
             elif args.inspvax_topic and conn.topic == args.inspvax_topic:
                 if origin is None and int(msg.ins_status.data) == 3:
                     origin = EnuOrigin(msg.latitude, msg.longitude, msg.height)
@@ -110,6 +119,8 @@ def main():
     meta = dict(T_body_lidar=T_bl, base_height=args.base_height, lidar="XT32", source=str(args.bag))
     if origin is not None:
         meta.update(lat0=origin.lat, lon0=origin.lon, h0=origin.h, inspvax_pos_type=pos_types)
+    if kygi:
+        meta["det_frame"] = dict(auto_ground=True, auto_level=True)    # INS attitude is heading only
     if (args.estimate_base_height or origin is not None) and scans:
         xyz = scans[0].xyz[np.isfinite(scans[0].xyz).all(1)]
         h = estimate_base_height(transform_points(T_bl, xyz))

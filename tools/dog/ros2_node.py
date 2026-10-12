@@ -46,6 +46,7 @@ class DogPerceptionNode(Node):
         p("predictor_model", "")
         p("lidar_topic", "/lidar_points")
         p("imu_topic", "/imu/data")
+        p("imu_convention", "ros")        # ros: rad/s in the body frame | kygi: the RTK IMU (deg/s, INS axes)
         p("odom_topic", "/Odometry")
         p("odom_twist", "none")           # none | body | world
         p("time_field", "timestamp")
@@ -74,6 +75,7 @@ class DogPerceptionNode(Node):
         self.odom_twist = g("odom_twist")
         self.time_field, self.time_mode = g("time_field"), g("time_mode")
         self.publish_cloud = bool(g("publish_cloud"))
+        self.kygi_imu = g("imu_convention") == "kygi"
 
         best_effort = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
         self.create_subscription(Imu, g("imu_topic"), self.on_imu, 400)
@@ -89,8 +91,13 @@ class DogPerceptionNode(Node):
         return stamp.sec + stamp.nanosec * 1e-9
 
     def on_imu(self, msg):
-        w = msg.angular_velocity
-        self.pipe.on_imu(self._t(msg.header.stamp), (w.x, w.y, w.z))
+        if self.kygi_imu:
+            from dog_perception.inspvax import gyro_from_kygi_imu
+            gyro = gyro_from_kygi_imu(msg)
+        else:
+            w = msg.angular_velocity
+            gyro = (w.x, w.y, w.z)
+        self.pipe.on_imu(self._t(msg.header.stamp), gyro)
 
     def on_odom(self, msg):
         p, q = msg.pose.pose.position, msg.pose.pose.orientation

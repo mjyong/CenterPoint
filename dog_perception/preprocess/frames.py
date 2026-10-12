@@ -12,33 +12,45 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..geometry import make_T, rot_z, yaw_of
+from ..geometry import make_T, rot_z, rot_zyx, yaw_of
 
 
 @dataclass
 class DetFrameConfig:
     base_height: float = 0.45          # body origin height above ground when standing [m]
     auto_ground: bool = False          # refine the ground offset from the point cloud
+    # also level D on the ground (slow roll / pitch). For pose sources without a
+    # usable attitude, e.g. INSPVAX where only the heading is trusted: the body
+    # tilt and the lidar mounting tilt then stay in the cloud (1-2 deg on the
+    # sample bags, 0.3-0.6 m of ground height error at 20 m)
+    auto_level: bool = False
     ground_ring: tuple = (1.5, 8.0)    # radial band used to sample the ground [m]
     ground_band: float = 0.35          # |z| window around the expected ground [m]
     ground_min_points: int = 200
     ground_alpha: float = 0.2          # EMA gain
     ground_max_correction: float = 0.3
+    ground_max_tilt: float = np.radians(5.0)
 
 
-def det_frame_from_body(T_world_body, base_height, ground_offset=0.0):
-    """T_world_det from the body pose."""
+def det_frame_from_body(T_world_body, base_height, ground_offset=0.0, tilt=(0.0, 0.0)):
+    """T_world_det from the body pose. ``tilt`` = (roll, pitch) of the ground in
+    the unlevelled D, removed by turning D's axes onto the ground."""
     R = T_world_body[:3, :3]
     origin = T_world_body[:3, 3] - np.array([0.0, 0.0, base_height - ground_offset])
-    return make_T(rot_z(yaw_of(R)), origin)
+    R_d = rot_z(yaw_of(R))
+    if tilt[0] or tilt[1]:
+        R_d = R_d @ rot_zyx(0.0, tilt[1], tilt[0])
+    return make_T(R_d, origin)
 
 
 class GroundHeightEstimator:
-    """Tracks the residual ground height in D (crouching, slopes, stairs)."""
+    """Tracks the residual ground height in D (crouching, slopes, stairs) and,
+    with ``auto_level``, the residual ground roll / pitch."""
 
     def __init__(self, cfg):
         self.cfg = cfg
         self.offset = 0.0
+        self.tilt = np.zeros(2)     # (roll, pitch) [rad]
 
     def update(self, xyz_det):
         cfg = self.cfg
@@ -46,10 +58,33 @@ class GroundHeightEstimator:
         m = (r > cfg.ground_ring[0]) & (r < cfg.ground_ring[1]) & (np.abs(xyz_det[:, 2]) < cfg.ground_band)
         if m.sum() < cfg.ground_min_points:
             return self.offset
-        residual = float(np.median(xyz_det[m, 2]))
-        self.offset = float(np.clip(self.offset + cfg.ground_alpha * residual,
-                                    -cfg.ground_max_correction, cfg.ground_max_correction))
+        if cfg.auto_ground:
+            residual = float(np.median(xyz_det[m, 2]))
+            self.offset = float(np.clip(self.offset + cfg.ground_alpha * residual,
+                                        -cfg.ground_max_correction, cfg.ground_max_correction))
+        if cfg.auto_level:
+            slope = fit_ground_slope(xyz_det[m])
+            if slope is not None:
+                # plane z = a x + b y + c  ->  roll = atan(b), pitch = -atan(a)
+                res = np.array([np.arctan(slope[1]), -np.arctan(slope[0])])
+                self.tilt = np.clip(self.tilt + cfg.ground_alpha * res, -cfg.ground_max_tilt, cfg.ground_max_tilt)
         return self.offset
+
+
+def fit_ground_slope(xyz, trim=0.08, min_points=100):
+    """Trimmed least-squares plane z = a x + b y + c. Returns (a, b) or None.
+
+    The second pass drops points more than ``trim`` off the first plane (object
+    feet, curbs, low vegetation that fall inside the ground band)."""
+    A = np.column_stack([xyz[:, 0], xyz[:, 1], np.ones(len(xyz))])
+    z = xyz[:, 2]
+    keep = np.ones(len(z), dtype=bool)
+    for _ in range(2):
+        if keep.sum() < min_points:
+            return None
+        coef = np.linalg.lstsq(A[keep], z[keep], rcond=None)[0]
+        keep = np.abs(z - A @ coef) < trim
+    return coef[:2]
 
 
 def estimate_base_height(xyz_body, ring=(2.0, 15.0), limits=(0.1, 3.0)):

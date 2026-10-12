@@ -42,7 +42,8 @@ def teacher_frames(args):
 
     reader = SequenceReader(args.seq)
     pcfg = PreprocessConfig(T_body_lidar=reader.T_body_lidar,
-                            det_frame=DetFrameConfig(base_height=reader.meta.get("base_height", 0.45)))
+                            det_frame=DetFrameConfig(base_height=reader.meta.get("base_height", 0.45),
+                                                     **reader.meta.get("det_frame", {})))
     det = CenterPointDetector(args.config_voxel, args.ckpt_voxel, device=args.device, tta=args.tta,
                               score_threshold=0.1)
     pipe = PerceptionPipeline(pcfg, det)

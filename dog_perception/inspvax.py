@@ -4,7 +4,25 @@ Matches the onboard parser in ``kygi665_msgs/parse_inspvx``: a solution is
 usable when ``ins_status`` is INS_SOLUTION_GOOD (3), position is
 latitude/longitude/height converted to ENU about the first fix, and heading
 is ``yaw = (-azimuth + 180) deg`` about +z. Velocity is east/north/up, which
-is already the ENU world frame.
+is already the ENU world frame. Roll / pitch are not used: on the moving
+sample bag the INS pitch swings by 10 deg while braking although the gyro
+and the ground plane show the body tilting by less than 2 deg; the residual
+tilt is levelled from the ground instead (``DetFrameConfig.auto_level``).
+
+Sensor axes and units, measured on the moving sample bag (robot driving
+straight at 1.5-2.5 m/s, see docs/DOG_PIPELINE.md section 9):
+
+* the RTK IMU (``/rte/rdap/rtk/imus/data_raw``) publishes angular velocity
+  in deg/s and acceleration in g, not the sensor_msgs units (gyro z
+  integrates to the azimuth change at scale 1.06 when read as deg/s; |acc| is
+  1.0 at rest). Its axes are the INS axes: x right, y along the azimuth, z up;
+* the body frame above (yaw = 180 deg - azimuth) is the INS frame turned by
+  180 deg about z, so body-frame rates are ``(-x, -y, z)``;
+* the XT32 axes match the INS axes as well: scan matching puts the motion on
+  lidar -y while the INS puts it on body +y, so ``T_body_lidar`` has a
+  180 deg yaw (``KYGI_LIDAR_RPY``). A static recording cannot show this; a
+  wrong yaw there only rotates the map, while the robot moves it shifts the
+  older sweeps the wrong way and static objects get the robot's speed.
 """
 from pathlib import Path
 
@@ -14,6 +32,9 @@ from .geometry import rot_z
 from .ros_utils import stamp_of
 
 INS_SOLUTION_GOOD = 3
+KYGI_GYRO_SCALE = np.pi / 180.0          # deg/s -> rad/s
+R_BODY_KYGI_IMU = rot_z(np.pi)           # IMU / INS axes in the body frame
+KYGI_LIDAR_RPY = (0.0, 0.0, np.pi)       # XT32 orientation in the body frame (roll, pitch, yaw) [rad]
 _A = 6378137.0
 _E2 = 6.69437999014e-3
 
@@ -57,6 +78,12 @@ class EnuOrigin:
 
     def enu(self, lat, lon, h):
         return self.R @ (_lla_to_ecef(lat, lon, h) - self.ecef)
+
+
+def gyro_from_kygi_imu(msg):
+    """sensor_msgs/Imu from the kygi665 RTK unit -> body-frame angular velocity [rad/s]."""
+    w = msg.angular_velocity
+    return R_BODY_KYGI_IMU @ (np.array([w.x, w.y, w.z], dtype=np.float64) * KYGI_GYRO_SCALE)
 
 
 def pose_from_inspvax(msg, origin):
