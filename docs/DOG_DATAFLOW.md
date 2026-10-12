@@ -46,9 +46,9 @@
 | 名称 | 定义 | 由谁给出 | 用在 |
 |---|---|---|---|
 | L 雷达系 | 驱动输出的点云坐标 | PointCloud2 | 原始点、自体滤除 |
-| B 机体系 | LIO / INS 位姿所描述的刚体 | `T_body_lidar` 外参（4×4） | 去畸变的参考系 |
+| B 机体系 | LIO / INS 位姿所描述的刚体。INSPVAX 时 `yaw = 180° − azimuth`，实测 +y 为行进方向 | `T_body_lidar` 外参（4×4）；kygi 实测为 180° yaw | 去畸变的参考系 |
 | W 世界系 | LIO 世界系，或 INSPVAX 的局部 ENU（以第一帧良好解为原点） | `PoseBuffer` 中的 `T_world_body` | 多帧缓存、跟踪、预测 |
-| D 检测系 | 重力对齐，航向跟随机身，原点在机身正下方的地面 | `det_frame_from_body(T_world_body, base_height)` | 拼好的点云、检测输出、给规划 |
+| D 检测系 | 重力对齐，航向跟随机身，原点在机身正下方的地面；`auto_level` 时再按近处地面找平 | `det_frame_from_body(T_world_body, base_height, offset, tilt)` | 拼好的点云、检测输出、给规划 |
 | M 网络系 | 虚拟 nuScenes 雷达：`x_M = Rz(90°)·x_D + [0,0,−1.84]` | `ModelFrame` | 只在网络输入输出处出现 |
 
 ---
@@ -67,6 +67,7 @@
 
 ```
 Imu.angular_velocity          ─► ImuPropagator.on_imu(t, gyro(3,))             pose_buffer.py:156
+  （kygi RTK IMU 先经 gyro_from_kygi_imu：deg/s → rad/s，INS 轴 → body 轴）     inspvax.py
                                    └─ _propagate: R ← R·Exp((ω−b)·dt),  p ← p0 + v0·(t−t0)   :166
                                       └─ PoseBuffer.add(t, R(3,3), p(3,))
 Odometry / INSPVAX            ─► ImuPropagator.on_odometry(t, R(3,3), p(3,), v(3,)|None)   :132
@@ -79,7 +80,7 @@ Odometry / INSPVAX            ─► ImuPropagator.on_odometry(t, R(3,3), p(3,),
 |---|---|---|
 | INSPVAX 转换结果 `pose_from_inspvax` → `(t, R, p, v)` | `float`, `(3,3) f64`, `(3,) f64`, `(3,) f64` | 只有 `ins_status==3` 的消息才用，否则返回 None |
 | `PoseBuffer` 内部数组 | `t (S,) f64`, `R (S,3,3) f64`, `p (S,3) f64` | 实测 S=74，最多保留 3 s（`max_age`） |
-| `PoseBuffer.interpolate(times)` | 输入 `(Q,)`，输出 `R (Q,3,3)`、`p (Q,3)` | SLERP 插值，允许外推 0.05 s |
+| `PoseBuffer.interpolate(times)` | 输入 `(Q,)`，输出 `R (Q,3,3)`、`p (Q,3)` | SLERP 插值；超出范围最多外推 0.05 s，外推速度取最近 20 ms 的运动（跳过短于 1 ms 的末段，见 DOG_PIPELINE 9.1 #3） |
 
 ---
 

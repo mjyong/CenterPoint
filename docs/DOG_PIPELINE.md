@@ -172,6 +172,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | 路径 | 内容 |
 |---|---|
 | `dog_perception/pose_buffer.py` | IMU 频率位姿缓冲（SLERP），LIO + 陀螺积分传播 |
+| `dog_perception/inspvax.py` | INSPVAX → ENU 位姿；kygi RTK IMU 的单位和轴（deg/s、INS 轴）、雷达外参的实测值 |
 | `dog_perception/preprocess/` | 去畸变、自体滤除、检测系、地面高度估计、多帧累积、`Preprocessor` |
 | `dog_perception/detection/centerpoint.py` | det3d Pillar/Voxel 统一封装，支持范围/NMS 配置和双翻转 TTA |
 | `dog_perception/detection/pillar_export.py`, `decode.py` | Orin/TensorRT 两段切分和 NumPy 解码 |
@@ -358,8 +359,8 @@ python -m pytest tests/dog -q
 
 ### 7.3 这次代码更新的评审意见（`7560387`、`da7e428`）
 
-- **INSPVAX 的姿态约定**：`yaw = 180° − azimuth`，并丢弃 roll/pitch（与车上的解析器一致）。按 ENU 标准，车头朝向应为 `90° − azimuth`，所以这个 "body" 系的 x 轴与前进方向相差 90°。雷达外参在代码里默认为单位阵，只有当点云坐标系恰好和这个约定一致时才对。样例 bag 中机器人静止，**无法验证这一点**。机器人一旦运动，这个约定错了会让多帧拼接出现拖影和重影。请先拿一段直线行驶加转弯的数据核对；如需要，我可以写一个扫描外参 yaw、使多帧对齐最好的检查工具。
-- **丢弃 roll/pitch 的影响**：INS 给出 roll 1.1°、pitch 0.7°。在检测系里拟合出的地面仍有约 0.6° 倾斜，30 m 处约 ±0.25 m。目前影响不大；以后如果远处框的高度出问题，再考虑用 INS 的 roll/pitch 或地面平面拟合做找平。
+- **INSPVAX 的姿态约定**：`yaw = 180° − azimuth`，并丢弃 roll/pitch（与车上的解析器一致）。按 ENU 标准，车头朝向应为 `90° − azimuth`，所以这个 "body" 系的 x 轴与前进方向相差 90°。雷达外参在代码里默认为单位阵，只有当点云坐标系恰好和这个约定一致时才对。样例 bag 中机器人静止，**无法验证这一点**。机器人一旦运动，这个约定错了会让多帧拼接出现拖影和重影。**已用运动 bag 验证（第 9 节）：雷达与这个 body 系差 180° yaw，默认外参已改。**
+- **丢弃 roll/pitch 的影响**：INS 给出 roll 1.1°、pitch 0.7°。在检测系里拟合出的地面仍有约 0.6° 倾斜，30 m 处约 ±0.25 m。当时判断影响不大；运动 bag 上倾斜达 1.7°，已加地面找平（第 9 节）。
 - **大文件进 git**：`.db3` 有 97 MB，已接近 GitHub 单文件 100 MB 的上限；`nusc_pp.pth` 有 72 MB。建议改用 Git LFS。另外 nuScenes 权重的许可是非商业用途。
 - `checkpoint.py` 中加上 `weights_only=False` 是必要的（torch ≥2.6 的默认值会拒绝加载旧 checkpoint）。本次提交也同步修改了 `convert_nusc_ckpt.py` 和预测模型加载处的同样问题。
 
@@ -466,3 +467,57 @@ polygraphy run deploy/rpn_head.onnx --trt --fp16 --onnxrt --atol 1e-2 --rtol 1e-
 - **Orin 型号**（AGX Orin 64/32 GB、Orin NX 16/8 GB、Orin Nano）：决定 GPU 算力、有没有 DLA，以及 Voxel 值不值得考虑。
 - **JetPack / TensorRT 版本**：TensorRT 8.x 和 10.x 的 Python 运行时接口不同，第 1 阶段的后端要按实际版本写。
 - **同一块 Orin 上还跑什么**（LIO、建图、运动控制、其他网络）：决定感知能分到多少 CPU 和 GPU。
+
+---
+
+## 9. 运动样例 bag 校验
+
+样例是 `samples/rosbag2_2026_09_21-16_41_27_moving`：3.1 s，27 帧点云，IMU 和 INSPVAX 都是 100 Hz。机器人以 1.4–2.5 m/s 直行，最后 0.6 s 减速到 0.15 m/s，航向只变了约 2.5°。第 7.3 节提醒过，静止 bag 验证不了位姿约定和雷达外参；这段数据把它们都暴露出来了。
+
+![moving before/after](dog_moving_before_after.png)
+
+图中只画地面以上的点，蓝色是最新一帧，橙色是 0.4 s 前的那一帧（多帧拼接里最老的一帧）。修复前，同一个物体错开 1 m 以上，整片点云还相对行进方向转了 180°；修复后两帧基本重合。
+
+### 9.1 发现的问题
+
+| # | 问题 | 怎么发现的 | 影响 | 修复 |
+|---|---|---|---|---|
+| 1 | RTK IMU（`/rte/rdap/rtk/imus/data_raw`）的角速度单位是 **deg/s**，加速度单位是 g；代码按 sensor_msgs 的约定当成 rad/s | 按 deg/s 理解，陀螺 z 与 INS 航向变化率的相关系数为 0.99，比例 1.06；按 rad/s 理解，3 s 内积出 136°，而 INS 只转了 2.5° | INS 每 10 ms 重置一次位姿，锚点之间靠陀螺积分。行驶中 z 轴角速度最大 25°/s，被当成 25 rad/s，10 ms 内就差 14° | `inspvax.gyro_from_kygi_imu`：换算成 rad/s，并把 IMU 轴（与 INS 轴一致：x 右、y 沿 azimuth、z 上）转到 body 系 |
+| 2 | 雷达坐标系与 INSPVAX 的 body 系（`yaw = 180° − azimuth`）差 **180° yaw**，而外参默认是单位阵 | 去掉地面后做多初值 ICP：雷达系里机器人每 0.4 s 沿 −y 移动 0.60–0.67 m；INS 在 body 系里给出的是沿 +y 移动 0.63–0.67 m | 拼接时旧帧被往反方向挪，0.4 s 前那帧错开约 2 × 0.6 m；检测速度头和跟踪器都把静止物体当成以接近机器人的速度运动 | `KYGI_LIDAR_RPY = (0, 0, π)`，作为 `run_bag_mcap.py` 和 `rosbag_to_sequence.py --inspvax-topic` 的默认外参 |
+| 3 | 位姿外推只用最后一段。INS 锚点常比 IMU 样本晚约 0.1 ms，两者之间几厘米的锚点修正被当成了速度 | 最后一帧检测系原点跳了 6.6 m（bag 里 INS 比最后一帧扫描早 6 ms 截止，需要外推） | 实时运行时，扫描常需要外推几毫秒，任何一次锚点修正都可能让整帧跳几米。静止时位置不变，所以静止 bag 看不出来 | `PoseBuffer` 外推时用最近 20 ms 的运动估计速度，并跳过短于 1 ms 的末段 |
+| 4 | INS 只用了航向，机身和安装的倾斜没有去掉 | 检测系内拟合地面：pitch −1.0°（静止 bag）/ −1.7°（运动 bag），roll 约 −0.55° | 20 m 处地面高度偏 0.3–0.6 m | `DetFrameConfig.auto_level`：用 1.5–8 m 环内的地面点拟合平面，慢速（EMA）找平检测系 |
+| 5 | 地面支撑过滤假定检测系 z = 0 处处是地面 | 找平后近处变好，但 25–40 m 处的局部地面偏离 z = 0 达 0.66 m（这片场地不是一个平面） | 远处的车被当成"漂浮"的框滤掉 | 过滤改用局部地面：当前帧在每个 2 m × 2 m 格内取最低点，再取框中心周围 4 m 圆内这些格子的 10% 分位；有点的格子太少时退回 z = 0。每帧多约 8 ms（Python，x86） |
+
+**为什么不用 INS 的 roll/pitch。** 减速的 0.6 s 内，INS pitch 从 +2.8° 变到 −9.9°，但陀螺任何一个轴的积分都不到 2°，检测系里拟合的地面 pitch 的标准差也只有 0.3°。所以 INS 的 pitch 在加减速时不可信，继续只用航向，残余倾斜用地面找平处理。这和车上解析器只用航向的做法一致。
+
+### 9.2 修复前后（运动 bag，nuScenes 预训练 Pillar）
+
+| | 修复前 | 修复后 |
+|---|---|---|
+| 最老一帧到最新一帧的结构点间距（中位数） | 0.44 m | **0.07 m** |
+| 上报检测的速度头输出（中位数） | 1.06 m/s | **0.00 m/s** |
+| 已确认轨迹的速度（中位数）；超过 1 m/s 的比例 | 1.38 m/s；70% | **0.20 m/s；10%** |
+| 每帧已确认轨迹 | 4.5（大多在 coasting） | 11.3 |
+| 命中 ≥ 20 帧（共 27 帧）的轨迹 | 2 | 7 |
+| 每帧上报检测 | 5.0 | 10.6 |
+
+机器人速度约 1.5 m/s。修复前，静止场景的速度基本等于机器人的速度。修复后剩下的 0.15–0.2 m/s 来自 30–40 m 处停放车辆的中心抖动，这是预训练权重在 32 线远距离上的问题，微调后应改善；另有一个 0.5 m/s 的"骑行者"在机器人右侧 3.4 m 处，在世界系里移动了 1.1 m，可能是真人在走动。
+
+静止 bag 在修复后基本不变：每帧上报 15.5 个检测、15.6 条已确认轨迹（第 7 节修复后为 16.4 和 16.8）。
+
+### 9.3 还需要确认
+
+- **前进方向。** 机器人的运动方向与 INS azimuth 相反（azimuth 197°，速度方向 17°）。假设这段数据是在向前开，那么按当前约定，body 系和检测系的 **+y 是前进方向，x 指向右侧**（与 7.3 节的分析一致），`to_local()` 交给规划的就是这个坐标系。如果规划侧期望 x 朝前，需要先确认车上 body 系的定义，再统一调整。
+- **雷达相对 INS 的平移（杠杆臂）仍为 0。** 这段数据几乎没有转向，标定不出来；需要一段原地转向的数据。
+- **起步阶段的速度。** 前 4 帧拼不满 5 个 sweep，速度头输出不可靠（有一条轨迹新建时速度为 10.8 m/s），跟踪器几帧后收敛。可以在拼接不满时不用检测速度初始化轨迹。
+- **`auto_level` 只拟合近处的一个平面。** 坡度变化的场景（如进出坡道），远处仍会有偏差；检测过滤已经改用局部地面，不受影响，但网络输入仍会受影响。
+
+### 9.4 复现
+
+```bash
+# 回归测试：多帧对齐、找平、静止场景不动（第二个测试需要 det3d 和权重）
+python -m pytest tests/dog/test_real_data.py -k moving
+# Foxglove 可视化
+python tools/dog/run_bag_mcap.py --bag samples/rosbag2_2026_09_21-16_41_27_moving \
+    --ckpt work_dirs/pretrained/nusc_pp.pth --mcap work_dirs/moving.mcap
+```
