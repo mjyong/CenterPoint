@@ -56,6 +56,11 @@ def _yaw_quat(yaw):
     return {"x": 0.0, "y": 0.0, "z": float(np.sin(yaw / 2)), "w": float(np.cos(yaw / 2))}
 
 
+def _lifetime(seconds):
+    ns = max(0, int(round(float(seconds) * 1e9)))
+    return {"sec": ns // 1_000_000_000, "nsec": ns % 1_000_000_000}
+
+
 class McapViz:
     def __init__(self, path):
         from mcap.writer import Writer
@@ -73,13 +78,15 @@ class McapViz:
         self._pose = self._w.register_channel("/pose", "json", pose)
         self.frames = 0
 
-    def add(self, stamp, xyz, intensity, detections, T_world_body, tracks=None):
+    def add(self, stamp, xyz, intensity, detections, T_world_body, tracks=None, lifetime=0.15):
         """xyz (N, 3), boxes and tracks are already in the map / world frame.
 
         ``detections`` are drawn as given: pass ``dets.above(DEFAULT_SCORE_THRESHOLDS)``,
         not the raw detector output (which keeps scores down to 0.1 for the tracker).
         ``tracks``: TrackState list; confirmed tracks are drawn on /tracks with id,
-        class and speed, coasting ones faded."""
+        class and speed, coasting ones faded. ``lifetime`` is how long a scene
+        entity stays up; the 0.15 s default matches a 10 Hz log, and a slower
+        source has to pass a longer one or the boxes vanish between frames."""
         xyz = np.asarray(xyz, np.float32)
         intensity = np.asarray(intensity, np.float32).reshape(-1)
         if len(xyz) > _MAX_POINTS:
@@ -113,12 +120,12 @@ class McapViz:
             })
         scene = {"deletions": [], "entities": [{
             "timestamp": ts, "frame_id": "map", "id": "detections",
-            "lifetime": {"sec": 0, "nsec": 150000000},
+            "lifetime": _lifetime(lifetime),
             "frame_locked": False, "cubes": cubes,
         }]}
         track_scene = {"deletions": [], "entities": [{
             "timestamp": ts, "frame_id": "map", "id": "tracks",
-            "lifetime": {"sec": 0, "nsec": 150000000},
+            "lifetime": _lifetime(lifetime),
             "frame_locked": False, "cubes": [], "texts": [],
         }]}
         for t in tracks or ():
