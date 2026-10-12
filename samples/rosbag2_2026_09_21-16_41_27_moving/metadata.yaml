@@ -1,0 +1,83 @@
+rosbag2_bagfile_information:
+  version: 5
+  storage_identifier: sqlite3
+  duration:
+    nanoseconds: 3090904192
+  starting_time:
+    nanoseconds_since_epoch: 1789980190508913600
+  message_count: 647
+  topics_with_message_count:
+    - topic_metadata:
+        name: /robot/topic/rdap/top_point_cloud2
+        type: sensor_msgs/msg/PointCloud2
+        serialization_format: cdr
+        offered_qos_profiles: |
+          - history: 1
+            depth: 10
+            reliability: 1
+            durability: 2
+            deadline:
+              sec: 9223372036
+              nsec: 854775807
+            lifespan:
+              sec: 9223372036
+              nsec: 854775807
+            liveliness: 1
+            liveliness_lease_duration:
+              sec: 9223372036
+              nsec: 854775807
+            avoid_ros_namespace_conventions: false
+      message_count: 27
+    - topic_metadata:
+        name: /rte/rdap/rtk/imus/data_raw
+        type: sensor_msgs/msg/Imu
+        serialization_format: cdr
+        offered_qos_profiles: |
+          - history: 1
+            depth: 100
+            reliability: 1
+            durability: 2
+            deadline:
+              sec: 9223372036
+              nsec: 854775807
+            lifespan:
+              sec: 9223372036
+              nsec: 854775807
+            liveliness: 1
+            liveliness_lease_duration:
+              sec: 9223372036
+              nsec: 854775807
+            avoid_ros_namespace_conventions: false
+      message_count: 310
+    - topic_metadata:
+        name: /rte/rdap/rtk/inspvax
+        type: kygi665_msgs/msg/INSPVAX
+        serialization_format: cdr
+        offered_qos_profiles: |
+          - history: 1
+            depth: 100
+            reliability: 1
+            durability: 2
+            deadline:
+              sec: 9223372036
+              nsec: 854775807
+            lifespan:
+              sec: 9223372036
+              nsec: 854775807
+            liveliness: 1
+            liveliness_lease_duration:
+              sec: 9223372036
+              nsec: 854775807
+            avoid_ros_namespace_conventions: false
+      message_count: 310
+  compression_format: ""
+  compression_mode: ""
+  relative_file_paths:
+    - rosbag2_2026_09_21-16_41_27_moving.db3
+  files:
+    - path: rosbag2_2026_09_21-16_41_27_moving.db3
+      starting_time:
+        nanoseconds_since_epoch: 1789980190508913600
+      duration:
+        nanoseconds: 3090904192
+      message_count: 647
