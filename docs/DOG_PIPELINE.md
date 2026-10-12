@@ -176,7 +176,8 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `dog_perception/preprocess/` | 去畸变、自体滤除、检测系、地面高度估计、多帧累积、`Preprocessor` |
 | `dog_perception/detection/centerpoint.py` | det3d Pillar/Voxel 统一封装，支持范围/NMS 配置和双翻转 TTA |
 | `dog_perception/detection/pillar_export.py`, `decode.py` | Orin/TensorRT 两段切分和 NumPy 解码 |
-| `dog_perception/detection/evaluate.py` | 中心距离 AP（含分距离段）、ATE、AVE |
+| `dog_perception/detection/evaluate.py` | 中心距离 AP（含分距离段）、ATE、ASE、AOE、AVE |
+| `dog_perception/tracking/evaluate.py` | 跟踪指标：MOTA、MOTP、IDF1、IDSW、FRAG、MT/ML |
 | `dog_perception/tracking/` | IMM、贪心/匈牙利匹配、多目标跟踪器 |
 | `dog_perception/prediction/` | 第一档 IMM 外推、特征构造、自监督数据、模型、训练/评估 |
 | `dog_perception/autolabel.py` | 离线轨迹级精修 |
@@ -193,6 +194,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/train_predictor.py` | 第二档训练，与 CV/IMM 对比 |
 | `tools/dog/ros2_node.py` | 在线 ROS 2 节点（MarkerArray 可视化） |
 | `tools/dog/run_sim_demo.py` | 仿真端到端演示，输出各段指标 |
+| `tools/dog/nusc_clip_eval.py`（`dog_perception/nuscenes_clip.py`、`clip_viz.py`、`foxglove.py`） | 在 nuScenes 片段上跑检测、跟踪、预测，与真值对比，输出 Foxglove MCAP 和指标报告，见 [NUSC_CLIP_EVAL.md](NUSC_CLIP_EVAL.md) |
 
 ---
 
