@@ -29,9 +29,10 @@ import numpy as np
 from . import foxglove as fx
 from .detection.boxes import CLASSES
 
-# dark-mode categorical steps (validated palette), so marks read on the 3D panel's dark background
+# Class colors stay blue / orange / gold. Track ids use a separate palette so a
+# track wireframe is not the same color as the detection of that class.
 CLASS_RGB = {0: fx.hex_rgba("#3987e5"), 1: fx.hex_rgba("#d95926"), 2: fx.hex_rgba("#c98500")}
-TRACK_RGB = [fx.hex_rgba(h) for h in ("#3987e5", "#d95926", "#c98500", "#d55181", "#9085e9", "#86b6ef")]
+TRACK_RGB = [fx.hex_rgba(h) for h in ("#14b8a6", "#db2777", "#7c3aed", "#22d3ee", "#f472b6", "#a78bfa")]
 # GT status uses the reserved status colors (good / critical), always with a text label
 GT_RGB = {"tracked": fx.hex_rgba("#0ca30c"), "missed": fx.hex_rgba("#d03b3b"), "ignored": fx.hex_rgba("#898781"),
           "interp": fx.hex_rgba("#0ca30c", 0.5)}
