@@ -4,8 +4,19 @@ AP is computed per class and per center-distance threshold (BEV), with
 predictions globally sorted by score and greedily matched to the closest
 unmatched ground truth of the same frame. Also reports per-range recall/AP,
 which is where CenterPoint-Pillar and -Voxel differ most on a 32-beam lidar.
+True positives at 2 m also give nuScenes' error metrics: ATE (center), ASE
+(1 - IoU of the boxes aligned on center and heading), AOE (heading, rad) and
+AVE (velocity).
 """
 import numpy as np
+
+from ..geometry import wrap_angle
+
+
+def scale_error(a, b):
+    """1 - IoU of two (l, w, h) boxes aligned on center and heading."""
+    inter = np.prod(np.minimum(a, b))
+    return float(1.0 - inter / (np.prod(a) + np.prod(b) - inter))
 
 
 def _ap(tp, n_gt):
@@ -52,8 +63,14 @@ def _match(frames_pred, frames_gt, cls, thr, rng_bin=None):
             gt_used[f][free[j]] = True
             tp.append(1)
             e = {"trans": d[j]}
+            gb, pb = g["boxes"][free[j]], p["boxes"][i]
+            if len(gb) >= 7 and len(pb) >= 7:
+                e["scale"] = scale_error(gb[3:6], pb[3:6])
+                e["orient"] = float(abs(wrap_angle(pb[6] - gb[6])))
             if "velocities" in g and "velocities" in p:
-                e["vel"] = float(np.linalg.norm(g["velocities"][free[j]] - p["velocities"][i]))
+                gv = g["velocities"][free[j]]
+                if np.all(np.isfinite(gv)):
+                    e["vel"] = float(np.linalg.norm(gv - p["velocities"][i]))
             errs.append(e)
         else:
             tp.append(0)
@@ -74,9 +91,10 @@ def evaluate_detections(frames_pred, frames_gt, class_names, dist_thresholds=(0.
             aps.append(ap)
             r["AP@%.1f" % thr] = ap
             if thr == 2.0 and errs:
-                r["ATE"] = float(np.mean([e["trans"] for e in errs]))
-                if "vel" in errs[0]:
-                    r["AVE"] = float(np.mean([e["vel"] for e in errs]))
+                for key, metric in (("trans", "ATE"), ("scale", "ASE"), ("orient", "AOE"), ("vel", "AVE")):
+                    v = [e[key] for e in errs if key in e]
+                    if v:
+                        r[metric] = float(np.mean(v))
         r["mAP"] = float(np.nanmean(aps)) if not np.all(np.isnan(aps)) else float("nan")
         r["num_gt"] = int(sum(int((g["labels"] == c).sum()) for g in frames_gt))
         for lo, hi in range_bins:
@@ -102,3 +120,22 @@ def format_table(results_by_model, class_names):
             vals = ["%.3f" % r[k] if k in r and not np.isnan(r[k]) else "-" for k in keys]
             lines.append("| %s | %s | %s | %d |" % (model, name, " | ".join(vals), r["num_gt"]))
     return "\n".join(lines)
+
+
+def match_frame(pred, gt, thr=2.0):
+    """Per-frame greedy matching (by score, same class, center distance <= thr),
+    for drawing: returns (pred_tp (P,) bool, gt_matched (G,) int index of the
+    matched prediction or -1)."""
+    order = np.argsort(-np.asarray(pred["scores"]), kind="stable")
+    tp = np.zeros(len(order), dtype=bool)
+    gt_m = np.full(len(gt["labels"]), -1, dtype=np.int64)
+    for i in order:
+        cand = np.nonzero((gt["labels"] == pred["labels"][i]) & (gt_m < 0))[0]
+        if len(cand) == 0:
+            continue
+        d = np.linalg.norm(gt["boxes"][cand, :2] - pred["boxes"][i, :2], axis=1)
+        j = int(np.argmin(d))
+        if d[j] <= thr:
+            gt_m[cand[j]] = i
+            tp[i] = True
+    return tp, gt_m
