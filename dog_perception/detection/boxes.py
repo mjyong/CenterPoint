@@ -99,13 +99,19 @@ def standard_to_det3d(std, vel=None):
                      vel[:, 0], vel[:, 1], wrap_angle(-std[:, 6] - np.pi / 2)], axis=1)
 
 
-def circle_nms(xy, scores, radius, max_keep=None):
-    """Greedy center-distance NMS. ``radius`` in meters. Returns kept indices."""
+def circle_nms(xy, scores, radius, max_keep=None, weak_radius=None, weak_ratio=None):
+    """Greedy center-distance NMS. ``radius`` in meters. Returns kept indices.
+
+    With ``weak_radius`` / ``weak_ratio``, a kept box also suppresses boxes up
+    to ``weak_radius`` away whose score is at most ``weak_ratio`` times its own:
+    a weak second peak next to a strong one is a duplicate, two strong peaks
+    are two objects."""
     order = np.argsort(-scores, kind="stable")
-    xy = xy[order]
+    xy, sc = xy[order], scores[order]
     suppressed = np.zeros(len(order), dtype=bool)
     keep = []
     r2 = radius * radius
+    w2 = weak_radius * weak_radius if weak_radius else 0.0
     for i in range(len(order)):
         if suppressed[i]:
             continue
@@ -114,21 +120,25 @@ def circle_nms(xy, scores, radius, max_keep=None):
             break
         d2 = np.sum((xy[i + 1:] - xy[i]) ** 2, axis=1)
         suppressed[i + 1:] |= d2 <= r2
+        if w2 > r2:
+            suppressed[i + 1:] |= (d2 <= w2) & (sc[i + 1:] <= weak_ratio * sc[i])
     return np.asarray(keep, dtype=np.int64)
 
 
 def classwise_circle_nms(dets, radii):
-    """``radii``: {class_name: radius_m}. Classes without an entry are kept as is."""
+    """``radii``: {class_name: radius_m or (radius_m, weak_radius_m, weak_ratio)}
+    (see ``circle_nms``). Classes without an entry, or radius 0, are kept as is."""
     keep = []
     for ci, name in enumerate(CLASSES):
         idx = np.nonzero(dets.labels == ci)[0]
         if len(idx) == 0:
             continue
         r = radii.get(name)
-        if r is None or r <= 0:
+        r, weak = (r[0], r[1:]) if isinstance(r, (tuple, list)) else (r, (None, None))
+        if r is None or (r <= 0 and not weak[0]):
             keep.append(idx)
         else:
-            keep.append(idx[circle_nms(dets.boxes[idx, :2], dets.scores[idx], r)])
+            keep.append(idx[circle_nms(dets.boxes[idx, :2], dets.scores[idx], r, None, *weak)])
     if not keep:
         return dets.select(np.zeros(0, dtype=np.int64))
     return dets.select(np.sort(np.concatenate(keep)))

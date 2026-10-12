@@ -48,6 +48,19 @@ def test_detections_transform_and_nms():
     assert len(kept) == 2
 
 
+def test_score_aware_pedestrian_merge():
+    # one strong pedestrian with a weak duplicate peak 0.8 m away, a second person 0.9 m away
+    # (similar score) and a weak box 0.4 m away (inside the plain radius)
+    xy = np.array([[0.0, 0.0], [0.8, 0.0], [0.0, 0.9], [-0.3, -0.25], [3.0, 0.0]])
+    sc = np.array([0.8, 0.3, 0.7, 0.75, 0.2])
+    assert list(circle_nms(xy, sc, 0.5)) == [0, 2, 1, 4]
+    assert list(circle_nms(xy, sc, 0.5, None, 1.0, 0.6)) == [0, 2, 4]
+    boxes = np.c_[xy, np.zeros((5, 1)), np.full((5, 3), 0.7), np.zeros((5, 1))]
+    d = Detections(boxes, np.zeros((5, 2)), sc, np.full(5, CLASSES.index("pedestrian")))
+    assert len(classwise_circle_nms(d, {"pedestrian": (0.5, 1.0, 0.6)})) == 3
+    assert len(classwise_circle_nms(d, {"pedestrian": 0.0})) == 5
+
+
 def test_center_distance_ap():
     gt = [dict(boxes=np.array([[0, 0, 0, 1, 1, 1, 0], [10, 0, 0, 1, 1, 1, 0]]), labels=np.array([1, 1]))]
     pred = [dict(boxes=np.array([[0.3, 0, 0, 1, 1, 1, 0], [30, 0, 0, 1, 1, 1, 0]]), labels=np.array([1, 1]),
