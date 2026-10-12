@@ -153,7 +153,7 @@ def evaluate_kinematic(samples, class_params=None, merge_dist=0.25, hist_dt=0.1,
             imm.predict(hist_dt)
             if h[k, 4] > 0.5:
                 imm.update(h[k, :4], H, R)
-        r = imm.rollout(T * fut_dt, fut_dt)
+        r = imm.rollout(T * fut_dt, fut_dt, mixed=False)
         m, _, pr = merge_modes(r["mode_means"][:, :, :2], r["mode_covs"][:, :, :2, :2], r["mode_probs"], merge_dist)
         imm_modes.append(m)
         imm_probs.append(pr)

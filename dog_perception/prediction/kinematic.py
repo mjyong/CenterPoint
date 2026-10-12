@@ -1,9 +1,12 @@
 """Tier 1: IMM rollout (CV / CT), 3 s horizon at 0.5 s steps.
 
-Each IMM mode becomes one predicted mode (``straight`` vs ``keeps turning``)
-with the current mode probability; modes whose trajectories coincide (the
-pedestrian CV-low / CV-high pair) are merged by moment matching, which turns
-the high-noise CV into the "uncertainty inflation" around a single path.
+Each IMM mode becomes one predicted mode (``straight`` vs ``keeps turning``,
+or for pedestrians ``steady`` vs ``manoeuvring``) with the current mode
+probability. Modes that stay within ``merge_dist`` of each other over the
+whole horizon are merged by moment matching. That is the exception, not the
+rule: the two filters have different gains, so their velocity estimates
+differ, and a difference above ~0.08 m/s already puts the 3 s end points more
+than 0.25 m apart (pedestrians merge in roughly 1 frame out of 5).
 """
 from dataclasses import dataclass
 
@@ -62,7 +65,7 @@ class IMMPredictor:
         self.horizon, self.step, self.merge_dist = horizon, step, merge_dist
 
     def predict_imm(self, imm, track_id, label, stamp):
-        r = imm.rollout(self.horizon, self.step)
+        r = imm.rollout(self.horizon, self.step, mixed=False)
         means = r["mode_means"][:, :, :2]
         covs = r["mode_covs"][:, :, :2, :2]
         means, covs, probs = merge_modes(means, covs, r["mode_probs"], self.merge_dist)

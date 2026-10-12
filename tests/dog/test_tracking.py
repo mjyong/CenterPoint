@@ -37,6 +37,11 @@ def test_imm_prefers_ct_on_turning_target():
     assert abs(x[4] - w) < 0.1
     r = imm.rollout(3.0, 0.5)
     assert r["mode_means"].shape == (2, 6, 5) and r["mean"].shape == (6, 5)
+    # the predictors skip the mixed rollout; the per-mode part must not change
+    r2 = imm.rollout(3.0, 0.5, mixed=False)
+    assert "mean" not in r2
+    for k in ("mode_means", "mode_covs", "mode_probs", "times"):
+        assert np.array_equal(r[k], r2[k])
     # CT mode keeps turning, CV mode goes straight
     heading = lambda m: np.arctan2(m[-1, 3], m[-1, 2])
     assert wrap_angle(heading(r["mode_means"][1]) - heading(r["mode_means"][0])) > 1.0

@@ -189,14 +189,15 @@ class IMM:
         P = np.einsum("j,jkl->kl", self.mu, self.P + d[:, :, None] * d[:, None, :])
         return x, P
 
-    def rollout(self, horizon, step):
+    def rollout(self, horizon, step, mixed=True):
         """Open-loop prediction.
 
         Returns dict with
           ``mode_means`` (M, T, 5) / ``mode_covs`` (M, T, 5, 5): each model run
               on its own (e.g. "keeps turning" vs "goes straight"),
           ``mode_probs`` (M,): current mode probabilities,
-          ``mean`` (T, 5) / ``cov`` (T, 5, 5): full IMM prediction (mixing each step).
+          ``mean`` (T, 5) / ``cov`` (T, 5, 5): full IMM prediction (mixing each
+              step); only with ``mixed=True``, it costs about 3x the per-mode part.
         """
         n = int(round(horizon / step))
         M = len(self.models)
@@ -207,11 +208,15 @@ class IMM:
             for k in range(n):
                 x, P = m.predict(x, P, step)
                 mode_means[j, k], mode_covs[j, k] = x, P
+        out = dict(mode_means=mode_means, mode_covs=mode_covs, mode_probs=self.mu.copy(),
+                   times=step * np.arange(1, n + 1))
+        if not mixed:
+            return out
         f = self.copy()
         mean = np.zeros((n, STATE_DIM))
         cov = np.zeros((n, STATE_DIM, STATE_DIM))
         for k in range(n):
             f.predict(step)
             mean[k], cov[k] = f.state
-        return dict(mode_means=mode_means, mode_covs=mode_covs, mode_probs=self.mu.copy(),
-                    mean=mean, cov=cov, times=step * np.arange(1, n + 1))
+        out.update(mean=mean, cov=cov)
+        return out
