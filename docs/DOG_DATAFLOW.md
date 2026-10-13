@@ -127,7 +127,7 @@ Preprocessor.process(scan)
 
 ### 4.3 检测 `CenterPointDetector.__call__`（`detection/centerpoint.py:189`）
 
-网络内部逐层的结构、参数量、计算量和解码细节见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)；从 61 224 个候选到最终检测的每一步（含真实数据的例子）见 [DETECTION_POSTPROCESS.md](DETECTION_POSTPROCESS.md)。
+网络内部逐层的结构、参数量、计算量和解码细节见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)（Voxel 见 [CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)）；从 61 224 个候选到最终检测的每一步（含真实数据的例子）见 [DETECTION_POSTPROCESS.md](DETECTION_POSTPROCESS.md)。
 
 ```
 CenterPointDetector.__call__(points_det, stamp)
@@ -252,7 +252,7 @@ for t in tracker.reported_tracks():
 
 ## 6. 其他分支的 shape
 
-**CenterPoint-Voxel**（按配置推算。这里没有 CUDA，前向没有实测）：
+**CenterPoint-Voxel**（这一帧没有在 Voxel 上实测；`rec_moving` 一帧上的逐层实测，包括各级稀疏卷积的非空格数和计算量，见 [CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)）：
 
 | 步骤 | shape |
 |---|---|

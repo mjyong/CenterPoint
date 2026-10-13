@@ -9,6 +9,7 @@ from dog_perception.geometry import make_T, rot_z
 from .conftest import requires_det3d
 
 PP_CFG = "configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py"
+VOXEL_CFG = "configs/nusc/voxelnet/nusc_centerpoint_voxelnet_0075voxel_fix_bn_z.py"
 
 
 def test_box_convention_roundtrip_and_nuscenes_yaw():
@@ -71,18 +72,22 @@ def test_center_distance_ap():
 
 
 @requires_det3d
-def test_decoder_matches_det3d_predict():
-    """NumPy decoder (ONNX / TensorRT path) == CenterHead.predict on peaked random maps."""
+@pytest.mark.parametrize("config, size", [(PP_CFG, 102), (VOXEL_CFG, 136)])
+def test_decoder_matches_det3d_predict(config, size):
+    """NumPy decoder (ONNX / TensorRT path) == CenterHead.predict on peaked random maps
+    (Pillar: stride 4 on 0.2 m pillars; Voxel: stride 8 on 0.075 m voxels)."""
     import torch
     from det3d.torchie import Config
     from det3d.models import build_detector
     from dog_perception.detection.centerpoint import configure_for_dog
     from dog_perception.detection.decode import decode_centerpoint
 
-    cfg = configure_for_dog(Config.fromfile(PP_CFG))
+    if config == VOXEL_CFG:
+        pytest.importorskip("spconv")
+    cfg = configure_for_dog(Config.fromfile(config))
     net = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg).eval()
     rng = np.random.default_rng(0)
-    H = W = 102
+    H = W = size
     preds, maps = [], []
     for t, nc in enumerate(net.bbox_head.num_classes):
         m = {k: rng.normal(0, 0.3, (c, H, W)).astype(np.float32)
@@ -239,3 +244,29 @@ def test_default_class_map_keeps_dog_classes():
     nusc = default_class_map(["car", "truck", "construction_vehicle", "bus", "trailer", "barrier", "motorcycle",
                               "bicycle", "pedestrian", "traffic_cone"])
     assert nusc["truck"] == "vehicle" and nusc["bicycle"] == "cyclist" and "barrier" not in nusc
+
+
+def test_sparse_pairs_match_spconv():
+    """tools/dog/profile_detector.py counts a sparse conv's work from its (input, output, kernel offset)
+    triples; the count must agree with spconv's own indice pairs for every conv type in SpMiddleResNetFHD."""
+    torch = pytest.importorskip("torch")
+    try:
+        from spconv.core import ConvAlgo
+        from spconv.pytorch import ops
+    except ImportError:
+        pytest.skip("spconv not installed")
+    from tools.dog.profile_detector import sparse_pairs
+
+    rng = np.random.default_rng(0)
+    shape = [11, 40, 36]
+    flat = rng.choice(2 * int(np.prod(shape)), 1500, replace=False)            # batch of 2
+    idx = np.column_stack([flat // np.prod(shape), *np.unravel_index(flat % np.prod(shape), shape)]).astype(np.int32)
+    for k, s, p, subm in [(3, 1, 1, True), (3, 2, 1, False), (3, 2, (0, 1, 1), False),
+                          ((3, 1, 1), (2, 1, 1), 0, False)]:
+        k3, s3, p3 = (list(np.broadcast_to(np.asarray(v), (3,)).astype(int)) for v in (k, s, p))
+        ref = ops.get_indice_pairs(torch.from_numpy(idx), 2, shape, ConvAlgo.Native, k3, s3, p3, [1, 1, 1],
+                                   [0, 0, 0], subm)
+        n = int(ref[2].sum())
+        if subm:   # spconv stores half of the offsets (-k mirrors +k) and leaves out the centre (identity)
+            n = 2 * n + len(idx)
+        assert sparse_pairs(idx, shape, k, s, p, subm) == n, (k, s, p, subm)

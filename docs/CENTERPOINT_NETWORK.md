@@ -1,10 +1,10 @@
 # CenterPoint-Pillar 网络详解
 
-对应 [DOG_DATAFLOW.md](DOG_DATAFLOW.md) 4.3 节里的 `net(example, return_loss=False)`。
+对应 [DOG_DATAFLOW.md](DOG_DATAFLOW.md) 4.3 节里的 `net(example, return_loss=False)`。Voxel 版及两者的逐项对比见 [CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)。
 
 **模型**：配置为 `configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py`，经 `configure_for_dog` 把范围改为 ±40.8 m；权重为 `work_dirs/pretrained/nusc_pp.pth`。
 
-**测量方式**：在每一层挂 forward hook，记录输出 shape、参数量和乘加次数（MAC）。用的是一帧仿真点云，含 9 663 个非空柱。PFN 的计算量与柱数成正比；样例 bag 那一帧只有 4 607 个柱，PFN 计算量约为表中的一半，其余部分不变。
+**测量方式**：在每一层挂 forward hook，记录输出 shape、参数量和乘加次数（MAC），现在可以用 `tools/dog/profile_detector.py` 复现。用的是一帧仿真点云，含 9 663 个非空柱。PFN 的计算量与柱数成正比；样例 bag 那一帧只有 4 607 个柱，PFN 计算量约为表中的一半，其余部分不变。
 
 **坐标系**：网络内部全部在虚拟 nuScenes 雷达系（M 系）：车头朝 +y，地面在 z = −1.84。
 

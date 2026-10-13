@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（46 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（70 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -152,7 +152,7 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 
 ## 2. 模块与文件对应
 
-逐函数的调用链路和每一步的数据 shape（在样例 bag 上实测）见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md)；网络逐层详解见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)；跟踪、预测和 IMM 原理见 [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md)。
+逐函数的调用链路和每一步的数据 shape（在样例 bag 上实测）见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md)；网络逐层详解见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)（Pillar）和 [CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)（Voxel，含与 Pillar 的逐项对比）；跟踪、预测和 IMM 原理见 [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md)。
 
 ```
 LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
@@ -197,6 +197,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/compare_detectors.py` | Pillar 与 Voxel 对比（AP、分段 AP、延迟、轨迹碎片化） |
 | `tools/dog/convert_nusc_ckpt.py` | nuScenes 10 类到 3 类的 head 权重迁移 |
 | `tools/dog/export_pillar_onnx.py` | 导出给 TensorRT 用的两段 ONNX，逐段校验，并打印上板建引擎的 `trtexec` 命令 |
+| `tools/dog/profile_detector.py` | 在一帧上测网络逐层的 shape、参数量、计算量（稀疏卷积按实际邻接对计）和各段耗时 |
 | `tools/dog/train_predictor.py` | 第二档训练，与 CV/IMM 对比 |
 | `tools/dog/ros2_node.py` | 在线 ROS 2 节点（MarkerArray 可视化） |
 | `tools/dog/run_sim_demo.py` | 仿真端到端演示，输出各段指标 |
@@ -332,7 +333,7 @@ python -m pytest tests/dog -q
 ## 6. 已知局限（没有在本环境中验证的部分）
 
 - **没有真实 XT32 数据和 nuScenes 预训练权重**（官方权重托管在 OneDrive，本环境无法下载）。所有检测相关的数字只验证了管线和一致性，Pillar 与 Voxel 的精度和延迟对比需要在你的机器上用步骤 1–2 实测。
-- Voxel 模型的前向需要 CUDA 版 spconv（CPU 版 spconv 不支持带 bias 的卷积），本环境只验证了模型构建和网格尺寸。
+- 检测封装里的 Voxel 前向需要 CUDA 版 spconv（CPU 版 spconv 不支持带 bias 的卷积）。本环境只用 `profile_detector.py` 的 CPU 绕行办法跑通过前向，实测了逐层 shape 和计算量（[CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)），没有 GPU 上的耗时拆分。
 - 本环境没有 ROS，`ros2_node.py` 没有实际运行过。bag 转换器已用合成的 ROS2 bag 测试。
 - 本环境没有 Orin 和 TensorRT。导出的 ONNX 只用 onnxruntime 验证过；TensorRT 引擎的构建、FP16 精度和板上延迟都要在 Orin 上确认（第 8 节）。
 - 预处理、跟踪和预测是 Python 参考实现。在 x86 上实测，网络以外的部分合计约 90 ms（见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md) 第 5 节）。Orin 的 ARM 核会更慢，所以上板时预处理必须搬到 GPU，见 8.3。
