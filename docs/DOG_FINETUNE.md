@@ -30,11 +30,12 @@ python tools/dog/rosbag_to_sequence.py --bag <bag 目录> --out data/seq/rec_001
 
 ```bash
 python tools/dog/run_sequence.py --seq data/seq/rec_001 --detectors voxel --tta \
-    --ckpt-voxel <nuScenes Voxel 权重> --save-frames --out work_dirs/rec_001
+    --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth --save-frames --out work_dirs/rec_001
 ```
 
 - `work_dirs/rec_001/frames/<stamp>.npy` 是预处理后的 5 帧拼接点云（检测系），和狗上线时模型的输入完全一样。训练直接用它，训练和部署走的是同一套预处理。
-- 教师用 Voxel + 双翻转 TTA。需要 GPU（spconv）和 nuScenes Voxel 权重（CenterPoint model zoo 中 `nusc_centerpoint_voxelnet_0075voxel_fix_bn_z` 对应的权重），仓库里目前只有 Pillar 的 `nusc_pp.pth`。
+- 教师用 Voxel + 双翻转 TTA。nuScenes Voxel 权重在仓库里用 Git LFS 存（`work_dirs/pretrained/nusc_voxel.pth`，103 MB），克隆后要 `git lfs install && git lfs pull` 才是真文件，否则只是 134 字节的指针。
+- Voxel 必须在 GPU 上跑：CPU 上 spconv 直接报错（`cpu don't support act and bias`）。
 - 没有 GPU 时可以先用 Pillar 试跑：`--detectors pillar --ckpt-pillar work_dirs/pretrained/nusc_pp.pth`。
 
 ## ③ 自动标注
