@@ -19,13 +19,25 @@ from tools import check_labels  as check
 #sys.path.append(os.path.join(BASE_DIR, './algos'))
 #import algos.rotation as rotation
 # CenterPoint dog pipeline (2026-10-13): TensorFlow and algos/models/deep_annotation_inference.h5 are only
-# needed for the auto-annotation / rotation-prediction buttons; without them the tool still loads, edits
-# and saves labels. See third_party/SUSTechPOINTS/VENDORED.md.
+# needed for the learned rotation prediction and the auto-annotation button; without them the tool still
+# loads, edits and saves labels, and new boxes get their yaw from the points' principal axis (numpy).
+# See third_party/SUSTechPOINTS/VENDORED.md.
+import numpy as np
 try:
     from algos import pre_annotate
 except Exception as e:  # ImportError without TensorFlow, OSError without the model file
     pre_annotate = None
-    print("SUSTechPOINTS: auto-annotation disabled (%s: %s)" % (type(e).__name__, e))
+    print("SUSTechPOINTS: learned rotation / auto-annotation disabled, PCA yaw used (%s: %s)" % (type(e).__name__, e))
+
+
+def principal_axis_yaw(points):
+    """Yaw of the main horizontal axis of an object's points (box-centered, unrotated), in [0, pi)."""
+    p = np.asarray(points, dtype=np.float64).reshape(-1, 3)[:, :2]
+    if len(p) < 3:
+        return 0.0
+    w, v = np.linalg.eigh(np.cov((p - p.mean(0)).T))
+    a = float(np.arctan2(v[1, -1], v[0, -1]))
+    return a % np.pi
 
 
 #sys.path.append(os.path.join(BASE_DIR, '../tracking'))
@@ -150,7 +162,7 @@ class Root(object):
       
       data = json.loads(rawbody)
       if pre_annotate is None:
-        raise cherrypy.HTTPError(503, "auto-annotation needs TensorFlow and algos/models/deep_annotation_inference.h5")
+        return {"angle": [0, 0, principal_axis_yaw(data["points"])]}
       
       return {"angle": pre_annotate.predict_yaw(data["points"])}
       #return {}

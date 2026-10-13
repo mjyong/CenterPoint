@@ -21,7 +21,7 @@ be changed together with the converter (`tools/dog/sustechpoints_convert.py`).
 
 | date | file | change |
 |---|---|---|
-| 2026-10-13 | `main.py` | TensorFlow / the model file are optional: without them the server starts, the auto-annotation and rotation-prediction endpoints answer 503, everything else works |
+| 2026-10-13 | `main.py` | TensorFlow / the model file are optional: without them the server starts, `/predict_rotation` (used when a new box snaps to its points) returns the yaw of the points' principal axis (numpy, 180 deg ambiguous: `g` flips) and `/auto_annotate` answers 503; everything else works |
 | 2026-10-13 | `.gitignore` | `data/*` instead of `data`, so `data/README.md` is kept; exported scenes stay ignored |
 | 2026-10-13 | `data/README.md` | new: what goes into `data/` |
 | 2026-10-13 | `scene_reader.py` | only directories in `data/` are scenes (otherwise `data/README.md` shows up as one) |

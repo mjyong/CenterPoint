@@ -33,19 +33,14 @@ VENDORED = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "
 
 
 def serve(app, host, port):
-    """Run SUSTechPOINTS' cherrypy app. Without TensorFlow its pre-annotation module is replaced by an
-    empty one: loading, editing and saving labels work, the auto-annotate button does not."""
-    import importlib.util
-    import types
+    """Run SUSTechPOINTS' cherrypy app (``python main.py`` with --host / --port). The vendored copy runs
+    without TensorFlow (see third_party/SUSTechPOINTS/VENDORED.md)."""
+    import cherrypy                    # before chdir: its autoreload restarts from the cwd at import time
 
     app = os.path.abspath(os.path.expanduser(app))
     os.makedirs(os.path.join(app, "data"), exist_ok=True)
     os.chdir(app)                      # the app resolves data/, public/ and server.conf from the cwd
     sys.path.insert(0, app)
-    if importlib.util.find_spec("tensorflow") is None:
-        sys.modules["algos.pre_annotate"] = types.ModuleType("algos.pre_annotate")
-        print("tensorflow not installed: SUSTechPOINTS auto-annotation disabled")
-    import cherrypy
     import main as sustech
     # as cherrypy.quickstart(Root(), "/", config="server.conf"), but host / port from the command line win
     cherrypy.config.update("server.conf")

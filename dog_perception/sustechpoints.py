@@ -9,8 +9,12 @@ sorted by file name.
 
 Export writes each labelled frame in the detection frame (gravity aligned,
 ground at z ~ 0), point cloud and boxes alike, so no calibration or ego
-pose is needed. Frame names are the stamp in microseconds (sortable). The
-track id becomes ``obj_id``; flagged tracks get ``obj_attr = "review"`` so
+pose is needed, shifted down by ``LIDAR_HEIGHT`` (1.8 m): SUSTechPOINTS
+assumes a lidar 1.8 m above the ground and puts a new box's bottom at
+z = -1.8 (``public/js/editor.js``, ``add_box_on_mouse_pos``); without the
+shift new boxes land under our ground and cannot snap to the points. Import
+shifts back (``z_offset`` in ``dog_meta.json``). Frame names are the stamp
+in microseconds (sortable). The track id becomes ``obj_id``; flagged tracks get ``obj_attr = "review"`` so
 they stand out in the tool. ``dog_meta.json`` keeps what SUSTechPOINTS does
 not: stamps, ``T_world_det`` per frame and the auto-label scores.
 
@@ -45,6 +49,7 @@ TYPE_TO_CLASS = {
 }
 
 META_FILE = "dog_meta.json"
+LIDAR_HEIGHT = 1.8          # [m] SUSTechPOINTS' assumed lidar height above the ground
 
 
 def frame_name(stamp):
@@ -106,11 +111,14 @@ def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_e
         if current_sweep_only and pts.shape[1] > 4:
             pts = pts[pts[:, 4] <= 1e-6]
         name = frame_name(f["stamp"])
-        write_pcd(os.path.join(root, "lidar", name + ".pcd"), pts[:, :3], np.clip(pts[:, 3] / 255.0, 0, 1))
+        xyz = pts[:, :3] - [0.0, 0.0, LIDAR_HEIGHT]
+        write_pcd(os.path.join(root, "lidar", name + ".pcd"), xyz, np.clip(pts[:, 3] / 255.0, 0, 1))
         objs, exported = [], {}
         for o in f["objects"]:
+            box = np.asarray(o["box"], float).copy()
+            box[2] -= LIDAR_HEIGHT
             objs.append({"obj_id": str(o["track_id"]), "obj_type": CLASS_TO_TYPE[o["label"]],
-                         "obj_attr": "review" if o.get("review") else "", "psr": box_to_psr(o["box"])})
+                         "obj_attr": "review" if o.get("review") else "", "psr": box_to_psr(box)})
             scores[o["track_id"]].append(float(o["score"]))
             exported[str(o["track_id"])] = dict(center=np.asarray(o["box"][:3], float).tolist(),
                                                 velocity=np.asarray(o["velocity"], float).tolist())
@@ -119,7 +127,7 @@ def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_e
         meta_frames.append(dict(name=name, stamp=float(f["stamp"]),
                                 T_world_det=np.asarray(f["T_world_det"], float).tolist(), objects=exported))
     meta = dict(sequence=labels.get("sequence"), frames=meta_frames, class_to_type=CLASS_TO_TYPE,
-                current_sweep_only=bool(current_sweep_only),
+                current_sweep_only=bool(current_sweep_only), z_offset=-LIDAR_HEIGHT,
                 track_scores={str(k): float(np.mean(v)) for k, v in scores.items()})
     with open(os.path.join(root, META_FILE), "w") as fh:
         json.dump(meta, fh, indent=1)
@@ -131,6 +139,7 @@ def import_scene(scene_dir, type_map=None, static_speed=0.2, velocity_window=0.5
     type_map = dict(TYPE_TO_CLASS, **(type_map or {}))
     with open(os.path.join(scene_dir, META_FILE)) as fh:
         meta = json.load(fh)
+    z_offset = float(meta.get("z_offset", 0.0))
     counts = defaultdict(int)
     frames, by_id = [], defaultdict(list)          # obj_id -> [(frame index, object index)]
     for fm in meta["frames"]:
@@ -150,6 +159,7 @@ def import_scene(scene_dir, type_map=None, static_speed=0.2, velocity_window=0.5
             if not oid:
                 oid = "anon-%s-%d" % (fm["name"], len(objs))
             box = psr_to_box(a["psr"])
+            box[2] -= z_offset
             ex = fm.get("objects", {}).get(oid)
             kept = ex is not None and np.hypot(*(box[:2] - ex["center"][:2])) <= moved_tol
             by_id[oid].append((len(frames), len(objs)))

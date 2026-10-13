@@ -58,7 +58,12 @@ def test_export_import_round_trip(tmp_path):
     ann = json.load(open(root / "label" / (name + ".json")))
     assert [(a["obj_id"], a["obj_type"], a["obj_attr"]) for a in ann] == [("1", "Car", "review"),
                                                                          ("2", "Pedestrian", "")]
-    assert read_pcd(str(root / "lidar" / (name + ".pcd"))).shape == (100, 4)      # accumulated sweeps by default
+    pcd = read_pcd(str(root / "lidar" / (name + ".pcd")))
+    assert pcd.shape == (100, 4)                                                  # accumulated sweeps by default
+    src = np.load(os.path.join(str(tmp_path / "frames"), "%.6f.npy" % labels["frames"][0]["stamp"]))
+    # SUSTechPOINTS expects the ground 1.8 m below its origin: points and boxes are shifted down
+    assert np.allclose(pcd[:, 2], src[:, 2] - 1.8, atol=1e-5)
+    assert np.isclose(ann[0]["psr"]["position"]["z"], labels["frames"][0]["objects"][0]["box"][2] - 1.8)
     out, counts = import_scene(str(root))
     assert counts == {"vehicle": 10, "pedestrian": 10, "moved or new": 0}
     for fa, fb in zip(labels["frames"], out["frames"]):
