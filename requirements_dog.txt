@@ -18,4 +18,6 @@ onnx
 onnxruntime      # tools/dog/export_pillar_onnx.py --check
 matplotlib       # tools/dog/run_sim_demo.py --plot
 mcap             # Foxglove MCAP output (run_bag_mcap.py, run_sequence.py --mcap)
+cherrypy         # third_party/SUSTechPOINTS (annotation tool)
+jinja2
 pytest

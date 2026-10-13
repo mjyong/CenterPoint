@@ -1,5 +1,5 @@
-data
 data/*
+!data/README.md
 data.bk/*
 .vscode
 temp

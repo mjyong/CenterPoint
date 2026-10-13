@@ -199,19 +199,24 @@ python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir work
 
 ### SUSTechPOINTS 的导入导出
 
+SUSTechPOINTS 的源码放在仓库里（`third_party/SUSTechPOINTS`，上游 2024-06 的最新版本），`git pull` 之后就能运行，也可以直接改。上游版本、去掉了哪些文件、本地改了什么，见其中的 `VENDORED.md`；以后再改它的代码，也请在那张表里记一笔（GPL-3.0 要求注明修改和日期）。
+
 ```bash
-# 导出：标签 + 点云 -> SUSTechPOINTS 场景（--out 指向它的 data/ 目录）。--every 5 = 10 Hz 里取 2 Hz
+pip install cherrypy jinja2     # 只有它自带的自动标注按钮需要 TensorFlow
+
+# 导出：标签 + 点云 -> third_party/SUSTechPOINTS/data/rec_001。--every 5 = 10 Hz 里取 2 Hz
 python tools/dog/sustechpoints_convert.py export --labels data/labels/rec_001/labels_reviewed.pkl \
-    --frames work_dirs/rec_001/frames --out ~/SUSTechPOINTS/data --scene rec_001 --every 5
+    --frames work_dirs/rec_001/frames --scene rec_001 --every 5
 
 # 启动标注工具，浏览器打开 http://127.0.0.1:8081
-# （也可以用它自己的 python main.py；这个包装只需要 cherrypy 和 jinja2，没装 TensorFlow 时自动标注按钮不可用）
-python tools/dog/sustechpoints_convert.py serve --app ~/SUSTechPOINTS
+python tools/dog/sustechpoints_convert.py serve
+#   等价于上游的 cd third_party/SUSTechPOINTS && python main.py（监听所有网卡）；serve 可用 --host / --port
 
 # 标完导回来，得到和 labels.pkl 一样格式的文件，直接给 export_dataset.py
-python tools/dog/sustechpoints_convert.py import --scene-dir ~/SUSTechPOINTS/data/rec_001 \
-    --out data/labels/rec_001/labels_sustech.pkl
+python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labels/rec_001/labels_sustech.pkl
 ```
+
+导出的场景在 `third_party/SUSTechPOINTS/data/` 下，被 .gitignore 忽略，不会提交到仓库（点云很大）。标好的结果以导回后的 `labels_sustech.pkl` 为准，另行保存。
 
 转换规则（`dog_perception/sustechpoints.py`）：
 

@@ -191,7 +191,8 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/run_sequence.py` | 录制数据回放，Pillar/Voxel 并行跑，输出结果、跟踪日志和帧数据 |
 | `tools/dog/auto_label.py`, `export_dataset.py` | 教师自动标注，导出为 DogDataset 并建 GT 库 |
 | `tools/dog/review_labels.py` | 自动标注的人工审核：生成 MCAP、按轨迹表修正标签 |
-| `tools/dog/sustechpoints_convert.py`（`dog_perception/sustechpoints.py`） | 与 SUSTechPOINTS 互转标签（逐框修正、补漏标），并可启动该工具 |
+| `tools/dog/sustechpoints_convert.py`（`dog_perception/sustechpoints.py`） | 与 SUSTechPOINTS 互转标签（逐框修正、补漏标），并启动该工具 |
+| `third_party/SUSTechPOINTS/` | 3D 点云标注工具 SUSTechPOINTS 的源码（GPL-3.0，版本和本地修改见 `VENDORED.md`） |
 | `tools/dog/nusc_autolabel_eval.py` | 在 nuScenes 上用真值检查自动标注质量 |
 | `tools/dog/compare_detectors.py` | Pillar 与 Voxel 对比（AP、分段 AP、延迟、轨迹碎片化） |
 | `tools/dog/convert_nusc_ckpt.py` | nuScenes 10 类到 3 类的 head 权重迁移 |

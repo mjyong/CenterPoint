@@ -19,6 +19,8 @@ def get_all_scene_desc():
 
 def get_scene_names():
       scenes = os.listdir(root_dir)
+      # CenterPoint dog pipeline (2026-10-13): only directories are scenes (data/README.md is not)
+      scenes = filter(lambda s: os.path.isdir(os.path.join(root_dir, s)), scenes)
       scenes = filter(lambda s: not os.path.exists(os.path.join(root_dir, s, "disable")), scenes)
       scenes = list(scenes)
       scenes.sort()

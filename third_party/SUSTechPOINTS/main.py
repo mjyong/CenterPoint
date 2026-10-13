@@ -18,7 +18,14 @@ from tools import check_labels  as check
 
 #sys.path.append(os.path.join(BASE_DIR, './algos'))
 #import algos.rotation as rotation
-from algos import pre_annotate
+# CenterPoint dog pipeline (2026-10-13): TensorFlow and algos/models/deep_annotation_inference.h5 are only
+# needed for the auto-annotation / rotation-prediction buttons; without them the tool still loads, edits
+# and saves labels. See third_party/SUSTechPOINTS/VENDORED.md.
+try:
+    from algos import pre_annotate
+except Exception as e:  # ImportError without TensorFlow, OSError without the model file
+    pre_annotate = None
+    print("SUSTechPOINTS: auto-annotation disabled (%s: %s)" % (type(e).__name__, e))
 
 
 #sys.path.append(os.path.join(BASE_DIR, '../tracking'))
@@ -142,6 +149,8 @@ class Root(object):
       rawbody = cherrypy.request.body.readline().decode('UTF-8')
       
       data = json.loads(rawbody)
+      if pre_annotate is None:
+        raise cherrypy.HTTPError(503, "auto-annotation needs TensorFlow and algos/models/deep_annotation_inference.h5")
       
       return {"angle": pre_annotate.predict_yaw(data["points"])}
       #return {}
@@ -151,6 +160,8 @@ class Root(object):
     @cherrypy.tools.json_out()
     def auto_annotate(self, scene, frame):
       print("auto annotate ", scene, frame)
+      if pre_annotate is None:
+        raise cherrypy.HTTPError(503, "auto-annotation needs TensorFlow and algos/models/deep_annotation_inference.h5")
       return pre_annotate.annotate_file('./data/{}/lidar/{}.pcd'.format(scene,frame))
       
 
