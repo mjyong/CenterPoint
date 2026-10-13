@@ -358,7 +358,8 @@ class Trainer(object):
 
         # data = example_convert_to_torch(data, device=device)
         example = example_to_device(
-            data, torch.cuda.current_device(), non_blocking=False
+            data, torch.cuda.current_device() if torch.cuda.is_available() else torch.device("cpu"),
+            non_blocking=False
         )
 
         self.call_hook("after_data_to_device")
@@ -481,7 +482,8 @@ class Trainer(object):
     def resume(self, checkpoint, resume_optimizer=True, map_location="default"):
         if map_location == "default":
             checkpoint = self.load_checkpoint(
-                checkpoint , map_location='cuda:{}'.format(torch.cuda.current_device()) # TODO: FIX THIS!!
+                checkpoint, map_location='cuda:{}'.format(torch.cuda.current_device())
+                if torch.cuda.is_available() else 'cpu'
             )
         else:
             checkpoint = self.load_checkpoint(checkpoint, map_location=map_location)

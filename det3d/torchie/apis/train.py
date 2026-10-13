@@ -89,10 +89,15 @@ def parse_second_losses(losses):
     return loss, log_vars
 
 
+def default_device(local_rank=0):
+    """The GPU of this process, or the CPU when there is none (CPU training / testing for smoke runs)."""
+    return torch.device("cuda", local_rank) if torch.cuda.is_available() else torch.device("cpu")
+
+
 def batch_processor(model, data, train_mode, **kwargs):
 
     if "local_rank" in kwargs:
-        device = torch.device(kwargs["local_rank"])
+        device = default_device(kwargs["local_rank"])
     else:
         device = None
 
@@ -288,8 +293,10 @@ def train_detector(model, dataset, cfg, distributed=False, validate=False, logge
             # broadcast_buffers=False,
             find_unused_parameters=True,
         )
-    else:
+    elif torch.cuda.is_available():
         model = model.cuda()
+    else:
+        logger.warning("no CUDA device: training on the CPU (smoke runs only)")
 
     logger.info(f"model structure: {model}")
 

@@ -83,13 +83,18 @@ def _load_state_dict(path):
 
 
 def checkpoint_arch(path):
-    """'pillar' / 'voxel' / None, from the parameter names of a det3d checkpoint."""
-    keys = _load_state_dict(path).keys()
+    """Preset name from the parameter names of a det3d checkpoint: 'pillar' / 'voxel' for the
+    nuScenes models (6 head tasks), 'dog_pillar' / 'dog_voxel' for the 3-class fine-tuned ones
+    (one task per class, configs/dog/), None if unknown."""
+    keys = list(_load_state_dict(path).keys())
     if any(k.startswith("reader.pfn_layers") for k in keys):
-        return "pillar"
-    if any(k.startswith("backbone.conv_input") for k in keys):
-        return "voxel"
-    return None
+        arch = "pillar"
+    elif any(k.startswith("backbone.conv_input") for k in keys):
+        arch = "voxel"
+    else:
+        return None
+    tasks = {k.split(".")[2] for k in keys if k.startswith("bbox_head.tasks.")}
+    return "dog_" + arch if len(tasks) == 3 else arch
 
 
 def check_checkpoint(net, path, arch=""):

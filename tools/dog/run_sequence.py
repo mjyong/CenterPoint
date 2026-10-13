@@ -38,8 +38,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seq", required=True)
     ap.add_argument("--detectors", default="pillar")
-    ap.add_argument("--config-pillar", default=PRESETS["pillar"])
-    ap.add_argument("--config-voxel", default=PRESETS["voxel"])
+    ap.add_argument("--config-pillar", default=None, help="default: from --ckpt-pillar (nuScenes or dog model)")
+    ap.add_argument("--config-voxel", default=None, help="default: from --ckpt-voxel")
     ap.add_argument("--ckpt-pillar", default=None)
     ap.add_argument("--ckpt-voxel", default=None)
     ap.add_argument("--tta", action="store_true", help="double-flip TTA (offline teacher)")
@@ -54,7 +54,14 @@ def main():
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
-    from dog_perception.detection.centerpoint import CenterPointDetector
+    from dog_perception.detection import PRESET_CONFIGS
+    from dog_perception.detection.centerpoint import CenterPointDetector, checkpoint_arch
+
+    for n in ("pillar", "voxel"):
+        ckpt = getattr(args, "ckpt_" + n)
+        if getattr(args, "config_" + n) is None:
+            arch = checkpoint_arch(ckpt) if ckpt else None
+            setattr(args, "config_" + n, PRESET_CONFIGS.get(arch, PRESETS[n]))
 
     reader = SequenceReader(args.seq)
     base_h = args.base_height if args.base_height is not None else reader.meta.get("base_height", 0.45)

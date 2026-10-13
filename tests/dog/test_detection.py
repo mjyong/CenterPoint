@@ -213,3 +213,20 @@ def test_standard_boxes_agree_with_det3d_points_in_rbbox():
     for i in range(len(std)):
         mine = points_in_boxes_oriented(pts, std[i:i + 1])
         assert mine.sum() > 50 and np.array_equal(inside[:, i], mine)
+
+
+def test_checkpoint_arch_tells_nuscenes_and_dog_models(tmp_path):
+    import torch
+    from dog_perception.detection.centerpoint import checkpoint_arch
+
+    def ckpt(name, first, n_tasks):
+        sd = {first: torch.zeros(1)}
+        sd.update({"bbox_head.tasks.%d.hm.0.weight" % t: torch.zeros(1) for t in range(n_tasks)})
+        path = str(tmp_path / name)
+        torch.save({"state_dict": sd}, path)
+        return path
+
+    assert checkpoint_arch(ckpt("a.pth", "reader.pfn_layers.0.linear.weight", 6)) == "pillar"
+    assert checkpoint_arch(ckpt("b.pth", "reader.pfn_layers.0.linear.weight", 3)) == "dog_pillar"
+    assert checkpoint_arch(ckpt("c.pth", "backbone.conv_input.0.weight", 3)) == "dog_voxel"
+    assert checkpoint_arch(ckpt("d.pth", "neck.blocks.0.weight", 6)) is None

@@ -134,7 +134,7 @@ def main():
         )
     else:
         # model = fuse_bn_recursively(model)
-        model = model.cuda()
+        model = model.cuda() if torch.cuda.is_available() else model
 
     model.eval()
     mode = "val"
@@ -156,11 +156,13 @@ def main():
 
     for i, data_batch in enumerate(data_loader):
         if i == start:
-            torch.cuda.synchronize()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
             time_start = time.time()
 
         if i == end:
-            torch.cuda.synchronize()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
             time_end = time.time()
 
         with torch.no_grad():

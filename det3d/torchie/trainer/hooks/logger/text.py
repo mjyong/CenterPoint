@@ -60,7 +60,8 @@ class TextLoggerHook(LoggerHook):
                     log_dict["forward_time"] - log_dict["transfer_time"],
                     log_dict["loss_parse_time"] - log_dict["forward_time"],
                 )
-                log_str += "memory: {}, ".format(log_dict["memory"])
+                if "memory" in log_dict:          # GPU memory; absent on CPU runs
+                    log_str += "memory: {}, ".format(log_dict["memory"])
         else:
             log_str = "Epoch({}) [{}][{}]\t".format(
                 log_dict["mode"], log_dict["epoch"] - 1, log_dict["iter"]
