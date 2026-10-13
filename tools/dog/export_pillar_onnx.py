@@ -96,7 +96,7 @@ def trtexec_commands(out_dir, fp16=True):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py")
+    ap.add_argument("--config", default=None, help="default: from --checkpoint (nuScenes or dog model)")
     ap.add_argument("--checkpoint", default=None)
     ap.add_argument("--out", default="deploy/centerpoint_pillar")
     ap.add_argument("--max-pillars", type=int, default=30000)
@@ -104,6 +104,10 @@ def main():
     ap.add_argument("--check", default=None, help="det-frame cloud (.npy, N x 5) to verify ONNX vs PyTorch")
     args = ap.parse_args()
 
+    if args.config is None:
+        from dog_perception.detection import PRESET_CONFIGS
+        from dog_perception.detection.centerpoint import checkpoint_arch
+        args.config = PRESET_CONFIGS[(checkpoint_arch(args.checkpoint) if args.checkpoint else None) or "pillar"]
     det = CenterPointDetector(args.config, args.checkpoint, device="cpu", xy_range=args.xy_range)
     keys = export(det, args.out, args.max_pillars)
     print("exported", sorted(os.listdir(args.out)))

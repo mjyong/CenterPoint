@@ -82,6 +82,15 @@ def _load_state_dict(path):
     return {k[7:] if k.startswith("module.") else k: v for k, v in sd.items()}
 
 
+def default_class_map(model_class_names):
+    """Model class -> dog class. Models already trained on the dog classes (configs/dog/) keep their
+    names; nuScenes models go through NUSC_TO_DOG. (Testing 'any name in NUSC_TO_DOG' is not enough:
+    'pedestrian' is in both, and a dog model's vehicle / cyclist would map to nothing and be dropped.)"""
+    if set(model_class_names) <= set(CLASSES):
+        return {n: n for n in model_class_names}
+    return NUSC_TO_DOG
+
+
 def checkpoint_arch(path):
     """Preset name from the parameter names of a det3d checkpoint: 'pillar' / 'voxel' for the
     nuScenes models (6 head tasks), 'dog_pillar' / 'dog_voxel' for the 3-class fine-tuned ones
@@ -139,7 +148,7 @@ class CenterPointDetector:
 
         names = [n for t in cfg.model.bbox_head.tasks for n in t["class_names"]]
         if class_map is None:
-            class_map = NUSC_TO_DOG if any(n in NUSC_TO_DOG for n in names) else {n: n for n in names}
+            class_map = default_class_map(names)
         self.model_class_names = names
         self.label_map = np.array([class_index(class_map.get(n, "")) for n in names], dtype=np.int64)
 

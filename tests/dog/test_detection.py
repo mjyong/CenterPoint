@@ -230,3 +230,12 @@ def test_checkpoint_arch_tells_nuscenes_and_dog_models(tmp_path):
     assert checkpoint_arch(ckpt("b.pth", "reader.pfn_layers.0.linear.weight", 3)) == "dog_pillar"
     assert checkpoint_arch(ckpt("c.pth", "backbone.conv_input.0.weight", 3)) == "dog_voxel"
     assert checkpoint_arch(ckpt("d.pth", "neck.blocks.0.weight", 6)) is None
+
+
+def test_default_class_map_keeps_dog_classes():
+    from dog_perception.detection.centerpoint import default_class_map
+    dog = default_class_map(["vehicle", "pedestrian", "cyclist"])      # configs/dog/ model
+    assert dog == {"vehicle": "vehicle", "pedestrian": "pedestrian", "cyclist": "cyclist"}
+    nusc = default_class_map(["car", "truck", "construction_vehicle", "bus", "trailer", "barrier", "motorcycle",
+                              "bicycle", "pedestrian", "traffic_cone"])
+    assert nusc["truck"] == "vehicle" and nusc["bicycle"] == "cyclist" and "barrier" not in nusc
