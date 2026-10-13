@@ -1,0 +1,1 @@
+work_dirs/pretrained/nusc_voxel.pth filter=lfs diff=lfs merge=lfs -text

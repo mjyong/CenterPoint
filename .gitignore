@@ -12,6 +12,7 @@ venv/
 *.sh 
 *.pth
 !work_dirs/pretrained/nusc_pp.pth
+!work_dirs/pretrained/nusc_voxel.pth
 *.pkl
 *.zip
 *.bin
