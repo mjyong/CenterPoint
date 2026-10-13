@@ -2,7 +2,7 @@
 
 用鸟瞰图上的中心点做 3D 检测和跟踪。论文：[Center-based 3D Object Detection and Tracking](https://arxiv.org/abs/2006.11275)（Yin, Zhou, Krähenbühl, CVPR 2021）。
 
-本仓库在上游检测代码之外，加了轮足机器狗 XT32 的四段流水线，见 `dog_perception/`。方案和命令在 [docs/DOG_PIPELINE.md](docs/DOG_PIPELINE.md)。
+本仓库在上游检测代码之外，加了轮足机器狗 XT32 的四段流水线，见 `dog_perception/`。方案和命令在 [docs/DOG_PIPELINE.md](docs/DOG_PIPELINE.md)。用自采 bag 做自动标注、审核和微调，见 [docs/DOG_FINETUNE.md](docs/DOG_FINETUNE.md)；第一次可以先照 [docs/LABELING_TUTORIAL.md](docs/LABELING_TUTORIAL.md) 用样例 bag 走一遍。
 
 不枚举锚框朝向。点云先压成鸟瞰图，`CenterHead` 在图上找物体中心，再在中心处回归尺寸、高度、朝向和速度。跟踪把当前中心加上速度外推，和上一帧中心做最近点匹配。
 
@@ -19,5 +19,6 @@
 | `tools/train.py` `tools/dist_test.py` `tools/create_data.py` | 训练、评测、把官方数据集转成 info pkl                                                                                             |
 | `tools/nusc_tracking/` `tools/waymo_tracking/`               | 检测结果出来之后的离线跟踪                                                                                                       |
 | `dog_perception/` `tools/dog/`                               | 机器狗四段流水线，不改检测器内部，包在外面                                                                                               |
+| `third_party/SUSTechPOINTS/`                                 | 3D 点云标注工具（GPL-3.0），用来逐框审核自动标注，见 `VENDORED.md` |
 
 

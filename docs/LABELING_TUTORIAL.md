@@ -1,0 +1,261 @@
+# 标注实操：用样例 bag 从提取走到训练数据
+
+用仓库里的两段样例 bag，把 [DOG_FINETUNE.md](DOG_FINETUNE.md) 的 ①–⑤ 步完整走一遍：bag 转换 → 教师推理 → 自动标注 → 按轨迹审核 → SUSTechPOINTS 逐框审核 → 导回 → 生成训练数据。下面的命令和输出都是在本仓库实际跑出来的，照着做应该得到同样的结果。
+
+| 录制 | bag | 帧数 | 用途 |
+|---|---|---|---|
+| `rec_static` | `samples/rosbag2_2026_09_21-16_41_27` | 28 | 训练集：只做按轨迹审核 |
+| `rec_moving` | `samples/rosbag2_2026_09_21-16_41_27_moving`（狗在走） | 27 | 验证集：按轨迹 + 逐框审核 |
+
+约定：
+
+- 所有命令在仓库根目录执行，先 `export PYTHONPATH=.`。
+- 产物都写在 `data/` 下（被 .gitignore 忽略）。SUSTechPOINTS 的场景写在 `third_party/SUSTechPOINTS/data/` 下（同样被忽略）。
+- 这里的教师用 nuScenes 预训练的 Pillar，CPU 就能跑。真实数据请用 Voxel + TTA（要 GPU），见第 9 节。
+
+## 0. 准备
+
+```bash
+pip install -r requirements_dog.txt      # 其中 rosbags、mcap、cherrypy、jinja2 是这里要用的
+```
+
+另外要有一个 Foxglove（桌面版或网页版 app.foxglove.dev）用来看第 4 步生成的 MCAP，以及一个浏览器打开 SUSTechPOINTS。
+
+## 1. bag → 序列
+
+```bash
+python tools/dog/rosbag_to_sequence.py --bag samples/rosbag2_2026_09_21-16_41_27 --out data/seq/rec_static \
+    --lidar-topic /robot/topic/rdap/top_point_cloud2 --imu-topic /rte/rdap/rtk/imus/data_raw \
+    --inspvax-topic /rte/rdap/rtk/inspvax
+python tools/dog/rosbag_to_sequence.py --bag samples/rosbag2_2026_09_21-16_41_27_moving --out data/seq/rec_moving \
+    --lidar-topic /robot/topic/rdap/top_point_cloud2 --imu-topic /rte/rdap/rtk/imus/data_raw \
+    --inspvax-topic /rte/rdap/rtk/inspvax
+```
+
+应有的输出（最后两行）：
+
+```
+odom t 1789980087.992 .. 1789980090.793  span 2.8s  pos_type {56: 283}  base_height 0.31
+wrote 29 scans, 283 imu, 283 odom -> data/seq/rec_static
+odom t 1789980190.502 .. 1789980193.591  span 3.1s  pos_type {56: 310}  base_height 0.72
+wrote 27 scans, 310 imu, 310 odom -> data/seq/rec_moving
+```
+
+检查：`pos_type` 全是 56（INS_RTKFIXED，RTK 固定解）。自己的数据如果混有别的值，说明定位有一段不是固定解，世界系轨迹会漂。
+
+## 2. 教师推理 + 保存帧
+
+```bash
+python tools/dog/run_sequence.py --seq data/seq/rec_static --detectors pillar \
+    --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --save-frames --out data/runs/rec_static
+python tools/dog/run_sequence.py --seq data/seq/rec_moving --detectors pillar \
+    --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --save-frames --out data/runs/rec_moving
+```
+
+输出：`[pillar] 28 frames, network 584.8 ms (median)`、`[pillar] 27 frames, network 592.5 ms (median)`（CPU，每段半分钟左右）。
+
+结果：`data/runs/<rec>/frames/*.npy`（预处理后的 5 帧拼接点云，就是模型的输入）和 `data/runs/<rec>/pillar/results.pkl`（教师结果）。两段一共 191 MB。
+
+## 3. 自动标注
+
+```bash
+python tools/dog/auto_label.py --results data/runs/rec_static/pillar/results.pkl --out data/labels/rec_static/labels.pkl
+python tools/dog/auto_label.py --results data/runs/rec_moving/pillar/results.pkl --out data/labels/rec_moving/labels.pkl
+```
+
+```
+labelled 28 frames, 463 boxes, 19 tracks (7 flagged for review) -> data/labels/rec_static/labels.pkl, data/labels/rec_static/labels_tracks.csv
+labelled 27 frames, 327 boxes, 17 tracks (13 flagged for review) -> data/labels/rec_moving/labels.pkl, data/labels/rec_moving/labels_tracks.csv
+```
+
+`labels_tracks.csv` 每条轨迹一行，待审核的（`review` = 1，平均分 < 0.5）排在前面。`rec_moving` 的前几行：
+
+```
+track_id,label,review,mean_score,frames,interpolated,t_first,t_last,min_range_m,moving_share,max_speed,action,from,to,note
+12,vehicle,1,0.300,25,3,0.20,2.60,43.9,0.00,0.00,,,,
+32,cyclist,1,0.305,15,7,1.10,2.50,31.1,0.00,0.00,,,,
+30,cyclist,1,0.311,16,3,1.00,2.50,22.1,0.00,0.00,,,,
+48,vehicle,1,0.312,6,0,1.90,2.40,31.9,1.00,6.94,,,,
+14,vehicle,1,0.340,23,4,0.30,2.50,31.4,0.39,1.27,,,,
+```
+
+各列：轨迹号、类别、是否待审核、平均分、帧数、其中插值补出来的帧数、出现和消失的时间（秒，从录制开始算）、离狗最近的距离、处于运动状态的帧的比例、最大速度。最后三列和 `note` 留给审核人填。
+
+## 4. 按轨迹审核（④a）
+
+### 4.1 在 Foxglove 里看
+
+```bash
+python tools/dog/review_labels.py mcap --labels data/labels/rec_moving/labels.pkl \
+    --frames data/runs/rec_moving/frames --results data/runs/rec_moving/pillar/results.pkl \
+    --out data/labels/rec_moving/review.mcap
+```
+
+输出 `121 messages -> data/labels/rec_moving/review.mcap`，文件 14 MB（`rec_static` 同理，15 MB）。
+
+在 Foxglove 里打开这个文件：
+
+1. 加一个 3D 面板，勾选 `/lidar`、`/labels`、`/teacher`。
+2. Display frame 选 `det` 时，视角跟着狗走；选 `world` 时，静止的物体应该不动，拖尾缩成一个点。
+3. 待审核的轨迹是品红色粗框。框上的文字是"轨迹号 类别 分数"，后面依次可能有 REVIEW、interp（插值补的）和速度。
+4. 加一个 Log 面板选 `/log`，里面列出每条待审核轨迹第一次出现的时间。
+
+### 4.2 判断
+
+看不清的物体，也可以在第 5 步的 SUSTechPOINTS 里看，它的批量窗口把同一物体的 20 帧并排显示，每帧有俯视、侧视、后视三个视图。下面是这次的四个决定和依据：
+
+| 录制 | 轨迹 | 表里的信息 | 看到的 | 决定 |
+|---|---|---|---|---|
+| rec_moving | T48 vehicle | 6 帧，最大 6.9 m/s，32 m | 框里只有几条斜的扫描线（俯视），侧视图里点贴着框底，没有车身（下图左） | `drop` |
+| rec_moving | T14 vehicle | 23 帧，31 m，框内每帧约 4 个点 | 俯视图里框基本是空的 | `drop` |
+| rec_moving | T6 cyclist | 26 帧，3.6 m，框内每帧约 670 个点 | 点很多，但侧视、后视都是上窄下宽的三角形，不像人骑车（下图右） | `drop` |
+| rec_static | T22 cyclist | 24 帧，40 m，框内每帧约 3 个点 | 点太少，看不出是什么 | `drop` |
+
+<img src="labeling/evidence_t48.png" width="45%"> <img src="labeling/evidence_t6.png" width="53%">
+
+框内点数是另外数的（当前帧、框放大 10%）。表里没有这一列，在工具里看最直接。
+
+其他待审核的轨迹这里先不动。`rec_moving` 会在第 5 步逐框看；`rec_static` 剩下的待审核轨迹会在第 7 步被 `--skip-review` 去掉，不进训练集。
+
+### 4.3 填表并应用
+
+在 `labels_tracks.csv` 里给这几行的 `action` 填 `drop`，`note` 写上理由（例如 `48,vehicle,1,...,drop,,,6 帧、6.9 m/s；框里只有几条斜的扫描线，没有车身`）。用 Excel / WPS 编辑时存回 CSV（UTF-8）。然后：
+
+```bash
+python tools/dog/review_labels.py apply --labels data/labels/rec_static/labels.pkl \
+    --edits data/labels/rec_static/labels_tracks.csv --out data/labels/rec_static/labels_reviewed.pkl
+python tools/dog/review_labels.py apply --labels data/labels/rec_moving/labels.pkl \
+    --edits data/labels/rec_moving/labels_tracks.csv --out data/labels/rec_moving/labels_reviewed.pkl
+```
+
+```
+applied {'drop': 1}; 6 tracks still flagged (dropped by export_dataset.py --skip-review) -> data/labels/rec_static/labels_reviewed.pkl
+applied {'drop': 3}; 10 tracks still flagged (dropped by export_dataset.py --skip-review) -> data/labels/rec_moving/labels_reviewed.pkl
+```
+
+其他动作（`ok`、改类别、`flip`、`static`、`from`/`to` 限定时间段）见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 ④ 步。
+
+## 5. SUSTechPOINTS 逐框审核（④b，验证集 rec_moving）
+
+### 5.1 导出并启动
+
+```bash
+python tools/dog/sustechpoints_convert.py export --labels data/labels/rec_moving/labels_reviewed.pkl \
+    --frames data/runs/rec_moving/frames --scene rec_moving
+python tools/dog/sustechpoints_convert.py serve
+```
+
+输出 `27 frames -> third_party/SUSTechPOINTS/data/rec_moving`，以及 `SUSTechPOINTS on http://127.0.0.1:8081 (scenes: rec_moving)`。没装 TensorFlow 时还会多一行提示，说明学习型的朝向预测和自动标注不可用，改用 PCA。这是正常的。
+
+样例 bag 很短，这里导出了全部 27 帧。真实数据用 `--every 5`（10 Hz 里取 2 Hz）。
+
+浏览器打开 http://127.0.0.1:8081 ，左上角第一个下拉框选 `rec_moving`，第二个选一帧（这里是 `1789980192497682`）。帧名是时间戳的微秒数。
+
+![总览](labeling/sustech_overview.png)
+
+- 框旁的文字是"类别 [review] 轨迹号"。带 `review` 的是第 4 步之后仍待审核的轨迹。
+- 中间是狗（原点）。点云的 z 整体下移了 1.8 m：工具假定雷达离地 1.8 m，导回时会移回来，不用管。
+- 右下角的 Output 窗口可以点 × 关掉。
+
+### 5.2 常用操作
+
+| 要做的事 | 操作 |
+|---|---|
+| 调视角 | 左键拖动旋转，右键拖动平移，滚轮缩放 |
+| 换帧 / 换框 | `3` / `4`（或 PageUp / PageDown）上一帧 / 下一帧；`1` / `2` 上一个 / 下一个框 |
+| 选中一个框 | 左键点框（下图） |
+| 改类别 | 选中后，框旁工具条的下拉框；右键框 → Sync object type & attr 可以把类别同步到这个物体的其他帧 |
+| 调位置 / 朝向 | 鼠标移到左侧某个子视图里：`a` `s` `d` `w` 平移，`q` `e` 旋转，`r` `f` 旋转并自动贴合点，`g` 翻转 180° |
+| 调大小 | 子视图里拖动虚线或角；双击虚线 / 角 / 中心，让框自动缩到贴住点 |
+| 一条轨迹多帧一起看、一起改 | 选中后按 `v`，或右键框 → Edit multiple instances（批量窗口，下图）。Previous / Next 翻页，Exit 或 `v` 退出 |
+| 删这一帧的框 | 选中后按 Delete |
+| 删整条轨迹 | 右键框 → Delete this object (in all frames) |
+| 补一个漏标的物体 | 在物体的点上右键（不要点在已有的框上）→ New → 类别（类别对应见 5.4）。框会从点自动生长贴合；之后在侧视图里检查高度，按 `g` 检查朝向 |
+| 保存 | 自动保存：每次修改约 0.5 s 后写回 `label/*.json`。Ctrl+S 也可以手动保存 |
+| 点的大小 / 颜色 | `+` / `-`；右上角 ⋮ 菜单里可以按强度着色 |
+
+选中一个框后，左侧三个子视图依次是俯视、侧视、后视。顶部信息条是"类别-ID | 距离 | x y z | 长 宽 高 | roll pitch yaw（度） | 框内点数"，下图是 `BicycleRider-10 | 7.94 | 3.84 6.95 -0.63 | 1.85 0.78 1.78 | 0.00 0.00 -70.27 | 739`：
+
+![选中一个框](labeling/sustech_selected.png)
+
+按 `v` 打开同一物体的批量窗口：
+
+![批量窗口](labeling/sustech_batch.png)
+
+右键框弹出的菜单（删除、同步类别、批量编辑等）：
+
+![框的右键菜单](labeling/sustech_box_menu.png)
+
+右键空白处 → New，选类别：
+
+![新建](labeling/sustech_new_menu.png)
+
+### 5.3 这次做的修改
+
+| 轨迹 | 看到的 | 操作 |
+|---|---|---|
+| T10 cyclist（分数 0.50，**没有**被标为待审核） | 俯视图里是三条腿的 Y 形，侧视、后视是三角形，每一帧都一样（上面的选中图和批量图）：是一个三脚架，不是骑车的人。第 4 步删掉的 T6 也是这个形状 | 右键 → Delete this object (in all frames) |
+| T32 cyclist（待审核） | 31 m 外，每帧约 5 个点，看不出是什么 | 右键 → Delete this object (in all frames) |
+
+两次删除都自动存盘：`label/` 里 27 帧都不再有 obj 10 和 32。
+
+T10 说明验证集为什么要逐框看。分数 0.50 刚好在待审核线（0.5）之上，按轨迹审核的表里不会提醒你，但它整条都是错的。
+
+### 5.4 标注约定
+
+- 只标三类：车（Car、Van、Bus、Truck 等，导回后都是 vehicle）、行人（Pedestrian、Child、RoadWorker）、骑行者（BicycleRider、MotorcyleRider、ScooterRider；停着的 Bicycle、Motorcycle、Scooter 也算，和 nuScenes 的约定一致）。其他类型导回时会被跳过并计数。
+- 框贴住物体的点。朝向是车头 / 人面朝的方向，看不出时取运动方向。
+- 点少到人也看不出是什么的，不标（标了也是猜）。
+- 范围：检测器只看 ±40.8 m，更远的可以不管。
+- 运动物体在 5 帧拼接的点云里有拖影，框放在拖影最前端（当前帧）。
+- 要挪一条轨迹的位置，在批量窗口里整条一起挪。只挪一帧的话，导回时那几帧的速度会算出跳变。
+
+## 6. 导回
+
+```bash
+python tools/dog/sustechpoints_convert.py import --scene rec_moving --out data/labels/rec_moving/labels_sustech.pkl
+```
+
+```
+27 frames, 12 tracks, boxes {'vehicle': 161, 'moved or new': 0, 'pedestrian': 47, 'cyclist': 23} -> data/labels/rec_moving/labels_sustech.pkl
+```
+
+和导出前比，轨迹从 14 条变成 12 条（少了 10 和 32）。`moved or new` 为 0，说明没有挪动过的框，其余框的位置和速度原样保留。导回的标签全部视为已审核（`review` 清零）。
+
+## 7. 生成训练数据
+
+```bash
+python tools/dog/export_dataset.py \
+    --recording data/runs/rec_static data/labels/rec_static/labels_reviewed.pkl \
+    --recording data/runs/rec_moving data/labels/rec_moving/labels_sustech.pkl \
+    --val-recordings rec_moving --out data/dog --gt-db --skip-review
+```
+
+```
+train 28 / val 27 frames -> data/dog
+load 232 vehicle database infos
+load 28 cyclist database infos
+load 36 pedestrian database infos
+```
+
+| | 帧 | vehicle | pedestrian | cyclist |
+|---|---|---|---|---|
+| train（rec_static） | 28 | 232 | 36 | 28 |
+| val（rec_moving） | 27 | 161 | 47 | 23 |
+
+`--skip-review` 去掉了 rec_static 里 6 条没审核的待审核轨迹。rec_moving 是逐框审核过的，不受影响。
+
+`data/dog` 的路径和 `configs/dog/dog_centerpoint_pp_xt32.py` 一致，接下来就是 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 ⑥ 步的 head 迁移和训练。
+
+## 8. 清理
+
+```bash
+rm -rf data/seq data/runs data/labels data/dog third_party/SUSTechPOINTS/data/rec_moving
+```
+
+## 9. 换成自己的数据时
+
+- **教师**：用 Voxel + TTA：`run_sequence.py --detectors voxel --tta --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth`（要 GPU；权重在 Git LFS 里，先 `git lfs pull`）。`auto_label.py --results` 指向 `data/runs/<rec>/voxel/results.pkl`。
+- **录制名**：每段 bag 一个，名字不能重复（`data/seq/<rec>`、`data/runs/<rec>`、`data/labels/<rec>`、SUSTechPOINTS 场景名都用它）。
+- **划分**：整段录制划给验证集。验证集每段都走第 5 步（`--every 5` 导出）；训练集至少走第 4 步。
+- **保存结果**：`data/` 不进 git。标好的 `labels_reviewed.pkl`、`labels_sustech.pkl` 和 `labels_tracks.csv` 请另外备份；SUSTechPOINTS 里的场景随时可以从 `labels_reviewed.pkl` 重新导出（会覆盖未导回的修改）。
