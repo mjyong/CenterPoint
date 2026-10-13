@@ -232,7 +232,7 @@ python tools/dog/export_dataset.py --recording work_dirs/rec_001 data/rec_001/la
     --recording work_dirs/rec_002 data/rec_002/labels_reviewed.pkl --val-recordings rec_002 --out data/dog \
     --gt-db --skip-review
 python tools/dog/convert_nusc_ckpt.py --src nusc_pp.pth --dst work_dirs/dog_pp_init.pth
-python -m torch.distributed.launch --nproc_per_node=4 tools/train.py configs/dog/dog_centerpoint_pp_xt32.py
+python tools/train.py configs/dog/dog_centerpoint_pp_xt32.py    # 单卡；评估、对比、验收见 DEVELOPMENT_WORKFLOW.md
 python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir work_dirs/dog_pp --checkpoint work_dirs/dog_centerpoint_pp_xt32/latest.pth
 
 # 4) 部署 Pillar：导出两段 ONNX 并与 PyTorch 逐段校验；把 deploy/ 拷到 Orin 上建 FP16 引擎（见第 8 节）

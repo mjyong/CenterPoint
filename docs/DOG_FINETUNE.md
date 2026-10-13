@@ -2,6 +2,8 @@
 
 从 kygi665 录制（Hesai XT32 + RTK 组合导航）到微调后的 Pillar 模型的完整流程。所有命令在仓库根目录执行，设置 `PYTHONPATH=.`。通用 LIO 里程计的写法见 [DOG_PIPELINE.md](DOG_PIPELINE.md) 第 3 节。
 
+训练之后的评估、对比、验收和部署，以及整轮迭代的做法，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md)。
+
 **第一次做，先照着 [LABELING_TUTORIAL.md](LABELING_TUTORIAL.md) 用仓库里的两段样例 bag 走一遍**：每一步的命令、应有的输出、SUSTechPOINTS 的界面截图和操作都在里面。
 
 中间产物都放在 `data/` 下（`data/seq`、`data/runs`、`data/labels`、`data/dog`），这个目录被 .gitignore 忽略，点云不会被误提交。
@@ -165,27 +167,30 @@ python tools/dog/export_dataset.py \
 
 ```bash
 python tools/dog/convert_nusc_ckpt.py --src work_dirs/pretrained/nusc_pp.pth --dst work_dirs/dog_pp_init.pth
-python tools/train.py configs/dog/dog_centerpoint_pp_xt32.py
+python tools/train.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir data/train/dog_pp_v001
 ```
 
 - 迁移：vehicle ← car，pedestrian ← pedestrian，cyclist ← bicycle；其余层原样。配置里 `load_from` 指向迁移后的权重。
-- 配置：3 个 task（每类一个），20 个 epoch，one-cycle 最大学习率 5e-4，GT 采样（车 2、人 4、骑行 4），±45° 旋转、±5% 缩放、±2° 俯仰/横滚增强。5k–10k 帧单卡就够。
-- 多卡命令（`torch.distributed.launch`）在当前 torch 2.14 上没有验证过。
+- 配置：3 个 task（每类一个），20 个 epoch，one-cycle 最大学习率 5e-4，GT 采样（车 2、人 4、骑行 4），±45° 旋转、±5% 缩放、±2° 俯仰/横滚增强。
+- 单卡（RTX 4090）直接运行；中断后用 `--resume_from <work_dir>/epoch_N.pth` 续训。多卡命令（`torch.distributed.launch`）在 torch 2.x 上没有验证过。没有 GPU 时同一条命令会在 CPU 上跑，只适合检查流程。
+- 配置要点、日志怎么看、怎么选 epoch，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) 第 4 节。
 
 ## ⑦ 评估
 
 ```bash
-python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir work_dirs/dog_pp_eval \
-    --checkpoint work_dirs/dog_centerpoint_pp_xt32/latest.pth
+python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir data/train/dog_pp_v001/eval \
+    --checkpoint data/train/dog_pp_v001/latest.pth
 ```
 
-- 预训练模型和微调模型在**同一批人工检查过的验证录制**上比较：两个都用 `run_sequence.py` 跑，再用 `compare_detectors.py --labels <验证集 labels_reviewed.pkl>` 按 0–10 / 10–20 / 20–40 m 分段比 AP、ATE、AVE。
+- 这是模型级评估（网络本身，验证集 `data/dog/infos_val.pkl`）。决定能不能替换线上模型，要看流水线级对比：预训练模型和微调模型都用 `run_sequence.py` 在**同一批人工逐框审核过的验证录制**上跑，再用 `compare_detectors.py --labels <验证集 labels_sustech.pkl>` 逐类、按 0–10 / 10–20 / 20–40 m 分段比。
+- 另外在 nuScenes mini_val 上查回归（`nusc_clip_eval.py`），在新 bag 上人眼看（`run_bag_mcap.py`）。
 - 不要用教师自己生成的标签评估教师同架构的模型。
-- 看效果：`python tools/dog/run_bag_mcap.py --bag <bag> --ckpt work_dirs/dog_centerpoint_pp_xt32/latest.pth --mcap out.mcap`（配置由权重自动识别）。
+- 各工具都按权重自动识别配置（nuScenes 10 类 / 狗 3 类），不用再手动指定。
+- 四层评估的命令、指标含义和验收标准，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) 第 5 节。
 
 ## ⑧ 部署到 Orin
 
-`tools/dog/export_pillar_onnx.py` 导出两段 ONNX 并与 PyTorch 逐段校验，再在 Orin 上用 `trtexec --fp16` 建引擎，见 DOG_PIPELINE.md 第 8 节。
+`tools/dog/export_pillar_onnx.py --checkpoint <权重> --out deploy/<名字> --check <一帧 .npy>` 导出两段 ONNX 并与 PyTorch 逐段校验，再在 Orin 上用 `trtexec --fp16` 建引擎，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) 第 6 节和 DOG_PIPELINE.md 第 8 节。
 
 ## ⑨ 迭代
 
