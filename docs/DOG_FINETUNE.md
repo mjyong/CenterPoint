@@ -193,11 +193,37 @@ python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir work
 | 维护 | 最后一次提交 2024-06，之后没有更新 | 持续更新（2026-09 仍有提交），LF AI & Data 项目 |
 | 许可 | GPL-3.0（内部使用不受影响） | Apache-2.0 |
 
-**建议先用 SUSTechPOINTS。** 我们的数据只有激光，没有相机；预标注来自自己的教师，不需要平台自带的模型；标注量是一两个人校正验证集、补漏标。SUSTechPOINTS 是纯文件格式，`frames/*.npy` 和 `labels.pkl` 写一个小转换脚本就能来回转换（保留轨迹号作为物体 ID），批量模式正好对应"一条轨迹连续多帧一起改"。它的问题是已经两年多没有维护，遇到 bug 得自己修。
+**建议先用 SUSTechPOINTS。** 我们的数据只有激光，没有相机；预标注来自自己的教师，不需要平台自带的模型；标注量是一两个人校正验证集、补漏标。SUSTechPOINTS 是纯文件格式，用 `tools/dog/sustechpoints_convert.py` 来回转换（见下文），轨迹号保留为物体 ID，批量模式正好对应"一条轨迹连续多帧一起改"。它的问题是已经两年多没有维护，遇到 bug 得自己修。
 
 **以后换 Xtreme1 的时机**：标注的人多了，需要分配任务、质检、统计；或者要加相机做融合标注；或者想要一个长期有人维护的平台。代价是部署重，预标注要转成它的导入格式。
 
-两种工具都建议导出 5 帧拼接的点云（就是模型的输入），远处稀疏的物体更容易看清；框放在检测系（重力对齐，地面 z ≈ 0）。
+### SUSTechPOINTS 的导入导出
+
+```bash
+# 导出：标签 + 点云 -> SUSTechPOINTS 场景（--out 指向它的 data/ 目录）。--every 5 = 10 Hz 里取 2 Hz
+python tools/dog/sustechpoints_convert.py export --labels data/labels/rec_001/labels_reviewed.pkl \
+    --frames work_dirs/rec_001/frames --out ~/SUSTechPOINTS/data --scene rec_001 --every 5
+
+# 启动标注工具，浏览器打开 http://127.0.0.1:8081
+# （也可以用它自己的 python main.py；这个包装只需要 cherrypy 和 jinja2，没装 TensorFlow 时自动标注按钮不可用）
+python tools/dog/sustechpoints_convert.py serve --app ~/SUSTechPOINTS
+
+# 标完导回来，得到和 labels.pkl 一样格式的文件，直接给 export_dataset.py
+python tools/dog/sustechpoints_convert.py import --scene-dir ~/SUSTechPOINTS/data/rec_001 \
+    --out data/labels/rec_001/labels_sustech.pkl
+```
+
+转换规则（`dog_perception/sustechpoints.py`）：
+
+- **坐标系**：点云和框都在每一帧自己的检测系（重力对齐，地面 z ≈ 0），不需要标定文件，也不写 `ego_pose`（SUSTechPOINTS 的 ego_pose 是 NovAtel 的 UTM 格式，并写死了它自己车上的雷达安装）。
+- **点云**：默认导出 5 帧拼接（模型的输入），远处稀疏的物体更容易看清；运动物体会拖影，框要放在拖影最前端（当前帧）。`--current-sweep` 只导当前帧。强度除以 255。
+- **帧名**：时间戳的微秒数（16 位数字，按名字排序就是时间顺序）。`dog_meta.json` 保存每帧的时间戳、`T_world_det` 和自动标注的速度、分数，导入时要用，不要删。
+- **框**：position 为框中心，scale 为（长、宽、高），rotation.z 为航向；导入时忽略 rotation.x / y。
+- **类别**：导出为 Car / Pedestrian / BicycleRider；待审核的轨迹 `obj_attr` 为 `review`，在工具里会显示出来。导入时按 `TYPE_TO_CLASS` 映射回三类：Car、Van、Bus、Truck 等为 vehicle；Pedestrian、RoadWorker、Child 为 pedestrian；BicycleRider、MotorcyleRider、ScooterRider 以及停着的 Bicycle、Motorcycle、Scooter 为 cyclist（和 nuScenes 的映射一致）。其他类型（Cone、TrafficBarrier 等）跳过并计数；`--type-map Trimotorcycle=vehicle` 可以补充。
+- **轨迹号**：数字 `obj_id`（自动标注的轨迹）原样保留；工具里新建、不是数字的 ID 分配新号。
+- **速度**：框没被挪动（中心偏移 ≤ 5 cm）就保留自动标注的速度，静止物体的处理不受影响；挪动过或新加的框，用同一 `obj_id` 在世界系的中心差分（±0.5 s）重算，低于 0.2 m/s 置 0。所以要改一条轨迹的位置时，用批量模式把整条轨迹一起挪；只挪其中一帧，那几帧的速度会算出一个跳变。
+
+在运动样例 bag 上用真实的 SUSTechPOINTS（2024-06 的最新版本）验证过：导出的 27 帧场景能正常加载（一帧 12 个框、18.7 万个点，网页没有报错，待审核的框显示 `review`）；不做修改直接导回，框、类别、速度与原标签完全一致；在工具里把一辆车挪 1 m 并改成 Van、新加一个行人，再用工具自己的保存功能存盘，导回后车仍是 vehicle、位置偏移 1.00 m，新行人成为一条新轨迹。
 
 ## 11. 在样例 bag 上跑通的结果
 
