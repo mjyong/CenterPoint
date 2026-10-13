@@ -11,7 +11,7 @@
 
 - 所有命令在仓库根目录执行，先 `export PYTHONPATH=.`。
 - 产物都写在 `data/` 下（被 .gitignore 忽略）。SUSTechPOINTS 的场景写在 `third_party/SUSTechPOINTS/data/` 下（同样被忽略）。
-- 这里的教师用 nuScenes 预训练的 Pillar，CPU 就能跑。真实数据请用 Voxel + TTA（要 GPU），见第 9 节。
+- 第 2 步在同一段序列上同时跑 Pillar 和 Voxel，并另跑一遍 Voxel 双翻转 TTA。第 3 步起仍用 Pillar 的 `results.pkl`，这样后面记下来的框数不变。自己的数据用 Voxel + TTA，见第 9 节。
 
 ## 0. 准备
 
@@ -45,16 +45,40 @@ wrote 27 scans, 310 imu, 310 odom -> data/seq/rec_moving
 
 ## 2. 教师推理 + 保存帧
 
+一次命令里把两个检测器跑在同一份预处理点云上。`--tta` 会作用到这次启动的每一个检测器，所以双翻转单独再跑 Voxel。
+
 ```bash
-python tools/dog/run_sequence.py --seq data/seq/rec_static --detectors pillar \
-    --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --save-frames --out data/runs/rec_static
-python tools/dog/run_sequence.py --seq data/seq/rec_moving --detectors pillar \
-    --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --save-frames --out data/runs/rec_moving
+python tools/dog/run_sequence.py --seq data/seq/rec_static --detectors pillar,voxel \
+    --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth \
+    --save-frames --device cuda:0 --out data/runs/rec_static
+python tools/dog/run_sequence.py --seq data/seq/rec_moving --detectors pillar,voxel \
+    --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth \
+    --save-frames --device cuda:0 --out data/runs/rec_moving
+python tools/dog/run_sequence.py --seq data/seq/rec_static --detectors voxel --tta \
+    --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth --device cuda:0 --out data/runs/rec_static_tta
+python tools/dog/run_sequence.py --seq data/seq/rec_moving --detectors voxel --tta \
+    --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth --device cuda:0 --out data/runs/rec_moving_tta
 ```
 
-输出：`[pillar] 28 frames, network 584.8 ms (median)`、`[pillar] 27 frames, network 592.5 ms (median)`（CPU，每段半分钟左右）。
+RTX 4090 上的网络耗时（丢掉第一帧后的中位数）：
 
-结果：`data/runs/<rec>/frames/*.npy`（预处理后的 5 帧拼接点云，就是模型的输入）和 `data/runs/<rec>/pillar/results.pkl`（教师结果）。两段一共 191 MB。
+```
+rec_static   [pillar] 28 frames, 129.5 ms    [voxel] 28 frames, 112.0 ms    [voxel --tta] 28 frames, 122.1 ms
+rec_moving   [pillar] 27 frames, 133.8 ms    [voxel] 27 frames, 115.7 ms    [voxel --tta] 27 frames, 126.3 ms
+```
+
+没有 GPU 时只跑 Pillar、去掉 `--device cuda:0`，CPU 上大约 585 ms、593 ms。
+
+上报阈值（车 0.35、人 0.30、骑行 0.40）下的框数，以及 2 m 内同类框的重合比例：
+
+| | pillar 框 | voxel 框 | voxel+TTA 框 | pillar 被 voxel 盖住 | voxel 与 voxel+TTA 互相盖住 |
+|---|---|---|---|---|---|
+| rec_static | 420（车 304 / 人 42 / 骑行 74） | 370（273 / 54 / 43） | 401（276 / 76 / 49） | 70% | 90% / 83% |
+| rec_moving | 287（147 / 78 / 62） | 196（106 / 47 / 43） | 168（93 / 43 / 32） | 44% | 79% / 92% |
+
+这两段没有人工真值，不能在狗的数据上分出谁更准。nuScenes 验证集上，当前这两份权重的成绩是 Voxel mAP 59.6 / NDS 66.8，Pillar mAP 50.3 / NDS 60.2（`configs/nusc/README.md`）。走动的那段里 Pillar 多出来的框，大部分 Voxel 对不上，和它在 nuScenes 上更弱是一致的。TTA 把四次翻转拼成一次前向，所以只慢大约 10 ms；它和单次 Voxel 重合最高。仓库里没有第三份预训练权重。标完并微调之后，狗自己的 Voxel 权重量才会超过这个 nuScenes 教师。
+
+结果：`data/runs/<rec>/frames/*.npy`（预处理后的 5 帧拼接点云）和 `data/runs/<rec>/{pillar,voxel}/results.pkl`。两段点云加结果大约 193 MB。第 3 步起用的是 `pillar/results.pkl`。自己的数据改用 `voxel` 加 `--tta` 的 `results.pkl`，见第 9 节。
 
 ## 3. 自动标注
 
