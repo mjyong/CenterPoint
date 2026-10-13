@@ -9,11 +9,13 @@ whole recording available, every track is refined *non-causally*:
 * center       : RTS smoothing + interpolation across short gaps
                  (recovers frames the teacher missed)
 * static/moving: a frame is moving only when both the smoothed trajectory
-                 (difference over +-0.5 s) and the teacher's velocity head
-                 say so. A static object seen from a moving robot drifts
-                 (its visible side changes), so the trajectory alone would
-                 give parked cars a few tenths of m/s
-* static track : fixed position (score-weighted median), zero velocity
+                 (difference over +-0.5 s, > 0.4 m/s) and the teacher's
+                 velocity head (> 0.15 m/s) say so. A static object seen
+                 from a moving robot drifts (its visible side changes), so
+                 the trajectory alone gives parked cars a few tenths of
+                 m/s; the velocity head alone under-reads slow movers
+* static track : zero velocity; fixed position (score-weighted median) when
+                 the boxes stay close (per-class spread)
 * heading      : direction of motion when moving fast, else circular mean
                  of the box yaws, 180 deg flips resolved against the motion
                  direction (or the best box when the track never moves)
@@ -23,7 +25,7 @@ whole recording available, every track is refined *non-causally*:
 Humans then only fix what is left (``review`` flags low-confidence tracks).
 """
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -39,7 +41,11 @@ class AutoLabelConfig:
     min_mean_score: float = 0.3
     max_gap: float = 0.5            # [s] gaps filled by interpolation
     moving_speed: float = 1.0       # [m/s] heading from motion above this
-    static_speed: float = 0.5       # [m/s] below this (trajectory or teacher) a frame is static
+    static_speed: float = 0.4       # [m/s] trajectory speed below this: static frame
+    teacher_speed: float = 0.15     # [m/s] teacher velocity-head speed below this: static frame
+    # [m] a static track is pinned to one position only when 90% of its boxes stay this close to the median;
+    # wider spread means the track drifted or switched objects, keep the smoothed path then
+    max_static_spread: dict = field(default_factory=lambda: {"vehicle": 1.0, "pedestrian": 0.5, "cyclist": 1.5})
     velocity_window: float = 0.5    # [s] half-width of the trajectory difference
     review_score: float = 0.5       # tracks below this mean score are flagged for review
 
@@ -88,10 +94,11 @@ def refine_track(obs, stamps, cfg):
     v_traj = _window_velocity(span, sx, sy, cfg.velocity_window)
     v_teacher = _running_median(np.array([np.hypot(*o["vel"]) for o in obs]), 2)
     moving = (np.hypot(v_traj[:, 0], v_traj[:, 1]) > cfg.static_speed) & \
-        (np.interp(span, t, v_teacher) > cfg.static_speed)
+        (np.interp(span, t, v_teacher) > cfg.teacher_speed)
     if not moving.any():                      # static object: one position for the whole track
-        sx = np.full(len(span), _weighted_median(boxes[:, 0], scores))
-        sy = np.full(len(span), _weighted_median(boxes[:, 1], scores))
+        c = np.array([_weighted_median(boxes[:, 0], scores), _weighted_median(boxes[:, 1], scores)])
+        if np.percentile(np.hypot(*(boxes[:, :2] - c).T), 90) <= cfg.max_static_spread.get(CLASSES[label], 1.0):
+            sx, sy = np.full(len(span), c[0]), np.full(len(span), c[1])
     vel = np.where(moving[:, None], v_traj, 0.0)
     speed = np.hypot(vel[:, 0], vel[:, 1])
 

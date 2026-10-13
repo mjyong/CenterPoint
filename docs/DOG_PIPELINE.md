@@ -106,9 +106,10 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 - 类别：按分数加权投票；
 - 尺寸和 z：取加权中位数；
 - 中心点：RTS 平滑，并插值补上 0.5 s 以内的漏检；
-- 朝向：运动时取速度方向，静止时取消歧后的环形均值；
+- 静止 / 运动：轨迹速度（±0.5 s 差分）> 0.4 m/s 并且教师速度头 > 0.15 m/s 的帧才算运动，否则速度为 0；整条轨迹都静止且框聚得紧时，位置取加权中位数。只看轨迹不行：狗走动时，静止的车被看到的那一面在变，框中心跟着漂，会被当成在动；只看速度头又会漏掉慢速运动。nuScenes 上的对比见 [DOG_FINETUNE.md](DOG_FINETUNE.md)；
+- 朝向：运动快（> 1 m/s）时取运动方向，否则取框朝向的环形均值，180° 歧义用运动方向（从没动过就用分数最高的框）消解；
 - 过滤：丢弃太短或平均分太低的轨迹；
-- 低置信轨迹导出到 `*_review.csv`，交给人工处理。
+- 所有轨迹导出到 `*_tracks.csv`，低置信的标为待审核，人工在 Foxglove 里看过后按轨迹修正（`tools/dog/review_labels.py`），见 [DOG_FINETUNE.md](DOG_FINETUNE.md)。
 
 在仿真中，对同一个带噪声的教师（每帧 0.5 个虚警、10% 朝向翻转），行人指标变化如下：
 
@@ -181,6 +182,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `dog_perception/tracking/` | IMM、贪心/匈牙利匹配、多目标跟踪器 |
 | `dog_perception/prediction/` | 第一档 IMM 外推、特征构造、自监督数据、模型、训练/评估 |
 | `dog_perception/autolabel.py` | 离线轨迹级精修 |
+| `dog_perception/label_review.py` | 按轨迹审核：轨迹表、修正动作、审核用 Foxglove MCAP |
 | `dog_perception/pipeline.py` | 四段串联 `PerceptionPipeline` |
 | `dog_perception/sim.py` | XT32 + 足式步态仿真器（测试和演示用） |
 | `det3d/datasets/dog/` + pipeline 改动 | `DogDataset`、GT-sampling、俯仰/横滚增强 |
@@ -188,6 +190,8 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/rosbag_to_sequence.py` | ROS1/ROS2 bag 转序列（无需安装 ROS，依赖 `rosbags`） |
 | `tools/dog/run_sequence.py` | 录制数据回放，Pillar/Voxel 并行跑，输出结果、跟踪日志和帧数据 |
 | `tools/dog/auto_label.py`, `export_dataset.py` | 教师自动标注，导出为 DogDataset 并建 GT 库 |
+| `tools/dog/review_labels.py` | 自动标注的人工审核：生成 MCAP、按轨迹表修正标签 |
+| `tools/dog/nusc_autolabel_eval.py` | 在 nuScenes 上用真值检查自动标注质量 |
 | `tools/dog/compare_detectors.py` | Pillar 与 Voxel 对比（AP、分段 AP、延迟、轨迹碎片化） |
 | `tools/dog/convert_nusc_ckpt.py` | nuScenes 10 类到 3 类的 head 权重迁移 |
 | `tools/dog/export_pillar_onnx.py` | 导出给 TensorRT 用的两段 ONNX，逐段校验，并打印上板建引擎的 `trtexec` 命令 |
@@ -200,7 +204,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 
 ## 3. 使用流程
 
-所有命令都在仓库根目录执行，并设置 `PYTHONPATH=.`。
+所有命令都在仓库根目录执行，并设置 `PYTHONPATH=.`。下面按 LIO 里程计（如 FAST-LIO）写；kygi665（XT32 + RTK 组合导航）录制的完整微调流程，包括人工审核，见 [DOG_FINETUNE.md](DOG_FINETUNE.md)。
 
 ```bash
 # 0) 录制数据 -> 序列（base_height 为机身原点离地高度，extrinsic 为雷达在 LIO body 系下的外参）
@@ -212,14 +216,19 @@ python tools/dog/rosbag_to_sequence.py --bag rec_001/ --out data/rec_001 \
 python tools/dog/run_sequence.py --seq data/rec_001 --detectors pillar,voxel \
     --ckpt-pillar nusc_pp.pth --ckpt-voxel nusc_voxel.pth --save-frames --out work_dirs/rec_001
 
-# 2) 离线教师自动标注 -> 人工修正 review.csv 中的轨迹 -> 对比两个检测器
+# 2) 离线教师自动标注 -> 在 Foxglove 里看、按轨迹表 labels_tracks.csv 修正 -> 对比两个检测器
 python tools/dog/auto_label.py --seq data/rec_001 --ckpt-voxel nusc_voxel.pth --tta --out data/rec_001/labels.pkl
-python tools/dog/compare_detectors.py --labels data/rec_001/labels.pkl \
+python tools/dog/review_labels.py mcap --labels data/rec_001/labels.pkl --frames work_dirs/rec_001/frames \
+    --out data/rec_001/review.mcap
+python tools/dog/review_labels.py apply --labels data/rec_001/labels.pkl --edits data/rec_001/labels_tracks.csv \
+    --out data/rec_001/labels_reviewed.pkl
+python tools/dog/compare_detectors.py --labels data/rec_001/labels_reviewed.pkl \
     --results pillar=work_dirs/rec_001/pillar/results.pkl voxel=work_dirs/rec_001/voxel/results.pkl
 
-# 3) 微调：导出数据集 + GT 库，迁移 head，用 det3d 训练
-python tools/dog/export_dataset.py --recording work_dirs/rec_001 data/rec_001/labels.pkl \
-    --recording work_dirs/rec_002 data/rec_002/labels.pkl --val-recordings rec_002 --out data/dog --gt-db
+# 3) 微调：导出数据集 + GT 库（--skip-review 丢掉没审核的低置信轨迹），迁移 head，用 det3d 训练
+python tools/dog/export_dataset.py --recording work_dirs/rec_001 data/rec_001/labels_reviewed.pkl \
+    --recording work_dirs/rec_002 data/rec_002/labels_reviewed.pkl --val-recordings rec_002 --out data/dog \
+    --gt-db --skip-review
 python tools/dog/convert_nusc_ckpt.py --src nusc_pp.pth --dst work_dirs/dog_pp_init.pth
 python -m torch.distributed.launch --nproc_per_node=4 tools/train.py configs/dog/dog_centerpoint_pp_xt32.py
 python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir work_dirs/dog_pp --checkpoint work_dirs/dog_centerpoint_pp_xt32/latest.pth
