@@ -8,9 +8,16 @@ whole recording available, every track is refined *non-causally*:
 * size, z      : score-weighted median (rigid objects do not change size)
 * center       : RTS smoothing + interpolation across short gaps
                  (recovers frames the teacher missed)
-* heading      : smoothed velocity direction when moving, circular mean of
-                 the (180 deg disambiguated) box yaws otherwise
-* velocity     : derivative of the smoothed trajectory
+* static/moving: a frame is moving only when both the smoothed trajectory
+                 (difference over +-0.5 s) and the teacher's velocity head
+                 say so. A static object seen from a moving robot drifts
+                 (its visible side changes), so the trajectory alone would
+                 give parked cars a few tenths of m/s
+* static track : fixed position (score-weighted median), zero velocity
+* heading      : direction of motion when moving fast, else circular mean
+                 of the box yaws, 180 deg flips resolved against the motion
+                 direction (or the best box when the track never moves)
+* velocity     : trajectory difference when moving, zero when static
 * drop         : tracks that are too short or too low-scoring
 
 Humans then only fix what is left (``review`` flags low-confidence tracks).
@@ -32,6 +39,8 @@ class AutoLabelConfig:
     min_mean_score: float = 0.3
     max_gap: float = 0.5            # [s] gaps filled by interpolation
     moving_speed: float = 1.0       # [m/s] heading from motion above this
+    static_speed: float = 0.5       # [m/s] below this (trajectory or teacher) a frame is static
+    velocity_window: float = 0.5    # [s] half-width of the trajectory difference
     review_score: float = 0.5       # tracks below this mean score are flagged for review
 
 
@@ -76,13 +85,23 @@ def refine_track(obs, stamps, cfg):
     xy = rts_smooth(t, boxes[:, :2])
     sx = np.interp(span, t, xy[:, 0])
     sy = np.interp(span, t, xy[:, 1])
-    if len(span) > 1:
-        vx, vy = np.gradient(sx, span), np.gradient(sy, span)
-    else:
-        vx, vy = np.array([obs[0]["vel"][0]]), np.array([obs[0]["vel"][1]])
+    v_traj = _window_velocity(span, sx, sy, cfg.velocity_window)
+    v_teacher = _running_median(np.array([np.hypot(*o["vel"]) for o in obs]), 2)
+    moving = (np.hypot(v_traj[:, 0], v_traj[:, 1]) > cfg.static_speed) & \
+        (np.interp(span, t, v_teacher) > cfg.static_speed)
+    if not moving.any():                      # static object: one position for the whole track
+        sx = np.full(len(span), _weighted_median(boxes[:, 0], scores))
+        sy = np.full(len(span), _weighted_median(boxes[:, 1], scores))
+    vel = np.where(moving[:, None], v_traj, 0.0)
+    speed = np.hypot(vel[:, 0], vel[:, 1])
 
-    # box yaw: resolve 180 deg flips against the highest-scoring observation
-    ref = boxes[np.argmax(scores), 6]
+    # box yaw: resolve 180 deg flips against the motion direction, else the highest-scoring box
+    fast = speed > cfg.moving_speed
+    if fast.any():
+        k = int(np.argmax(speed))
+        ref = float(np.arctan2(vel[k, 1], vel[k, 0]))
+    else:
+        ref = boxes[np.argmax(scores), 6]
     yaws = boxes[:, 6].copy()
     flip = np.abs(wrap_angle(yaws - ref)) > np.pi / 2
     yaws[flip] += np.pi
@@ -90,15 +109,26 @@ def refine_track(obs, stamps, cfg):
 
     out = []
     for k, s in enumerate(span):
-        speed = np.hypot(vx[k], vy[k])
-        if speed > cfg.moving_speed:
-            yaw = float(np.arctan2(vy[k], vx[k]))
-        else:
-            yaw = static_yaw
+        yaw = float(np.arctan2(vel[k, 1], vel[k, 0])) if fast[k] else static_yaw
         out.append(dict(t=float(s), label=label, box=np.array([sx[k], sy[k], z, *size, wrap_angle(yaw)]),
-                        velocity=np.array([vx[k], vy[k]]), score=float(scores.mean()),
+                        velocity=vel[k].copy(), score=float(scores.mean()), moving=bool(moving[k]),
                         review=bool(scores.mean() < cfg.review_score), interpolated=bool(np.min(np.abs(t - s)) > 1e-6)))
     return out
+
+
+def _window_velocity(t, x, y, half):
+    """Velocity from the position difference over [t - half, t + half] (clipped to the track)."""
+    if len(t) < 2:
+        return np.zeros((len(t), 2))
+    lo = np.clip(t - half, t[0], t[-1])
+    hi = np.clip(t + half, t[0], t[-1])
+    dt = np.maximum(hi - lo, 1e-3)
+    return np.stack([(np.interp(hi, t, x) - np.interp(lo, t, x)) / dt,
+                     (np.interp(hi, t, y) - np.interp(lo, t, y)) / dt], 1)
+
+
+def _running_median(x, k):
+    return np.array([np.median(x[max(0, i - k):i + k + 1]) for i in range(len(x))])
 
 
 def auto_label(frames, cfg=None, tracker_cfg=None):

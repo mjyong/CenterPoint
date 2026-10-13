@@ -36,3 +36,37 @@ def test_auto_label_beats_raw_teacher():
     r_al = evaluate_detections(al, gts, CLASSES)["pedestrian"]
     assert r_al["AP@0.5"] > r_raw["AP@0.5"] + 0.2
     assert r_al["ATE"] < 0.7 * r_raw["ATE"] and r_al["AVE"] < 0.7 * r_raw["AVE"]
+
+
+def _obs(t, xy, yaw, vel, score=0.6, label=0, size=(4.5, 1.9, 1.6)):
+    return [dict(t=float(tk), box=np.array([*p, 0.8, *size, yk]), vel=np.asarray(v, float), score=score, label=label)
+            for tk, p, yk, v in zip(t, xy, yaw, vel)]
+
+
+def test_refine_track_static_and_moving():
+    from dog_perception.autolabel import AutoLabelConfig, refine_track
+    rng = np.random.default_rng(0)
+    t = np.arange(30) * 0.1
+    cfg = AutoLabelConfig()
+    # parked car seen from a passing robot: the box center drifts 0.6 m in 3 s (visible side changes), the
+    # teacher's velocity head says ~0; old labels gave it 0.2-0.6 m/s and a heading from that drift
+    xy = np.c_[10 + 0.2 * t, 5 + 0.1 * t] + rng.normal(0, 0.05, (30, 2))
+    out = refine_track(_obs(t, xy, np.full(30, 0.3), rng.normal(0, 0.1, (30, 2))), t, cfg)
+    v = np.array([o["velocity"] for o in out])
+    b = np.array([o["box"] for o in out])
+    assert np.all(v == 0) and not any(o["moving"] for o in out)
+    assert np.ptp(b[:, 0]) == 0 and np.ptp(b[:, 1]) == 0 and np.allclose(b[:, 6], 0.3, atol=0.05)
+    # walking pedestrian (1.3 m/s along +y): keeps its velocity, heading from motion
+    xy = np.c_[np.full(30, 3.0), 1.3 * t] + rng.normal(0, 0.05, (30, 2))
+    out = refine_track(_obs(t, xy, np.zeros(30), np.tile([0, 1.3], (30, 1)), label=1, size=(0.6, 0.6, 1.7)), t, cfg)
+    v = np.array([o["velocity"] for o in out])
+    assert all(o["moving"] for o in out) and np.allclose(v.mean(0), [0, 1.3], atol=0.15)
+    assert np.allclose([o["box"][6] for o in out], np.pi / 2, atol=0.15)
+    # driving car whose best box points backwards: the 180 deg flip is resolved against the motion
+    xy = np.c_[5.0 * t, np.zeros(30)]
+    yaw = np.zeros(30)
+    out = refine_track(_obs(t, xy, yaw, np.tile([5.0, 0], (30, 1)), score=0.5), t, cfg)
+    assert np.allclose([o["box"][6] for o in out], 0.0, atol=0.05)
+    obs = _obs(t, xy, np.where(np.arange(30) == 3, np.pi, 0.0), np.tile([5.0, 0], (30, 1)))
+    obs[3]["score"] = 0.95
+    assert np.allclose([o["box"][6] for o in refine_track(obs, t, cfg)[5:25]], 0.0, atol=0.05)

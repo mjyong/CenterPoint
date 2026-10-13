@@ -8,13 +8,14 @@ output of run_sequence.py (--results). Output ``labels.pkl``:
         "objects": [{"track_id", "label", "box" (7, det frame), "velocity" (2, det frame),
                      "score", "review", "interpolated"}]}]}
 
-``review.csv`` lists low-confidence tracks for the human pass; after
-correction, feed the labels to export_dataset.py.
+``labels_tracks.csv`` lists every track (low-confidence ones first, flagged
+``review``) for the human pass: look at the labels in Foxglove and fill its
+``action`` column, then apply it with tools/dog/review_labels.py and feed the
+result to export_dataset.py.
 
     python tools/dog/auto_label.py --seq data/rec_001 --ckpt-voxel nusc_voxel.pth --tta --out data/rec_001/labels.pkl
 """
 import argparse
-import csv
 import os
 import pickle
 import sys
@@ -26,6 +27,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from dog_perception.autolabel import AutoLabelConfig, auto_label  # noqa: E402
 from dog_perception.detection.boxes import CLASSES, Detections  # noqa: E402
 from dog_perception.geometry import inv_T  # noqa: E402
+from dog_perception.label_review import write_track_table  # noqa: E402
 
 
 def teacher_frames(args):
@@ -77,32 +79,27 @@ def main():
     world = [(s, d.transform(T, "world")) for s, T, d in frames]
     labels = auto_label(world, AutoLabelConfig(min_track_len=args.min_track_len, min_mean_score=args.min_mean_score))
 
-    out_frames, review = [], {}
+    out_frames = []
     for stamp, T_wd, _ in frames:
         objs = labels.get(round(float(stamp), 6), [])
         if objs:
             d = Detections(np.stack([o["box"] for o in objs]), np.stack([o["velocity"] for o in objs]),
                            np.array([o["score"] for o in objs]), np.array([o["label"] for o in objs]))
             d = d.transform(inv_T(T_wd), "det")
-        entries = []
-        for i, o in enumerate(objs):
-            entries.append(dict(track_id=o["track_id"], label=CLASSES[o["label"]], box=d.boxes[i],
-                                velocity=d.velocities[i], score=o["score"], review=o["review"],
-                                interpolated=o["interpolated"]))
-            if o["review"]:
-                review.setdefault(o["track_id"], [CLASSES[o["label"]], o["score"], stamp, stamp])[3] = stamp
+        entries = [dict(track_id=o["track_id"], label=CLASSES[o["label"]], box=d.boxes[i], velocity=d.velocities[i],
+                        score=o["score"], review=o["review"], interpolated=o["interpolated"], moving=o["moving"])
+                   for i, o in enumerate(objs)]
         out_frames.append(dict(stamp=stamp, T_world_det=T_wd, objects=entries))
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+    result = dict(sequence=args.seq or args.results, frames=out_frames)
     with open(args.out, "wb") as f:
-        pickle.dump(dict(sequence=args.seq or args.results, frames=out_frames), f)
-    with open(os.path.splitext(args.out)[0] + "_review.csv", "w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["track_id", "label", "mean_score", "first_stamp", "last_stamp"])
-        for tid, (lab, sc, t0, t1) in sorted(review.items()):
-            w.writerow([tid, lab, "%.3f" % sc, "%.3f" % t0, "%.3f" % t1])
+        pickle.dump(result, f)
+    table = os.path.splitext(args.out)[0] + "_tracks.csv"
+    rows = write_track_table(table, result)
     n = sum(len(f["objects"]) for f in out_frames)
-    print("labelled %d frames, %d boxes, %d tracks flagged for review" % (len(out_frames), n, len(review)))
+    print("labelled %d frames, %d boxes, %d tracks (%d flagged for review) -> %s, %s"
+          % (len(out_frames), n, len(rows), sum(r["review"] for r in rows), args.out, table))
 
 
 if __name__ == "__main__":
