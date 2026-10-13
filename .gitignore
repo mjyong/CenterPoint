@@ -17,3 +17,6 @@ venv/
 *.zip
 *.bin
 .vscode/
+# vendored SUSTechPOINTS: keep its sources; scenes exported into its data/ stay local (its own .gitignore)
+!third_party/SUSTechPOINTS/**/*.sh
+!third_party/SUSTechPOINTS/data/
