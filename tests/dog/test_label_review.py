@@ -57,6 +57,24 @@ def test_apply_edits(tmp_path):
     assert labels["frames"][0]["objects"][1]["label"] == "cyclist"          # input untouched
 
 
+def test_vehicle_subclass_actions(tmp_path):
+    """car / truck / bus set a vehicle's subclass; changing the class drops a vehicle subclass,
+    confirming 'vehicle' keeps it. The table shows the teacher's subclass."""
+    labels = _labels()
+    for f in labels["frames"]:
+        f["objects"][0]["subclass"] = "car"
+        f["objects"][1]["subclass"] = "cyclist"
+    rows = write_track_table(str(tmp_path / "t.csv"), labels)
+    assert {r["track_id"]: r["subclass"] for r in rows} == {1: "car", 2: "cyclist"}
+    edits = _edit(str(tmp_path / "t.csv"), labels, [(1, "truck", "", "0.45"), (1, "vehicle", "0.5", ""),
+                                                    (2, "vehicle", "", "")])
+    out, _ = apply_edits(labels, edits)
+    t1 = [o for f in out["frames"] for o in f["objects"] if o["track_id"] == 1]
+    assert [o["subclass"] for o in t1] == ["truck"] * 5 + ["car"] * 5 and {o["label"] for o in t1} == {"vehicle"}
+    t2 = [o for f in out["frames"] for o in f["objects"] if o["track_id"] == 2]
+    assert {(o["label"], o["subclass"]) for o in t2} == {("vehicle", None)}
+
+
 def test_unknown_action(tmp_path):
     with pytest.raises(ValueError):
         _edit(str(tmp_path / "t.csv"), _labels(), [(1, "remove", "", "")])

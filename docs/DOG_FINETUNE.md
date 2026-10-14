@@ -55,6 +55,7 @@ python tools/dog/auto_label.py --results data/runs/rec_001/voxel/results.pkl --o
 对整段录制离线跟踪，再逐条轨迹非因果精修（`dog_perception/autolabel.py`）：
 
 - 类别按分数加权投票；尺寸和 z 取加权中位数；
+- 车的子类（car / truck / bus，即教师是哪个 head 出的框）在车的观测里同样加权投票，写进 `subclass` 字段，训练时用作 head 类别（第 12 节）；行人、骑行者的 `subclass` 与类别相同；
 - 中心 RTS 平滑，0.5 s 以内的漏检插值补上；
 - **静止 / 运动**：某一帧只有在轨迹速度（±0.5 s 差分）> 0.4 m/s **并且**教师速度头 > 0.15 m/s 时才算运动，否则速度为 0。从头到尾都没动的轨迹，如果 90% 的框离中位数不超过车 1.0 m / 人 0.5 m / 骑行 1.5 m，位置固定为加权中位数；散得更开说明轨迹漂了或跟错了物体，保留平滑后的路径；
 - 朝向：运动快（> 1 m/s）时取运动方向；否则取框朝向的环形均值，180° 歧义用运动方向消解，从没动过就用分数最高的那个框；
@@ -122,7 +123,7 @@ python tools/dog/review_labels.py mcap --labels data/labels/rec_001/labels.pkl \
 | topic | 内容 |
 |---|---|
 | `/lidar` | 当前帧点云（`--all-sweeps` 画 5 帧拼接，文件大很多） |
-| `/labels` | 标签框，按类别着色；待审核的轨迹为品红色粗框；插值补出来的框更淡；文字是轨迹号、类别、分数、速度 |
+| `/labels` | 标签框，按类别着色；待审核的轨迹为品红色粗框；插值补出来的框更淡；文字是轨迹号、类别（车带子类，如 `vehicle/truck`）、分数、速度 |
 | `/teacher` | 教师原始框（灰色，达到上报阈值的），用来对照 |
 | `/tf` | `world → det`。3D 面板显示系选 `world` 时，静止物体应该不动，拖尾（过去 3 s）是一个点 |
 | `/log` | 每条待审核轨迹第一次出现的时间 |
@@ -133,7 +134,8 @@ python tools/dog/review_labels.py mcap --labels data/labels/rec_001/labels.pkl \
 |---|---|
 | `ok` | 确认无误，清除待审核标记 |
 | `drop` | 删掉（误检、重复框、跟错的物体） |
-| `vehicle` / `pedestrian` / `cyclist` | 改类别 |
+| `vehicle` / `pedestrian` / `cyclist` | 改类别（改成别的类时车的子类清空；只是确认 `vehicle` 则保留子类） |
+| `car` / `truck` / `bus` | 是车，并指定子类（表里 `subclass` 列是教师投票的结果，错了就改） |
 | `flip` | 朝向转 180° |
 | `static` | 物体没动：速度置 0，位置和朝向固定为整段的中位数 / 均值 |
 
@@ -163,6 +165,8 @@ python tools/dog/export_dataset.py \
 
 点云和框都从检测系转到虚拟 nuScenes 雷达系（`ModelFrame`），和预训练模型的 z 先验一致。输出 `data/dog/infos_{train,val}.pkl`、`lidar/` 和 GT 采样库，路径与 `configs/dog/dog_centerpoint_pp_xt32.py` 一致。
 
+类别名用模型 head 的 5 个类：car / truck / bus / pedestrian / cyclist（取标签的 `subclass`）。没有子类的车（子类出现之前做的标签，或用旧的 3 类模型当教师）按尺寸补一个（长 ≥ 10 m 为 bus，长 ≥ 6.5 m 或高 ≥ 2.8 m 为 truck，否则 car），脚本会打印有多少个，最好重新跑一遍 `auto_label.py` 或在 ④ 里核对。旧的 3 类配置（`*_3cls.py`）要加 `--classes coarse`，类别名为 vehicle / pedestrian / cyclist。
+
 ## ⑥ head 权重迁移 + 训练
 
 ```bash
@@ -170,8 +174,8 @@ python tools/dog/convert_nusc_ckpt.py --src work_dirs/pretrained/nusc_pp.pth --d
 python tools/train.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir data/train/dog_pp_v001
 ```
 
-- 迁移：vehicle ← car，pedestrian ← pedestrian，cyclist ← bicycle；其余层原样。配置里 `load_from` 指向迁移后的权重。
-- 配置：3 个 task（每类一个），20 个 epoch，one-cycle 最大学习率 5e-4，GT 采样（车 2、人 4、骑行 4），±45° 旋转、±5% 缩放、±2° 俯仰/横滚增强。
+- 迁移：car ← car，truck ← truck（nuScenes task 1 的 truck 通道），bus ← bus（task 2 的 bus 通道），pedestrian ← pedestrian，cyclist ← bicycle；其余层原样。task 从 `--config` 读（默认 `configs/dog/dog_centerpoint_pp_xt32.py`，Voxel 的 head 布局相同），旧的 3 类配置传 `--config configs/dog/dog_centerpoint_pp_xt32_3cls.py`（vehicle ← car）。配置里 `load_from` 指向迁移后的权重。
+- 配置：5 个 task（car、truck、bus、行人、骑行者各一个），输出时 car / truck / bus 合并为 vehicle，见第 12 节；20 个 epoch，one-cycle 最大学习率 5e-4，GT 采样（car 2、truck 2、bus 2、人 4、骑行 4；GT 库里没有的类别跳过），±45° 旋转、±5% 缩放、±2° 俯仰/横滚增强。
 - 单卡（RTX 4090）直接运行；中断后用 `--resume_from <work_dir>/epoch_N.pth` 续训。多卡命令（`torch.distributed.launch`）在 torch 2.x 上没有验证过。没有 GPU 时同一条命令会在 CPU 上跑，只适合检查流程。
 - 配置要点、日志怎么看、怎么选 epoch，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) 第 4 节。
 
@@ -185,7 +189,8 @@ python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir data
 - 这是模型级评估（网络本身，验证集 `data/dog/infos_val.pkl`）。决定能不能替换线上模型，要看流水线级对比：预训练模型和微调模型都用 `run_sequence.py` 在**同一批人工逐框审核过的验证录制**上跑，再用 `compare_detectors.py --labels <验证集 labels_sustech.pkl>` 逐类、按 0–10 / 10–20 / 20–40 m 分段比。
 - 另外在 nuScenes mini_val 上查回归（`nusc_clip_eval.py`），在新 bag 上人眼看（`run_bag_mcap.py`）。
 - 不要用教师自己生成的标签评估教师同架构的模型。
-- 各工具都按权重自动识别配置（nuScenes 10 类 / 狗 3 类），不用再手动指定。
+- `dist_test.py` 对 5 个 head 各出一行 AP，另外以 `merged/` 开头的几行是合并成 vehicle / pedestrian / cyclist、做完跨 head 去重之后的结果，也就是检测器实际输出的类别。
+- 各工具都按权重自动识别配置（nuScenes 10 类 / 狗 5 个 head / 旧的狗 3 类 `*_3cls`），不用再手动指定。
 - 四层评估的命令、指标含义和验收标准，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) 第 5 节。
 
 ## ⑧ 部署到 Orin
@@ -240,7 +245,7 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
 - **点云**：默认导出 5 帧拼接（模型的输入），远处稀疏的物体更容易看清；运动物体会拖影，框要放在拖影最前端（当前帧）。`--current-sweep` 只导当前帧。强度除以 255。
 - **帧名**：时间戳的微秒数（16 位数字，按名字排序就是时间顺序）。`dog_meta.json` 保存每帧的时间戳、`T_world_det` 和自动标注的速度、分数，导入时要用，不要删。
 - **框**：position 为框中心，scale 为（长、宽、高），rotation.z 为航向；导入时忽略 rotation.x / y。
-- **类别**：导出为 Car / Pedestrian / BicycleRider；待审核的轨迹 `obj_attr` 为 `review`，在工具里会显示出来。导入时按 `TYPE_TO_CLASS` 映射回三类：Car、Van、Bus、Truck 等为 vehicle；Pedestrian、RoadWorker、Child 为 pedestrian；BicycleRider、MotorcyleRider、ScooterRider 以及停着的 Bicycle、Motorcycle、Scooter 为 cyclist（和 nuScenes 的映射一致）。其他类型（Cone、TrafficBarrier 等）跳过并计数；`--type-map Trimotorcycle=vehicle` 可以补充。
+- **类别**：车按子类导出为 Car / Truck / Bus（没有子类的车导出为 Car），行人为 Pedestrian，骑行者为 BicycleRider；待审核的轨迹 `obj_attr` 为 `review`，在工具里会显示出来。导入时按 `TYPE_TO_SUBCLASS` 映射：Car、Van、PoliceCar、TourCar 为 car；Truck、ConcreteTruck 和工程机械（Excavator、ForkLift、Crane、RoadRoller、Bulldozer）为 truck；Bus、Tram、LongVehicle 为 bus（和 nuScenes 一样，工程车归 truck，挂车这类长车归 bus）；三者都是 vehicle。Pedestrian、RoadWorker、Child 为 pedestrian；BicycleRider、MotorcyleRider、ScooterRider 以及停着的 Bicycle、Motorcycle、Scooter 为 cyclist（和 nuScenes 的映射一致）。其他类型（Cone、TrafficBarrier 等）跳过并计数；`--type-map Trimotorcycle=car` 可以补充。**标车的时候把类型选对**（Car / Truck / Bus），它决定训练哪个 head。
 - **轨迹号**：数字 `obj_id`（自动标注的轨迹）原样保留；工具里新建、不是数字的 ID 分配新号。
 - **速度**：框没被挪动（中心偏移 ≤ 5 cm）就保留自动标注的速度，静止物体的处理不受影响；挪动过或新加的框，用同一 `obj_id` 在世界系的中心差分（±0.5 s）重算，低于 0.2 m/s 置 0。所以要改一条轨迹的位置时，用批量模式把整条轨迹一起挪；只挪其中一帧，那几帧的速度会算出一个跳变。
 
@@ -270,3 +275,55 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
 | ⑥ 训练（CPU，6 步） | loss 9.5 → 5.1；同样几帧上，迁移起训 5.8，随机初始化 18.1 |
 
 17 条轨迹里 13 条平均分低于 0.5、被标为待审核：预训练模型在 32 线数据上的分数普遍偏低。换成 Voxel 教师、再做自训练后，这个比例应该会下降。
+
+## 12. 车辆分成 car / truck / bus 三个 head
+
+**结论**：大车（卡车、公交）的框更准，数据少的时候召回也更稳；小车和合并后的 vehicle mAP 不变；代价是计算量多 12–14%。下面是做法、原因、实验和代价。
+
+**做法。** 检测头有 5 个 task：car、truck、bus、pedestrian、cyclist，各 1 类（`configs/dog/dog_centerpoint_{pp,voxel}_xt32.py`）。输出时 car / truck / bus 合并成 vehicle（`SUBCLASS_TO_CLASS`），再按 2 m 做一次类内去重；跟踪、预测、评估和 ROS 看到的仍然是 vehicle / pedestrian / cyclist 三类。子类按 nuScenes head 的分组来分，也就是按尺寸：
+
+| 子类 | nuScenes 类别 | SUSTechPOINTS 类型 | 典型长度 | 迁移自 nuScenes |
+|---|---|---|---|---|
+| car | car | Car、Van、PoliceCar、TourCar | 4–5 m | task 0（car） |
+| truck | truck、construction_vehicle | Truck、ConcreteTruck、Excavator、ForkLift、Crane、RoadRoller、Bulldozer | 6–10 m | task 1 的 truck 通道 |
+| bus | bus、trailer | Bus、Tram、LongVehicle | 10–18 m | task 2 的 bus 通道 |
+
+子类沿着整条数据链传下去：
+1. 教师：nuScenes 模型本来就有这几个 head，检测结果里带 `subclasses`；
+2. 自动标注：每条轨迹在车的观测里按分数加权投票，写进 `subclass` 字段（③）；
+3. 审核：表里多一列 `subclass`，错了用 `car` / `truck` / `bus` 动作改（④a）；SUSTechPOINTS 里导出为 Car / Truck / Bus，改类型即改子类（第 10 节）；
+4. 导出：`export_dataset.py` 把子类写成训练类别名；没有子类的车按尺寸补，并打印个数（⑤）。
+
+在运动样例 bag 上重新跑教师（nuScenes Pillar）和自动标注：17 条轨迹、327 个框与之前完全一致，车的轨迹都带上了子类。7.2 m 长、3.2 m 高的 T12 为 truck，4.5 m 的 T7、T14 为 car。另有两条 2.2–2.5 m 长、2.5 m 高的轨迹（T3、T18）由 truck head 给出（nuScenes 的工程车也归在 truck）。教师给的子类在狗的数据上不一定对，审核时看一眼 `subclass` 列。
+
+**为什么更准：**
+1. **热启动不丢东西。** 旧布局只有一个 vehicle head，只能从 nuScenes 的 car head 继承，而 car head 训练时把卡车、公交当负样本。新布局三个 head 各自继承，起点和 nuScenes 模型一样（下表"起点"两行）。
+2. **每个 head 只管一个尺寸段。** CenterPoint 一个 task 内共用回归分支，尺寸用 log 后的 L1 回归。4.5 m 的轿车和 12 m 的公交放在一个 head 里，尺寸分布是双峰的。nuScenes 按尺寸分 task 就是这个原因。
+3. **各 head 有自己的 NMS 半径**：car 2 m、truck 3.5 m、bus 3.2 m。
+4. **狗的数据里确实有大车。** 样例 `rec_static` 的停车场里就有 6 辆长约 12 m、高约 4 m 的车（[LABELING_TUTORIAL.md](LABELING_TUTORIAL.md) 第 7 节）。
+
+**实验**（nuScenes mini，Pillar，2026-10-14，CPU）。
+- **数据**：训练用 mini_train 的 8 个场景（323 个关键帧），验证用 mini_val 的 2 个场景（81 帧，预训练模型没见过）；10 帧叠加，±40.8 m。
+- **对比的两种 head**：单 vehicle head（旧布局，从 car head 迁移）和 car / truck / bus 三个 head（新布局）。两者都从 nuScenes Pillar 权重迁移，配置相同，只差 head；训练 6 个 epoch，关掉 GT 采样和按类重采样，保证看到的数据完全一样。
+- **评估方式**：走检测器封装（合并成三类、2 m 去重、几何过滤），只算 40 m 内、至少有 1 个点的真值。车的真值共 1816 个框：car 1710，truck 77（4 辆），bus 29（1 辆）。召回、尺寸误差（1 − 对齐后的 IoU）和朝向误差（rad）按车的上报阈值 0.35、2 m 内匹配计算。
+
+| | vehicle mAP | car 召回 / 尺寸误差 / 朝向误差 | truck 召回 / 尺寸 / 朝向 | bus 召回 / 尺寸 / 朝向 |
+|---|---|---|---|---|
+| 起点：单 vehicle head（= car head） | 0.718 | 0.739 / 0.168 / 0.26 | 0.338 / 0.220 / 0.03 | 0.000 / – / – |
+| 起点：三个 head | 0.746 | 0.740 / 0.169 / 0.26 | 0.935 / 0.198 / 0.22 | 1.000 / 0.162 / 0.02 |
+| 微调后：单 vehicle head | 0.736 | 0.725 / 0.177 / 0.31 | 0.935 / 0.229 / 0.05 | 0.966 / 0.347 / 0.19 |
+| 微调后：三个 head | **0.738** | 0.733 / 0.179 / 0.30 | 0.922 / **0.194** / 0.44 | **1.000 / 0.113 / 0.02** |
+
+结论：
+- **小车和总分一样。** 微调后合并的 vehicle mAP 是 0.738 对 0.736，差别在噪声以内：验证集里 94% 是小车，两种布局的小车 head 都从 car head 来。作为噪声的量级参考，两次训练行人 / 骑行者 mAP 也差了 0.016 / 0.019，而这两类的 head 两边完全一样。
+- **大车的框更准。** 公交尺寸误差 0.11 对 0.35：单 head 给 12 m 的公交平均画 13.4 m。公交朝向误差 0.02 对 0.19；卡车尺寸误差 0.19 对 0.23。微调后两者的大车召回都在 0.92–1.0。
+- **起点差别很大。** 不微调时，单 head 只找回 34% 的卡车、0% 的公交；三个 head 和 nuScenes 模型一样（vehicle mAP 0.746 对 0.718）。mini_train 里有 46 辆大车，6 个 epoch 就把单 head 的召回补回来了。狗的数据里大车少得多，补不回来的风险更大，这时三个 head 的优势最明显。
+- **唯一变差的是一辆 5 m 长的小卡车。** car 和 truck 两个 head 都会出框（30 帧里 22 帧由 car head 出），其中 9 帧朝向反了 180°，所以 truck 的平均朝向误差是 0.44。介于两类之间的车（皮卡、小厢式货车）会在两个 head 之间分票。标注时按 nuScenes 的习惯把皮卡、面包车标成 car。运动中的 180° 翻转，跟踪和自动标注会按运动方向纠正。
+- **样本少**：验证集只有 2 个场景、4 辆卡车、1 辆公交，大车的数字只说明方向，要在自己的数据上用 `compare_detectors.py` 再确认。
+
+**代价：**
+- **计算量**：多 2 个 task。Pillar 从 34.1 增加到 38.9 GMAC（+14%），Voxel 从 67.5 增加到 75.9 GMAC（+12%），参数多 0.46 M。Orin 上 head 在 TensorRT 引擎里，延迟要实测。
+- **标注**：车的类型要选对（Car / Truck / Bus）。教师会先给出子类，审核时只需要改错的。
+- **样本少**：卡车、公交的框少，对应的 head 主要靠迁移来的权重和 GT 采样（truck 2、bus 2）。如果录制里一辆公交都没有，bus head 在微调中只见到负样本，会越来越不出框。这种情况下旧布局同样检测不到公交（它的 vehicle head 来自 car head），但要知道新布局的优势只在有大车样本时才能保持，录数据时要包含一些有大车的场景。
+
+**旧布局**：配置保留为 `*_3cls.py`（预设名 `dog_pillar_3cls` / `dog_voxel_3cls`）。迁移时加 `--config configs/dog/dog_centerpoint_pp_xt32_3cls.py`，导出加 `--classes coarse`。已经按旧布局训练的权重照常能用，各工具按权重里的 task 数自动识别。

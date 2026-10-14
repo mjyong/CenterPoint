@@ -280,5 +280,6 @@ TensorRT   rpn_head.engine  (1,64,408,408) → 36 张图（6 task × [reg, heigh
 ```
 frames/*.npy (N,5) D 系 ─► ModelFrame.points_to_model ─► lidar/*.npy (N,5) M 系
 labels.pkl  box (7,) D 系 ─► boxes_to_model + standard_to_det3d ─► infos[i]["gt_boxes"] (M,9) det3d 格式
+labels.pkl  label + subclass ─► gt_name（car / truck / bus / pedestrian / cyclist）─► infos[i]["gt_names"]
 ```
-之后进入 det3d 的训练管道：`LoadPointCloudFromFile` → `Preprocess`（GT 采样等增强）→ `Voxelization` → `AssignLabel`（热力图 `(C_t,102,102)`）。
+之后进入 det3d 的训练管道：`LoadPointCloudFromFile` → `Preprocess`（GT 采样等增强）→ `Voxelization` → `AssignLabel`（5 个 task 各一张热力图 `(1,102,102)`）。

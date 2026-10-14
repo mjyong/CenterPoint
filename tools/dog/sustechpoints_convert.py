@@ -17,7 +17,8 @@ SUSTechPOINTS is vendored in third_party/SUSTechPOINTS (see its VENDORED.md); sc
     python tools/dog/export_dataset.py --recording work_dirs/rec_001 data/labels/rec_001/labels_sustech.pkl ...
 
 Frames and boxes are in the detection frame (gravity aligned, ground at z ~ 0). Types map back with
-dog_perception.sustechpoints.TYPE_TO_CLASS (override with --type-map Trimotorcycle=vehicle); velocities
+dog_perception.sustechpoints.TYPE_TO_SUBCLASS (Car / Van -> car, Truck and construction machines ->
+truck, Bus / Tram / LongVehicle -> bus; override with --type-map Trimotorcycle=car); velocities
 are recomputed from the annotated boxes. See docs/DOG_FINETUNE.md.
 """
 import argparse
@@ -72,7 +73,8 @@ def main():
     src.add_argument("--scene-dir", help="scene directory anywhere else")
     i.add_argument("--out", required=True)
     i.add_argument("--type-map", nargs="*", default=[], metavar="TYPE=CLASS",
-                   help="extra / changed type mappings, CLASS in vehicle, pedestrian, cyclist, or 'skip'")
+                   help="extra / changed type mappings, CLASS in car, truck, bus, pedestrian, cyclist "
+                        "(or vehicle without a subclass), or 'skip'")
     i.add_argument("--static-speed", type=float, default=0.2, help="[m/s] slower boxes get zero velocity")
     v = sub.add_parser("serve", help="start SUSTechPOINTS (works without TensorFlow)")
     v.add_argument("--app", default=VENDORED, help="SUSTechPOINTS checkout (default: the vendored copy)")

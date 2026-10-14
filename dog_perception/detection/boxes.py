@@ -14,22 +14,54 @@ from ..geometry import wrap_angle
 
 CLASSES = ("vehicle", "pedestrian", "cyclist")
 
-# nuScenes detection classes -> the three classes the dog cares about.
+# Classes of the dog models' heads (configs/dog/): vehicles are split by size the way nuScenes'
+# heads are (car | truck + construction vehicle | bus + trailer), so each head regresses one size
+# range and warm-starts from the matching nuScenes head. Everything after the detector (tracker,
+# predictor, evaluation, ROS) sees CLASSES; the subclass rides along in ``Detections.subclasses``
+# so auto-labels keep it for the next fine-tuning round.
+SUBCLASSES = ("car", "truck", "bus", "pedestrian", "cyclist")
+SUBCLASS_TO_CLASS = {"car": "vehicle", "truck": "vehicle", "bus": "vehicle",
+                     "pedestrian": "pedestrian", "cyclist": "cyclist"}
+
+# nuScenes detection classes -> subclasses / the three classes the dog cares about.
 # barrier / traffic_cone are dropped (static, handled by the occupancy map).
-NUSC_TO_DOG = {
-    "car": "vehicle",
-    "truck": "vehicle",
-    "construction_vehicle": "vehicle",
-    "bus": "vehicle",
-    "trailer": "vehicle",
+NUSC_TO_SUBCLASS = {
+    "car": "car",
+    "truck": "truck",
+    "construction_vehicle": "truck",
+    "bus": "bus",
+    "trailer": "bus",
     "motorcycle": "cyclist",
     "bicycle": "cyclist",
     "pedestrian": "pedestrian",
 }
+NUSC_TO_DOG = {k: SUBCLASS_TO_CLASS[v] for k, v in NUSC_TO_SUBCLASS.items()}
 
 
 def class_index(name):
     return CLASSES.index(name) if name in CLASSES else -1
+
+
+def subclass_index(name):
+    return SUBCLASSES.index(name) if name in SUBCLASSES else -1
+
+
+def default_subclasses(labels):
+    """Subclass indices when only the class is known: pedestrian / cyclist are their own subclass,
+    a vehicle's is unknown (-1)."""
+    lut = np.array([subclass_index(n) if n in SUBCLASSES else -1 for n in CLASSES], dtype=np.int64)
+    labels = np.asarray(labels, dtype=np.int64)
+    return np.where(labels >= 0, lut[np.clip(labels, 0, None)], -1)
+
+
+def subclass_from_size(length, height):
+    """Vehicle subclass guessed from the box size, for labels that carry no subclass
+    (bus: >= 10 m long; truck: >= 6.5 m long or >= 2.8 m high; else car)."""
+    if length >= 10.0:
+        return "bus"
+    if length >= 6.5 or height >= 2.8:
+        return "truck"
+    return "car"
 
 
 @dataclass
@@ -40,6 +72,18 @@ class Detections:
     labels: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     frame: str = "det"
     stamp: float = None
+    subclasses: np.ndarray = None      # (N,) index into SUBCLASSES, -1 unknown; default from labels
+
+    def __post_init__(self):
+        if self.subclasses is None or len(self.subclasses) != len(self.labels):
+            self.subclasses = default_subclasses(self.labels)
+        else:
+            self.subclasses = np.asarray(self.subclasses, dtype=np.int64)
+
+    def __setstate__(self, state):     # results pickled before subclasses existed
+        self.__dict__.update(state)
+        if state.get("subclasses") is None:
+            self.subclasses = default_subclasses(self.labels)
 
     def __len__(self):
         return len(self.scores)
@@ -48,9 +92,13 @@ class Detections:
     def names(self):
         return [CLASSES[i] for i in self.labels]
 
+    @property
+    def subclass_names(self):
+        return [SUBCLASSES[i] if i >= 0 else None for i in self.subclasses]
+
     def select(self, mask):
         return Detections(self.boxes[mask], self.velocities[mask], self.scores[mask],
-                          self.labels[mask], self.frame, self.stamp)
+                          self.labels[mask], self.frame, self.stamp, self.subclasses[mask])
 
     def above(self, thresholds):
         """Detections worth reporting: score >= a float or a {class_name: score} dict."""
@@ -64,7 +112,8 @@ class Detections:
         boxes[:, :3] = self.boxes[:, :3] @ R.T + T_new_old[:3, 3]
         boxes[:, 6] = wrap_angle(self.boxes[:, 6] + dyaw)
         vel = self.velocities @ R[:2, :2].T
-        return Detections(boxes, vel, self.scores.copy(), self.labels.copy(), frame, self.stamp)
+        return Detections(boxes, vel, self.scores.copy(), self.labels.copy(), frame, self.stamp,
+                          self.subclasses.copy())
 
     @staticmethod
     def concat(dets):
@@ -74,7 +123,7 @@ class Detections:
         return Detections(
             np.concatenate([d.boxes for d in dets]), np.concatenate([d.velocities for d in dets]),
             np.concatenate([d.scores for d in dets]), np.concatenate([d.labels for d in dets]),
-            dets[0].frame, dets[0].stamp)
+            dets[0].frame, dets[0].stamp, np.concatenate([d.subclasses for d in dets]))
 
 
 def score_threshold_array(labels, thresholds):

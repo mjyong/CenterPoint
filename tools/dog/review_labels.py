@@ -12,7 +12,7 @@
     python tools/dog/review_labels.py apply --labels data/labels/rec_001/labels.pkl \
         --edits data/labels/rec_001/labels_tracks.csv --out data/labels/rec_001/labels_reviewed.pkl
 
-Actions: ok, drop, vehicle / pedestrian / cyclist, flip, static; combine with
+Actions: ok, drop, vehicle / pedestrian / cyclist, car / truck / bus (vehicle subclass), flip, static; combine with
 "+"; "from" / "to" (seconds since the recording start) limit an action to part
 of a track. See dog_perception/label_review.py.
 """

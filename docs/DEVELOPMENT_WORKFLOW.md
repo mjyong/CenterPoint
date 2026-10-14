@@ -104,19 +104,19 @@ ln -sfn dog_v002 data/dog
 python tools/dog/convert_nusc_ckpt.py --src work_dirs/pretrained/nusc_pp.pth --dst work_dirs/dog_pp_init.pth
 ```
 
-nuScenes 模型有 6 个 task（10 类），狗的配置每类一个 task（3 类）。迁移时 vehicle 继承 car 的 head，pedestrian 继承 pedestrian，cyclist 继承 bicycle；backbone、neck 和共享卷积原样保留。配置里 `load_from` 指向这个文件。
+nuScenes 模型有 6 个 task（10 类）。狗的配置有 5 个 task：车按尺寸分成 car / truck / bus 三个 head，再加行人、骑行者；输出时 car / truck / bus 合并成 vehicle，所以下游仍然只有三类。迁移时 car、truck、bus 分别继承 nuScenes 的 car、truck、bus head，pedestrian 继承 pedestrian，cyclist 继承 bicycle；backbone、neck 和共享卷积原样保留。配置里 `load_from` 指向这个文件。
 
-注意：迁移后的 vehicle 只继承了 car 的 head，10 类模型里 truck、bus 等 head 的能力没有带过来。样例验证集上 vehicle AP@2m 从 0.80 掉到 0.16（第 9 节），要靠微调补回来。
+为什么车要分三个 head、实验结果和代价，见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 12 节。旧的单 vehicle head 只能继承 car 的 head，nuScenes 的卡车、公交能力全部丢掉（样例验证集上 vehicle AP@2m 从 0.80 掉到 0.16，第 9 节），新布局把它们原样带了过来。旧布局的配置保留为 `*_3cls.py`，迁移时加 `--config configs/dog/dog_centerpoint_pp_xt32_3cls.py`。
 
 ### 4.2 配置要点（`configs/dog/dog_centerpoint_pp_xt32.py`）
 
 | 项 | 值 | 说明 |
 |---|---|---|
-| `tasks` | vehicle / pedestrian / cyclist 各一个 | 改类别要同时改 `convert_nusc_ckpt.py` |
+| `tasks` | car / truck / bus / pedestrian / cyclist 各一个 | 输出合并为 vehicle / pedestrian / cyclist；新加类别要在 `convert_nusc_ckpt.py` 的 `NUSC_HEAD` 里指定从哪个 nuScenes head 继承 |
 | `PC_RANGE` | ±40.8 m，z −5–3 m（虚拟 nuScenes 雷达系，地面约 −1.84） | 与线上预处理一致，不要改 z |
 | `VOXEL` | 0.2 × 0.2 × 8 m | 输出 102 × 102 |
 | `nsweeps` | 5 | 与线上一致 |
-| `db_sampler.sample_groups` | 车 2、人 4、骑行 4 | GT 采样，每帧贴入的个数 |
+| `db_sampler.sample_groups` | car 2、truck 2、bus 2、人 4、骑行 4 | GT 采样，每帧补到这个个数；GT 库里没有的类别（比如还没录到公交）跳过 |
 | 数据增强 | ±45° 旋转、±5% 缩放、平移 σ 0.1 m、±2° 俯仰/横滚 | |
 | `samples_per_gpu` / `workers_per_gpu` | 4 / 8 | batch 和数据加载进程数 |
 | `lr_config` | one-cycle，最大 5e-4 | 微调用的学习率，比从头训练小 |
@@ -193,14 +193,15 @@ python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py \
 | AOE | 平均朝向误差（rad） |
 | AVE | 平均速度误差（m/s） |
 | AP@2.0[a-b m] | 只算距离 a–b m 内的真值和预测；`nan` / `-` 表示这个距离段没有真值 |
-| Evaluation mAP | 三类 mAP 的平均 |
+| Evaluation mAP | 5 个 head 的 mAP 平均 |
+| `merged/...` | 合并成 vehicle / pedestrian / cyclist、做完跨 head 去重（和检测器输出一致）后的同一套指标；和旧的 3 类模型比、和流水线级结果对照，都看这几行 |
 
 ### 5.3 第二层：流水线级（`run_sequence.py` + `compare_detectors.py`）
 
 把模型放进线上的完整流水线（预处理、检测、过滤、合并 NMS、跟踪），在验证录制上和人工标签比，**这是决定替换与否的主要依据**：
 
 ```bash
-# 每个模型在验证录制上跑一遍（配置按权重自动识别：nuScenes 10 类 / 狗 3 类）
+# 每个模型在验证录制上跑一遍（配置按权重自动识别：nuScenes 10 类 / 狗 5 个 head / 旧的狗 3 类）
 python tools/dog/run_sequence.py --seq data/seq/rec_val --detectors pillar \
     --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --device cuda:0 --out data/eval/pretrained/rec_val
 python tools/dog/run_sequence.py --seq data/seq/rec_val --detectors pillar \
@@ -283,7 +284,7 @@ python tools/dog/export_pillar_onnx.py --checkpoint data/train/dog_pp_v001/lates
 ### 6.2 Orin
 
 1. 把 `deploy/dog_pp_v001/` 拷到 Orin，运行上一步打印的 `trtexec ... --fp16` 两条命令建引擎（引擎和 GPU、TensorRT 版本绑定，必须在 Orin 上建）。
-2. 当前的 ROS 2 节点（`tools/dog/ros2_node.py`）跑的是 PyTorch 模型：`-p config:=dog_pillar -p checkpoint:=<权重>`（`dog_pillar` 是 3 类模型的预设配置名）。把 TensorRT 引擎接进节点是 [DOG_PIPELINE.md](DOG_PIPELINE.md) 第 8 节里还没做完的一步。
+2. 当前的 ROS 2 节点（`tools/dog/ros2_node.py`）跑的是 PyTorch 模型：`-p config:=dog_pillar -p checkpoint:=<权重>`（`dog_pillar` 是狗模型（5 个 head）的预设配置名，旧的 3 类权重用 `dog_pillar_3cls`）。把 TensorRT 引擎接进节点是 [DOG_PIPELINE.md](DOG_PIPELINE.md) 第 8 节里还没做完的一步。
 3. 上车录一段新 bag，回到第 5.5 节对着看，再进下一轮。
 
 ## 7. 下一轮（⑪）
@@ -309,6 +310,8 @@ python tools/dog/export_pillar_onnx.py --checkpoint data/train/dog_pp_v001/lates
 ## 9. 样例数据上跑通一轮的记录
 
 数据来自 [LABELING_TUTORIAL.md](LABELING_TUTORIAL.md)：训练集 `rec_static` 28 帧（只做了按轨迹审核），验证集 `rec_moving` 27 帧（逐框审核）。教师是 nuScenes 预训练 Pillar。这台机器只有 4 核 CPU、没有 GPU，所有步骤都在 CPU 上跑。
+
+这一节是车辆拆成 car / truck / bus 三个 head 之前跑的，用的是现在的 `*_3cls.py` 配置（单个 vehicle head）。
 
 **这些数字只用来说明流程能跑通、指标怎么读，不代表微调的效果**：训练集只有一段停车场录制（行人 36 个框、骑行者 28 个框，各来自一两条轨迹），模型必然过拟合；而且验证标签来自 Pillar 教师，对 Pillar 基线有利。
 

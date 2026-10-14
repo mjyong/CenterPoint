@@ -70,6 +70,7 @@ def test_export_import_round_trip(tmp_path):
         assert np.isclose(fa["stamp"], fb["stamp"]) and np.allclose(fa["T_world_det"], fb["T_world_det"])
         for a, b in zip(fa["objects"], fb["objects"]):
             assert (a["track_id"], a["label"]) == (b["track_id"], b["label"]) and not b["review"]
+            assert b["subclass"] == ("car" if a["label"] == "vehicle" else a["label"])   # no subclass -> Car
             assert np.allclose(a["box"], b["box"]) and np.allclose(a["velocity"], b["velocity"])
             assert np.isclose(b["score"], a["score"])
 
@@ -100,4 +101,25 @@ def test_import_annotator_edits(tmp_path):
     bikes = [o for f in out["frames"] for o in f["objects"] if o["label"] == "cyclist"]
     assert len({o["track_id"] for o in bikes}) == 1 and bikes[0]["track_id"] == 3   # new id after 1, 2
     assert all(np.all(o["velocity"] == 0) and not o["moving"] for o in bikes)
+    assert {o["subclass"] for f in out["frames"] for o in f["objects"] if o["label"] == "vehicle"} == {"car"}
+
+
+def test_vehicle_subclass_types(tmp_path):
+    """Export writes the vehicle subclass as the object type; import maps types back to car / truck / bus."""
+    labels = _labels()
+    for f in labels["frames"]:
+        f["objects"][0]["subclass"] = "truck"
+    export_scene(labels, _frames_dir(tmp_path, labels), str(tmp_path / "data"), "rec")
+    root = tmp_path / "data" / "rec"
+    names = sorted(os.listdir(root / "label"))
+    retyped = ["Truck", "Bus", "LongVehicle", "ForkLift", "Van", "Tram", "Trimotorcycle", "Truck", "Truck", "Car"]
+    for nm, typ in zip(names, retyped):
+        ann = json.load(open(root / "label" / nm))
+        assert ann[0]["obj_type"] == "Truck"
+        ann[0]["obj_type"] = typ
+        json.dump(ann, open(root / "label" / nm, "w"))
+    out, counts = import_scene(str(root), type_map={"Trimotorcycle": "car"})
+    subs = [f["objects"][0]["subclass"] for f in out["frames"]]
+    assert subs == ["truck", "bus", "bus", "truck", "car", "bus", "car", "truck", "truck", "car"]
+    assert {f["objects"][0]["label"] for f in out["frames"]} == {"vehicle"} and counts["vehicle"] == 10
 

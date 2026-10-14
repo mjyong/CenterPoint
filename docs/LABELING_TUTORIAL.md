@@ -92,7 +92,7 @@ labelled 28 frames, 463 boxes, 19 tracks (7 flagged for review) -> data/labels/r
 labelled 27 frames, 327 boxes, 17 tracks (13 flagged for review) -> data/labels/rec_moving/labels.pkl, data/labels/rec_moving/labels_tracks.csv
 ```
 
-`labels_tracks.csv` 每条轨迹一行，待审核的（`review` = 1，平均分 < 0.5）排在前面。`rec_moving` 的前几行：
+`labels_tracks.csv` 每条轨迹一行，待审核的（`review` = 1，平均分 < 0.5）排在前面。（本教程的输出是在加入车辆子类之前记录的。现在 `label` 后面多一列 `subclass`：车是教师 head 投票出的 car / truck / bus，行人、骑行者与类别相同；审核时可以用 `car` / `truck` / `bus` 动作改，见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 12 节。）`rec_moving` 的前几行：
 
 ```
 track_id,label,review,mean_score,frames,interpolated,t_first,t_last,min_range_m,moving_share,max_speed,action,from,to,note
@@ -227,7 +227,8 @@ T10 说明验证集为什么要逐框看。分数 0.50 刚好在待审核线（0
 
 ### 5.4 标注约定
 
-- 只标三类：车（Car、Van、Bus、Truck 等，导回后都是 vehicle）、行人（Pedestrian、Child、RoadWorker）、骑行者（BicycleRider、MotorcyleRider、ScooterRider；停着的 Bicycle、Motorcycle、Scooter 也算，和 nuScenes 的约定一致）。其他类型导回时会被跳过并计数。
+- 只标三类：车、行人（Pedestrian、Child、RoadWorker）、骑行者（BicycleRider、MotorcyleRider、ScooterRider；停着的 Bicycle、Motorcycle、Scooter 也算，和 nuScenes 的约定一致）。其他类型导回时会被跳过并计数。
+- 车的类型要选对，它决定训练哪个 head：小车（Car、Van）→ car；卡车和工程车（Truck、ConcreteTruck、Excavator、ForkLift、Crane 等）→ truck；公交、有轨电车、挂车这类长车（Bus、Tram、LongVehicle）→ bus。导回后三者都是 vehicle，子类记在 `subclass` 里。
 - 框贴住物体的点。朝向是车头 / 人面朝的方向，看不出时取运动方向。
 - 点少到人也看不出是什么的，不标（标了也是猜）。
 - 范围：检测器只看 ±40.8 m，更远的可以不管。
@@ -257,15 +258,20 @@ python tools/dog/export_dataset.py \
 
 ```
 train 28 / val 27 frames -> data/dog
-load 232 vehicle database infos
+boxes: bus 111, car 257, cyclist 51, pedestrian 83, truck 25
+note: 393 vehicle boxes had no subclass and got one from their size (car / truck / bus); check them, or re-run auto_label.py with a teacher that has car / truck / bus heads
+load 121 car database infos
+load 111 bus database infos
 load 28 cyclist database infos
 load 36 pedestrian database infos
 ```
 
-| | 帧 | vehicle | pedestrian | cyclist |
-|---|---|---|---|---|
-| train（rec_static） | 28 | 232 | 36 | 28 |
-| val（rec_moving） | 27 | 161 | 47 | 23 |
+| | 帧 | car | truck | bus | pedestrian | cyclist |
+|---|---|---|---|---|---|---|
+| train（rec_static） | 28 | 121 | 0 | 111 | 36 | 28 |
+| val（rec_moving） | 27 | 136 | 25 | 0 | 47 | 23 |
+
+类别名是模型 head 的 5 个类。这里的标签是在加入车辆子类之前做的，所以 393 个车框都按尺寸补了子类（脚本最后一行提示）。rec_static 停车场里有 6 辆长约 12 m、高约 4 m 的车（T5、T6、T8、T9、T11、T12），被归为 bus；rec_moving 的 T12（7.2 m × 3.2 m 高）归为 truck。现在重新跑 ② ③，教师（nuScenes 模型本身就有 car / truck / bus head）会直接给出子类，不再靠尺寸猜。
 
 `--skip-review` 去掉了 rec_static 里 6 条没审核的待审核轨迹。rec_moving 是逐框审核过的，不受影响。
 

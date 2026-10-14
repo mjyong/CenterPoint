@@ -4,7 +4,9 @@ The teacher (CenterPoint-Voxel with flip TTA, nuScenes weights at first,
 later your own fine-tuned voxel model) runs frame by frame; then, with the
 whole recording available, every track is refined *non-causally*:
 
-* class        : score-weighted vote over the track (kills class flicker)
+* class        : score-weighted vote over the track (kills class flicker);
+                 a vehicle's subclass (car / truck / bus) is voted the same way
+                 among the observations that carry one
 * size, z      : score-weighted median (rigid objects do not change size)
 * center       : RTS smoothing + interpolation across short gaps
                  (recovers frames the teacher missed)
@@ -29,7 +31,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .detection.boxes import CLASSES
+from .detection.boxes import CLASSES, SUBCLASS_TO_CLASS, SUBCLASSES
 from .geometry import wrap_angle
 from .prediction.dataset import rts_smooth
 from .tracking import MultiObjectTracker, TrackerConfig
@@ -64,7 +66,8 @@ def associate_offline(frames, tracker_cfg=None):
         trk.step(dets, stamp)
         for tid, d in trk.last_matches.items():
             obs[tid].append(dict(t=stamp, box=dets.boxes[d].copy(), vel=dets.velocities[d].copy(),
-                                 score=float(dets.scores[d]), label=int(dets.labels[d])))
+                                 score=float(dets.scores[d]), label=int(dets.labels[d]),
+                                 subclass=int(dets.subclasses[d])))
     return obs
 
 
@@ -81,6 +84,12 @@ def refine_track(obs, stamps, cfg):
     for o in obs:
         votes[o["label"]] += o["score"]
     label = int(np.argmax(votes))
+    sub_votes = np.zeros(len(SUBCLASSES))
+    for o in obs:
+        s = o.get("subclass", -1)
+        if s >= 0 and SUBCLASS_TO_CLASS[SUBCLASSES[s]] == CLASSES[label]:
+            sub_votes[s] += o["score"]
+    subclass = int(np.argmax(sub_votes)) if sub_votes.any() else -1
     size = np.array([_weighted_median(boxes[:, k], scores) for k in (3, 4, 5)])
     z = _weighted_median(boxes[:, 2], scores)
 
@@ -117,7 +126,8 @@ def refine_track(obs, stamps, cfg):
     out = []
     for k, s in enumerate(span):
         yaw = float(np.arctan2(vel[k, 1], vel[k, 0])) if fast[k] else static_yaw
-        out.append(dict(t=float(s), label=label, box=np.array([sx[k], sy[k], z, *size, wrap_angle(yaw)]),
+        out.append(dict(t=float(s), label=label, subclass=subclass,
+                        box=np.array([sx[k], sy[k], z, *size, wrap_angle(yaw)]),
                         velocity=vel[k].copy(), score=float(scores.mean()), moving=bool(moving[k]),
                         review=bool(scores.mean() < cfg.review_score), interpolated=bool(np.min(np.abs(t - s)) > 1e-6)))
     return out

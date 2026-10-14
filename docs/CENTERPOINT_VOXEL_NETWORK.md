@@ -2,7 +2,7 @@
 
 对应 [DOG_DATAFLOW.md](DOG_DATAFLOW.md) 4.3 节里 Voxel 分支的 `net(example, return_loss=False)`。Pillar 版见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)，两者共用的部分（head 各分支的含义、训练目标、解码细节）在那里讲得更细，本文只写 Voxel 不同的地方。第 9 节是与 Pillar 的逐项对比。
 
-**模型**：配置为 `configs/nusc/voxelnet/nusc_centerpoint_voxelnet_0075voxel_fix_bn_z.py`，经 `configure_for_dog` 把 xy 范围改为 ±40.8 m（z 不动，见 3.4 节）；权重为 `work_dirs/pretrained/nusc_voxel.pth`（Git LFS，103 MB）。机器狗 3 类微调配置 `configs/dog/dog_centerpoint_voxel_xt32.py` 的网络完全相同，只是 head 从 6 个 task 减到 3 个（5.3 节）。
+**模型**：配置为 `configs/nusc/voxelnet/nusc_centerpoint_voxelnet_0075voxel_fix_bn_z.py`，经 `configure_for_dog` 把 xy 范围改为 ±40.8 m（z 不动，见 3.4 节）；权重为 `work_dirs/pretrained/nusc_voxel.pth`（Git LFS，103 MB）。机器狗的微调配置 `configs/dog/dog_centerpoint_voxel_xt32.py` 的网络完全相同，只是 head 从 6 个 task 变成 5 个（5.3 节）。
 
 **测量方式**：`tools/dog/profile_detector.py`，在每一层挂 forward hook，记录输出 shape、非空格数、参数量和乘加次数（MAC）。用的是样例 bag `rec_moving` 的一帧（`1789980192.298542.npy`，5 帧叠加共 187 434 点，进入范围的 148 734 点）。同一帧给 Pillar 是 9 658 个非空柱。
 - 稀疏卷积的计算量按实际的"（输入格，输出格，卷积核偏移）三元组数 × C_in × C_out"统计，所以主干部分随帧变化；稠密部分与帧无关。
@@ -195,9 +195,9 @@ z 方向多加的 1 层永远是空的，因为体素化只有 40 层。加这�
 
 head 的参数量两者相同（1.374 M），计算量与特征图面积成正比：136² / 102² = 1.78 倍。
 
-### 5.3 机器狗 3 类配置
+### 5.3 机器狗配置
 
-`configs/dog/dog_centerpoint_voxel_xt32.py` 只有 3 个 task（vehicle、pedestrian、cyclist，各 1 类），共 18 个分支。实测 tasks 部分有 0.686 M 参数、12.6 GMAC；整个网络 **8.25 M 参数、67.5 GMAC**。Pillar 的 3 类配置是 5.30 M、34.1 GMAC。
+`configs/dog/dog_centerpoint_voxel_xt32.py` 有 5 个 task（car、truck、bus、pedestrian、cyclist，各 1 类），共 30 个分支，输出时 car / truck / bus 合并为 vehicle（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 12 节）。实测 tasks 部分 1.14 M 参数、21.0 GMAC；整个网络 **8.71 M 参数、75.9 GMAC**。Pillar 的狗配置是 5.76 M、38.9 GMAC。旧的单 vehicle head 布局（`*_3cls.py`，3 个 task）分别是 8.25 M、67.5 GMAC 和 5.30 M、34.1 GMAC。
 
 ### 5.4 训练目标
 
@@ -224,10 +224,10 @@ y = (row + reg_y) * 8 * 0.075 + (-40.8)
 
 `dog_centerpoint_voxel_xt32.py` 与 `dog_centerpoint_pp_xt32.py` 只在模型和体素化两处不同（Voxel 的 assigner 里多写的 `dense_reg=1` 在 det3d 里没有被用到）。训练相关的设置完全一样：
 - 5 帧叠加；
-- GT-AUG：vehicle 2、pedestrian 4、cyclist 4；
+- GT-AUG：car 2、truck 2、bus 2、pedestrian 4、cyclist 4（GT 库里没有的类别跳过）；
 - 全局增强：旋转 ±45°、缩放 0.95–1.05、平移 σ = 0.1 m、俯仰和横滚 ±2°；
 - 优化：Adam + one-cycle，`lr_max=5e-4`，20 个 epoch，batch 4；
-- 热启动：`tools/dog/convert_nusc_ckpt.py`。car → vehicle、pedestrian → pedestrian、bicycle → cyclist 各自继承整组 head，主干、neck 和 shared_conv 原样拷贝。
+- 热启动：`tools/dog/convert_nusc_ckpt.py`。car、truck、bus、pedestrian 各自继承 nuScenes 同名的 head，cyclist 继承 bicycle，主干、neck 和 shared_conv 原样拷贝。
 
 需要注意：
 - 训练同样需要 CUDA 版 spconv。
@@ -267,8 +267,8 @@ y = (row + reg_y) * 8 * 0.075 + (-40.8)
 | 输出步长 `out_size_factor` | 4（相对 0.2 m 柱） | 8（相对 0.075 m 体素） |
 | xy 范围约束 | 2·XY 是 1.6 m 的整数倍 | 2·XY 是 1.2 m 的整数倍 |
 | z 范围 | 可以随意改，只起裁剪作用 | 必须保持 [−5, 3]（3.4 节） |
-| 参数量（6 task / 狗 3 task） | 5.99 M / 5.30 M | 8.94 M / 8.25 M |
-| 计算量（6 task / 狗 3 task） | 41.3 / 34.1 GMAC，基本固定 | 80.2 / 67.5 GMAC，其中稀疏主干 13.5 随点数变化 |
+| 参数量（nuScenes 6 task / 狗 5 task） | 5.99 M / 5.76 M | 8.94 M / 8.71 M |
+| 计算量（nuScenes 6 task / 狗 5 task） | 41.3 / 38.9 GMAC，基本固定 | 80.2 / 75.9 GMAC，其中稀疏主干 13.5 随点数变化 |
 | 计算量的最大头 | RPN（58%） | RPN（45%），其中 `blocks[0]` 一块就占 24% |
 | nuScenes 验证集（官方） | mAP 50.3 / NDS 60.2 | mAP 59.6 / NDS 66.8 |
 | 官方测速（TITAN RTX） | 31 FPS | 0.1 m 版 16 FPS，0.075 m 版没有列出（更慢） |

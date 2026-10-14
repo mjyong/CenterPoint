@@ -107,10 +107,34 @@ class DogDataset(PointCloudDataset):
             preds.append(dict(boxes=pb, velocities=pv, scores=score, labels=label.astype(np.int64)))
             gts.append(dict(boxes=gb, velocities=gv, labels=glab))
         res = evaluate_detections(preds, gts, names)
+        merged = self._evaluate_merged(preds, gts, names)
         flat = {}
-        for k, v in res.items():
-            if isinstance(v, dict):
-                flat[k] = ", ".join("%s=%.3f" % (kk, vv) for kk, vv in v.items() if isinstance(vv, float))
-            else:
-                flat[k] = "%.4f" % v
-        return {"results": flat, "raw": res}, None
+        for prefix, r in (("", res), ("merged/", merged or {})):
+            for k, v in r.items():
+                if isinstance(v, dict):
+                    flat[prefix + k] = ", ".join("%s=%.3f" % (kk, vv) for kk, vv in v.items() if isinstance(vv, float))
+                else:
+                    flat[prefix + k] = "%.4f" % v
+        return {"results": flat, "raw": res, "merged": merged}, None
+
+    @staticmethod
+    def _evaluate_merged(preds, gts, names):
+        """Heads car / truck / bus: also score what the detector outputs, vehicle / pedestrian / cyclist,
+        after the same cross-head merge (``classwise_circle_nms``) the detector wrapper applies."""
+        from dog_perception.detection.boxes import CLASSES, SUBCLASS_TO_CLASS, Detections, classwise_circle_nms
+        from dog_perception.detection.centerpoint import MERGED_NMS_RADIUS
+        from dog_perception.detection.evaluate import evaluate_detections
+
+        coarse = [SUBCLASS_TO_CLASS.get(n, n) for n in names]
+        if coarse == names:
+            return None
+        lut = np.array([CLASSES.index(c) if c in CLASSES else -1 for c in coarse], dtype=np.int64)
+        to_coarse = lambda l: np.where(l >= 0, lut[np.clip(l, 0, None)], -1)   # noqa: E731
+        mp, mg = [], []
+        for p, g in zip(preds, gts):
+            lab = to_coarse(p["labels"])
+            d = Detections(p["boxes"], p["velocities"], p["scores"], lab).select(lab >= 0)
+            d = classwise_circle_nms(d, MERGED_NMS_RADIUS)
+            mp.append(dict(boxes=d.boxes, velocities=d.velocities, scores=d.scores, labels=d.labels))
+            mg.append(dict(g, labels=to_coarse(g["labels"])))
+        return evaluate_detections(mp, mg, list(CLASSES))

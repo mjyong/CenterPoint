@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（70 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（77 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -20,8 +20,8 @@
 | 4 | 未提及 | **近场垂直盲区**：XT32 视场 -16°~+15°，装在约 0.6 m 高处时，行人要在 4.1 m 以外才能完整进入视场。1 m 处只能看到 0.31–0.87 m 高度的一段。nuScenes 数据里没有这种样本 | 高 |
 | 5 | 3~5 帧累积，"32 线变百线" | 固定为 **5 帧**（dt 范围 0–0.4 s，对应 nuScenes 的 0–0.45 s，点数约 32 万，nuScenes 约 34 万）。"变百线"的说法偏乐观：狗速度慢，相邻帧的光束几乎重合。多帧累积的实际收益在于与预训练分布对齐，以及让速度头可用 | 中 |
 | 6 | 检测范围 ±40 m | 改为 **±40.8 m**。网格尺寸需要是网络最大步长的整数倍（Pillar 为 408 格，Voxel 为 1088 格）。另外 Voxel 模型的 z 网格**不能改**，稀疏主干需要 41 个 z 格 | 中（否则直接报错或权重失配） |
-| 7 | 3 类，nuScenes 预训练后微调 | 不要随机初始化 3 类 head。做 **head 权重迁移**：vehicle 继承 car head，pedestrian 继承 pedestrian 通道，cyclist 继承 bicycle 通道。car/truck/bus 映射到同一类后需要再做一次类内 NMS | 中 |
-| 8 | OpenPCDet 训练 | 本仓库就是 CenterPoint 原版（det3d），已加入 `DogDataset`、3 类配置和 GT 采样库，**不需要迁移框架** | 低 |
+| 7 | 3 类，nuScenes 预训练后微调 | 不要随机初始化 head。做 **head 权重迁移**。车按尺寸分成 car / truck / bus 三个 head，各自继承 nuScenes 对应的 head；pedestrian 继承 pedestrian 通道，cyclist 继承 bicycle 通道；输出时合并成三类，再做一次类内 NMS（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 12 节） | 中 |
+| 8 | OpenPCDet 训练 | 本仓库就是 CenterPoint 原版（det3d），已加入 `DogDataset`、狗的配置（5 个 head，输出 3 类）和 GT 采样库，**不需要迁移框架** | 低 |
 | 9 | 离线大模型教师 | 在逐帧检测之外，补一步**轨迹级非因果精修**：类别投票、尺寸取中位数、RTS 平滑补漏检、用运动方向消除朝向歧义。仿真中行人 AP@0.5 m 从 0.59 提升到 0.99 | 中 |
 | 10 | 跟踪：中心距离匹配 | 必须在 **LIO 世界系**里跟踪。速度头的输出直接作为 KF 量测。关联采用**两阶段**（高分检测先匹配，低分检测只用于延续已有轨迹）。行人保活时间放宽到 1.5 s | 高 |
 | 11 | 第一档 IMM (CV/CTRV) | 改用 CV + CT（笛卡尔速度的协调转弯模型），两者共享 5 维状态，没有角度回绕问题。跟踪器的滤波器与预测器共用这一个 IMM，每个模态单独外推，自然得到多模态输出 | 中 |
@@ -87,8 +87,8 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 由于 car、truck、bus 属于不同的 task head，映射后同一物体可能出现两个框，所以之后要再做一次类内 NMS。另外，nuScenes 的 bicycle 类包含停放的无人自行车；这对狗来说是静态障碍物，可以通过速度来区分。
 
 **微调**（`configs/dog/dog_centerpoint_{pp,voxel}_xt32.py`）：
-- 每个类别一个 task。
-- 用 `tools/dog/convert_nusc_ckpt.py` 从 nuScenes 权重迁移 head。
+- 每个类别一个 task，车分成 car / truck / bus 三个 task（和 nuScenes 按尺寸分组一致），输出时合并为 vehicle。
+- 用 `tools/dog/convert_nusc_ckpt.py` 从 nuScenes 权重迁移 head（car、truck、bus、pedestrian、bicycle 各对各）。旧的单 vehicle head 配置保留为 `*_3cls.py`。
 - GT-sampling 开启。在重力对齐、原点在地面的检测系下，采样粘贴的目标才会贴地。
 - 增加 ±2° 的俯仰/横滚增强（`global_pitch_roll_noise`，新加到 det3d 的 `Preprocess` 中）。
 - 训练数据直接保存**预处理后的多帧点云**，与线上使用同一份预处理代码，从源头保证训练和部署一致。
@@ -186,7 +186,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `dog_perception/pipeline.py` | 四段串联 `PerceptionPipeline` |
 | `dog_perception/sim.py` | XT32 + 足式步态仿真器（测试和演示用） |
 | `det3d/datasets/dog/` + pipeline 改动 | `DogDataset`、GT-sampling、俯仰/横滚增强 |
-| `configs/dog/` | 3 类 Pillar/Voxel 微调配置（±40.8 m、5 帧） |
+| `configs/dog/` | Pillar/Voxel 微调配置（±40.8 m、5 帧；head 为 car / truck / bus / 行人 / 骑行者，输出 3 类）；`*_3cls.py` 是旧的单 vehicle head 布局 |
 | `tools/dog/rosbag_to_sequence.py` | ROS1/ROS2 bag 转序列（无需安装 ROS，依赖 `rosbags`） |
 | `tools/dog/run_sequence.py` | 录制数据回放，Pillar/Voxel 并行跑，输出结果、跟踪日志和帧数据 |
 | `tools/dog/auto_label.py`, `export_dataset.py` | 教师自动标注，导出为 DogDataset 并建 GT 库 |
@@ -195,7 +195,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `third_party/SUSTechPOINTS/` | 3D 点云标注工具 SUSTechPOINTS 的源码（GPL-3.0，版本和本地修改见 `VENDORED.md`） |
 | `tools/dog/nusc_autolabel_eval.py` | 在 nuScenes 上用真值检查自动标注质量 |
 | `tools/dog/compare_detectors.py` | Pillar 与 Voxel 对比（AP、分段 AP、延迟、轨迹碎片化） |
-| `tools/dog/convert_nusc_ckpt.py` | nuScenes 10 类到 3 类的 head 权重迁移 |
+| `tools/dog/convert_nusc_ckpt.py` | nuScenes 10 类 head 到狗的 5 个 head（或旧的 3 个）的权重迁移 |
 | `tools/dog/export_pillar_onnx.py` | 导出给 TensorRT 用的两段 ONNX，逐段校验，并打印上板建引擎的 `trtexec` 命令 |
 | `tools/dog/profile_detector.py` | 在一帧上测网络逐层的 shape、参数量、计算量（稀疏卷积按实际邻接对计）和各段耗时 |
 | `tools/dog/train_predictor.py` | 第二档训练，与 CV/IMM 对比 |
@@ -329,6 +329,7 @@ python -m pytest tests/dog -q
 - `det3d/solver/*.py`、`torchie/parallel/collate.py`：`collections.Iterable/Sequence/Mapping` 改为 `collections.abc`，这些名字在 Python 3.10 中已被移除，而 Ubuntu 22.04 / JetPack 6 自带的就是 3.10。
 - `torch.load` 的四处调用（`det3d/torchie/trainer/checkpoint.py`、`detection/centerpoint.py`、`prediction/model.py`、`tools/dog/convert_nusc_ckpt.py`）：显式传 `weights_only=False`（新版 torch 默认值改成了 True，会拒绝加载这些权重）；遇到不认识该参数的老版本 torch（JetPack 5 上常见）时，自动退回不带该参数的调用。
 - `det3d/core/bbox/geometry.py: points_in_convex_polygon_jit`：新版 numba（nopython 默认开启）不再支持列表花式索引，改写为显式循环，已对照原公式验证。GT-sampling 的碰撞检测依赖这个函数。
+- `det3d/core/sampler/{preprocess,sample_ops}.py`：GT 库里没有的类别（比如还没录到公交）在按点数过滤和采样时跳过，原来会直接 `KeyError`。
 
 ## 6. 已知局限（没有在本环境中验证的部分）
 

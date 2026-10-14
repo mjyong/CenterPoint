@@ -134,7 +134,8 @@ class DataBaseSamplerV2:
         avoid_coll_boxes = gt_boxes
 
         for class_name, sampled_num in zip(sampled_groups, sample_num_per_class):
-            if sampled_num > 0:
+            # classes absent from the database (e.g. no bus recorded yet) are not sampled
+            if sampled_num > 0 and len(self._group_db_infos.get(class_name, [])) > 0:
                 if self._use_group_sampling:
                     sampled_cls = self.sample_group(
                         class_name, sampled_num, avoid_coll_boxes, total_group_ids

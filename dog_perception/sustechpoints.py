@@ -18,8 +18,11 @@ in microseconds (sortable). The track id becomes ``obj_id``; flagged tracks get 
 they stand out in the tool. ``dog_meta.json`` keeps what SUSTechPOINTS does
 not: stamps, ``T_world_det`` per frame and the auto-label scores.
 
-Import reads the (corrected) labels back. Classes map from the SUSTechPOINTS
-object types (``TYPE_TO_CLASS``; other types are skipped and counted). A box
+Import reads the (corrected) labels back. Classes and vehicle subclasses map
+from the SUSTechPOINTS object types (``TYPE_TO_SUBCLASS``: Car / Van -> car,
+Truck and construction machines -> truck, Bus / Tram / LongVehicle -> bus; other
+types are skipped and counted). Export writes a vehicle's subclass as its type
+(``SUBCLASS_TO_TYPE``), Car when it has none. A box
 the annotator did not move (center within ``moved_tol``) keeps the exported
 auto-label velocity, which already handles static objects (see
 dog_perception/autolabel.py); moved or new boxes get a velocity from their
@@ -34,19 +37,24 @@ from collections import defaultdict
 import numpy as np
 
 from .autolabel import _window_velocity
-from .detection.boxes import CLASSES, Detections
+from .detection.boxes import CLASSES, SUBCLASS_TO_CLASS, Detections
 from .geometry import inv_T, wrap_angle
 
 CLASS_TO_TYPE = {"vehicle": "Car", "pedestrian": "Pedestrian", "cyclist": "BicycleRider"}
+SUBCLASS_TO_TYPE = {"car": "Car", "truck": "Truck", "bus": "Bus", "pedestrian": "Pedestrian", "cyclist": "BicycleRider"}
 
-# SUSTechPOINTS object types (public/js/obj_cfg.js) -> dog classes. Parked bicycles / motorcycles are
-# cyclists, as in the nuScenes mapping (NUSC_TO_DOG); the tracker tells them apart by speed.
-TYPE_TO_CLASS = {
-    **{t: "vehicle" for t in ("Car", "Van", "Bus", "Truck", "PoliceCar", "TourCar", "LongVehicle", "ConcreteTruck",
-                              "Tram", "Excavator", "ForkLift", "Crane", "RoadRoller", "Bulldozer")},
+# SUSTechPOINTS object types (public/js/obj_cfg.js) -> subclasses, grouped by size the way nuScenes'
+# heads are (construction machines with trucks; trams and long vehicles with buses, like trailers).
+# Parked bicycles / motorcycles are cyclists, as in the nuScenes mapping (NUSC_TO_SUBCLASS); the
+# tracker tells them apart by speed.
+TYPE_TO_SUBCLASS = {
+    **{t: "car" for t in ("Car", "Van", "PoliceCar", "TourCar")},
+    **{t: "truck" for t in ("Truck", "ConcreteTruck", "Excavator", "ForkLift", "Crane", "RoadRoller", "Bulldozer")},
+    **{t: "bus" for t in ("Bus", "Tram", "LongVehicle")},
     **{t: "pedestrian" for t in ("Pedestrian", "RoadWorker", "Child")},
     **{t: "cyclist" for t in ("BicycleRider", "MotorcyleRider", "ScooterRider", "Bicycle", "Motorcycle", "Scooter")},
 }
+TYPE_TO_CLASS = {t: SUBCLASS_TO_CLASS[s] for t, s in TYPE_TO_SUBCLASS.items()}
 
 META_FILE = "dog_meta.json"
 LIDAR_HEIGHT = 1.8          # [m] SUSTechPOINTS' assumed lidar height above the ground
@@ -117,7 +125,8 @@ def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_e
         for o in f["objects"]:
             box = np.asarray(o["box"], float).copy()
             box[2] -= LIDAR_HEIGHT
-            objs.append({"obj_id": str(o["track_id"]), "obj_type": CLASS_TO_TYPE[o["label"]],
+            otype = SUBCLASS_TO_TYPE.get(o.get("subclass")) or CLASS_TO_TYPE[o["label"]]
+            objs.append({"obj_id": str(o["track_id"]), "obj_type": otype,
                          "obj_attr": "review" if o.get("review") else "", "psr": box_to_psr(box)})
             scores[o["track_id"]].append(float(o["score"]))
             exported[str(o["track_id"])] = dict(center=np.asarray(o["box"][:3], float).tolist(),
@@ -135,8 +144,10 @@ def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_e
 
 
 def import_scene(scene_dir, type_map=None, static_speed=0.2, velocity_window=0.5, moved_tol=0.05):
-    """SUSTechPOINTS scene (exported by ``export_scene``, then corrected) -> (labels dict, counts)."""
-    type_map = dict(TYPE_TO_CLASS, **(type_map or {}))
+    """SUSTechPOINTS scene (exported by ``export_scene``, then corrected) -> (labels dict, counts).
+
+    ``type_map`` adds or overrides object types: type -> subclass (car, truck, ...) or class."""
+    type_map = dict(TYPE_TO_SUBCLASS, **(type_map or {}))
     with open(os.path.join(scene_dir, META_FILE)) as fh:
         meta = json.load(fh)
     z_offset = float(meta.get("z_offset", 0.0))
@@ -151,8 +162,12 @@ def import_scene(scene_dir, type_map=None, static_speed=0.2, velocity_window=0.5
         T = np.asarray(fm["T_world_det"], float)
         objs = []
         for a in anns:
-            cls = type_map.get(a.get("obj_type"))
-            if cls not in CLASSES:
+            name = type_map.get(a.get("obj_type"))
+            if name in SUBCLASS_TO_CLASS:
+                cls, sub = SUBCLASS_TO_CLASS[name], name
+            elif name in CLASSES:
+                cls, sub = name, None if name == "vehicle" else name
+            else:
                 counts["skipped type %s" % a.get("obj_type")] += 1
                 continue
             oid = str(a.get("obj_id", "")).strip()
@@ -163,7 +178,8 @@ def import_scene(scene_dir, type_map=None, static_speed=0.2, velocity_window=0.5
             ex = fm.get("objects", {}).get(oid)
             kept = ex is not None and np.hypot(*(box[:2] - ex["center"][:2])) <= moved_tol
             by_id[oid].append((len(frames), len(objs)))
-            objs.append(dict(obj_id=oid, label=cls, box=box, velocity=np.asarray(ex["velocity"]) if kept else None))
+            objs.append(dict(obj_id=oid, label=cls, subclass=sub, box=box,
+                             velocity=np.asarray(ex["velocity"]) if kept else None))
             counts[cls] += 1
             counts["moved or new"] += not kept
         frames.append(dict(stamp=fm["stamp"], T_world_det=T, objects=objs))

@@ -42,6 +42,9 @@ def test_dog_dataset_gt_sampling_and_training_step(sim_frames, tmp_path):
     labels = _labels_from_sim(sim_frames, str(tmp_path / "run" / "frames"))
     infos = export_recording(str(tmp_path / "run" / "frames"), labels, root, "sim")
     assert len(infos) == 6 and sum(len(i["gt_names"]) for i in infos) > 10
+    # head classes: the sim labels carry no vehicle subclass, so vehicles get one from their size
+    names = set(np.concatenate([i["gt_names"] for i in infos]))
+    assert names <= {"car", "truck", "bus", "pedestrian", "cyclist"} and "car" in names
     for split in ("train", "val"):
         with open(os.path.join(root, "infos_%s.pkl" % split), "wb") as f:
             pickle.dump(infos, f)
@@ -55,11 +58,11 @@ def test_dog_dataset_gt_sampling_and_training_step(sim_frames, tmp_path):
         d.root_path, d.info_path, d.ann_file = root, os.path.join(root, "infos_%s.pkl" % split), None
     cfg.data.train.pipeline[2].cfg.db_sampler.db_info_path = db
     cfg.data.train.pipeline[2].cfg.db_sampler.db_prep_steps[0].filter_by_min_num_points = dict(
-        vehicle=1, pedestrian=1, cyclist=1)
+        car=1, truck=1, bus=1, pedestrian=1, cyclist=1)       # no bus in the sim: sampler skips it
     np.random.seed(0)
     ds = build_dataset(cfg.data.train)
     batch = collate_kitti([ds[0], ds[1]])
-    assert batch["hm"][1].shape[1:] == (1, 102, 102)     # pedestrian task heat-map at stride 4
+    assert len(batch["hm"]) == 5 and batch["hm"][3].shape[1:] == (1, 102, 102)   # pedestrian task, stride 4
 
     torch.manual_seed(0)
     model = build_detector(cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
@@ -75,3 +78,5 @@ def test_dog_dataset_gt_sampling_and_training_step(sim_frames, tmp_path):
             for i in infos}
     res, _ = val.evaluation(dets)
     assert abs(res["raw"]["mAP"] - 1.0) < 1e-6
+    # and the merged output classes (what the detector reports), after the cross-head merge
+    assert abs(res["merged"]["vehicle"]["mAP"] - 1.0) < 1e-6 and "merged/vehicle" in res["results"]

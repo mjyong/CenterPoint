@@ -7,6 +7,8 @@ one row per track in the track table (``write_track_table``): the
     ok                          accept the track as is (clears the review flag)
     drop                        remove it
     vehicle|pedestrian|cyclist  change the class
+    car|truck|bus               a vehicle of that subclass (the dog models' vehicle heads; the
+                                ``subclass`` column shows the teacher's vote)
     flip                        turn the heading by 180 deg
     static                      the object does not move: zero velocity, one position, one heading
 
@@ -25,12 +27,13 @@ from collections import defaultdict
 
 import numpy as np
 
-from .detection.boxes import CLASSES, Detections
+from .detection.boxes import CLASSES, SUBCLASS_TO_CLASS, Detections
 from .geometry import inv_T, wrap_angle
 
-ACTIONS = ("ok", "drop", "flip", "static") + CLASSES
-TABLE_COLUMNS = ["track_id", "label", "review", "mean_score", "frames", "interpolated", "t_first", "t_last",
-                 "min_range_m", "moving_share", "max_speed", "action", "from", "to", "note"]
+VEHICLE_SUBCLASSES = tuple(k for k, v in SUBCLASS_TO_CLASS.items() if v == "vehicle")
+ACTIONS = ("ok", "drop", "flip", "static") + CLASSES + VEHICLE_SUBCLASSES
+TABLE_COLUMNS = ["track_id", "label", "subclass", "review", "mean_score", "frames", "interpolated", "t_first",
+                 "t_last", "min_range_m", "moving_share", "max_speed", "action", "from", "to", "note"]
 
 
 def _tracks(labels):
@@ -51,7 +54,8 @@ def track_table(labels):
         stamps = [labels["frames"][fi]["stamp"] for fi, _ in refs]
         speed = np.array([np.hypot(*o["velocity"]) for o in objs])
         rows.append(dict(
-            track_id=tid, label=objs[0]["label"], review=int(any(o["review"] for o in objs)),
+            track_id=tid, label=objs[0]["label"], subclass=objs[0].get("subclass") or "",
+            review=int(any(o["review"] for o in objs)),
             mean_score="%.3f" % np.mean([o["score"] for o in objs]), frames=len(objs),
             interpolated=sum(bool(o["interpolated"]) for o in objs),
             t_first="%.2f" % (min(stamps) - t0), t_last="%.2f" % (max(stamps) - t0),
@@ -117,7 +121,11 @@ def apply_edits(labels, edits):
             o = out["frames"][fi]["objects"][oi]
             for a in acts:
                 if a in CLASSES:
+                    if a != o["label"]:     # a vehicle keeps its subclass when only confirmed
+                        o["subclass"] = None if a == "vehicle" else a
                     o["label"] = a
+                elif a in VEHICLE_SUBCLASSES:
+                    o["label"], o["subclass"] = "vehicle", a
                 elif a == "flip":
                     o["box"][6] = wrap_angle(o["box"][6] + np.pi)
             o["review"] = False
@@ -190,14 +198,16 @@ def write_review_mcap(path, labels, frames_dir=None, results=None, current_sweep
                 base = flagged_rgb if o["review"] else CLASS_RGB.get(c, (0.6, 0.6, 0.6, 1))
                 alpha = 0.12 if o["interpolated"] else 0.3
                 b = o["box"]
-                tag = "T%d %s %.2f%s%s" % (o["track_id"], o["label"], o["score"], " REVIEW" if o["review"] else "",
+                name = o["label"] + ("/" + o["subclass"] if o.get("subclass") not in (None, o["label"]) else "")
+                tag = "T%d %s %.2f%s%s" % (o["track_id"], name, o["score"], " REVIEW" if o["review"] else "",
                                          " interp" if o["interpolated"] else "")
                 v = np.hypot(*o["velocity"])
                 if v > 0.05:
                     tag += " %.1f m/s" % v
                 ents.append(fx.entity(
                     "label/%d" % o["track_id"], t, "det", lifetime=0.3,
-                    metadata=dict(track_id=o["track_id"], label=o["label"], score="%.3f" % o["score"],
+                    metadata=dict(track_id=o["track_id"], label=o["label"], subclass=o.get("subclass") or "",
+                                  score="%.3f" % o["score"],
                                   review=o["review"], t="%.2f" % (t - t0)),
                     cubes=[fx.cube(b[:3], b[3:6], b[6], base[:3] + (alpha,))],
                     lines=[fx.box_wire(b, base[:3] + (1.0,), 0.12 if o["review"] else 0.05)],

@@ -164,17 +164,32 @@ def test_nusc_to_dog_head_surgery_loads_strictly():
     import torch
     from det3d.models import build_detector
     from det3d.torchie import Config
-    from tools.dog.convert_nusc_ckpt import convert_state_dict
+    from tools.dog.convert_nusc_ckpt import convert_state_dict, mapping_for
 
     src = build_detector(Config.fromfile(PP_CFG).model, train_cfg=None, test_cfg=None)
     dst_cfg = Config.fromfile("configs/dog/dog_centerpoint_pp_xt32.py")
+    assert [t["class_names"] for t in dst_cfg.model.bbox_head.tasks] == [["car"], ["truck"], ["bus"],
+                                                                          ["pedestrian"], ["cyclist"]]
     dst = build_detector(dst_cfg.model, train_cfg=None, test_cfg=dst_cfg.test_cfg)
     sd = convert_state_dict(src.state_dict())
     dst.load_state_dict(sd, strict=True)
-    # pedestrian head's heat-map comes from nuScenes task 5 channel 0, cyclist from task 4 channel 1
-    assert torch.equal(dst.bbox_head.tasks[1].hm[-1].weight, src.bbox_head.tasks[5].hm[-1].weight[[0]])
-    assert torch.equal(dst.bbox_head.tasks[2].hm[-1].bias, src.bbox_head.tasks[4].hm[-1].bias[[1]])
-    assert torch.equal(dst.bbox_head.tasks[2].vel[0].weight, src.bbox_head.tasks[4].vel[0].weight)
+    hm = lambda net, t: net.bbox_head.tasks[t].hm[-1]   # noqa: E731
+    # truck / bus heads keep nuScenes' truck (task 1 ch 0) and bus (task 2 ch 0) heat-maps and branches,
+    # pedestrian comes from task 5 channel 0, cyclist from task 4 channel 1 (bicycle)
+    assert torch.equal(hm(dst, 1).weight, hm(src, 1).weight[[0]])
+    assert torch.equal(hm(dst, 2).bias, hm(src, 2).bias[[0]])
+    assert torch.equal(dst.bbox_head.tasks[2].dim[0].weight, src.bbox_head.tasks[2].dim[0].weight)
+    assert torch.equal(hm(dst, 3).weight, hm(src, 5).weight[[0]])
+    assert torch.equal(hm(dst, 4).bias, hm(src, 4).bias[[1]])
+    assert torch.equal(dst.bbox_head.tasks[4].vel[0].weight, src.bbox_head.tasks[4].vel[0].weight)
+
+    # the older 3-task layout (vehicle <- car) still converts
+    old_cfg = Config.fromfile("configs/dog/dog_centerpoint_pp_xt32_3cls.py")
+    old = build_detector(old_cfg.model, train_cfg=None, test_cfg=old_cfg.test_cfg)
+    old.load_state_dict(convert_state_dict(src.state_dict(), mapping_for(
+        [t["class_names"] for t in old_cfg.model.bbox_head.tasks])), strict=True)
+    assert torch.equal(hm(old, 0).weight, hm(src, 0).weight[[0]])
+    assert torch.equal(hm(old, 1).weight, hm(src, 5).weight[[0]])
 
 
 @requires_det3d
@@ -232,8 +247,10 @@ def test_checkpoint_arch_tells_nuscenes_and_dog_models(tmp_path):
         return path
 
     assert checkpoint_arch(ckpt("a.pth", "reader.pfn_layers.0.linear.weight", 6)) == "pillar"
-    assert checkpoint_arch(ckpt("b.pth", "reader.pfn_layers.0.linear.weight", 3)) == "dog_pillar"
-    assert checkpoint_arch(ckpt("c.pth", "backbone.conv_input.0.weight", 3)) == "dog_voxel"
+    assert checkpoint_arch(ckpt("b.pth", "reader.pfn_layers.0.linear.weight", 5)) == "dog_pillar"
+    assert checkpoint_arch(ckpt("c.pth", "backbone.conv_input.0.weight", 5)) == "dog_voxel"
+    assert checkpoint_arch(ckpt("e.pth", "reader.pfn_layers.0.linear.weight", 3)) == "dog_pillar_3cls"
+    assert checkpoint_arch(ckpt("f.pth", "backbone.conv_input.0.weight", 3)) == "dog_voxel_3cls"
     assert checkpoint_arch(ckpt("d.pth", "neck.blocks.0.weight", 6)) is None
 
 
@@ -244,6 +261,47 @@ def test_default_class_map_keeps_dog_classes():
     nusc = default_class_map(["car", "truck", "construction_vehicle", "bus", "trailer", "barrier", "motorcycle",
                               "bicycle", "pedestrian", "traffic_cone"])
     assert nusc["truck"] == "vehicle" and nusc["bicycle"] == "cyclist" and "barrier" not in nusc
+    heads = default_class_map(["car", "truck", "bus", "pedestrian", "cyclist"])   # configs/dog/ (current)
+    assert heads == {"car": "vehicle", "truck": "vehicle", "bus": "vehicle", "pedestrian": "pedestrian",
+                     "cyclist": "cyclist"}
+
+
+@requires_det3d
+@pytest.mark.parametrize("config, subclasses", [
+    ("configs/dog/dog_centerpoint_pp_xt32.py", ["car", "truck", "bus", "pedestrian", "cyclist"]),
+    ("configs/dog/dog_centerpoint_pp_xt32_3cls.py", [None, "pedestrian", "cyclist"]),
+    (PP_CFG, ["car", "truck", "truck", "bus", "bus", None, "cyclist", "cyclist", "pedestrian", None]),
+])
+def test_detector_outputs_three_classes_and_keeps_subclass(config, subclasses):
+    """Heads car / truck / bus come out as vehicle, with the head kept in Detections.subclasses."""
+    from dog_perception.detection.boxes import SUBCLASS_TO_CLASS
+    from dog_perception.detection.centerpoint import CenterPointDetector
+    det = CenterPointDetector(config, device="cpu")
+    n = len(det.model_class_names)
+    box9 = np.zeros((n, 9))
+    box9[:, 0] = np.arange(n) * 10.0 - 30.0          # far apart: no merge NMS
+    box9[:, 3:6] = [1.0, 2.0, 1.5]
+    d = det.postprocess(box9, np.full(n, 0.9), np.arange(n))
+    # barrier / traffic_cone (nuScenes) are dropped; the older 'vehicle' head has no subclass
+    want = [(SUBCLASS_TO_CLASS[s], s) if s else ("vehicle", None)
+            for name, s in zip(det.model_class_names, subclasses) if name not in ("barrier", "traffic_cone")]
+    assert sorted(zip(d.names, d.subclass_names), key=str) == sorted(want, key=str)
+
+
+def test_detections_carry_subclasses():
+    import pickle
+    d = Detections(np.zeros((3, 7)), np.zeros((3, 2)), np.ones(3), np.array([0, 1, 0]))
+    assert d.subclass_names == [None, "pedestrian", None]          # default: vehicles unknown
+    d = Detections(np.zeros((3, 7)), np.zeros((3, 2)), np.ones(3), np.array([0, 1, 0]), subclasses=np.array([1, 3, 2]))
+    assert d.select(np.array([2, 0])).subclass_names == ["bus", "truck"]
+    T = make_T(rot_z(0.3), [1.0, 2.0, 0.0])
+    assert d.transform(T, "world").subclass_names == ["truck", "pedestrian", "bus"]
+    assert Detections.concat([d, d.select([1])]).subclass_names == ["truck", "pedestrian", "bus", "pedestrian"]
+    # results.pkl written before subclasses existed still load
+    old = pickle.loads(pickle.dumps(d))
+    del old.__dict__["subclasses"]
+    again = pickle.loads(pickle.dumps(old))
+    assert again.subclass_names == [None, "pedestrian", None]
 
 
 def test_sparse_pairs_match_spconv():

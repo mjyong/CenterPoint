@@ -1,5 +1,6 @@
-from .boxes import (CLASSES, NUSC_TO_DOG, Detections, circle_nms, class_index, classwise_circle_nms,
-                    det3d_to_standard, score_threshold_array, standard_to_det3d)
+from .boxes import (CLASSES, NUSC_TO_DOG, NUSC_TO_SUBCLASS, SUBCLASS_TO_CLASS, SUBCLASSES, Detections, circle_nms,
+                    class_index, classwise_circle_nms, det3d_to_standard, score_threshold_array, standard_to_det3d,
+                    subclass_index)
 from .filters import DEFAULT_SCORE_THRESHOLDS, DetectionFilterConfig, filter_detections
 from .frame_adapter import NUSC_LIDAR_HEIGHT, ModelFrame
 from .oracle import OracleDetector, OracleNoise
@@ -8,8 +9,10 @@ from .oracle import OracleDetector, OracleNoise
 PRESET_CONFIGS = {
     "pillar": "configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py",
     "voxel": "configs/nusc/voxelnet/nusc_centerpoint_voxelnet_0075voxel_fix_bn_z.py",
-    "dog_pillar": "configs/dog/dog_centerpoint_pp_xt32.py",
+    "dog_pillar": "configs/dog/dog_centerpoint_pp_xt32.py",              # car, truck, bus, pedestrian, cyclist
     "dog_voxel": "configs/dog/dog_centerpoint_voxel_xt32.py",
+    "dog_pillar_3cls": "configs/dog/dog_centerpoint_pp_xt32_3cls.py",    # older: vehicle, pedestrian, cyclist
+    "dog_voxel_3cls": "configs/dog/dog_centerpoint_voxel_xt32_3cls.py",
 }
 
 

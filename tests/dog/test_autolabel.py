@@ -70,3 +70,22 @@ def test_refine_track_static_and_moving():
     obs = _obs(t, xy, np.where(np.arange(30) == 3, np.pi, 0.0), np.tile([5.0, 0], (30, 1)))
     obs[3]["score"] = 0.95
     assert np.allclose([o["box"][6] for o in refine_track(obs, t, cfg)[5:25]], 0.0, atol=0.05)
+
+
+def test_refine_track_votes_vehicle_subclass():
+    """A vehicle track's subclass (car / truck / bus head of the teacher) is a score-weighted vote over the
+    observations that carry one; observations of another class do not count; no subclass at all -> -1."""
+    from dog_perception.autolabel import AutoLabelConfig, refine_track
+    from dog_perception.detection.boxes import SUBCLASSES
+    t = np.arange(10) * 0.1
+    xy = np.c_[np.full(10, 12.0), np.full(10, 4.0)]
+    obs = _obs(t, xy, np.zeros(10), np.zeros((10, 2)), size=(9.0, 2.6, 3.2))
+    subs = ["truck"] * 6 + ["car"] * 3 + ["pedestrian"]       # flickering teacher heads
+    for o, s, sc in zip(obs, subs, [0.6] * 6 + [0.9] * 3 + [0.2]):
+        o["subclass"], o["score"] = SUBCLASSES.index(s), sc
+    obs[-1]["label"] = 1
+    out = refine_track(obs, t, AutoLabelConfig())
+    assert {o["label"] for o in out} == {0} and {o["subclass"] for o in out} == {SUBCLASSES.index("truck")}
+    for o in obs:
+        o["subclass"] = -1                  # teacher without vehicle subclasses (older 3-class dog model)
+    assert {o["subclass"] for o in refine_track(obs, t, AutoLabelConfig())} == {-1}

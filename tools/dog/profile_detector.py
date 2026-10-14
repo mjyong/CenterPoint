@@ -5,7 +5,7 @@
 
 ``--frame`` is a model-input frame saved by ``run_sequence.py --save-frames`` (detection frame,
 x y z intensity dt). The config comes from the checkpoint (``checkpoint_arch``) unless ``--config``
-names a preset (pillar, voxel, dog_pillar, dog_voxel) or a det3d config file; without ``--ckpt`` the
+names a preset (PRESET_CONFIGS: pillar, voxel, dog_pillar, ...) or a det3d config file; without ``--ckpt`` the
 weights are random, which is fine for shapes, parameters and MACs.
 
 Dense convs count ``output elements x C_in x k x k`` multiply-adds. A sparse conv counts its real

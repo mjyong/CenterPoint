@@ -1,5 +1,7 @@
 """CenterPoint-Voxel (0.075 m, sparse 3D conv) fine-tuned on robot-dog XT32 data.
 
+Heads: car, truck, bus, pedestrian, cyclist; output: vehicle, pedestrian, cyclist.
+
 Higher accuracy / offline teacher for auto-labelling. Needs sparse conv
 (spconv, or libspconv in NVIDIA's CUDA-CenterPoint), so on the Orin it is
 an online option only if its measured latency fits next to the rest.
@@ -11,9 +13,14 @@ import logging
 
 from det3d.utils.config_tool import get_downsample_factor
 
-# one task per class: each gets its own heat-map head (warm-started from car / pedestrian / bicycle)
+# one task per class. Vehicles are split by size like nuScenes' heads, so each head regresses one
+# size range and warm-starts from the matching nuScenes head (car / truck / bus / pedestrian /
+# bicycle, tools/dog/convert_nusc_ckpt.py). The detector merges car, truck and bus into "vehicle"
+# on output (dog_perception.detection.boxes.SUBCLASS_TO_CLASS).
 tasks = [
-    dict(num_class=1, class_names=["vehicle"]),
+    dict(num_class=1, class_names=["car"]),
+    dict(num_class=1, class_names=["truck"]),       # + construction vehicles
+    dict(num_class=1, class_names=["bus"]),         # + trailers, trams, long vehicles
     dict(num_class=1, class_names=["pedestrian"]),
     dict(num_class=1, class_names=["cyclist"]),
 ]
@@ -69,7 +76,7 @@ test_cfg = dict(
     max_per_img=500,
     nms=dict(nms_pre_max_size=1000, nms_post_max_size=83, nms_iou_threshold=0.2),
     circular_nms=True,
-    min_radius=[4.0, 0.175, 0.85],     # squared meters: vehicle, pedestrian, cyclist
+    min_radius=[4.0, 12.0, 10.0, 0.175, 0.85],     # squared meters, per task (as nuScenes)
     score_threshold=0.1,
     pc_range=PC_RANGE[:2],
     out_size_factor=get_downsample_factor(model),
@@ -84,9 +91,9 @@ db_sampler = dict(
     type="GT-AUG",
     enable=True,
     db_info_path="data/dog/dbinfos_train_5sweeps_withvelo.pkl",
-    sample_groups=[dict(vehicle=2), dict(pedestrian=4), dict(cyclist=4)],
+    sample_groups=[dict(car=2), dict(truck=2), dict(bus=2), dict(pedestrian=4), dict(cyclist=4)],
     db_prep_steps=[
-        dict(filter_by_min_num_points=dict(vehicle=10, pedestrian=5, cyclist=5)),
+        dict(filter_by_min_num_points=dict(car=10, truck=10, bus=10, pedestrian=5, cyclist=5)),
         dict(filter_by_difficulty=[-1]),
     ],
     global_random_rotation_range_per_object=[0, 0],

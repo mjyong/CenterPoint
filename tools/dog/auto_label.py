@@ -5,8 +5,12 @@ fine-tuned voxel model in later rounds). Either run it here or reuse the
 output of run_sequence.py (--results). Output ``labels.pkl``:
 
     {"sequence": str, "frames": [{"stamp", "T_world_det",
-        "objects": [{"track_id", "label", "box" (7, det frame), "velocity" (2, det frame),
+        "objects": [{"track_id", "label", "subclass", "box" (7, det frame), "velocity" (2, det frame),
                      "score", "review", "interpolated"}]}]}
+
+``label`` is vehicle / pedestrian / cyclist; ``subclass`` is car / truck / bus
+for vehicles (the teacher's head, voted over the track; None when the teacher
+has no vehicle subclasses) and equal to ``label`` otherwise.
 
 ``labels_tracks.csv`` lists every track (low-confidence ones first, flagged
 ``review``) for the human pass: look at the labels in Foxglove and fill its
@@ -25,7 +29,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.autolabel import AutoLabelConfig, auto_label  # noqa: E402
-from dog_perception.detection.boxes import CLASSES, Detections  # noqa: E402
+from dog_perception.detection.boxes import CLASSES, SUBCLASSES, Detections  # noqa: E402
 from dog_perception.geometry import inv_T  # noqa: E402
 from dog_perception.label_review import write_track_table  # noqa: E402
 
@@ -86,7 +90,9 @@ def main():
             d = Detections(np.stack([o["box"] for o in objs]), np.stack([o["velocity"] for o in objs]),
                            np.array([o["score"] for o in objs]), np.array([o["label"] for o in objs]))
             d = d.transform(inv_T(T_wd), "det")
-        entries = [dict(track_id=o["track_id"], label=CLASSES[o["label"]], box=d.boxes[i], velocity=d.velocities[i],
+        entries = [dict(track_id=o["track_id"], label=CLASSES[o["label"]],
+                        subclass=SUBCLASSES[o["subclass"]] if o["subclass"] >= 0 else None,
+                        box=d.boxes[i], velocity=d.velocities[i],
                         score=o["score"], review=o["review"], interpolated=o["interpolated"], moving=o["moving"])
                    for i, o in enumerate(objs)]
         out_frames.append(dict(stamp=stamp, T_world_det=T_wd, objects=entries))

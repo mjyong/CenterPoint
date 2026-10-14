@@ -18,7 +18,8 @@ from det3d.models import build_detector
 from det3d.torchie import Config
 from det3d.torchie.trainer import load_checkpoint
 
-from .boxes import CLASSES, NUSC_TO_DOG, Detections, class_index, classwise_circle_nms, det3d_to_standard
+from .boxes import (CLASSES, NUSC_TO_DOG, NUSC_TO_SUBCLASS, SUBCLASS_TO_CLASS, SUBCLASSES, Detections, class_index,
+                    classwise_circle_nms, det3d_to_standard, subclass_index)
 from .filters import DetectionFilterConfig, filter_detections
 from .frame_adapter import ModelFrame
 
@@ -83,18 +84,25 @@ def _load_state_dict(path):
 
 
 def default_class_map(model_class_names):
-    """Model class -> dog class. Models already trained on the dog classes (configs/dog/) keep their
-    names; nuScenes models go through NUSC_TO_DOG. (Testing 'any name in NUSC_TO_DOG' is not enough:
-    'pedestrian' is in both, and a dog model's vehicle / cyclist would map to nothing and be dropped.)"""
-    if set(model_class_names) <= set(CLASSES):
-        return {n: n for n in model_class_names}
+    """Model class -> dog class. Dog models (configs/dog/: car / truck / bus / pedestrian / cyclist,
+    or the older vehicle / pedestrian / cyclist) go through SUBCLASS_TO_CLASS, nuScenes models
+    through NUSC_TO_DOG. (Testing 'any name in NUSC_TO_DOG' is not enough: 'pedestrian' is in both,
+    and a dog model's cyclist would map to nothing and be dropped.)"""
+    if set(model_class_names) <= set(CLASSES) | set(SUBCLASSES):
+        return {n: SUBCLASS_TO_CLASS.get(n, n) for n in model_class_names}
     return NUSC_TO_DOG
+
+
+def model_subclass(name):
+    """Subclass of a model class name (None for the older dog models' 'vehicle')."""
+    return name if name in SUBCLASSES else NUSC_TO_SUBCLASS.get(name)
 
 
 def checkpoint_arch(path):
     """Preset name from the parameter names of a det3d checkpoint: 'pillar' / 'voxel' for the
-    nuScenes models (6 head tasks), 'dog_pillar' / 'dog_voxel' for the 3-class fine-tuned ones
-    (one task per class, configs/dog/), None if unknown."""
+    nuScenes models (6 head tasks), 'dog_pillar' / 'dog_voxel' for the fine-tuned dog models
+    (5 tasks: car, truck, bus, pedestrian, cyclist), 'dog_pillar_3cls' / 'dog_voxel_3cls' for the
+    older 3-task ones (vehicle, pedestrian, cyclist), None if unknown."""
     keys = list(_load_state_dict(path).keys())
     if any(k.startswith("reader.pfn_layers") for k in keys):
         arch = "pillar"
@@ -103,7 +111,7 @@ def checkpoint_arch(path):
     else:
         return None
     tasks = {k.split(".")[2] for k in keys if k.startswith("bbox_head.tasks.")}
-    return "dog_" + arch if len(tasks) == 3 else arch
+    return {5: "dog_" + arch, 3: "dog_%s_3cls" % arch}.get(len(tasks), arch)
 
 
 def check_checkpoint(net, path, arch=""):
@@ -151,6 +159,10 @@ class CenterPointDetector:
             class_map = default_class_map(names)
         self.model_class_names = names
         self.label_map = np.array([class_index(class_map.get(n, "")) for n in names], dtype=np.int64)
+        # subclass only where it agrees with the mapped class (a custom class_map may disagree)
+        subs = [model_subclass(n) for n in names]
+        self.subclass_map = np.array([subclass_index(s) if s and SUBCLASS_TO_CLASS[s] == class_map.get(n) else -1
+                                      for n, s in zip(names, subs)], dtype=np.int64)
 
         self.net = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
         if checkpoint:
@@ -226,11 +238,13 @@ class CenterPointDetector:
         return dets
 
     def postprocess(self, box9, scores, model_labels, stamp=None):
-        labels = self.label_map[model_labels.astype(np.int64)]
+        model_labels = model_labels.astype(np.int64)
+        labels = self.label_map[model_labels]
         keep = labels >= 0
         std, vel = det3d_to_standard(box9[keep])
         std, vel = self.frame.boxes_from_model(std, vel)
-        dets = Detections(std, vel, scores[keep].astype(np.float64), labels[keep], "det", stamp)
+        dets = Detections(std, vel, scores[keep].astype(np.float64), labels[keep], "det", stamp,
+                          self.subclass_map[model_labels[keep]])
         return classwise_circle_nms(dets, self.merged_nms)
 
     @property
