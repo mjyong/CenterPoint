@@ -1,0 +1,77 @@
+{
+  "offsets": [
+    -0.15,
+    -0.125,
+    -0.1,
+    -0.075,
+    -0.05,
+    -0.025,
+    0.0,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.125,
+    0.15
+  ],
+  "turn_dw_deg_s": 20.0,
+  "gap_s": 0.5,
+  "sequences": [
+    {
+      "name": "0921_164127_s003",
+      "meta_offset": 0.0,
+      "n_turn": 10,
+      "n_steady": 28,
+      "best_offset": 0.05,
+      "turn_median_at_0": 0.29805719144931964,
+      "turn_median_at_best": 0.11016658714155234
+    },
+    {
+      "name": "0921_164127_s004",
+      "meta_offset": 0.0,
+      "n_turn": 29,
+      "n_steady": 22,
+      "best_offset": 0.0,
+      "turn_median_at_0": 0.024493761571113798,
+      "turn_median_at_best": 0.024493761571113798
+    },
+    {
+      "name": "0921_165659_s019",
+      "meta_offset": 0.0,
+      "n_turn": 53,
+      "n_steady": 14,
+      "best_offset": 0.0,
+      "turn_median_at_0": 0.11852253038969329,
+      "turn_median_at_best": 0.11852253038969329
+    },
+    {
+      "name": "0921_165659_s020",
+      "meta_offset": 0.0,
+      "n_turn": 51,
+      "n_steady": 14,
+      "best_offset": 0.0,
+      "turn_median_at_0": 0.13866341442969157,
+      "turn_median_at_best": 0.13866341442969157
+    },
+    {
+      "name": "0921_165659_s026",
+      "meta_offset": 0.0,
+      "n_turn": 73,
+      "n_steady": 18,
+      "best_offset": 0.0,
+      "turn_median_at_0": 0.1485323255438652,
+      "turn_median_at_best": 0.1485323255438652
+    },
+    {
+      "name": "0921_165659_s018",
+      "meta_offset": 0.0,
+      "n_turn": 11,
+      "n_steady": 26,
+      "best_offset": 0.0,
+      "turn_median_at_0": 0.305542178551909,
+      "turn_median_at_best": 0.305542178551909
+    }
+  ],
+  "best_offset": 0.0,
+  "verdict": "sequences disagree (best +0.000 s over all; 0921_164127_s003 +0.050 s, 0921_164127_s004 +0.000 s, 0921_165659_s019 +0.000 s, 0921_165659_s020 +0.000 s, 0921_165659_s026 +0.000 s, 0921_165659_s018 +0.000 s): look at the PNGs one by one - a clock offset is the same on every sequence, so this is not one"
+}
