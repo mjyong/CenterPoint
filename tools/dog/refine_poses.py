@@ -48,17 +48,29 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))          # sequence_preview (pose checks)
 
-from dog_perception.geometry import quat_to_R, transform_points, yaw_of  # noqa: E402
+from dog_perception.geometry import make_T, quat_to_R, rot_z, transform_points, yaw_of  # noqa: E402
 from dog_perception.io import SequenceReader, load_scan  # noqa: E402
 from dog_perception.preprocess import SelfFilter, SelfFilterConfig, dedup_returns  # noqa: E402
 
 ODOM_INS = "odom_ins.npy"
 
 
-def lidar_odometry(rd, voxel=0.4, max_range=60.0, min_range=1.5):
-    """(stamps (K,), poses (K, 4, 4)): KISS-ICP body poses at the scan ends, in the frame of the
-    first scan."""
+def scene_points(xyz_body, base_height, cell=0.05):
+    """Points 0.3-3 m above the ground and 1.5-30 m away (walls, poles, trees, cars), one per 5 cm
+    cell, body frame (M, 3) float32: what the pose checks register."""
+    r = np.hypot(xyz_body[:, 0], xyz_body[:, 1])
+    z = xyz_body[:, 2] + base_height
+    p = xyz_body[(z > 0.3) & (z < 3.0) & (r > 1.5) & (r < 30)]
+    k = np.unique(np.floor(p / cell).astype(np.int64), axis=0, return_index=True)[1]
+    return p[k].astype(np.float32)
+
+
+def lidar_odometry(rd, voxel=0.4, max_range=60.0, min_range=1.5, keep_every=10):
+    """(stamps (K,), poses (K, 4, 4), {index: scene points}): KISS-ICP body poses at the scan
+    ends, in the frame of the first scan, plus the registration points of every ``keep_every``-th
+    scan for the pose checks."""
     from kiss_icp.config import KISSConfig
     from kiss_icp.kiss_icp import KissICP
 
@@ -67,16 +79,19 @@ def lidar_odometry(rd, voxel=0.4, max_range=60.0, min_range=1.5):
     cfg.mapping.voxel_size = voxel
     odo = KissICP(cfg)
     sf = SelfFilter(SelfFilterConfig(), rd.T_body_lidar)
-    stamps, poses = [], []
-    for f in rd.scan_files:
+    stamps, poses, kept = [], [], {}
+    base = float(rd.meta.get("base_height", 0.45))
+    for k, f in enumerate(rd.scan_files):
         scan = dedup_returns(load_scan(f).shifted(rd.lidar_time_offset))
         keep = np.isfinite(scan.xyz).all(axis=1)
         keep[keep] = sf(scan.xyz[keep])
         xyz = transform_points(rd.T_body_lidar, scan.xyz[keep]).astype(np.float64)
-        odo.register_frame(xyz, np.asarray(scan.point_times, np.float64)[keep])
+        frame, _ = odo.register_frame(xyz, np.asarray(scan.point_times, np.float64)[keep])
         stamps.append(scan.stamp)
         poses.append(odo.last_pose.copy())
-    return np.array(stamps), np.array(poses)
+        if keep_every and k % keep_every == 0:
+            kept[k] = scene_points(np.asarray(frame), base)          # deskewed to the scan end
+    return np.array(stamps), np.array(poses), kept
 
 
 def ins_at(odom, t):
@@ -169,10 +184,20 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=0.05, huber=0.2, h
     a = (yaw_ins - yaw_lo)[:-1]                                   # odometry frame -> ENU, per step
     c, s = np.cos(a), np.sin(a)
     d = np.column_stack([c * step[:, 0] - s * step[:, 1], s * step[:, 0] + c * step[:, 1]])
-    # a failed registration: the odometry step disagrees with the INS step by more than lo_gate
+    # A failed registration: the odometry step is off both from the INS velocity over the step and
+    # from the odometry steps around it. Not from the INS position step: while the INS is
+    # unhealthy that one jumps by up to 0.45 m and would reject good odometry steps.
     ins_step = np.diff(p_ins[:, :2], axis=0)
-    bad_lo = np.linalg.norm(d - ins_step, axis=1) > lo_gate
-    d_used = np.where(bad_lo[:, None], ins_step, d)
+    v = odom_ins[:, 8:10]
+    if np.isfinite(v).all():
+        v_s = np.column_stack([np.interp(stamps, odom_ins[:, 0], v[:, i]) for i in (0, 1)])
+        vel_step = 0.5 * (v_s[1:] + v_s[:-1]) * np.diff(stamps)[:, None]
+    else:
+        vel_step = ins_step
+    from scipy.ndimage import median_filter
+    nb = median_filter(d, size=(5, 1), mode="nearest") if len(d) else d
+    bad_lo = (np.linalg.norm(d - vel_step, axis=1) > lo_gate) & (np.linalg.norm(d - nb, axis=1) > lo_gate)
+    d_used = np.where(bad_lo[:, None], vel_step, d)
     w_lo = np.where(bad_lo, 1.0, 1.0 / sigma_lo ** 2)
     lo_cum = np.concatenate([[[0.0, 0.0]], np.cumsum(d_used, axis=0)])
     healthy, rate_v, rate_lo = ins_health(odom_ins, stamps, lo_cum)
@@ -216,7 +241,27 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=0.05, huber=0.2, h
                                       / len(stamps)), 3),
                 lo_path_m=round(float(np.sum(np.linalg.norm(d_used, axis=1))), 2),
                 ins_path_m=round(float(np.sum(np.linalg.norm(ins_step, axis=1))), 2))
-    return xy, corr, info, dict(healthy=healthy, rate_v=rate_v, rate_lo=rate_lo)
+    return xy, corr, info, dict(healthy=healthy, rate_v=rate_v, rate_lo=rate_lo, bad_lo=bad_lo, p_ins=p_ins,
+                                yaw_ins=yaw_ins)
+
+
+def pose_checks(stamps, lo_poses, xy, diag, kept, gap=1.0, seed=0):
+    """Position error between scans ``gap`` seconds apart as the lidar sees it (the preview's
+    shift check), for the INS, the lidar odometry alone and the fused poses: tells whether a
+    remaining error comes from the odometry or from the fusion."""
+    from sequence_preview import pose_shift
+
+    p_ins, yaw_ins = diag["p_ins"], diag["yaw_ins"]
+    pose = dict(ins=lambda k: make_T(rot_z(yaw_ins[k]), p_ins[k]), lo=lambda k: lo_poses[k],
+                fused=lambda k: make_T(rot_z(yaw_ins[k]), [xy[k, 0], xy[k, 1], p_ins[k, 2]]))
+    step = max(1, int(round(gap / max(np.median(np.diff(stamps)), 1e-3)))) if len(stamps) > 1 else 1
+    pairs = [(i, i + step) for i in sorted(kept) if i + step in kept]
+    out = dict(pair_t=np.array([stamps[i] - stamps[0] for i, _ in pairs]))
+    for name, T in pose.items():
+        rng = np.random.default_rng(seed)
+        w = {k: transform_points(T(k), kept[k].astype(np.float64))[:, :2] for k in kept}
+        out[name] = np.array([pose_shift(w[i], w[j], rng) for i, j in pairs])
+    return out
 
 
 def refined_odom(odom_ins, stamps, xy):
@@ -234,12 +279,13 @@ def refined_odom(odom_ins, stamps, xy):
     return out
 
 
-def draw(path, name, odom_ins, stamps, xy, corr, info, diag):
+def draw(path, name, odom_ins, stamps, xy, corr, info, diag, checks=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, (a1, a2) = plt.subplots(1, 2, figsize=(14, 5.5))
+    fig, axs = plt.subplots(1, 3 if checks else 2, figsize=(21 if checks else 14, 5.5))
+    a1, a2 = axs[0], axs[1]
     a1.plot(odom_ins[:, 1], odom_ins[:, 2], c="0.6", lw=1, label="INS")
     a1.plot(xy[:, 0], xy[:, 1], c="tab:blue", lw=1.2, label="lidar odometry + RTK")
     a1.set_aspect("equal")
@@ -259,6 +305,20 @@ def draw(path, name, odom_ins, stamps, xy, corr, info, diag):
     a2.legend(fontsize=8)
     a2.set_title("correction: median %.2f m, p90 %.2f m, max %.2f m" % (
         info["correction_median_m"], info["correction_p90_m"], info["correction_max_m"]))
+    bl = np.nonzero(diag["bad_lo"])[0]
+    if len(bl):
+        a2.plot(stamps[bl + 1] - t0, np.zeros(len(bl)), "kx", ms=5, label="odometry step rejected")
+        a2.legend(fontsize=8)
+    if checks:
+        a3 = axs[2]
+        for k, c in (("ins", "0.5"), ("lo", "tab:green"), ("fused", "tab:blue")):
+            a3.plot(checks["pair_t"], checks[k], "o-", ms=3, lw=0.8, c=c,
+                    label="%s (p90 %.2f m)" % (k, np.nanpercentile(checks[k], 90) if len(checks[k]) else np.nan))
+        a3.set_xlabel("time [s]")
+        a3.set_ylabel("lidar shift between scans 1 s apart [m]")
+        a3.grid(alpha=0.3)
+        a3.legend(fontsize=8)
+        a3.set_title("pose check per source")
     fig.tight_layout()
     fig.savefig(path, dpi=80)
     plt.close(fig)
@@ -270,8 +330,14 @@ def refine(seq_dir, plots=None, **kw):
     odom_ins = np.load(p_ins) if os.path.exists(p_ins) else rd.odom
     if len(rd) < 2 or len(odom_ins) < 2:
         return None
-    stamps, poses = lidar_odometry(rd)
+    stamps, poses, kept = lidar_odometry(rd)
     xy, corr, info, diag = fuse(stamps, poses, odom_ins, **kw)
+    checks = pose_checks(stamps, poses, xy, diag, kept) if kept else None
+    if checks:
+        for k in ("ins", "lo", "fused"):
+            v = checks[k][np.isfinite(checks[k])]
+            info["shift_%s_p90_m" % k] = round(float(np.percentile(v, 90)), 3) if len(v) else None
+            info["shift_%s_median_m" % k] = round(float(np.median(v)), 3) if len(v) else None
     out = refined_odom(odom_ins, stamps, xy)
     if not os.path.exists(p_ins):
         np.save(p_ins, odom_ins)
@@ -283,25 +349,35 @@ def refine(seq_dir, plots=None, **kw):
     name = os.path.basename(os.path.normpath(seq_dir))
     if plots:
         os.makedirs(plots, exist_ok=True)
-        draw(os.path.join(plots, name + ".png"), name, odom_ins, stamps, xy, corr, info, diag)
+        draw(os.path.join(plots, name + ".png"), name, odom_ins, stamps, xy, corr, info, diag, checks)
+        # everything needed to look at one sequence again without its point clouds (a few tens of kB)
+        np.savez_compressed(os.path.join(plots, name + "_diag.npz"), stamps=stamps, xy=xy,
+                            lo_xyz=poses[:, :3, 3], lo_yaw=[yaw_of(T[:3, :3]) for T in poses],
+                            p_ins=diag["p_ins"], yaw_ins=diag["yaw_ins"], healthy=diag["healthy"],
+                            rate_v=diag["rate_v"], bad_lo=diag["bad_lo"], odom_ins=odom_ins.astype(np.float32),
+                            **({"check_" + k: v for k, v in checks.items()} if checks else {}))
     return info
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seq", nargs="+", required=True)
-    ap.add_argument("--plots", default=None, help="directory for one trajectory / correction plot per sequence")
+    ap.add_argument("--plots", default=None,
+                    help="directory for one plot and one <seq>_diag.npz per sequence, and refine_summary.csv")
     ap.add_argument("--sigma-lo", type=float, default=0.02, help="[m] trust in one odometry step")
     ap.add_argument("--sigma-ins", type=float, default=0.05, help="[m] trust in one healthy INS position")
     ap.add_argument("--huber", type=float, default=0.2, help="[m] INS residual above which it is down-weighted")
-    ap.add_argument("--lo-gate", type=float, default=0.3, help="[m] odometry step this far from the INS step is rejected")
+    ap.add_argument("--lo-gate", type=float, default=0.3,
+                    help="[m] an odometry step this far from both the INS velocity and its neighbours is rejected")
     ap.add_argument("--gap-tol", type=float, default=0.25,
                     help="[m] (+5%% of its length) a bridged gap may miss the INS at its far end before it counts as bad")
     args = ap.parse_args()
     kw = dict(sigma_lo=args.sigma_lo, sigma_ins=args.sigma_ins, huber=args.huber, lo_gate=args.lo_gate,
               gap_tol=args.gap_tol)
-    print("%-26s %5s  %-28s %9s %9s %10s  %s" % ("sequence", "scans", "correction med / p90 / max [m]", "INS bad",
-                                                  "pose bad", "LO 1s p90", "path lidar / INS [m]"))
+    print("%-26s %5s  %-28s %9s %9s %10s %-24s  %s" % (
+        "sequence", "scans", "correction med / p90 / max [m]", "INS bad", "pose bad", "LO rej",
+        "shift p90 ins / lo / fused", "path lidar / INS [m]"))
+    rows = []
     for seq in sorted(args.seq):
         if not os.path.exists(os.path.join(seq, "meta.json")):
             continue
@@ -309,14 +385,25 @@ def main():
         if info is None:
             print("%-26s  too short - skipped" % os.path.basename(os.path.normpath(seq)))
             continue
-        lo = info["lo_vs_ins_1s_p90_m"]
-        print("%-26s %5d  %6.3f / %6.3f / %6.3f        %6.1f%%   %6.1f%% %10s  %7.1f / %7.1f" % (
-            os.path.basename(os.path.normpath(seq)), info["scans"], info["correction_median_m"],
-            info["correction_p90_m"], info["correction_max_m"], 100 * info["ins_unhealthy_share"],
-            100 * info["bad_share"], "-" if lo is None else "%.3f" % lo, info["lo_path_m"], info["ins_path_m"]),
-            flush=True)
+        name = os.path.basename(os.path.normpath(seq))
+        f = lambda k: "-" if info.get(k) is None else "%.2f" % info[k]   # noqa: E731
+        print("%-26s %5d  %6.3f / %6.3f / %6.3f        %6.1f%%   %6.1f%% %10d %-24s  %7.1f / %7.1f" % (
+            name, info["scans"], info["correction_median_m"], info["correction_p90_m"], info["correction_max_m"],
+            100 * info["ins_unhealthy_share"], 100 * info["bad_share"], info["lo_steps_rejected"],
+            " / ".join(f("shift_%s_p90_m" % k) for k in ("ins", "lo", "fused")), info["lo_path_m"],
+            info["ins_path_m"]), flush=True)
         for g in info["bad_intervals"]:
             print("    pose bad %.3f .. %.3f: odometry misses the INS by %.2f m across the gap" % tuple(g))
+        rows.append(dict(name=name, **{k: v for k, v in info.items() if not isinstance(v, list)},
+                         bad_intervals=json.dumps(info["bad_intervals"]),
+                         unverified_intervals=json.dumps(info["unverified_intervals"])))
+    if args.plots and rows:
+        import csv
+        cols = list(dict.fromkeys(k for r in rows for k in r))
+        with open(os.path.join(args.plots, "refine_summary.csv"), "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=cols)
+            w.writeheader()
+            w.writerows(rows)
 
 
 if __name__ == "__main__":

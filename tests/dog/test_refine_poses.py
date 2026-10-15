@@ -63,6 +63,19 @@ def test_fuse_bridges_braking_error():
     assert np.allclose(np.interp(stamps, out[:, 0], out[:, 1]), xy[:, 0])
 
 
+def test_fuse_keeps_good_odometry_while_the_ins_jumps():
+    """While braking, the kygi INS position is pulled back in steps of up to 0.45 m. Those steps
+    must not get good odometry steps rejected (and replaced by the INS jumps)."""
+    stamps, poses, odom, truth, _ = _synthetic()
+    t = odom[:, 0]
+    saw = np.where((t > 2.0) & (t < 3.6), 0.45 * (((t - 2.0) / 0.4) % 1.0), 0.0)
+    odom = odom.copy()
+    odom[:, 1] = 1.2 * t + saw                                    # truth along x plus the sawtooth only
+    xy, corr, info, diag = refine_poses.fuse(stamps, poses, odom)
+    e = np.linalg.norm(xy - truth, axis=1)
+    assert info["lo_steps_rejected"] == 0 and e.max() < 0.06, (info["lo_steps_rejected"], e.round(3))
+
+
 def test_fuse_reports_a_stalled_odometry():
     """The odometry sees no motion during the braking (a wall-only corridor): neither source is
     right there. The gap is reported as bad; outside it the healthy INS holds the trajectory."""

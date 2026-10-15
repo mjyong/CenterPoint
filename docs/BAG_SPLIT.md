@@ -231,6 +231,21 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 - 合成数据（有真值）：INS 超前 0.5 m 的那段被修正到误差 < 6 cm；激光在这段失效时，这段会被标为不可靠。见 `tests/dog/test_refine_poses.py`。
 - 不做 INS 健康判定（激光和 INS 同等对待）时，1 s 帧对的 p90 是 0.37 m：激光在走廊里会少算位移，健康的 INS 必须拿来定住轨迹。
 
+**诊断输出**（`--plots` 目录）：
+- 每个场景一张三栏图：轨迹；修正量、INS 不可信时段、被拒的激光步；三种位姿各自的 `shift`（纯 INS / 纯激光里程计 / 融合）；
+- `<场景>_diag.npz`：几十 KB，存着各来源的位姿、健康判定和被拒的步，不用点云就能重新分析；
+- `refine_summary.csv`：汇总表。
+
+**怎么读三种位姿的 `shift` 对比**：
+- 纯激光差（> 0.2 m）：激光里程计本身在这个场景不行，例如转角、开阔地、动态物体多；
+- 纯激光好、融合反而差：融合有问题。
+
+**0921 第一次融合（5.4）**：
+- 29 + 6 个场景里，大多数的 `shift_p90_m` 下降了，但转角场景仍是 FAIL（s020 0.59 m、s026 0.61 m、s024 0.52 m、164127_s003 0.49 m）；s011（0.39→0.51 m）和 s027（0.33→0.42 m）反而变差；
+- 大 bag 里 INS 不可信的时间比样例多得多（s020 约 60%），激光要单独接管 5–10 s；这些时段的融合轨迹有锯齿。
+- 找到的一个原因：激光步是否失效，原来是和 INS 的位置步长比的。但 INS 不可信时，它的位置正在往回跳（最多 0.45 m），结果正常的激光步被拒掉，换成了带跳变的 INS 步长。
+- 已改为：激光步和 INS 速度积分、以及前后几步的激光自己**都**对不上，才算失效；替换时用 INS 速度积分。见 `test_fuse_keeps_good_odometry_while_the_ins_jumps`。
+
 **预览的 `shift` 检查**：对相隔约 1 s 的两帧，取离地 0.3–3 m 的点（墙、杆、树、车），在 ±0.8 m 范围内做二维搜索，找到把一帧叠到另一帧上最合适的平移量。这就是激光看到的两帧位姿误差，沿行进方向的误差也能测出来。状态按 p90 判定：≤ 0.20 m 为 OK，≤ 0.40 m 为 WARN，更大为 FAIL。运动样例 bag 用 INS 位姿时是 0.51 m（FAIL），融合后是 0.12 m（OK）。
 
 ## 4. 之后：教师推理 + 自动标注（批量）
@@ -401,5 +416,26 @@ s005 也基本没动（0.27），有效验证只有约 100 s；两份录制是�
 - refine_poses.py 打印的整张表，以及所有 "pose bad" 行（不可靠时段）；
 - 每个场景修正前后的 shift_p90_m 和 status（两份 checks.csv 对比），以及修正后 shift_p90_m > 0.2 m 的场景；
 - 第 4 步看图的结论（修正后的轨迹是否平滑、地图里的墙和杆是否更清晰）；
+- 每步耗时。
+```
+
+### 5.5 第五轮：修正后重新融合，并输出诊断（0921）
+
+```text
+任务：用修正后的 refine_poses.py 重新融合 0921 所有序列，提交诊断文件。不重转 bag，不进入第 4 步。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+
+1. 重新融合（输入自动取 odom_ins.npy，不会叠加上一次的结果），记下打印的整张表：
+   python tools/dog/refine_poses.py --seq data/seq/0921_* --plots data/preview/poses
+2. 重跑预览：
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_165659_s*" --out data/preview/0921_165659
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_164127_s*" --out data/preview/0921_164127
+3. 提交 data/preview/poses（PNG、*_diag.npz、refine_summary.csv）和两个预览目录，推送到 claude/me/v01。
+   不要提交 data/seq。
+
+最后报告：
+- refine_poses.py 打印的整张表（含 "LO rej" 和 "shift p90 ins / lo / fused" 两列）和所有 "pose bad" 行；
+- shift_lo_p90 > 0.2 m 的场景（激光里程计本身不行），以及 fused 比 lo 差 0.05 m 以上的场景；
+- 预览里每个场景 shift_p90_m 和 status，与上一轮（5.4）对比；
 - 每步耗时。
 ```
