@@ -158,7 +158,38 @@ python tools/dog/time_offset_check.py --seq <几个有转弯的场景> --out dat
 - **时钟**：IMU 陀螺的 z 轴和 INS 航向变化率在 0 延迟处相关最高（0.91），方向一致，所以 INS 航向没有延迟。
 - **对齐**：中位数 0.003–0.083 m。尖峰集中在急转、急停的时刻，最大是 164127_s003 的 6.2 m（bag 第 105 s）。运动样例 bag 正好是这一刻之前的 3 s：INS 速度冲到 2.5 m/s 后骤降，位置每 0.2 s 被往回拉，最多 0.33 m。所以这个尖峰来自定位，不是外参或时钟。服务器上的 `ins_step_m` 会给出所有场景里这种情况有多频繁。
 - **离地高度**：第一帧估计的值在 0.59–1.05 m 之间（中位数 0.71 m）。用 3.1 节改成多帧中位数。
+- **验证集**：16:41 整份做验证只有 173 s，其中 s000 狗趴着不动、s005 基本没动，有效约 100 s；和 16:56 的路线是否重合也不知道。用 3.4 节调整。
 - **线上节点**：之前没开 `auto_ground` / `auto_level`，离地高度默认 0.45 m，和训练数据不一致。现在用 `-p robot:=kygi` 一次设好（`dog_perception/node_config.py`）。`tests/dog/test_ros2_node.py` 把样例 bag 回放进节点，检查检测系点云和训练序列是否一致。
+
+### 3.4 训练 / 验证划分（多份录制）
+
+体检给每份录制各自分了训练和验证。录制有好几份时，用 `split_check.py` 统一检查和调整：
+
+```bash
+python tools/dog/split_check.py --seq data/seq/0921_* --out data/survey/split \
+    --holdout 0921_165659 --holdout-s 90            # 先不加 --apply，只看结果
+```
+
+所有场景的轨迹都按各自 `meta.json` 里的 lat0/lon0 换到同一个 ENU 坐标系，再按顺序做三件事：
+
+1. **静止的验证场景去掉**：机器人运动（> 0.3 m/s）的时间不到 30% 的验证场景，标为 `drop`。狗趴着或站着时，30 秒里同一个视角重复约 300 次，验证指标几乎只在量这一个视角。
+2. **从训练录制里留出一段做验证**（`--holdout`）：在这份录制里找连续的训练场景，总长不少于 `--holdout-s`，选离其余训练路线最远的那段，标为 `val`；它两侧各一个场景标为 `drop`，作为缓冲（前后几秒看到的是同一批物体）。
+   - 路线离得一样远时，选需要缓冲秒数少的（录制开头或结尾的一段只要一个缓冲）；再一样，选路程长的。
+3. **空间重叠**：一个验证场景和一个训练场景，只要其中一条路线有超过 10%（`--max-share`）落在另一条路线的 10 m（`--radius`）以内，就算重叠（同一条街、同一批停着的车，前后只差几分钟）。对每个有重叠的验证场景，去掉代价小的一方：
+   - 和它重叠的训练场景总时长比它长，就去掉这个验证场景；
+   - 否则去掉那些训练场景。
+
+**输出**（`--out`）：
+- `split_check.csv`：每个场景的录制、时长、路程、运动占比、调整前后的划分、原因、路线落在另一方 10 m 内的比例；
+- `split_check.png`：地图，蓝色训练、橙色验证、灰色去掉；
+- `split_check.json`：调整前后的合计，以及验证路线落在训练路线 10 m 内的比例。
+
+**写入**：加 `--apply` 后，写出 `split.csv`（每个场景 `train` / `val` / `drop`），并改每个 `meta.json` 的 `segment.split`（体检给的原值在 `segment.split_survey` 里保留一份）。重跑总是从体检的原值算起，结果不变。第 4 步按 `split.csv` 跑。
+
+**参考目标**：
+- 验证集里机器人在动的时间 ≥ 150 s，占全部运动数据的 12–25%；
+- 验证路线落在训练路线 10 m 内的比例 ≤ 5%；
+- 因为重叠和缓冲去掉的训练数据不超过原训练时长的 15%。
 
 ## 4. 之后：教师推理 + 自动标注（批量）
 
@@ -177,6 +208,17 @@ done
 - 训练集场景至少按轨迹审核；
 - 验证集场景（`segments.csv` 里 `split = val`）用 SUSTechPOINTS 逐框看，导出时加 `--every 5`。
 
+用 3.4 节的 `split.csv` 时，循环换成它列出的场景（`drop` 的不跑）：
+
+```bash
+SPLIT=data/survey/split/split.csv
+for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do
+  python tools/dog/run_sequence.py --seq data/seq/$r --detectors voxel --tta \
+      --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth --save-frames --device cuda:0 --out data/runs/$r
+  python tools/dog/auto_label.py --results data/runs/$r/voxel/results.pkl --out data/labels/$r/labels.pkl
+done
+```
+
 审核完导出数据集，验证集就是 `split = val` 的那些场景：
 
 ```bash
@@ -184,6 +226,16 @@ REC=$(for d in data/runs/${NAME}_s*; do r=$(basename $d); \
       f=data/labels/$r/labels_sustech.pkl; [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
       echo --recording $d $f; done)
 VAL=$(awk -F, 'NR>1 && $11==1 && $10=="val" {print $1}' data/survey/$NAME/segments.csv)
+python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v001 --gt-db --skip-review
+```
+
+用 `split.csv` 时：
+
+```bash
+REC=$(for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do \
+      f=data/labels/$r/labels_sustech.pkl; [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
+      echo --recording data/runs/$r $f; done)
+VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
 python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v001 --gt-db --skip-review
 ```
 
@@ -247,5 +299,39 @@ python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v00
   （checks.csv 里有），以及 >0.15 m 的场景数；
 - 4 张 PNG 的结论：错位尖峰是否对应 INS 跳变或速度急变；
 - time_offset.json 的 verdict，每个场景的 best_offset、turn_median_at_0、turn_median_at_best、n_turn；
+- 每步耗时。
+```
+
+### 5.3 第三轮：调整训练 / 验证划分（0921 两份数据）
+
+可以接在 5.2 后面一起做，两者互不影响。
+
+```text
+任务：按 docs/BAG_SPLIT.md 3.4 节调整 0921 两份数据的训练 / 验证划分。不重转 bag，不进入第 4 步。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+现状：0921_165659_s000..s028 全是训练；0921_164127_s000..s005 全是验证，其中 s000 是狗趴着不动（moving 0.00），
+s005 也基本没动（0.27），有效验证只有约 100 s；两份录制是不是走过同一段路还不知道。
+
+1. 先只看结果（不写入）：
+   python tools/dog/split_check.py --seq data/seq/0921_* --out data/survey/split --holdout 0921_165659 --holdout-s 90
+   打开 data/survey/split/split_check.png，看两份录制的路线是否重合、留出的那段在哪里。
+2. 用打印的 after 行和最后一行，对照 3 个目标：
+   a) 验证集运动时间（val ... moving）>= 150 s，且 val = 12-25% of the moving data；
+   b) val path within 10 m of train <= 5%；
+   c) 因为缓冲和重叠被 drop 的训练场景（split_before=train 且 split_after=drop）合计 <= 训练原时长的 15%。
+   如果 a) 不满足，改 --holdout-s 120 再跑一次；
+   如果 c) 不满足，改 --holdout-s 60 再跑一次；
+   都不满足就停下，不要 --apply，报告三次的结果。
+3. 满足时，用同样的参数加 --apply 再跑一次（写出 data/survey/split/split.csv，并更新每个 meta.json 的 segment.split）。
+4. 重跑两份 preview，让 index.html 的 split 列反映新的划分：
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_165659_s*" --out data/preview/0921_165659
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_164127_s*" --out data/preview/0921_164127
+5. 提交 data/survey/split（split.csv、split_check.csv、split_check.json、split_check.png）和 data/preview，
+   推送到 claude/me/v01。不要提交 data/seq。
+
+最后报告：
+- 每次运行打印的整张表和 before / after 两行、最后一行；
+- 最终用的 --holdout-s，哪些场景是 val、哪些 drop 及原因；
+- 你看 split_check.png 的结论：两份录制的路线是否有重合，在哪里；
 - 每步耗时。
 ```

@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（84 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（85 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -191,6 +191,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/bag_survey.py`, `sequence_preview.py` | 长 bag 体检、切场景（`segments.csv`）；转换后的序列逐个做可视化和数值检查，含 INS 位置跳变（[BAG_SPLIT.md](BAG_SPLIT.md)） |
 | `tools/dog/sequence_meta.py` | 不重转 bag，修正序列 `meta.json` 里的离地高度（多帧中位数或给定值）和雷达时间偏移 |
 | `tools/dog/time_offset_check.py` | 在转弯处测雷达和 INS 之间的时间差；仿真里能准确找回注入的 50 ms 偏差 |
+| `tools/dog/split_check.py` | 多份录制的训练 / 验证划分：去掉静止的验证场景，从训练录制里留出离其余路线最远的一段做验证，按路线 10 m 内的重叠去掉代价小的一方；输出地图和 `split.csv` |
 | `tools/dog/run_sequence.py` | 录制数据回放，Pillar/Voxel 并行跑，输出结果、跟踪日志和帧数据 |
 | `tools/dog/auto_label.py`, `export_dataset.py` | 教师自动标注，导出为 DogDataset 并建 GT 库 |
 | `tools/dog/review_labels.py` | 自动标注的人工审核：生成 MCAP、按轨迹表修正标签 |
