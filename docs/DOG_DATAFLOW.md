@@ -57,7 +57,7 @@
 
 | 入口 | 适用场景 | 位姿来源 | 调用链 |
 |---|---|---|---|
-| `tools/dog/ros2_node.py` | 在线运行 | `nav_msgs/Odometry`（LIO） | `on_imu:91` → `pipe.on_imu`；`on_odom:95` → `pipe.on_odometry`；`on_cloud:106` → `scan_from_msg` → `pipe.on_scan` → `publish:118` |
+| `tools/dog/ros2_node.py` | 在线运行 | `nav_msgs/Odometry`（LIO）；`robot:=kygi` 时为 `kygi665_msgs/INSPVAX`（`on_inspvax`，与转换器同样只取航向） | `on_imu:90` → `pipe.on_imu`；`on_odom:99` / `on_inspvax:110` → `pipe.on_odometry`；`on_cloud:128` → `scan_from_msg` → `pipe.on_scan` → `publish:140` |
 | `tools/dog/run_bag_mcap.py` | 离线回放带 INSPVAX 的 bag | `pose_from_inspvax`（ENU，`yaw = 180° − azimuth`，roll/pitch 置 0） | 按消息记录时间顺序读 `AnyReader`，其余与在线相同（`:96`、`:117`），最后 `McapViz.add`（`:124`） |
 | `rosbag_to_sequence.py` → `run_sequence.py` | 批量评测、保存帧数据和跟踪日志 | 先把 bag 转成序列目录，再用 `SequenceReader.events()` 回放 | 与在线相同，另外保存 `results.pkl`、`track_log.npz` 和 `frames/*.npy` |
 
@@ -225,7 +225,7 @@ for t in tracker.reported_tracks():
 | 输出 | 函数 | 坐标系 | 内容 / shape |
 |---|---|---|---|
 | **给规划** | `PerceptionPipeline.to_local(out)`（`pipeline.py:91`） | D（重力对齐，航向跟随机身，原点在地面） | 轨迹：`[{id, label, position(3,), velocity(2,), yaw, size(3,), score, coasting}] × T`；预测：`Prediction × T`，其中 `modes (K,6,2)` |
-| ROS 2 可视化 | `DogPerceptionNode.publish`（`ros2_node.py:118`） | W（`world_frame` 参数） | `~/tracks`：每条轨迹一个 CUBE 加一个 TEXT；`~/predictions`：每个模态一条 6 点的 LINE_STRIP；`~/cloud`（可选）：`(N,5) f32`，20 字节/点 |
+| ROS 2 可视化 | `DogPerceptionNode.publish`（`ros2_node.py:140`） | W（`world_frame` 参数） | `~/tracks`：每条轨迹一个 CUBE 加一个 TEXT；`~/predictions`：每个模态一条 6 点的 LINE_STRIP；`~/cloud`（可选）：`(N,5) f32`，20 字节/点 |
 | Foxglove MCAP | `McapViz.add`（`mcap_viz.py:76`） | map = W | `/lidar`：当前帧，最多 20 000 点，16 字节/点；`/detections`：`above()` 之后的框；`/tracks`；`/pose` |
 | 离线文件 | `run_sequence.py` | D / W | `results.pkl`（逐帧的 Detections / TrackState / Prediction）、`track_log.npz`（`rows (R,9)`、`ego (F,4)`、线上 IMM 预测）、`frames/*.npy`（`(N,5)`） |
 

@@ -5,6 +5,11 @@
         -p lidar_topic:=/lidar_points -p imu_topic:=/imu/data -p odom_topic:=/Odometry \
         -p extrinsic_t:="[0.2, 0.0, 0.15]" -p base_height:=0.45
 
+kygi665 robot (RTK INSPVAX localization; the det frame is built exactly like the training
+sequences: base height 0.72 m, auto_ground, auto_level - see dog_perception/node_config.py):
+
+    python3 tools/dog/ros2_node.py --ros-args -p robot:=kygi -p config:=dog_pillar -p checkpoint:=<weights>
+
 Publishes (world = LIO odom frame, ``world_frame`` parameter):
     ~/tracks        visualization_msgs/MarkerArray  boxes + ids + velocity arrows
     ~/predictions   visualization_msgs/MarkerArray  one line strip per predicted mode
@@ -27,9 +32,10 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy  # noqa: E402
 from sensor_msgs.msg import Imu, PointCloud2, PointField  # noqa: E402
 from visualization_msgs.msg import Marker, MarkerArray  # noqa: E402
 
-from dog_perception.geometry import make_T, quat_to_R, rot_zyx  # noqa: E402
+from dog_perception.geometry import quat_to_R  # noqa: E402
+from dog_perception.inspvax import INS_RTKFIXED, INS_SOLUTION_GOOD, EnuOrigin, pose_from_inspvax  # noqa: E402
+from dog_perception.node_config import node_parameters, preprocess_config  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
-from dog_perception.preprocess import DetFrameConfig, PreprocessConfig  # noqa: E402
 from dog_perception.ros_utils import scan_from_msg  # noqa: E402
 
 COLORS = {"vehicle": (0.2, 0.6, 1.0), "pedestrian": (1.0, 0.3, 0.3), "cyclist": (1.0, 0.8, 0.1)}
@@ -38,34 +44,17 @@ COLORS = {"vehicle": (0.2, 0.6, 1.0), "pedestrian": (1.0, 0.3, 0.3), "cyclist": 
 class DogPerceptionNode(Node):
     def __init__(self):
         super().__init__("dog_perception")
-        p = self.declare_parameter
-        p("detector", "pillar")
-        p("config", "")
-        p("checkpoint", "")
-        p("device", "")
-        p("predictor_model", "")
-        p("lidar_topic", "/lidar_points")
-        p("imu_topic", "/imu/data")
-        p("imu_convention", "ros")        # ros: rad/s in the body frame | kygi: the RTK IMU (deg/s, INS axes)
-        p("odom_topic", "/Odometry")
-        p("odom_twist", "none")           # none | body | world
-        p("time_field", "timestamp")
-        p("time_mode", "absolute")
-        p("extrinsic_t", [0.0, 0.0, 0.0])
-        p("extrinsic_rpy", [0.0, 0.0, 0.0])
-        p("base_height", 0.45)
-        p("num_sweeps", 5)
-        p("world_frame", "camera_init")
-        p("publish_cloud", False)
-        g = lambda n: self.get_parameter(n).value
+        # robot:=kygi presets topics, localization, extrinsic and det frame (dog_perception/node_config.py)
+        robot = self.declare_parameter("robot", "").value
+        params = {n: self.declare_parameter(n, d).value for n, d in node_parameters(robot).items()}
+        g = params.get
+        self.get_logger().info("robot %r: base_height %.2f, auto_ground %s, auto_level %s, localization %s" % (
+            robot, g("base_height"), g("auto_ground"), g("auto_level"), g("localization")))
 
         from dog_perception.detection import build_detector
         kind = g("config") or g("detector")
         det = build_detector(kind, checkpoint=g("checkpoint") or None, device=g("device") or None)
-        rpy, t = g("extrinsic_rpy"), g("extrinsic_t")
-        pcfg = PreprocessConfig(T_body_lidar=make_T(rot_zyx(rpy[2], rpy[1], rpy[0]), t),
-                                num_sweeps=int(g("num_sweeps")),
-                                det_frame=DetFrameConfig(base_height=float(g("base_height"))))
+        pcfg = preprocess_config(params)
         predictor = "imm"
         if g("predictor_model"):
             from dog_perception.prediction.learned import LearnedPredictor
@@ -76,10 +65,18 @@ class DogPerceptionNode(Node):
         self.time_field, self.time_mode = g("time_field"), g("time_mode")
         self.publish_cloud = bool(g("publish_cloud"))
         self.kygi_imu = g("imu_convention") == "kygi"
+        self.lidar_time_offset = float(g("lidar_time_offset"))
 
         best_effort = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
         self.create_subscription(Imu, g("imu_topic"), self.on_imu, 400)
-        self.create_subscription(Odometry, g("odom_topic"), self.on_odom, 50)
+        if g("localization") == "inspvax":
+            from kygi665_msgs.msg import INSPVAX     # built in the robot's ROS workspace
+            self.origin = None
+            self.create_subscription(INSPVAX, g("inspvax_topic"), self.on_inspvax, 200)
+        elif g("localization") == "odom":
+            self.create_subscription(Odometry, g("odom_topic"), self.on_odom, 50)
+        else:
+            raise ValueError("localization must be odom or inspvax, got %r" % g("localization"))
         self.create_subscription(PointCloud2, g("lidar_topic"), self.on_cloud, best_effort)
         self.pub_tracks = self.create_publisher(MarkerArray, "~/tracks", 5)
         self.pub_preds = self.create_publisher(MarkerArray, "~/predictions", 5)
@@ -110,8 +107,26 @@ class DogPerceptionNode(Node):
                 v = R @ v
         self.pipe.on_odometry(self._t(msg.header.stamp), R, [p.x, p.y, p.z], v)
 
+    def on_inspvax(self, msg):
+        """Same reading as the bag converter: heading only, ENU origin at the first good fix."""
+        if self.origin is None:
+            if int(msg.ins_status.data) != INS_SOLUTION_GOOD:
+                self.get_logger().warn("waiting for a good INS solution", throttle_duration_sec=2.0)
+                return
+            self.origin = EnuOrigin(msg.latitude, msg.longitude, msg.height)
+            self.get_logger().info("ENU origin %.8f %.8f %.2f" % (msg.latitude, msg.longitude, msg.height))
+        got = pose_from_inspvax(msg, self.origin)
+        if got is None:
+            self.get_logger().warn("INS solution not good (ins_status %d)" % int(msg.ins_status.data),
+                                   throttle_duration_sec=2.0)
+            return
+        if int(msg.pos_type.data) != INS_RTKFIXED:
+            self.get_logger().warn("RTK not fixed (pos_type %d)" % int(msg.pos_type.data), throttle_duration_sec=5.0)
+        t, R, p, v = got
+        self.pipe.on_odometry(t, R, p, v)
+
     def on_cloud(self, msg):
-        scan = scan_from_msg(msg, self.time_field, self.time_mode)
+        scan = scan_from_msg(msg, self.time_field, self.time_mode).shifted(self.lidar_time_offset)
         out = self.pipe.on_scan(scan)
         if out is None:
             self.get_logger().warn("no pose for scan yet (waiting for odometry / IMU)", throttle_duration_sec=2.0)

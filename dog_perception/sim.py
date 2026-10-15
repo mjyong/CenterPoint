@@ -51,6 +51,8 @@ class GaitModel:
     bounce_amp: float = 0.02
     bounce_freq: float = 4.0
     base_height: float = 0.45
+    yaw_amp_deg: float = 0.0       # body yaw wiggle around the path heading (turn starts / stops)
+    yaw_freq: float = 1.0
 
 
 class RobotTrajectory:
@@ -62,13 +64,14 @@ class RobotTrajectory:
         """Vectorised T_world_body: returns R (N,3,3), p (N,3)."""
         g = self.g
         t = np.atleast_1d(np.asarray(t, dtype=np.float64))
-        yaw = g.yaw0 + g.yaw_rate * t
+        path_yaw = g.yaw0 + g.yaw_rate * t
         if abs(g.yaw_rate) > 1e-9:
-            x = g.speed / g.yaw_rate * (np.sin(yaw) - np.sin(g.yaw0))
-            y = -g.speed / g.yaw_rate * (np.cos(yaw) - np.cos(g.yaw0))
+            x = g.speed / g.yaw_rate * (np.sin(path_yaw) - np.sin(g.yaw0))
+            y = -g.speed / g.yaw_rate * (np.cos(path_yaw) - np.cos(g.yaw0))
         else:
             x = g.speed * t * np.cos(g.yaw0)
             y = g.speed * t * np.sin(g.yaw0)
+        yaw = path_yaw + np.deg2rad(g.yaw_amp_deg) * np.sin(2 * np.pi * g.yaw_freq * t)
         z = g.base_height + g.bounce_amp * np.sin(2 * np.pi * g.bounce_freq * t)
         pitch = np.deg2rad(g.pitch_amp_deg) * np.sin(2 * np.pi * g.pitch_freq * t)
         roll = np.deg2rad(g.roll_amp_deg) * np.sin(2 * np.pi * g.roll_freq * t + 0.7)

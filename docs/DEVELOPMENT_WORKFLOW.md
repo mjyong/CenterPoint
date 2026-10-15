@@ -284,7 +284,7 @@ python tools/dog/export_pillar_onnx.py --checkpoint data/train/dog_pp_v001/lates
 ### 6.2 Orin
 
 1. 把 `deploy/dog_pp_v001/` 拷到 Orin，运行上一步打印的 `trtexec ... --fp16` 两条命令建引擎（引擎和 GPU、TensorRT 版本绑定，必须在 Orin 上建）。
-2. 当前的 ROS 2 节点（`tools/dog/ros2_node.py`）跑的是 PyTorch 模型：`-p config:=dog_pillar -p checkpoint:=<权重>`（`dog_pillar` 是狗模型（5 个 head）的预设配置名，旧的 3 类权重用 `dog_pillar_3cls`）。把 TensorRT 引擎接进节点是 [DOG_PIPELINE.md](DOG_PIPELINE.md) 第 8 节里还没做完的一步。
+2. 当前的 ROS 2 节点（`tools/dog/ros2_node.py`）跑的是 PyTorch 模型：`-p robot:=kygi -p config:=dog_pillar -p checkpoint:=<权重>`（`robot:=kygi` 让检测系和训练数据一致：离地 0.72 m、`auto_ground`、`auto_level`、INSPVAX 定位）（`dog_pillar` 是狗模型（5 个 head）的预设配置名，旧的 3 类权重用 `dog_pillar_3cls`）。把 TensorRT 引擎接进节点是 [DOG_PIPELINE.md](DOG_PIPELINE.md) 第 8 节里还没做完的一步。
 3. 上车录一段新 bag，回到第 5.5 节对着看，再进下一轮。
 
 ## 7. 下一轮（⑪）

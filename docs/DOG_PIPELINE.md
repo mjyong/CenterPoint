@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（80 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（84 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -188,7 +188,9 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `det3d/datasets/dog/` + pipeline 改动 | `DogDataset`、GT-sampling、俯仰/横滚增强 |
 | `configs/dog/` | Pillar/Voxel 微调配置（±40.8 m、5 帧；head 为 car / truck / bus / 行人 / 骑行者，输出 3 类）；`*_3cls.py` 是旧的单 vehicle head 布局 |
 | `tools/dog/rosbag_to_sequence.py` | ROS1/ROS2 bag 转序列（无需安装 ROS，依赖 `rosbags`）；边读边写，`--segments` 一次切出多个场景 |
-| `tools/dog/bag_survey.py`, `sequence_preview.py` | 长 bag 体检、切场景（`segments.csv`）；转换后的序列逐个做可视化和数值检查（[BAG_SPLIT.md](BAG_SPLIT.md)） |
+| `tools/dog/bag_survey.py`, `sequence_preview.py` | 长 bag 体检、切场景（`segments.csv`）；转换后的序列逐个做可视化和数值检查，含 INS 位置跳变（[BAG_SPLIT.md](BAG_SPLIT.md)） |
+| `tools/dog/sequence_meta.py` | 不重转 bag，修正序列 `meta.json` 里的离地高度（多帧中位数或给定值）和雷达时间偏移 |
+| `tools/dog/time_offset_check.py` | 在转弯处测雷达和 INS 之间的时间差；仿真里能准确找回注入的 50 ms 偏差 |
 | `tools/dog/run_sequence.py` | 录制数据回放，Pillar/Voxel 并行跑，输出结果、跟踪日志和帧数据 |
 | `tools/dog/auto_label.py`, `export_dataset.py` | 教师自动标注，导出为 DogDataset 并建 GT 库 |
 | `tools/dog/review_labels.py` | 自动标注的人工审核：生成 MCAP、按轨迹表修正标签 |
@@ -200,7 +202,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/export_pillar_onnx.py` | 导出给 TensorRT 用的两段 ONNX，逐段校验，并打印上板建引擎的 `trtexec` 命令 |
 | `tools/dog/profile_detector.py` | 在一帧上测网络逐层的 shape、参数量、计算量（稀疏卷积按实际邻接对计）和各段耗时 |
 | `tools/dog/train_predictor.py` | 第二档训练，与 CV/IMM 对比 |
-| `tools/dog/ros2_node.py` | 在线 ROS 2 节点（MarkerArray 可视化） |
+| `tools/dog/ros2_node.py`（参数在 `dog_perception/node_config.py`） | 在线 ROS 2 节点（MarkerArray 可视化）。`-p robot:=kygi` 一次设好 kygi 的话题、INSPVAX 定位、外参、离地高度 0.72 m、`auto_ground` / `auto_level`，和训练序列的处理一致 |
 | `tools/dog/run_sim_demo.py` | 仿真端到端演示，输出各段指标 |
 | `tools/dog/nusc_clip_eval.py`（`dog_perception/nuscenes_clip.py`、`clip_viz.py`、`foxglove.py`） | 在 nuScenes 片段上跑检测、跟踪、预测，与真值对比，输出 Foxglove MCAP 和指标报告，见 [NUSC_CLIP_EVAL.md](NUSC_CLIP_EVAL.md) |
 
@@ -255,6 +257,8 @@ python tools/dog/run_bag_mcap.py --bag samples/rosbag2_2026_09_21-16_41_27 \
 # 在线（ROS 2）
 python3 tools/dog/ros2_node.py --ros-args -p detector:=dog_pillar -p checkpoint:=pp.pth \
     -p predictor_model:=work_dirs/pred/gru.pt -p extrinsic_t:="[0.2,0.0,0.15]" -p base_height:=0.45
+# kygi665（RTK INSPVAX 定位）：检测系和训练数据完全一致（离地 0.72 m，auto_ground + auto_level）
+python3 tools/dog/ros2_node.py --ros-args -p robot:=kygi -p config:=dog_pillar -p checkpoint:=<权重>
 
 # 仿真演示和测试
 python tools/dog/run_sim_demo.py --frames 80 --plot 3 --out work_dirs/sim_demo
@@ -336,7 +340,7 @@ python -m pytest tests/dog -q
 
 - **没有真实 XT32 数据和 nuScenes 预训练权重**（官方权重托管在 OneDrive，本环境无法下载）。所有检测相关的数字只验证了管线和一致性，Pillar 与 Voxel 的精度和延迟对比需要在你的机器上用步骤 1–2 实测。
 - 检测封装里的 Voxel 前向需要 CUDA 版 spconv（CPU 版 spconv 不支持带 bias 的卷积）。本环境只用 `profile_detector.py` 的 CPU 绕行办法跑通过前向，实测了逐层 shape 和计算量（[CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)），没有 GPU 上的耗时拆分。
-- 本环境没有 ROS，`ros2_node.py` 没有实际运行过。bag 转换器已用合成的 ROS2 bag 测试。
+- 本环境没有 ROS，`ros2_node.py` 没有在真实 ROS 下运行过。`tests/dog/test_ros2_node.py` 用替身代替 rclpy 和消息包，把运动样例 bag 按到达顺序回放进 `robot:=kygi` 的节点，结果与训练序列的检测系点云逐帧一致。27 帧里有 20 帧中位差 < 5 mm；其余几帧差几厘米，因为 INS 位置正好在那时跳变：节点在线做插值，回放序列时只能外推。bag 转换器已用合成的 ROS2 bag 测试。
 - 本环境没有 Orin 和 TensorRT。导出的 ONNX 只用 onnxruntime 验证过；TensorRT 引擎的构建、FP16 精度和板上延迟都要在 Orin 上确认（第 8 节）。
 - 预处理、跟踪和预测是 Python 参考实现。在 x86 上实测，网络以外的部分合计约 90 ms（见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md) 第 5 节）。Orin 的 ARM 核会更慢，所以上板时预处理必须搬到 GPU，见 8.3。
 - 仿真中的目标没有社交交互，所以第二档在真实数据上的收益（主要来自对机器人的避让等交互）需要用实车日志重新评估。

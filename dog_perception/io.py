@@ -2,6 +2,9 @@
 
     seq_dir/
       meta.json            {"T_body_lidar": 4x4, "base_height": 0.45, ...}
+                           optional "lidar_time_offset": seconds added to every lidar time when
+                           reading (lidar clock -> IMU / localization clock); see
+                           tools/dog/time_offset_check.py
       scans/000000.npz     xyz (N,3) f32, intensity (N,) f32, t (N,) f64 absolute, stamp f64
       imu.npy              (M, 4)  t, wx, wy, wz        body-frame gyro [rad/s]
       odom.npy             (K, 11) t, x, y, z, qx, qy, qz, qw, vx, vy, vz   LIO world frame
@@ -68,10 +71,17 @@ def load_scan(path):
 
 
 class SequenceReader:
-    def __init__(self, seq_dir):
+    """``lidar_time_offset`` overrides ``meta["lidar_time_offset"]`` (default 0): it is added to
+    the scan stamps and point times that ``events`` yields, so every tool downstream (preview,
+    auto-label, dataset export) sees the lidar on the localization clock. The files keep the
+    times as recorded."""
+
+    def __init__(self, seq_dir, lidar_time_offset=None):
         self.dir = seq_dir
         with open(os.path.join(seq_dir, "meta.json")) as f:
             self.meta = json.load(f)
+        self.lidar_time_offset = float(self.meta.get("lidar_time_offset", 0.0)
+                                       if lidar_time_offset is None else lidar_time_offset)
         self.scan_files = sorted(glob.glob(os.path.join(seq_dir, "scans", "*.npz")))
         p = os.path.join(seq_dir, "imu.npy")
         self.imu = np.load(p) if os.path.exists(p) else np.zeros((0, 4))
@@ -85,18 +95,20 @@ class SequenceReader:
     def __len__(self):
         return len(self.scan_files)
 
-    def events(self, odom_latency=0.0, start=0, stop=None):
+    def events(self, odom_latency=0.0, start=0, stop=None, indices=None):
         """Time-ordered ('imu', t, gyro) / ('odom', t, R, p, v) / ('scan', LidarScan).
 
         Scans are emitted at their end stamp; odometry for time t is emitted at
         ``t + odom_latency`` (0 replays the best case, a positive value mimics
         the LIO processing delay so the IMU propagation path is exercised).
+        ``indices`` (sorted scan indices) loads only those scans.
         """
-        files = self.scan_files[start:stop]
+        files = self.scan_files[start:stop] if indices is None else [self.scan_files[i] for i in indices]
+        dt = self.lidar_time_offset
         stamps = []
         for f in files:
             with np.load(f) as d:
-                stamps.append(float(d["stamp"]))
+                stamps.append(float(d["stamp"]) + dt)
         ev = [(t, 0, ("imu", t, row[1:4])) for t, row in zip(self.imu[:, 0], self.imu)]
         for row in self.odom:
             v = None if np.any(np.isnan(row[8:11])) else row[8:11]
@@ -109,6 +121,6 @@ class SequenceReader:
             if t < t_lo or t > t_hi + 1e-6:
                 continue
             if e[0] == "scan":
-                yield ("scan", load_scan(e[1]))
+                yield ("scan", load_scan(e[1]).shifted(dt))
             else:
                 yield e

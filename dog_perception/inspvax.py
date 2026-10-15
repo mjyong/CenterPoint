@@ -32,6 +32,7 @@ from .geometry import rot_z
 from .ros_utils import stamp_of
 
 INS_SOLUTION_GOOD = 3
+INS_RTKFIXED = 56                        # pos_type of an RTK-fixed INS solution
 KYGI_GYRO_SCALE = np.pi / 180.0          # deg/s -> rad/s
 R_BODY_KYGI_IMU = rot_z(np.pi)           # IMU / INS axes in the body frame
 KYGI_LIDAR_RPY = (0.0, 0.0, np.pi)       # XT32 orientation in the body frame (roll, pitch, yaw) [rad]

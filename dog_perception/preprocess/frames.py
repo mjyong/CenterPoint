@@ -101,3 +101,16 @@ def estimate_base_height(xyz_body, ring=(2.0, 15.0), limits=(0.1, 3.0)):
     z5 = np.percentile(z, 5)
     ground = np.median(z[(z > z5 - 0.1) & (z < z5 + 0.25)])
     return float(np.clip(-ground, *limits))
+
+
+def median_base_height(heights):
+    """Per-sweep ``estimate_base_height`` values (None allowed) -> (median or None, summary).
+
+    One sweep sees the ground around one spot (a kerb, a road lower than the pavement, a slope),
+    so single values scatter: first-sweep estimates of the standing kygi robot ranged
+    0.59-1.05 m over 29 scenes. The median over a scene does not depend on where it starts."""
+    h = np.array([x for x in heights if x is not None], dtype=np.float64)
+    if len(h) == 0:
+        return None, dict(n=0)
+    return float(np.median(h)), dict(n=int(len(h)), p10=round(float(np.percentile(h, 10)), 3),
+                                     p90=round(float(np.percentile(h, 90)), 3))

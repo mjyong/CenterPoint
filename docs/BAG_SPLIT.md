@@ -74,7 +74,7 @@ python tools/dog/rosbag_to_sequence.py --bag $BAG --inspvax-topic /rte/rdap/rtk/
 - 每个场景一个目录 `data/seq/${NAME}_sNNN/`，格式和单个 bag 转出来的一样。
 - 场景里的雷达帧按头时间戳落在 `[t_start, t_end)` 内取，和 `segments.csv` 的 `scans` 列一一对应。IMU 和定位前后各多留 `--pad`（1 s），去畸变和位姿缓冲要用。
 - `meta.json` 的 `segment` 里记着场景名、起止时间和 `split`，后面的工具会读。
-- 每个场景各自从第一帧估计机身离地高度。
+- 每个场景的机身离地高度（`base_height`）取每 10 帧估一次的中位数，`meta.json` 的 `base_height_sweeps` 里记着用了几帧和 p10–p90。只看一帧会受脚下地形影响：0921 的 29 个场景，第一帧估出来的值在 0.59–1.05 m 之间，而狗站着的真实高度约 0.72 m。2026-10 之前转的序列只用了第一帧，按 3.1 节补救，不用重转。
 - 每个场景打印一行 `wrote N scans, M imu, K odom -> ...`。没有雷达帧或没有定位的场景会打印 `skipped`。
 - 只重做部分场景时加 `--only ${NAME}_s003 ${NAME}_s007`。
 
@@ -95,23 +95,70 @@ python tools/dog/sequence_preview.py --seq "data/seq/${NAME}_s*" --out data/prev
 | `tilt_deg` | 同一片地面拟合平面的倾角 | ≤ 2° | ≤ 4° | 更大 |
 | `lidar_gap_s` / `imu_gap_s` / `odom_gap_s` | 最大间隔 | 0.2 / 0.05 / 0.1 s | 0.5 / 0.2 / 0.5 s | 更大 |
 | `rtk` | 场景内（含前后 1 s）的 pos_type 全是 56 | 是 | 否 | |
+| `ins_step_m` | INS 位置的跳变：每个定位样本的位移减去它自己的速度 × Δt，取最大值。多帧拼接在跳变两侧对不齐 | ≤ 0.15 m | ≤ 0.5 m | 更大 |
 
 参考值：
 - 运动样例 bag（1.5–2.5 m/s）：`align` 在相隔 0.1 s 时是 0.02 m，相隔 0.5 s 时是 0.04 m；地面 0.02 m，倾角 1.4°。
 - 静止样例 bag：`align` 0.003 m。
 - 把雷达外参的 180° 偏航故意改错，`align` 会变成 1.03 m（FAIL），测试里就是这样验证这项检查的。
+- 运动样例 bag 的 `ins_step_m` 是 0.33 m（WARN）：最后 1 s 狗在刹车，INS 报的速度先冲到 2.5 m/s，位置每 0.2 s 被往回拉 0.1–0.33 m（共 5 次）。
 
 **每张图怎么看**：
 - **左：世界系地图。** 抽检帧里竖直结构的点叠在一起，颜色是时间，黑线是轨迹。墙和杆应该是一条细线；出现双线、拖影或扇形，说明位姿、外参或时间同步有问题。
 - **右上：模型输入。** 中间一帧，正是检测器看到的样子（5 帧拼接，检测系，灰色是旧帧），虚线框是 ±40.8 m 检测范围。
 - **右中：侧视。** 地面要贴着红线 z = 0。远处地形本身起伏（坡、路沿）是正常的。
-- **下：曲线和文字。** 速度和错位随时间变化（红虚线是 FAIL 线）、雷达帧间隔、数值和问题列表。
+- **下：曲线和文字。** 速度和错位随时间变化（红虚线是 FAIL 线），红色三角是超过 5 cm 的 INS 位置跳变；雷达帧间隔、数值和问题列表。
 
 **不正常时**：
 - `align` FAIL 或地图里墙是双线：先看同一 bag 里是不是所有场景都这样。全都这样，多半是外参或话题设置错了，对照样例 bag 的设置（`--inspvax-topic` 会自动用 180° 偏航）。个别场景这样，看 `survey.png` 里那段 INS 是否跳变，跳变的场景 `keep = 0` 后重转。
 - `ground_z` / `tilt` WARN：看侧视图。近处地面整体高出或低于红线（平地上），说明离地高度或找平有问题；坡道、台阶上出现 WARN 是正常的。
 - `rtk` WARN：场景边上有非固定解。体检时已经避开，通常只是前后补的 1 s；内容正常就可以保留。
-- **这里查不出的**：雷达和 INS 之间一个固定的时间差，在直线匀速时所有帧一起偏，错位看不出来。这靠第 1 步的时钟检查。
+- 错位只在个别时刻冲高（中位数正常）：看同一时刻有没有红色三角（INS 位置跳变）、速度是不是在急变。有就是定位的问题，不是外参。没有、而且都在转弯时，用 3.2 节查时间差。
+- **这里查不出的**：雷达和 INS 之间一个固定的时间差，在直线匀速时所有帧一起偏，错位看不出来。第 1 步的时钟检查只能发现大的偏差，小的（几十毫秒）用 3.2 节在转弯处查。
+
+### 3.1 修正已转好的序列（不用重转）
+
+```bash
+python tools/dog/sequence_meta.py --seq data/seq/${NAME}_s*                       # 只看表
+python tools/dog/sequence_meta.py --seq data/seq/${NAME}_s* --base-height auto    # 每 10 帧估一次取中位数
+```
+
+只改 `meta.json`。原来的值会在 `base_height_first_sweep` 里保留一份。改完重跑第 3 步的 preview。
+
+站着走的场景，结果应在 0.65–0.80 m 之间。趴着的场景（例如 16:41 开头和结尾）约 0.2–0.3 m，是对的。站着走却明显偏离的场景，可以直接写死：`--seq <场景> --base-height 0.72`。
+
+### 3.2 雷达与 INS 的时间差（转弯检查）
+
+```bash
+python tools/dog/time_offset_check.py --seq <几个有转弯的场景> --out data/preview/time_offset
+```
+
+**原理**：时间差 δ 会让每帧用到 δ 秒之前（或之后）的位姿。
+- 匀速转弯或直行时，每帧偏的角度一样，帧与帧之间仍然对得齐。
+- 角速度变化时（开始转、停止转、原地掉头），相隔 0.5 s 的两帧偏差不同。错位大约是：距离 × 角速度变化 × δ。例如 10 m 处、角速度变化 90°/s、δ = 0.05 s 时，错位是 0.8 m。
+
+**做法**：取角速度变化 ≥ 20°/s 的帧对，把雷达时间平移 −0.15…+0.15 s，每个偏移都重算 preview 里的错位，取错位最小的偏移。角速度几乎不变的帧对作为对照，应保持平稳。
+
+**验证**：仿真里给雷达注入 50 ms 延迟，工具找到 −0.050 s，转弯帧对的错位从 0.77 m 降到 0.007 m。见 `tests/dog/test_time_offset.py`。
+
+**输出**：
+- `time_offset.csv`：每个场景 × 每个偏移的错位；
+- 每个场景一张 `<场景>.png`：左边是错位随偏移的曲线，右边是偏移 0 和最佳偏移下各帧对的错位，以及角速度变化；
+- `time_offset.json`：每个场景和总体的最佳偏移，以及结论。
+
+**怎么判断**：
+- 几个场景都在同一个非 0 的偏移处有明显最小值（|δ| ≥ 0.02 s，错位比 0 处小 1.5 倍以上），说明时钟有固定偏差。修正方法：
+  - 写进序列：`python tools/dog/sequence_meta.py --seq data/seq/${NAME}_s* --lidar-time-offset <δ>`。`SequenceReader` 读的时候会加上，preview、自动标注、导出都会用到它，不用重转。
+  - 写进线上节点的参数：`-p lidar_time_offset:=<δ>`。
+- 曲线平，或者最小值就在 0：时钟没问题，转弯处的尖峰另有原因（多半是 INS 位置跳变，见上面的 `ins_step_m`）。
+- 各场景的最佳偏移不一样：不是时钟问题，结论会直接写明。
+
+### 3.3 0921 两份数据的复核结论（2026-10）
+
+- **时钟**：IMU 陀螺的 z 轴和 INS 航向变化率在 0 延迟处相关最高（0.91），方向一致，所以 INS 航向没有延迟。
+- **对齐**：中位数 0.003–0.083 m。尖峰集中在急转、急停的时刻，最大是 164127_s003 的 6.2 m（bag 第 105 s）。运动样例 bag 正好是这一刻之前的 3 s：INS 速度冲到 2.5 m/s 后骤降，位置每 0.2 s 被往回拉，最多 0.33 m。所以这个尖峰来自定位，不是外参或时钟。服务器上的 `ins_step_m` 会给出所有场景里这种情况有多频繁。
+- **离地高度**：第一帧估计的值在 0.59–1.05 m 之间（中位数 0.71 m）。用 3.1 节改成多帧中位数。
+- **线上节点**：之前没开 `auto_ground` / `auto_level`，离地高度默认 0.45 m，和训练数据不一致。现在用 `-p robot:=kygi` 一次设好（`dog_perception/node_config.py`）。`tests/dog/test_ros2_node.py` 把样例 bag 回放进节点，检查检测系点云和训练序列是否一致。
 
 ## 4. 之后：教师推理 + 自动标注（批量）
 
@@ -169,4 +216,36 @@ python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v00
 - 转换日志里每个场景的 wrote 行（或 skipped 行）；
 - preview 的汇总行（N OK / N WARN / N FAIL）和每个非 OK 场景的 problems 列，以及你看图的结论（墙是否是细线、地面是否贴着 z = 0）；
 - 用掉的磁盘空间（du -sh data/seq data/preview）和每步耗时。
+```
+
+### 5.2 第二轮：复核后的修正（0921 两份数据，序列已经转好）
+
+```text
+任务：对已转好的 0921 序列做三件事：修正离地高度、用新指标重跑预览、检查雷达与 INS 的时间差。不重转 bag，不进入第 4 步。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+序列：data/seq/0921_165659_s000..s028（训练）、data/seq/0921_164127_s000..s005（验证）。
+
+1. 离地高度（docs/BAG_SPLIT.md 3.1 节）：
+   python tools/dog/sequence_meta.py --seq data/seq/0921_* --base-height auto
+   核对：站着走的场景应在 0.65-0.80 m；164127_s000、s005（狗趴着）约 0.2-0.3 m 是对的。
+   站着走却在范围外的场景，单独执行 --seq <场景> --base-height 0.72。
+2. 重跑预览（新增了 INS 位置跳变 ins_step_m，图里红色三角）：
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_165659_s*" --out data/preview/0921_165659
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_164127_s*" --out data/preview/0921_164127
+   核对：所有场景的 ground_z_m 应比上一轮更接近 0；看 165659_s026、s019、s020 和 164127_s003 这 4 张 PNG，
+   错位尖峰是否和红色三角（INS 跳变）或速度急变在同一时刻。
+3. 时间差（3.2 节）：
+   python tools/dog/time_offset_check.py --out data/preview/time_offset \
+       --seq data/seq/0921_164127_s003 data/seq/0921_164127_s004 data/seq/0921_165659_s019 \
+             data/seq/0921_165659_s020 data/seq/0921_165659_s026 data/seq/0921_165659_s018
+   每个场景大约几分钟。只做检查，不要用 --lidar-time-offset 改序列，等人确认。
+4. 把 data/preview（含 time_offset）提交并推送到 claude/me/v01，提交信息写清楚做了什么。不要提交 data/seq。
+
+最后报告：
+- sequence_meta.py 打印的表（每个场景 base_height 旧值 -> 新值、p10-p90）；
+- 两份 preview 的汇总行和每个非 OK 场景的 problems；所有场景的 ins_step_m 和 ins_steps_over_10cm
+  （checks.csv 里有），以及 >0.15 m 的场景数；
+- 4 张 PNG 的结论：错位尖峰是否对应 INS 跳变或速度急变；
+- time_offset.json 的 verdict，每个场景的 best_offset、turn_median_at_0、turn_median_at_best、n_turn；
+- 每步耗时。
 ```

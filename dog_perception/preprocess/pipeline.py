@@ -39,6 +39,14 @@ class LidarScan:
                 raise ValueError("need either stamp or point_times")
             self.stamp = float(np.max(self.point_times))
 
+    def shifted(self, dt):
+        """The same sweep with every time moved by ``dt`` [s], e.g. from the lidar clock onto the
+        IMU / localization clock."""
+        if not dt:
+            return self
+        return LidarScan(xyz=self.xyz, intensity=self.intensity, stamp=self.stamp + dt,
+                         point_times=None if self.point_times is None else np.asarray(self.point_times) + dt)
+
 
 def dedup_returns(scan, resolution=1e-3):
     """Remove repeated points (same xyz on a ``resolution`` grid, first one kept)

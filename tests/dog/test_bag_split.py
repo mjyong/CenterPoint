@@ -79,7 +79,9 @@ def test_preview_passes_good_data_and_fails_a_wrong_extrinsic(split, tmp_path):
     subprocess.run([sys.executable, "tools/dog/sequence_preview.py", "--seq", str(root / "full"), str(bad),
                     "--out", str(tmp_path / "preview")], check=True, capture_output=True)
     checks = {c["name"]: c for c in json.load(open(tmp_path / "preview" / "checks.json"))}
-    assert checks["full"]["status"] == "OK" and checks["full"]["align_m"] < 0.1
+    # the INS pulls its position back by up to 0.33 m while the robot brakes at the end of this bag
+    assert checks["full"]["problems"] == "ins_step_m=WARN" and checks["full"]["align_m"] < 0.1
+    assert 0.25 < checks["full"]["ins_step_m"] < 0.4 and checks["full"]["ins_steps_over_10cm"] == 5
     assert abs(checks["full"]["ground_z_m"]) < 0.1
     assert checks["bad_extrinsic"]["status"] == "FAIL" and checks["bad_extrinsic"]["align_m"] > 0.5
     assert (tmp_path / "preview" / "index.html").exists() and (tmp_path / "preview" / "full.png").exists()
