@@ -2,7 +2,9 @@
 **build**
 **egg-info**
 **dist**
-data/
+data/*
+!data/survey/
+!data/preview/
 *.pyc
 venv/
 *.idea/

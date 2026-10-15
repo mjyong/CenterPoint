@@ -1,0 +1,71 @@
+{
+ "bag": "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/rosbag0921/rosbag2_2026_09_21-16_41_27",
+ "duration_s": 172.76819968223572,
+ "topics": [
+  {
+   "topic": "/robot/topic/rdap/top_point_cloud2",
+   "type": "sensor_msgs/msg/PointCloud2",
+   "count": 1728
+  },
+  {
+   "topic": "/rte/rdap/rtk/imus/data_raw",
+   "type": "sensor_msgs/msg/Imu",
+   "count": 17280
+  },
+  {
+   "topic": "/rte/rdap/rtk/inspvax",
+   "type": "kygi665_msgs/msg/INSPVAX",
+   "count": 17280
+  }
+ ],
+ "lidar": {
+  "frames": 1728,
+  "rate_hz": 10.000170123592854,
+  "max_gap_s": 0.11464881896972656,
+  "gaps_over_limit": 0,
+  "mean_msg_mb": 3.173813961170338
+ },
+ "imu": {
+  "msgs": 17280,
+  "rate_hz": 100.01237768454095,
+  "max_gap_s": 0.04198026657104492
+ },
+ "ins": {
+  "msgs": 17280,
+  "rate_hz": 100.01258139636496,
+  "good_share": 1.0,
+  "pos_type": {
+   "56": 17280
+  },
+  "path_m": 167.3346246148335
+ },
+ "log_minus_header": {
+  "/robot/topic/rdap/top_point_cloud2": {
+   "median_s": 0.10492908954620361,
+   "p5_s": 0.10236855745315551,
+   "p95_s": 0.11509076356887815
+  },
+  "/rte/rdap/rtk/imus/data_raw": {
+   "median_s": 0.0006622076034545898,
+   "p5_s": 0.00027440786361694337,
+   "p95_s": 0.002284431457519529
+  },
+  "/rte/rdap/rtk/inspvax": {
+   "median_s": 0.0004749298095703125,
+   "p5_s": 0.0001430511474609375,
+   "p95_s": 0.0020136952400207518
+  }
+ },
+ "usable_s": 172.60497426986694,
+ "usable_intervals": [
+  [
+   -0.0008234977722167969,
+   172.60415077209473
+  ]
+ ],
+ "scenes": 6,
+ "scenes_kept": 6,
+ "train_s": 0.0,
+ "val_s": 172.8,
+ "val_path_within_10m_of_train": null
+}
