@@ -245,7 +245,7 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
 - **点云**：默认导出 5 帧拼接（模型的输入），远处稀疏的物体更容易看清；运动物体会拖影，框要放在拖影最前端（当前帧）。`--current-sweep` 只导当前帧。强度除以 255。
 - **帧名**：时间戳的微秒数（16 位数字，按名字排序就是时间顺序）。`dog_meta.json` 保存每帧的时间戳、`T_world_det` 和自动标注的速度、分数，导入时要用，不要删。
 - **框**：position 为框中心，scale 为（长、宽、高），rotation.z 为航向；导入时忽略 rotation.x / y。
-- **类别**：车按子类导出为 Car / Truck / Bus（没有子类的车导出为 Car），行人为 Pedestrian，骑行者为 BicycleRider；待审核的轨迹 `obj_attr` 为 `review`，在工具里会显示出来。导入时按 `TYPE_TO_SUBCLASS` 映射：Car、Van、PoliceCar、TourCar 为 car；Truck、ConcreteTruck 和工程机械（Excavator、ForkLift、Crane、RoadRoller、Bulldozer）为 truck；Bus、Tram、LongVehicle 为 bus（和 nuScenes 一样，工程车归 truck，挂车这类长车归 bus）；三者都是 vehicle。Pedestrian、RoadWorker、Child 为 pedestrian；BicycleRider、MotorcyleRider、ScooterRider 以及停着的 Bicycle、Motorcycle、Scooter 为 cyclist（和 nuScenes 的映射一致）。其他类型（Cone、TrafficBarrier 等）跳过并计数；`--type-map Trimotorcycle=car` 可以补充。**标车的时候把类型选对**（Car / Truck / Bus），它决定训练哪个 head。
+- **类别**：车按子类导出为 Car / Truck / Bus（没有子类的车导出为 Car），行人为 Pedestrian，骑行者为 BicycleRider；待审核的轨迹 `obj_attr` 为 `review`，在工具里会显示出来。导入时按 `TYPE_TO_SUBCLASS` 映射：Car、Van、PoliceCar、TourCar 为 car；Truck、ConcreteTruck 和工程机械（Excavator、ForkLift、Crane、RoadRoller、Bulldozer）为 truck（皮卡没有单独的类型，选 Truck，和 nuScenes 一致）；Bus、Tram、LongVehicle 为 bus（和 nuScenes 一样，工程车归 truck，挂车这类长车归 bus）；三者都是 vehicle。Pedestrian、RoadWorker、Child 为 pedestrian；BicycleRider、MotorcyleRider、ScooterRider 以及停着的 Bicycle、Motorcycle、Scooter 为 cyclist（和 nuScenes 的映射一致）。其他类型（Cone、TrafficBarrier 等）跳过并计数；`--type-map Trimotorcycle=car` 可以补充。**标车的时候把类型选对**（Car / Truck / Bus），它决定训练哪个 head。
 - **轨迹号**：数字 `obj_id`（自动标注的轨迹）原样保留；工具里新建、不是数字的 ID 分配新号。
 - **速度**：框没被挪动（中心偏移 ≤ 5 cm）就保留自动标注的速度，静止物体的处理不受影响；挪动过或新加的框，用同一 `obj_id` 在世界系的中心差分（±0.5 s）重算，低于 0.2 m/s 置 0。所以要改一条轨迹的位置时，用批量模式把整条轨迹一起挪；只挪其中一帧，那几帧的速度会算出一个跳变。
 
@@ -294,7 +294,7 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
 3. 审核：表里多一列 `subclass`，错了用 `car` / `truck` / `bus` 动作改（④a）；SUSTechPOINTS 里导出为 Car / Truck / Bus，改类型即改子类（第 10 节）；
 4. 导出：`export_dataset.py` 把子类写成训练类别名；没有子类的车按尺寸补，并打印个数（⑤）。
 
-在运动样例 bag 上重新跑教师（nuScenes Pillar）和自动标注：17 条轨迹、327 个框与之前完全一致，车的轨迹都带上了子类。7.2 m 长、3.2 m 高的 T12 为 truck，4.5 m 的 T7、T14 为 car。另有两条 2.2–2.5 m 长、2.5 m 高的轨迹（T3、T18）由 truck head 给出（nuScenes 的工程车也归在 truck）。教师给的子类在狗的数据上不一定对，审核时看一眼 `subclass` 列。
+在运动样例 bag 上重新跑教师（nuScenes Pillar）和自动标注：17 条轨迹、327 个框与之前完全一致，车的轨迹都带上了子类。7.2 m 长、3.2 m 高的 T12 为 truck，4.5 m 的 T7、T14 为 car。另有两条 2.2–2.5 m 长、2.5 m 高的轨迹（T3、T18）也由 truck head 给出（nuScenes 的工程车也归在 truck）。细看它们都是一面高墙墙脚的东西，不是车，教程里在 SUSTechPOINTS 中删掉了（[LABELING_TUTORIAL.md](LABELING_TUTORIAL.md) 第 5.3 节）。所以审核时要看一眼 `subclass` 列：尺寸和子类对不上，往往说明根本不是车；子类拿不准时保留教师的。
 
 **为什么更准：**
 1. **热启动不丢东西。** 旧布局只有一个 vehicle head，只能从 nuScenes 的 car head 继承，而 car head 训练时把卡车、公交当负样本。新布局三个 head 各自继承，起点和 nuScenes 模型一样（下表"起点"两行）。
@@ -318,7 +318,7 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
 - **小车和总分一样。** 微调后合并的 vehicle mAP 是 0.738 对 0.736，差别在噪声以内：验证集里 94% 是小车，两种布局的小车 head 都从 car head 来。作为噪声的量级参考，两次训练行人 / 骑行者 mAP 也差了 0.016 / 0.019，而这两类的 head 两边完全一样。
 - **大车的框更准。** 公交尺寸误差 0.11 对 0.35：单 head 给 12 m 的公交平均画 13.4 m。公交朝向误差 0.02 对 0.19；卡车尺寸误差 0.19 对 0.23。微调后两者的大车召回都在 0.92–1.0。
 - **起点差别很大。** 不微调时，单 head 只找回 34% 的卡车、0% 的公交；三个 head 和 nuScenes 模型一样（vehicle mAP 0.746 对 0.718）。mini_train 里有 46 辆大车，6 个 epoch 就把单 head 的召回补回来了。狗的数据里大车少得多，补不回来的风险更大，这时三个 head 的优势最明显。
-- **唯一变差的是一辆 5 m 长的小卡车。** car 和 truck 两个 head 都会出框（30 帧里 22 帧由 car head 出），其中 9 帧朝向反了 180°，所以 truck 的平均朝向误差是 0.44。介于两类之间的车（皮卡、小厢式货车）会在两个 head 之间分票。标注时按 nuScenes 的习惯把皮卡、面包车标成 car。运动中的 180° 翻转，跟踪和自动标注会按运动方向纠正。
+- **唯一变差的是一辆 5 m 长的小卡车。** car 和 truck 两个 head 都会出框（30 帧里 22 帧由 car head 出），其中 9 帧朝向反了 180°，所以 truck 的平均朝向误差是 0.44。介于两类之间的车（皮卡、小厢式货车）会在两个 head 之间分票。按 nuScenes 的定义，轿车、SUV、面包车是 car，皮卡和各种货车是 truck；标注时照这个来，点太稀、分不清时保留教师给的子类。运动中的 180° 翻转，跟踪和自动标注会按运动方向纠正。
 - **样本少**：验证集只有 2 个场景、4 辆卡车、1 辆公交，大车的数字只说明方向，要在自己的数据上用 `compare_detectors.py` 再确认。
 
 **代价：**
