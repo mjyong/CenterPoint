@@ -19,21 +19,42 @@ from .geometry import R_to_quat, quat_to_R
 from .preprocess.pipeline import LidarScan
 
 
-def write_sequence(seq_dir, scans, imu=None, odom=None, meta=None):
-    os.makedirs(os.path.join(seq_dir, "scans"), exist_ok=True)
-    for i, s in enumerate(scans):
-        np.savez_compressed(os.path.join(seq_dir, "scans", "%06d.npz" % i), xyz=s.xyz.astype(np.float32),
+class SequenceWriter:
+    """Writes a sequence one scan at a time, so a long bag never has to fit in memory. IMU / odom
+    rows are collected (small) and written by ``close`` together with ``meta.json``; a sequence
+    without ``meta.json`` was not finished."""
+
+    def __init__(self, seq_dir):
+        self.dir = seq_dir
+        os.makedirs(os.path.join(seq_dir, "scans"), exist_ok=True)
+        self.n_scans = 0
+        self.imu, self.odom = [], []
+
+    def add_scan(self, s):
+        np.savez_compressed(os.path.join(self.dir, "scans", "%06d.npz" % self.n_scans), xyz=s.xyz.astype(np.float32),
                             intensity=np.asarray(s.intensity, np.float32), t=np.asarray(s.point_times, np.float64),
                             stamp=np.float64(s.stamp))
-    if imu is not None:
-        np.save(os.path.join(seq_dir, "imu.npy"), np.asarray(imu, np.float64))
-    if odom is not None:
-        np.save(os.path.join(seq_dir, "odom.npy"), np.asarray(odom, np.float64))
-    meta = dict(meta or {})
-    if "T_body_lidar" in meta:
-        meta["T_body_lidar"] = np.asarray(meta["T_body_lidar"]).tolist()
-    with open(os.path.join(seq_dir, "meta.json"), "w") as f:
-        json.dump(meta, f, indent=2)
+        self.n_scans += 1
+
+    def close(self, meta=None, imu=None, odom=None):
+        imu = self.imu if imu is None else imu
+        odom = self.odom if odom is None else odom
+        if len(imu):
+            np.save(os.path.join(self.dir, "imu.npy"), np.asarray(imu, np.float64).reshape(-1, 4))
+        if len(odom):
+            np.save(os.path.join(self.dir, "odom.npy"), np.asarray(odom, np.float64).reshape(-1, 11))
+        meta = dict(meta or {})
+        if "T_body_lidar" in meta:
+            meta["T_body_lidar"] = np.asarray(meta["T_body_lidar"]).tolist()
+        with open(os.path.join(self.dir, "meta.json"), "w") as f:
+            json.dump(meta, f, indent=2)
+
+
+def write_sequence(seq_dir, scans, imu=None, odom=None, meta=None):
+    w = SequenceWriter(seq_dir)
+    for s in scans:
+        w.add_scan(s)
+    w.close(meta, [] if imu is None else imu, [] if odom is None else odom)
 
 
 def odom_row(t, R, p, v=None):

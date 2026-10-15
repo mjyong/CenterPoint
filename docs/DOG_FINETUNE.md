@@ -34,6 +34,8 @@ python tools/dog/rosbag_to_sequence.py --bag <bag 目录> --out data/seq/rec_001
 
 加了 `--inspvax-topic` 之后，雷达 180° 外参、IMU 的 deg/s 单位、机身离地高度估计和地面找平都自动处理（见 DOG_PIPELINE.md 第 9 节）。每段 bag 一个序列目录，目录名就是录制名，不能重复。
 
+几分钟以上的长 bag（几十 GB）先体检、再一次性切成多个 30 s 左右的场景并逐个检查，见 [BAG_SPLIT.md](BAG_SPLIT.md)（`bag_survey.py` → `rosbag_to_sequence.py --segments` → `sequence_preview.py`）。每个场景就是一个录制名。
+
 ## ② 预处理 + 教师推理 + 保存帧
 
 ```bash

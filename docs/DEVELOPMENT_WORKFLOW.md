@@ -17,7 +17,7 @@
 
 ```
 采集 bag
-  ① rosbag_to_sequence        bag → 序列
+  ① rosbag_to_sequence        bag → 序列（长 bag 先切场景：BAG_SPLIT.md）
   ② run_sequence              预处理 + 教师推理（Voxel + TTA），保存模型输入帧
   ③ auto_label                离线跟踪 + 轨迹精修 → 自动标注
   ④ review_labels / SUSTechPOINTS   人工审核：按轨迹（训练集）+ 逐框（验证集）
