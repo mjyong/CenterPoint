@@ -4,6 +4,8 @@
 
 训练之后的评估、对比、验收和部署，以及整轮迭代的做法，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md)。
 
+每一步读写哪些文件、用到 bag 的哪些字段、审核改了哪些字段，见 [DATA_LINEAGE.md](DATA_LINEAGE.md)（附思维导图 [data_lineage_mindmap.html](data_lineage_mindmap.html)）。
+
 **第一次做，先照着 [LABELING_TUTORIAL.md](LABELING_TUTORIAL.md) 用仓库里的两段样例 bag 走一遍**：每一步的命令、应有的输出、SUSTechPOINTS 的界面截图和操作都在里面。
 
 中间产物都放在 `data/` 下（`data/seq`、`data/runs`、`data/labels`、`data/dog`），这个目录被 .gitignore 忽略，点云不会被误提交。

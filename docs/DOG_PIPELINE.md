@@ -152,7 +152,7 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 
 ## 2. 模块与文件对应
 
-逐函数的调用链路和每一步的数据 shape（在样例 bag 上实测）见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md)；网络逐层详解见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)（Pillar）和 [CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)（Voxel，含与 Pillar 的逐项对比）；跟踪、预测和 IMM 原理见 [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md)。
+逐函数的调用链路和每一步的数据 shape（在样例 bag 上实测）见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md)；离线数据从 rosbag 话题字段一路到训练集的链路（每个脚本的处理、产出的文件、审核改的字段）见 [DATA_LINEAGE.md](DATA_LINEAGE.md) 和它的思维导图 [data_lineage_mindmap.html](data_lineage_mindmap.html)；网络逐层详解见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)（Pillar）和 [CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)（Voxel，含与 Pillar 的逐项对比）；跟踪、预测和 IMM 原理见 [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md)。
 
 ```
 LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐

@@ -1,0 +1,380 @@
+<title>XT32 标注数据链路</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600&display=swap">
+<style>
+/* Layout: two-sided mind map, root in the middle; left = raw data and preparation (①–③),
+   right = labelling, review, dataset and training (④–⑧). Stage families carry the colour. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #1d2733;
+  --muted: #5d6b7a;
+  --line: #d5dce3;
+  --focus: #1f6feb;
+  --data: #3d5a80;      --data-soft: #e3eaf3;
+  --prep: #1f7a72;      --prep-soft: #ddefec;
+  --label: #a8681a;     --label-soft: #f6ead8;
+  --review: #a83f63;    --review-soft: #f5e1e8;
+  --train: #64489a;     --train-soft: #e9e3f4;
+  --hit: #f2c94c;
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-title: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-code: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171d; --surface: #1a2129; --ink: #e3e9ef; --muted: #98a6b5; --line: #2f3a46; --focus: #6aa6ff;
+    --data: #8fb0d9; --data-soft: #223246; --prep: #6cc7bc; --prep-soft: #173733;
+    --label: #e5ad5c; --label-soft: #3a2c17; --review: #e88aa9; --review-soft: #3c2029;
+    --train: #b49be3; --train-soft: #2c2440; --hit: #c9a227;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12171d; --surface: #1a2129; --ink: #e3e9ef; --muted: #98a6b5; --line: #2f3a46; --focus: #6aa6ff;
+  --data: #8fb0d9; --data-soft: #223246; --prep: #6cc7bc; --prep-soft: #173733;
+  --label: #e5ad5c; --label-soft: #3a2c17; --review: #e88aa9; --review-soft: #3c2029;
+  --train: #b49be3; --train-soft: #2c2440; --hit: #c9a227;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+.page { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 0; }
+header { display: grid; gap: 10px; max-width: 1180px; }
+h1 { font-family: var(--font-title); font-weight: 600; font-size: 1.6rem; margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+.lede code, .detail code { font-family: var(--font-code); font-size: 0.92em; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+button, input { font: inherit; color: var(--ink); }
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--muted); }
+.btn:focus-visible, input:focus-visible, .node:focus-visible, .tog:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#q { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; width: 15em; max-width: 100%; font-size: 13px; }
+#hits { font-size: 12.5px; color: var(--muted); min-width: 4em; font-variant-numeric: tabular-nums; }
+.scroller { margin-top: 14px; overflow: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--bg); }
+.sizer { position: relative; }
+.canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+svg.links { position: absolute; left: 0; top: 0; overflow: visible; }
+svg.links path { fill: none; stroke-width: 1.6; opacity: 0.55; }
+.node { position: absolute; border-radius: 7px; cursor: pointer; transition: opacity .15s; }
+.node.root { background: var(--ink); color: var(--bg); font-family: var(--font-title); font-weight: 600; font-size: 17px; padding: 12px 18px; max-width: 260px; text-align: center; line-height: 1.35; white-space: nowrap; }
+.node.stage { color: #fff; font-weight: 700; font-size: 14px; padding: 7px 12px; max-width: 220px; line-height: 1.35; }
+.node.stage small { overflow-wrap: anywhere; }
+:root[data-theme="dark"] .node.stage { color: #10151b; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .node.stage { color: #10151b; } }
+.node.stage small { display: block; font-weight: 400; font-size: 11.5px; opacity: 0.9; font-family: var(--font-code); }
+.node.item { background: var(--surface); border: 1px solid var(--line); padding: 4px 9px 4px 8px; font-size: 12.5px; max-width: 290px; line-height: 1.45; display: flex; gap: 6px; align-items: baseline; }
+.node.item .tx { min-width: 0; }
+.node code { font-family: var(--font-code); font-size: 11.5px; }
+.tag { flex: none; font-size: 10.5px; letter-spacing: 0.04em; padding: 0 5px; border-radius: 4px; line-height: 1.6; font-weight: 500; }
+.f-data .tag { background: var(--data-soft); color: var(--data); }
+.f-prep .tag { background: var(--prep-soft); color: var(--prep); }
+.f-label .tag { background: var(--label-soft); color: var(--label); }
+.f-review .tag { background: var(--review-soft); color: var(--review); }
+.f-train .tag { background: var(--train-soft); color: var(--train); }
+.stage.f-data { background: var(--data); } .stage.f-prep { background: var(--prep); } .stage.f-label { background: var(--label); }
+.stage.f-review { background: var(--review); } .stage.f-train { background: var(--train); }
+.item.f-data { border-left: 3px solid var(--data); } .item.f-prep { border-left: 3px solid var(--prep); }
+.item.f-label { border-left: 3px solid var(--label); } .item.f-review { border-left: 3px solid var(--review); }
+.item.f-train { border-left: 3px solid var(--train); }
+.node.sel { box-shadow: 0 0 0 2px var(--focus); }
+.node.hit { box-shadow: 0 0 0 3px var(--hit); }
+.dim .node:not(.hit):not(.root) { opacity: 0.28; }
+.tog { position: absolute; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 11px; line-height: 16px; text-align: center; padding: 0; cursor: pointer; font-family: var(--font-code); }
+.side-R .tog { right: -24px; } .side-L .tog { left: -24px; }
+.detail { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding-block: 10px calc(12px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); margin-top: 0; min-height: 64px; }
+.detail .crumb { font-size: 12px; color: var(--muted); margin: 0 0 2px; }
+.detail .body { margin: 0; max-width: 90ch; }
+footer { color: var(--muted); font-size: 12px; padding-block: 10px 6px; }
+@media (prefers-reduced-motion: reduce) { .node { transition: none; } }
+@media (max-width: 520px) { h1 { font-size: 1.3rem; } }
+</style>
+
+<div class="page">
+  <header>
+    <h1>XT32 标注数据链路</h1>
+    <p class="lede">kygi665 录制的 rosbag 怎样一步步变成 det3d 能训练的数据：3 个话题里用到的字段，每个脚本做的处理和产出的文件，人工审核改了什么。完整说明见仓库里的 <code>docs/DATA_LINEAGE.md</code>。点节点看说明，圆形按钮折叠或展开。</p>
+    <div class="bar">
+      <div class="legend" aria-label="颜色图例">
+        <span><i style="background:var(--data)"></i>原始数据</span>
+        <span><i style="background:var(--prep)"></i>①–③ 切分与检查</span>
+        <span><i style="background:var(--label)"></i>④–⑤ 教师与自动标注</span>
+        <span><i style="background:var(--review)"></i>⑥ 人工审核</span>
+        <span><i style="background:var(--train)"></i>⑦–⑧ 数据集与训练</span>
+      </div>
+      <div class="tools">
+        <input id="q" type="search" placeholder="搜索字段或文件，如 pos_type" aria-label="搜索">
+        <span id="hits" aria-live="polite"></span>
+        <button class="btn" id="expand" type="button">全部展开</button>
+        <button class="btn" id="collapse" type="button">只看步骤</button>
+        <button class="btn" id="zout" type="button" aria-label="缩小">−</button>
+        <button class="btn" id="zfit" type="button">适应宽度</button>
+        <button class="btn" id="zin" type="button" aria-label="放大">+</button>
+      </div>
+    </div>
+  </header>
+  <div class="scroller" id="scroller"><div class="sizer" id="sizer"><div class="canvas" id="canvas"><svg class="links" id="links"></svg></div></div></div>
+</div>
+<section class="detail" id="detail" aria-live="polite">
+  <p class="crumb" id="crumb">说明</p>
+  <p class="body" id="dbody">点任一节点，这里显示它的详细说明。左侧是原始数据和前三步，右侧是标注、审核、导出和训练，编号就是处理顺序。</p>
+</section>
+<div class="page"><footer>数字来自运动样例 bag（27 帧）和 0921 两份录制。坐标系：L 雷达系，B 机身系，W 世界系（ENU），D 检测系，M 网络系。</footer></div>
+
+<script>
+// k: stage | item; f: family; g: tag on items; d: detail shown in the panel
+const T = (g, t, d, c) => ({ k: "item", g, t, d, c });
+const TREE = {
+  k: "root", t: "rosbag → 可训练数据", d: "从录制的 rosbag 到 det3d 训练集的完整链路。左侧：原始数据（3 个话题）和 ①体检、②切分转换、③检查与修正。右侧：④预处理与教师、⑤自动标注、⑥人工审核、⑦导出、⑧训练。",
+  c: [
+    { side: "L", f: "data", k: "stage", t: "点云话题", s: "/robot/topic/rdap/top_point_cloud2",
+      d: "sensor_msgs/PointCloud2，10 Hz，frame_id hesai_lidar。每帧固定 128000 个槽位（point_step 26 字节），无回波的为 0 或 NaN；一帧约 3.17 MB，30 GB 的 bag 几乎全是它。",
+      c: [
+        T("字段", "`header.stamp`：扫描开始时刻", "一圈扫描开始的时刻。bag 的写入时刻比它晚约 0.105 s（转完一圈才发出）。场景按它切分；体检时直接从原始字节第 4–12 字节读，不解码点云。"),
+        T("字段", "`x` `y` `z`：雷达系 L，m", "float32。转换时去掉 0 和 NaN 的无效点，原样存进 scans/*.npz 的 xyz。"),
+        T("字段", "`intensity`：0–255", "float32 回波强度，作为网络的第 4 维输入，不缩放。导出到 SUSTechPOINTS 时才缩放到 0–1。"),
+        T("字段", "`timestamp`：每点绝对时间", "float64，Hesai 驱动 2.0 的逐点时间（秒）。存为 npz 的 t，用于逐点去畸变；整帧时刻 stamp 取它的最大值（扫描结束）。"),
+        T("字段", "`ring`：不用", "uint16，第几根激光线（XT32 共 32 线）。转换时丢掉。"),
+        T("注意", "有效约 10.6 万点，去重后 5.2 万", "双回波模式（最后 + 最强）在两次回波重合时会重复同一个点，预处理的去重步骤在 1 mm 网格上只留一个。"),
+      ] },
+    { side: "L", f: "data", k: "stage", t: "IMU 话题", s: "/rte/rdap/rtk/imus/data_raw",
+      d: "sensor_msgs/Imu，100 Hz，frame_id imu_link。只用到角速度。",
+      c: [
+        T("字段", "`angular_velocity`：deg/s，INS 轴", "乘 π/180 转成 rad/s，再绕 z 转 180° 到机身系 B（gyro_from_kygi_imu）。存进 imu.npy，用于去畸变时在两个定位点之间插值姿态。"),
+        T("字段", "`linear_acceleration`：不用", "数值看起来以 g 为单位（静止时 z ≈ 0.88），流水线没有用到。"),
+        T("字段", "`orientation`：没有提供", "四元数为 (0,0,0,1)，协方差全 0。"),
+      ] },
+    { side: "L", f: "data", k: "stage", t: "定位话题 INSPVAX", s: "/rte/rdap/rtk/inspvax",
+      d: "kygi665_msgs/INSPVAX（NovAtel 格式），100 Hz，frame_id gps。提供位置、航向和速度；横滚俯仰不用。",
+      c: [
+        T("字段", "`ins_status`：3 = 可用", "INS_SOLUTION_GOOD。不是 3 的行直接丢掉；第一个是 3 的行作为整份录制共用的 ENU 原点（lat0/lon0/h0）。"),
+        T("字段", "`pos_type`：56 = RTK 固定解", "按 NovAtel 标准 56 = INS_RTKFIXED，55 = 浮点解，实测 56 的位置标准差 1.3 cm，确认是固定解。仓库里的 msg 文件常量名把 55/56 写反了。只用于质量统计：体检选可用区间、meta 的 inspvax_pos_type、预览的 rtk 检查。"),
+        T("字段", "`latitude` `longitude` `height`", "经纬度（度）和高程（m），换算成相对原点的 ENU 坐标（东、北、天，m），写进 odom.npy 的 x y z。"),
+        T("字段", "`azimuth`：航向", "从正北顺时针（度）。机身航向 yaw = 180° − azimuth（ENU 下从东向逆时针），写成只有 yaw 的四元数。雷达系与这个机身系差 180°（T_body_lidar）。"),
+        T("字段", "`north/east/up_velocity`", "m/s，按（东、北、天）写进 odom.npy 的 vx vy vz；去畸变外推和自动标注之外，预览用它算 INS 位置跳变。"),
+        T("字段", "`roll` `pitch`：不用", "加减速时不可信：0.6 s 内 pitch 从 +2.8° 跳到 −9.9°，而陀螺积分不到 2°。倾斜改由点云在线找平（auto_level）。"),
+        T("字段", "`*_stdev`、`kygi_header` 等：不用", "各量标准差、GPS 周、时间状态（180）、ext_sol_status、time_since_update、undulation。只在核对定位质量时看。"),
+        T("注意", "急停时位置会被往回拉", "狗急停时 INS 速度冲过头，位置每约 0.2 s 被往回拉一次，最多 0.33 m。多帧拼接在跳变两侧对不齐，预览用 ins_step_m 量它。"),
+      ] },
+    { side: "L", f: "prep", k: "stage", t: "① 体检", s: "bag_survey.py",
+      d: "只读时间戳和定位，不解码点云，30 GB 的 bag 也很快。决定哪些时间段能用、怎么切场景。",
+      c: [
+        T("处理", "时钟检查：写入时刻 − header.stamp", "雷达约 +0.10 s（扫描开始时间戳），IMU 和 INS 约 0；5–95% 区间宽于 50 ms 或有几秒的偏差就停下来查。"),
+        T("处理", "可用区间 = INS 可用 ∩ RTK 固定 ∩ 雷达连续", "再按约 30 s 切场景；最后 20% 的时间划为验证，它前面一个场景作为缓冲（keep = 0）。"),
+        T("输出", "`survey.json`、`survey.png`", "频率、最大间隔、时钟差（中位数和 5/95% 分位）、pos_type 分布、可用时长、场景列表、训练 / 验证时长；轨迹、速度、偏航角速度、pos_type 曲线。"),
+        T("输出", "`segments.csv`：场景切分表", "列：name, t_start, t_end（header.stamp，左闭右开）, duration, scans, path_m, mean_speed, moving_share, pos_types, split, keep, note。"),
+        T("人工", "可改 keep / split / name", "例如去掉狗一直不动的场景、调整训练验证划分。"),
+      ] },
+    { side: "L", f: "prep", k: "stage", t: "② 切分转换", s: "rosbag_to_sequence.py",
+      d: "整个 bag 只读一遍，按 segments.csv 里 keep = 1 的行，每个场景写一个序列目录 data/seq/<场景>/。点云不做几何处理。",
+      c: [
+        T("处理", "按 header.stamp 分配场景，其余不解码", "落在 [t_start, t_end) 的帧写进对应场景；去掉无效点、丢掉 ring。"),
+        T("处理", "IMU、INSPVAX 换算，前后多留 1 s", "IMU：deg/s → rad/s，转到机身系。INSPVAX：丢掉 ins_status ≠ 3 的行，经纬高 → ENU，azimuth → 航向。去畸变和位姿插值要用前后各 1 s。"),
+        T("处理", "离地高度：每 10 帧估一次取中位数", "2–15 m 环内取 z 第 5 百分位附近点的中位数作为地面。只看一帧会受地形影响：0921 的 29 个场景第一帧估出 0.59–1.05 m，真实约 0.72 m。"),
+        T("输出", "`scans/*.npz`：xyz, intensity, t, stamp", "雷达系 L，原样保存；t 是每点绝对时间，stamp 是扫描结束时刻。约 0.6 MB/帧。"),
+        T("输出", "`imu.npy` (M,4)：t, wx, wy, wz", "机身系角速度，rad/s。"),
+        T("输出", "`odom.npy` (K,11)：t, x y z, 四元数, vx vy vz", "世界系 W（ENU）的位置、只含航向的姿态、东北天速度。"),
+        T("输出", "`meta.json`", "T_body_lidar（绕 z 180°）、base_height 和 base_height_sweeps、lat0/lon0/h0、segment（name, t_start, t_end, split）、inspvax_pos_type、det_frame {auto_ground, auto_level}、lidar、source。最后写，没有它说明没写完。"),
+      ] },
+    { side: "L", f: "prep", k: "stage", t: "③ 检查与修正", s: "只改 meta.json",
+      d: "这一步只读序列，最多改 meta.json；点云、IMU、定位文件都不变。",
+      c: [
+        T("输出", "`sequence_preview.py` → data/preview/", "每 5 帧做一次和线上一样的预处理。检查帧间错位 align_m、地面高度 ground_z_m、倾斜 tilt_deg、各话题最大间隔、rtk、INS 位置跳变 ins_step_m；每个场景一张图，加 checks.csv 和 index.html。"),
+        T("处理", "`sequence_meta.py` 改 base_height、lidar_time_offset", "不重转 bag：离地高度改成多帧中位数或给定值（旧值留在 base_height_first_sweep）；写入雷达时间偏移，读取时加到所有雷达时间上。"),
+        T("处理", "`time_offset_check.py` 测时间差", "只在角速度变化的转弯处才看得出时间差：把雷达时间平移 −0.15…+0.15 s，取帧间错位最小的偏移。仿真里注入 50 ms，能准确找回。"),
+        T("输出", "`split_check.py` → split.csv", "统一划分训练 / 验证：去掉静止的验证场景；从训练录制里留出离其余路线最远的一段做验证，两侧各丢一个缓冲；路线 10 m 内重叠时丢代价小的一方。--apply 才写 split.csv 和 meta 的 segment.split。"),
+      ] },
+    { side: "R", f: "label", k: "stage", t: "④ 预处理 + 教师", s: "run_sequence.py",
+      d: "把每帧点云处理成检测器的输入（和线上节点同一份代码），再用教师模型检测。",
+      c: [
+        T("处理", "去重：10.6 万 → 5.2 万点", "双回波重合的点在 1 mm 网格上只留一个。"),
+        T("处理", "去自身点：→ 3.8 万点", "机身系里去掉狗身体和腿的盒子（x ±0.6、y ±0.4、z −0.8…0.3 m）、0.4 m 以内的点、3 m 内的孤立飞点。"),
+        T("处理", "逐点去畸变，转到世界系", "100 Hz 位姿（INS 锚定 + 陀螺积分），把每个点挪到扫描结束时刻的机身位置，再转到 W 系，进最近 5 帧的缓存。"),
+        T("处理", "检测系 D + 拼 5 帧：约 19 万点", "D：重力对齐、航向跟机身、原点在机身下方地面（base_height），用 1.5–8 m 的地面修正高度（±0.3 m）和倾斜（±5°）。最近 5 帧（≤ 0.55 s）转到当前 D 系，每点加 dt 列。"),
+        T("处理", "教师：CenterPoint-Voxel + TTA", "第一轮用 nuScenes 权重，之后用自己微调的 Voxel 模型；双翻转增强，分数阈值 0.1（低分框留给跟踪）。网络在 M 系运行，结果转回 D 系；5 个头合成车辆 / 行人 / 骑行者，car / truck / bus 留在 subclasses。"),
+        T("输出", "`frames/<stamp>.npy` (N,5)", "[x, y, z, intensity, dt]，D 系，就是检测器的输入；约 3.7 MB/帧。"),
+        T("输出", "`voxel/results.pkl`", "每帧：stamp、T_world_det（D→W）、T_world_body、detections（boxes (N,7) [x,y,z,l,w,h,yaw]、velocities、scores、labels、subclasses）、tracks、predictions、timings。另有 track_log.npz 和 voxel.mcap（Foxglove）。"),
+      ] },
+    { side: "R", f: "label", k: "stage", t: "⑤ 自动标注", s: "auto_label.py",
+      d: "在世界系里跟踪，再利用整段录制对每条轨迹做非因果修正，人只需修剩下的问题。",
+      c: [
+        T("处理", "类别、子类：整条轨迹加权投票", "按分数加权，消除类别跳变；车辆的 car / truck / bus 也这样投票。"),
+        T("处理", "尺寸和 z 取加权中位数；中心 RTS 平滑", "0.5 s 以内的漏检插值补帧（interpolated = True）。"),
+        T("处理", "静止判定：速度置零、位置固定", "平滑轨迹速度 > 0.4 m/s 且教师速度头 > 0.15 m/s 才算运动；静止轨迹的框够集中时位置固定为加权中位数。"),
+        T("处理", "朝向消歧；删短轨迹、低分轨迹", "快速运动时取运动方向，否则取环形均值，180° 歧义按运动方向；少于 5 次观测或平均分 < 0.3 的删掉；平均分 < 0.5 的标 review。"),
+        T("输出", "`labels.pkl`", "frames → objects：track_id, label（vehicle/pedestrian/cyclist）, subclass（car/truck/bus）, box（7，D 系）, velocity（2）, score, review, interpolated, moving。"),
+        T("输出", "`labels_tracks.csv`", "一条轨迹一行，待审核的排前面：track_id, label, subclass, review, mean_score, frames, interpolated, t_first, t_last, min_range_m, moving_share, max_speed, action, from, to, note。"),
+      ] },
+    { side: "R", f: "review", k: "stage", t: "⑥ 轨迹级审核", s: "review_labels.py",
+      d: "在 Foxglove 里看整条轨迹，在表格里一行改一条轨迹。只能改已有的，不能新增漏标的物体。",
+      c: [
+        T("输出", "`review.mcap`", "标签、点云和教师原始框（灰色），在 Foxglove 里看。"),
+        T("人工", "填 action：ok / drop / 类别 / car·truck·bus / flip / static", "ok 只清 review；drop 删掉轨迹（或 from–to 一段）；类别和子类改 label、subclass；flip 把 yaw 加 180°；static 速度置零、位置和朝向固定。可用 + 组合，如 cyclist+flip。"),
+        T("输出", "`labels_reviewed.pkl`", "格式同 labels.pkl。改过的框 review = False、reviewed = True；仍标 review 的在导出时用 --skip-review 丢掉。"),
+      ] },
+    { side: "R", f: "review", k: "stage", t: "⑥ 框级审核", s: "SUSTechPOINTS",
+      d: "逐框精修，并能补上漏标的物体。验证集场景建议都走这一步。",
+      c: [
+        T("输出", "export：pcd + label json + dog_meta.json", "--every 5（10 Hz 里取 2 Hz）。点云在 D 系整体下移 1.8 m（工具假定雷达离地 1.8 m），强度缩放到 0–1；框写成 obj_id（= track_id）、obj_type、psr；dog_meta.json 记 stamp、T_world_det、分数。"),
+        T("人工", "挪框、改尺寸朝向类型、删框、新增漏标", "在浏览器里标注（sustechpoints_convert.py serve）。"),
+        T("输出", "import → `labels_sustech.pkl`", "z 移回；类型映射回类别和子类（Car/Van → car，Truck 和工程车 → truck，Bus/Tram/LongVehicle → bus）；挪过和新加的框按 obj_id 在 W 系重算速度；只含导出的那些帧。"),
+      ] },
+    { side: "R", f: "train", k: "stage", t: "⑦ 导出数据集", s: "export_dataset.py",
+      d: "每个场景给一对 run 目录和 labels 文件（优先 labels_sustech.pkl，否则 labels_reviewed.pkl），按录制分训练 / 验证。",
+      c: [
+        T("处理", "D 系 → 网络系 M", "x_M = Rz(+90°)·x_D，z_M = z_D − 1.84 m：变成虚拟 nuScenes 雷达，沿用预训练模型的 z 先验。点云和框都这样转。"),
+        T("处理", "框 → det3d [x,y,z,w,l,h,vx,vy,r]", "r = −yaw − π/2。类名用 subclass（car/truck/bus/pedestrian/cyclist）；旧标签没有子类时按尺寸猜。--skip-review 丢掉仍待审核的框。"),
+        T("输出", "`infos_train.pkl` / `infos_val.pkl`", "每帧：token, lidar_path, gt_boxes (M,9), gt_names, sequence, timestamp。"),
+        T("输出", "`lidar/<场景>/<stamp>.npy`", "(N,5) float32 [x, y, z, intensity, dt]，M 系。"),
+        T("输出", "`gt_database_5sweeps_withvelo/`、`dbinfos_train_*.pkl`", "--gt-db：每个训练框内的点（减去框中心）存成 .bin，dbinfos 按类记录路径、框、点数，给 GT 采样增强用。"),
+      ] },
+    { side: "R", f: "train", k: "stage", t: "⑧ 训练", s: "det3d",
+      d: "DogDataset 读 infos，输入已是拼好 5 帧的点云（5 个特征），训练时不再拼接。",
+      c: [
+        T("处理", "`convert_nusc_ckpt.py` → dog_voxel_init.pth", "狗的每个头继承 nuScenes 对应的头：car←car，truck←truck 通道，bus←bus 通道，pedestrian←pedestrian，cyclist←bicycle 通道；主干原样复制。即配置里的 load_from。"),
+        T("处理", "`tools/train.py configs/dog/*.py`", "5 个检测头：car / truck / bus / pedestrian / cyclist；DogDataset 读 data/dog 下的 infos 和 lidar。"),
+        T("处理", "增强：GT 采样 + 全局变换", "每帧贴入 car 2、truck 2、bus 2、pedestrian 4、cyclist 4 个物体（点太少的不用）；旋转 ±45°、缩放 0.95–1.05、平移 σ 0.1 m、俯仰横滚 ±2°。"),
+        T("输出", "权重 → 下一轮教师 / Orin 部署", "回到 ④ 当教师；或导出 ONNX 上板，线上节点用 -p robot:=kygi，检测系构造和训练数据一致。"),
+      ] },
+  ],
+};
+
+const SIB_GAP = 7, STAGE_GAP = 20, H_GAP = 46, PAD = 28;
+const canvas = document.getElementById("canvas"), svg = document.getElementById("links");
+const sizer = document.getElementById("sizer"), scroller = document.getElementById("scroller");
+let scale = 1, userZoomed = false, selected = null, uid = 0;
+
+function rich(s) {
+  return s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])).replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+function plain(s) { return (s || "").replace(/`/g, ""); }
+
+function build(n, parent, depth, side, fam) {
+  n.id = uid++; n.parent = parent; n.depth = depth; n.side = n.side || side; n.f = n.f || fam; n.open = true;
+  const el = document.createElement("div");
+  el.className = "node " + n.k + (n.f ? " f-" + n.f : "") + (n.side ? " side-" + n.side : "");
+  el.tabIndex = 0;
+  if (n.k === "item") el.innerHTML = '<span class="tag">' + n.g + '</span><span class="tx">' + rich(n.t) + "</span>";
+  else if (n.k === "stage") el.innerHTML = rich(n.t) + (n.s ? "<small>" + rich(n.s) + "</small>" : "");
+  else el.innerHTML = rich(n.t);
+  el.addEventListener("click", e => { if (!e.target.classList.contains("tog")) select(n); });
+  el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(n); } });
+  if (n.c && n.c.length && n.k !== "root") {
+    const b = document.createElement("button");
+    b.className = "tog"; b.type = "button";
+    b.addEventListener("click", e => { e.stopPropagation(); n.open = !n.open; layout(); });
+    el.appendChild(b); n.tog = b;
+  }
+  canvas.appendChild(el); n.el = el;
+  (n.c || []).forEach(ch => build(ch, n, depth + 1, n.side || ch.side, n.f || ch.f));
+}
+
+function visible(n) { for (let p = n.parent; p; p = p.parent) if (!p.open) return false; return true; }
+function each(n, fn) { fn(n); (n.c || []).forEach(ch => each(ch, fn)); }
+function kids(n) { return n.open && n.c ? n.c : []; }
+
+function layout() {
+  each(TREE, n => { n.el.hidden = !visible(n); });
+  each(TREE, n => {
+    if (n.tog) { n.tog.textContent = n.open ? "−" : String(n.c.length); n.tog.setAttribute("aria-label", n.open ? "折叠" : "展开 " + n.c.length + " 项"); }
+  });
+  each(TREE, n => { if (!n.el.hidden) { n.w = n.el.offsetWidth; n.h = n.el.offsetHeight; } });
+  const sides = { L: TREE.c.filter(n => n.side === "L"), R: TREE.c.filter(n => n.side === "R") };
+  const colW = { L: [], R: [] };
+  each(TREE, n => { if (n.k !== "root" && !n.el.hidden) colW[n.side][n.depth] = Math.max(colW[n.side][n.depth] || 0, n.w); });
+  const sub = n => {
+    const k = kids(n);
+    const s = k.reduce((a, ch) => a + sub(ch), 0) + Math.max(0, k.length - 1) * SIB_GAP;
+    return (n.hh = Math.max(n.h, s));
+  };
+  const total = {};
+  for (const sd of ["L", "R"]) total[sd] = sides[sd].reduce((a, n) => a + sub(n), 0) + Math.max(0, sides[sd].length - 1) * STAGE_GAP;
+  const H = Math.max(total.L, total.R, TREE.h);
+  const width = sd => colW[sd].reduce((a, w) => a + (w ? w + H_GAP : 0), 0);
+  const rootX = PAD + width("L");
+  TREE.x = rootX; TREE.y = PAD + H / 2 - TREE.h / 2;
+  const colX = (sd, depth) => {
+    let x = 0;
+    for (let d = 1; d < depth; d++) x += (colW[sd][d] || 0) + H_GAP;
+    return sd === "R" ? rootX + TREE.w + H_GAP + x : rootX - H_GAP - x - (colW[sd][depth] || 0);
+  };
+  const place = (n, top) => {
+    n.y = top + n.hh / 2 - n.h / 2;
+    const cx = colX(n.side, n.depth);
+    n.x = n.side === "R" ? cx : cx + (colW[n.side][n.depth] - n.w);
+    const k = kids(n);
+    let t = top + (n.hh - (k.reduce((a, ch) => a + ch.hh, 0) + Math.max(0, k.length - 1) * SIB_GAP)) / 2;
+    k.forEach(ch => { place(ch, t); t += ch.hh + SIB_GAP; });
+  };
+  for (const sd of ["L", "R"]) {
+    let t = PAD + (H - total[sd]) / 2;
+    sides[sd].forEach(n => { place(n, t); t += n.hh + STAGE_GAP; });
+  }
+  each(TREE, n => { if (!n.el.hidden) { n.el.style.left = n.x + "px"; n.el.style.top = n.y + "px"; } });
+  const W = rootX + TREE.w + H_GAP + width("R") + PAD, HH = H + 2 * PAD;
+  svg.setAttribute("width", W); svg.setAttribute("height", HH);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + HH);
+  let paths = "";
+  each(TREE, n => {
+    kids(n).forEach(ch => {
+      const r = ch.side === "R";
+      const x1 = n.k === "root" ? (r ? n.x + n.w : n.x) : (r ? n.x + n.w : n.x), y1 = n.y + n.h / 2;
+      const x2 = r ? ch.x : ch.x + ch.w, y2 = ch.y + ch.h / 2;
+      const mx = (x1 + x2) / 2;
+      paths += '<path stroke="var(--' + ch.f + ')" d="M' + x1 + " " + y1 + " C" + mx + " " + y1 + " " + mx + " " + y2 + " " + x2 + " " + y2 + '"/>';
+    });
+  });
+  svg.innerHTML = paths;
+  canvas.style.width = W + "px"; canvas.style.height = HH + "px";
+  canvas.dataset.w = W; canvas.dataset.h = HH;
+  applyScale();
+}
+
+function applyScale() {
+  const W = +canvas.dataset.w, H = +canvas.dataset.h;
+  if (!userZoomed) scale = Math.max(0.6, Math.min(1, (scroller.clientWidth - 2) / W));
+  canvas.style.transform = "scale(" + scale + ")";
+  sizer.style.width = W * scale + "px"; sizer.style.height = H * scale + "px";
+}
+
+function path(n) { const p = []; for (let x = n; x; x = x.parent) p.unshift(x); return p; }
+function select(n) {
+  if (selected) selected.el.classList.remove("sel");
+  selected = n; n.el.classList.add("sel");
+  document.getElementById("crumb").textContent = path(n).map(x => plain(x.t)).join(" › ");
+  document.getElementById("dbody").innerHTML = rich(n.d || n.t);
+}
+
+const q = document.getElementById("q"), hits = document.getElementById("hits");
+q.addEventListener("input", () => {
+  const s = q.value.trim().toLowerCase();
+  let count = 0;
+  each(TREE, n => n.el.classList.remove("hit"));
+  if (s) {
+    each(TREE, n => {
+      if (n.k === "root") return;
+      const text = (plain(n.t) + " " + plain(n.s) + " " + (n.d || "")).toLowerCase();
+      if (text.includes(s)) { count++; n.el.classList.add("hit"); for (let p = n.parent; p; p = p.parent) p.open = true; }
+    });
+  }
+  canvas.classList.toggle("dim", !!s);
+  hits.textContent = s ? count + " 处" : "";
+  layout();
+});
+document.getElementById("expand").addEventListener("click", () => { each(TREE, n => n.open = true); layout(); });
+document.getElementById("collapse").addEventListener("click", () => { each(TREE, n => { if (n.k === "stage") n.open = false; }); layout(); });
+document.getElementById("zin").addEventListener("click", () => { userZoomed = true; scale = Math.min(1.6, scale * 1.15); applyScale(); });
+document.getElementById("zout").addEventListener("click", () => { userZoomed = true; scale = Math.max(0.35, scale / 1.15); applyScale(); });
+document.getElementById("zfit").addEventListener("click", () => { userZoomed = false; applyScale(); });
+window.addEventListener("resize", () => { if (!userZoomed) applyScale(); });
+
+build(TREE, null, 0, null, null);
+layout();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+</script>
