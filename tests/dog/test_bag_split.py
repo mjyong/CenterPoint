@@ -79,8 +79,10 @@ def test_preview_passes_good_data_and_fails_a_wrong_extrinsic(split, tmp_path):
     subprocess.run([sys.executable, "tools/dog/sequence_preview.py", "--seq", str(root / "full"), str(bad),
                     "--out", str(tmp_path / "preview")], check=True, capture_output=True)
     checks = {c["name"]: c for c in json.load(open(tmp_path / "preview" / "checks.json"))}
-    # the INS pulls its position back by up to 0.33 m while the robot brakes at the end of this bag
-    assert checks["full"]["problems"] == "ins_step_m=WARN" and checks["full"]["align_m"] < 0.1
+    # the INS runs ~0.45 m ahead while the robot brakes at the end of this bag and pulls its position back in
+    # steps of up to 0.33 m: the lidar shift check fails on the INS poses (tools/dog/refine_poses.py fixes it,
+    # see test_refine_poses.py); everything else passes
+    assert checks["full"]["problems"] == "shift_p90_m=FAIL ins_step_m=WARN" and checks["full"]["align_m"] < 0.1
     assert 0.25 < checks["full"]["ins_step_m"] < 0.4 and checks["full"]["ins_steps_over_10cm"] == 5
     assert abs(checks["full"]["ground_z_m"]) < 0.1
     assert checks["bad_extrinsic"]["status"] == "FAIL" and checks["bad_extrinsic"]["align_m"] > 0.5

@@ -159,6 +159,7 @@ python tools/dog/time_offset_check.py --seq <几个有转弯的场景> --out dat
 - **对齐**：中位数 0.003–0.083 m。尖峰集中在急转、急停的时刻，最大是 164127_s003 的 6.2 m（bag 第 105 s）。运动样例 bag 正好是这一刻之前的 3 s：INS 速度冲到 2.5 m/s 后骤降，位置每 0.2 s 被往回拉，最多 0.33 m。所以这个尖峰来自定位，不是外参或时钟。服务器上的 `ins_step_m` 会给出所有场景里这种情况有多频繁。
 - **离地高度**：第一帧估计的值在 0.59–1.05 m 之间（中位数 0.71 m）。用 3.1 节改成多帧中位数。
 - **验证集**：16:41 整份做验证只有 173 s，其中 s000 狗趴着不动、s005 基本没动，有效约 100 s；和 16:56 的路线是否重合也不知道。用 3.4 节调整。
+- **INS 急停误差**（第二轮复核）：急停时 INS 位置超前约 0.45 m，并非落后；往回拉的跳变方向是对的，但没拉够。处理见 3.5 节。
 - **线上节点**：之前没开 `auto_ground` / `auto_level`，离地高度默认 0.45 m，和训练数据不一致。现在用 `-p robot:=kygi` 一次设好（`dog_perception/node_config.py`）。`tests/dog/test_ros2_node.py` 把样例 bag 回放进节点，检查检测系点云和训练序列是否一致。
 
 ### 3.4 训练 / 验证划分（多份录制）
@@ -190,6 +191,47 @@ python tools/dog/split_check.py --seq data/seq/0921_* --out data/survey/split \
 - 验证集里机器人在动的时间 ≥ 150 s，占全部运动数据的 12–25%；
 - 验证路线落在训练路线 10 m 内的比例 ≤ 5%；
 - 因为重叠和缓冲去掉的训练数据不超过原训练时长的 15%。
+
+### 3.5 位姿融合：激光里程计 + RTK（`refine_poses.py`）
+
+**问题**：狗急停时，kygi INS 的速度会冲过头（2.5 m/s），位置跑到真实位置前面约 0.5 m，并保持 1 秒以上；随后几次往回拉只修正了一部分。运动样例 bag 在 2.1 s 时超前 0.44 m，这是把激光帧两两配准测出来的。
+
+**影响**：
+- 这段时间拼接的 5 帧点云会有重影；
+- 自动标注把静止物体固定在世界系里，那几帧的框会和点云错开约 0.5 m。
+
+预览里的 `align_m` 看不出这个问题：误差沿行进方向，而墙大多和路平行，帧沿着墙滑动时墙照样对得上。所以加了 `shift` 检查（见下）。
+
+```bash
+python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/poses
+```
+
+**每个场景的处理**：
+1. KISS-ICP 激光里程计：用和线上相同的去重、去自身点，以及逐点时间。它给出帧与帧之间的运动，但会慢慢漂移；在没有特征的长墙边可能停住不动。
+2. INS 健康判定：在 0.5 s 窗口内，看 INS 位置变化和它自己的速度积分是否一致。急停时两者差 1 m/s，正常走只差 0.1 m/s。超过 0.4 m/s 判为不可信，前后各扩 0.3 s；夹在两段不可信之间、短于 1 s 的"可信"小段，也算不可信。
+3. 东、北两个方向分别做最小二乘融合：
+   - INS 可信的地方由 INS 定住轨迹，激光只补帧与帧之间的运动；
+   - INS 不可信的地方 INS 权重为 0，由激光把前后两段可信的 INS 连起来；
+   - 两边都用 Huber 稳健权重，所以激光卡住或跳变、INS 偶尔的离群点，影响都会被降低。
+4. 自检：不可信段两端都有可信 INS 时，检查激光走完这段后能否和对端的 INS 闭合。差距超过 `--gap-tol`（0.25 m 加上段长的 5%），就把这段记为**不可靠**（`pose_refine.bad_intervals`）：两种来源在这里都不可信，这段的帧不要标注。不可信段如果挨着序列开头或结尾，就无法检查，只记为 `unverified_intervals`。
+5. 写回：
+   - `odom.npy` 保留 INS 原来的行（100 Hz 时间点、只有航向的姿态、高度），东、北坐标换成融合后的轨迹（在帧与帧之间线性插值），速度换成它的导数。去畸变和 IMU 位姿传播的用法和以前完全一样；
+   - INS 原始数据另存为 `odom_ins.npy`，以后每次都从它读，所以可以放心重跑；
+   - `meta.json` 加上 `pose_source = "kiss-icp+ins"` 和 `pose_refine`（修正量统计、不可靠和未验证的时间段、可信段里激光 1 s 位移和 INS 的差）。
+
+**验证**：
+- 运动样例 bag 上，所有相隔 0.5 / 1 / 2 s 的帧对，用二维配准测出的位姿偏差：
+
+  | 帧间隔 | INS（中位 / p90） | 融合后（中位 / p90） |
+  |---|---|---|
+  | 0.5 s | 0.11 / 0.32 m | 0.04 / 0.07 m |
+  | 1 s | 0.25 / 0.55 m | 0.06 / 0.14 m |
+  | 2 s | 0.50 / 0.64 m | 0.11 / 0.18 m |
+
+- 合成数据（有真值）：INS 超前 0.5 m 的那段被修正到误差 < 6 cm；激光在这段失效时，这段会被标为不可靠。见 `tests/dog/test_refine_poses.py`。
+- 不做 INS 健康判定（激光和 INS 同等对待）时，1 s 帧对的 p90 是 0.37 m：激光在走廊里会少算位移，健康的 INS 必须拿来定住轨迹。
+
+**预览的 `shift` 检查**：对相隔约 1 s 的两帧，取离地 0.3–3 m 的点（墙、杆、树、车），在 ±0.8 m 范围内做二维搜索，找到把一帧叠到另一帧上最合适的平移量。这就是激光看到的两帧位姿误差，沿行进方向的误差也能测出来。状态按 p90 判定：≤ 0.20 m 为 OK，≤ 0.40 m 为 WARN，更大为 FAIL。运动样例 bag 用 INS 位姿时是 0.51 m（FAIL），融合后是 0.12 m（OK）。
 
 ## 4. 之后：教师推理 + 自动标注（批量）
 
@@ -333,5 +375,31 @@ s005 也基本没动（0.27），有效验证只有约 100 s；两份录制是�
 - 每次运行打印的整张表和 before / after 两行、最后一行；
 - 最终用的 --holdout-s，哪些场景是 val、哪些 drop 及原因；
 - 你看 split_check.png 的结论：两份录制的路线是否有重合，在哪里；
+- 每步耗时。
+```
+
+### 5.4 第四轮：位姿融合（0921 两份数据，接在 5.3 之前做）
+
+```text
+任务：用激光里程计 + RTK 融合修正 0921 所有序列的位姿，并用新的 shift 检查对比修正前后。不重转 bag，不进入第 4 步。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，再 pip install -r requirements_dog.txt（新增 kiss-icp），
+所有命令在仓库根目录执行，export PYTHONPATH=.。
+
+1. 修正前的基线（新版预览多了 shift 检查）：
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_165659_s*" --out data/preview/0921_165659_ins
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_164127_s*" --out data/preview/0921_164127_ins
+2. 融合（docs/BAG_SPLIT.md 3.5 节），记下打印的整张表：
+   python tools/dog/refine_poses.py --seq data/seq/0921_* --plots data/preview/poses
+3. 修正后的预览：
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_165659_s*" --out data/preview/0921_165659
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_164127_s*" --out data/preview/0921_164127
+4. 看图：data/preview/poses/ 里修正量最大的 3 个场景，以及修正后 shift_p90_m 仍然最高的 3 个场景的预览 PNG。
+5. 提交 data/preview（含 poses 和 *_ins 目录），推送到 claude/me/v01。不要提交 data/seq。
+   如果 refine_poses.py 报错或某个场景 LO 1s p90 > 0.5 m，不要改参数重跑，记下来报告。
+
+最后报告：
+- refine_poses.py 打印的整张表，以及所有 "pose bad" 行（不可靠时段）；
+- 每个场景修正前后的 shift_p90_m 和 status（两份 checks.csv 对比），以及修正后 shift_p90_m > 0.2 m 的场景；
+- 第 4 步看图的结论（修正后的轨迹是否平滑、地图里的墙和杆是否更清晰）；
 - 每步耗时。
 ```

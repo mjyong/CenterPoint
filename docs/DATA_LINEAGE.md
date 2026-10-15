@@ -25,8 +25,8 @@ data/survey/<录制>/  survey.json  survey.png  segments.csv（场景切分表�
   │ ② rosbag_to_sequence.py    一遍读完，按场景写序列
   ▼
 data/seq/<场景>/     meta.json  scans/*.npz  imu.npy  odom.npy
-  │ ③ sequence_preview / sequence_meta / time_offset_check / split_check
-  │                            只检查或改 meta.json，不动点云
+  │ ③ sequence_preview / sequence_meta / time_offset_check / split_check / refine_poses
+  │                            只检查或改 meta.json 和位姿（odom.npy），不动点云
   ▼
 data/preview/  data/survey/split/split.csv
   │ ④ run_sequence.py          预处理（与线上一致）+ 教师模型（Voxel + TTA）
@@ -74,6 +74,7 @@ mindmap
       sequence_meta 离地高度和时间偏移
       time_offset_check 时间差
       split_check 训练验证划分
+      refine_poses 激光里程计加 RTK 融合位姿
     预处理和教师 run_sequence
       frames npy 检测系点云
       results.pkl 教师检测
@@ -105,6 +106,10 @@ mindmap
 | W | 世界系 | ENU（东、北、天），原点是这份录制第一个 `ins_status = 3` 的定位点；同一录制的所有场景共用这个原点 | `odom.npy`、跟踪、地图 |
 | D | 检测系 | 重力对齐，航向跟机身，原点在机身正下方的地面（机身原点下移 `base_height`），再用近处地面在线修正高度和倾斜（`auto_ground` / `auto_level`） | 预处理输出、教师检测、标签、审核 |
 | M | 网络系 | 虚拟 nuScenes 雷达：`x_M = Rz(+90°)·x_D`，`z_M = z_D − 1.84 m`，以沿用 nuScenes 预训练模型的 z 先验 | 训练数据集、网络输入输出 |
+
+**kygi 的前进方向是 D 系的 +y，不是 +x**：INSPVAX 的机身系约定（`yaw = 180° − azimuth`）让机身 x 轴指向狗的侧面。运动样例里，速度方向和 D 系 x 轴正好差 90.2°。所以进入 M 系后，前进方向是 −x_M，而 nuScenes 训练时是 +y_M，相当于整个场景转了 90°。
+- 在 nuScenes mini_val（81 个关键帧）上把场景同样转 90° 再送进 nuScenes Pillar 模型：mAP 从 0.663 降到 0.650（车辆 0.700→0.692，行人 0.790→0.783，骑行者 0.498→0.475），车辆朝向误差从 0.27 rad 增加到 0.34 rad。
+- 影响很小，微调后的模型又是按 kygi 的这个映射训练和部署的，所以**不改**。如果要改，教师推理、`export_dataset.py` 和线上节点的 `ModelFrame` 必须一起改。
 
 框在 D 系里统一写成 `[x, y, z, l, w, h, yaw]`：中心点、长宽高、yaw 从 +x 逆时针。进入训练集时改成 det3d 格式 `[x, y, z, w, l, h, vx, vy, r]`，其中 `r = −yaw − π/2`。
 
@@ -183,7 +188,9 @@ mindmap
 - 实测 56 时的位置标准差是 1.3 cm，是固定解的精度，所以按 56 = 固定解处理是对的，是消息文件的常量名写反了。
 - 0921 那份长 bag 里，56 占 93%，其余是 54（4399 条）、52（1341 条）、55（359 条）。
 
-**已知问题**：狗急停时，INS 报的速度会冲过头，位置每约 0.2 s 被往回拉一次，最多拉回 0.33 m（运动样例 bag 的最后 1 s）。预览里的 `ins_step_m` 就是用来量这个的。
+**已知问题**：狗急停时，INS 报的速度会冲过头（2.5 m/s），位置跑到真实位置前面约 0.45 m，并保持 1 秒以上；随后位置每约 0.2 s 被往回拉一次（最多 0.33 m），但没拉够（运动样例 bag 的最后 1 s）。
+- 预览里的 `ins_step_m` 量的是往回拉的跳变，`shift_p90_m` 用激光配准量位姿误差本身；
+- 修正方法见第 4 节的 `refine_poses.py`。
 
 ---
 
@@ -251,7 +258,8 @@ mindmap
 |---|---|---|
 | `scans/000000.npz` … | 每帧一个 | `xyz` (N,3) float32，雷达系 L；`intensity` (N,) float32，0–255；`t` (N,) float64，每个点的绝对时间；`stamp` float64，扫描结束时刻 |
 | `imu.npy` | (M,4) float64 | `t, wx, wy, wz`：机身系角速度，rad/s |
-| `odom.npy` | (K,11) float64 | `t, x, y, z, qx, qy, qz, qw, vx, vy, vz`：W 系里的位置（ENU，m）、姿态（只有航向）、速度（东、北、天，m/s） |
+| `odom.npy` | (K,11) float64 | `t, x, y, z, qx, qy, qz, qw, vx, vy, vz`：W 系里的位置（ENU，m）、姿态（只有航向）、速度（东、北、天，m/s）。跑过 `refine_poses.py` 后，东、北坐标和速度换成融合后的值 |
+| `odom_ins.npy` | (K,11) float64 | 只在跑过 `refine_poses.py` 后存在：融合前的 INS 原始数据，同样格式，是以后每次融合的输入 |
 | `meta.json` | JSON | 见下表。**最后写**，目录里没有它说明这个场景没写完 |
 
 `meta.json` 的字段：
@@ -267,6 +275,8 @@ mindmap
 | `det_frame` | 转换器 | kygi 是 `{"auto_ground": true, "auto_level": true}`：检测系用近处地面在线修正高度和倾斜 |
 | `segment` | 转换器 / `split_check.py` | `name, t_start, t_end, split`；`split_check.py --apply` 会改 `split`，体检给的原值存在 `split_survey` |
 | `lidar_time_offset` | `sequence_meta.py`（可选） | 读取时加到所有雷达时间上的秒数，用来把雷达时钟对齐到 INS 时钟，默认 0 |
+| `pose_source` | `refine_poses.py` | 没有这个字段表示用的是 INS 位姿；`kiss-icp+ins` 表示激光里程计 + RTK 融合 |
+| `pose_refine` | `refine_poses.py` | 修正量（中位、p90、最大）、INS 不可信的时间占比、不可靠时段 `bad_intervals`（这些帧不要标注）、未验证时段 `unverified_intervals`、可信段里激光 1 s 位移和 INS 的差，以及所用参数 |
 | `lidar` `source` | 转换器 | `XT32`、来源 bag 的路径 |
 
 体积：一帧在 bag 里 3.17 MB，压缩成 npz 后约 0.6 MB。
@@ -275,11 +285,12 @@ mindmap
 
 ## 4. ③ 检查与修正（不动点云）
 
-这一步的工具只读序列，最多改 `meta.json`。点云、IMU、定位文件不变。
+这一步的工具只读序列，最多改 `meta.json`；`refine_poses.py` 还会改 `odom.npy`（INS 原始数据另存为 `odom_ins.npy`）。点云和 IMU 文件不变。
 
 | 脚本 | 读 | 写 | 改了什么数据 |
 |---|---|---|---|
-| `sequence_preview.py` | 序列（每 5 帧做一次和线上一样的预处理） | `data/preview/<录制>/`：每个场景一张 PNG，`checks.csv` / `checks.json`，`index.html` | 不改。检查项：帧间错位 `align_m`、地面高度 `ground_z_m`、倾斜 `tilt_deg`、各话题最大间隔、`rtk`、INS 位置跳变 `ins_step_m` |
+| `sequence_preview.py` | 序列（每 5 帧做一次和线上一样的预处理） | `data/preview/<录制>/`：每个场景一张 PNG，`checks.csv` / `checks.json`，`index.html` | 不改。检查项：帧间错位 `align_m`；激光测出的相隔 1 s 两帧的位姿误差 `shift_p90_m`（沿行进方向的误差也能测出）；地面高度 `ground_z_m`；倾斜 `tilt_deg`；各话题最大间隔；`rtk`；INS 位置跳变 `ins_step_m` |
+| `refine_poses.py` | 序列的 `scans/`、`odom.npy`（或已有的 `odom_ins.npy`） | `odom.npy`、`odom_ins.npy`；`--plots` 时每个场景一张轨迹和修正量图 | KISS-ICP 激光里程计与 RTK 融合：INS 可信时由 INS 定住轨迹、激光补帧与帧之间的运动；INS 不可信时（急停）由激光把两端可信的 INS 连起来。改 `odom.npy` 的东、北坐标和速度，`meta.json` 加 `pose_source`、`pose_refine` |
 | `sequence_meta.py` | `meta.json`，每 10 帧一个 `scans/*.npz` | `meta.json` | `base_height`（多帧中位数或给定值）、`base_height_sweeps`、`base_height_first_sweep`、`lidar_time_offset` |
 | `time_offset_check.py` | 有转弯的序列 | `time_offset.csv/json`、每个场景一张 PNG | 不改。在转弯处扫描雷达时间偏移，给出建议值；确认后用 `sequence_meta.py` 写入 |
 | `split_check.py` | 所有序列的 `meta.json` 和 `odom.npy` | `data/survey/split/`：`split_check.csv/json/png`；加 `--apply` 后还写 `split.csv` | 加 `--apply` 时改 `meta.json` 的 `segment.split`（`train` / `val` / `drop`），原值存进 `split_survey` |

@@ -17,6 +17,12 @@ gravity / ground levelling, sweep stacking) and is checked:
   only because the view changes. Above 0.1 m look at the map, above 0.2 m the frames do not
   line up. A constant lidar-INS time offset while driving straight shifts all frames alike and
   is not caught here; turns and speed changes show it.
+* shift: for frames about 1 s apart, the translation that best overlays the points 0.3-3 m above
+  the ground (walls, poles, trees, cars) of one onto the other in the world frame (2-D search,
+  +-0.8 m). It is the position error between the two poses as the lidar sees it, along the
+  direction of travel too, which the alignment above misses: a wall parallel to the path still
+  matches when a frame slides along it. Moving sample bag: p90 0.55 m with the INS poses (it runs
+  ~0.45 m ahead while braking), 0.14 m after tools/dog/refine_poses.py.
 * ground: in the detection frame the ground has to be at z = 0 and level: height of the ground
   (10th percentile of z per 2 m cell, 3-12 m away) and the tilt of a plane fitted to it (sloped
   terrain counts too, so a few degrees can be the place, not the levelling).
@@ -46,7 +52,7 @@ from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
 from dog_perception.preprocess import DetFrameConfig, PreprocessConfig  # noqa: E402
 
 # (ok_max, warn_max) per check; above warn_max is FAIL
-LIMITS = dict(align_m=(0.10, 0.20), ground_z_m=(0.10, 0.20), tilt_deg=(2.0, 4.0), lidar_gap_s=(0.2, 0.5),
+LIMITS = dict(align_m=(0.10, 0.20), shift_p90_m=(0.20, 0.40), ground_z_m=(0.10, 0.20), tilt_deg=(2.0, 4.0), lidar_gap_s=(0.2, 0.5),
               imu_gap_s=(0.05, 0.2), odom_gap_s=(0.1, 0.5), ins_step_m=(0.15, 0.5))
 XY_RANGE = 40.8
 
@@ -113,6 +119,33 @@ def structure_xy(frame, cell=0.4, min_extent=0.6):
     return w[:, :2]
 
 
+def scene_xy(frame, cell=0.05):
+    """Current-sweep points 0.3-3 m above the ground and 1.5-30 m away, world frame, one per 5 cm
+    cell, (M, 2): walls, poles, trees and cars, for registration."""
+    p = frame.points[frame.points[:, 4] <= 1e-6]
+    r = np.hypot(p[:, 0], p[:, 1])
+    p = p[(p[:, 2] > 0.3) & (p[:, 2] < 3.0) & (r > 1.5) & (r < 30)]
+    w = p[:, :3] @ frame.T_world_det[:3, :3].T + frame.T_world_det[:3, 3]
+    k = np.unique(np.floor(w[:, :2] / cell).astype(np.int64), axis=0, return_index=True)[1]
+    return w[k, :2]
+
+
+def pose_shift(a, b, rng, n=2000, span=0.8):
+    """Length [m] of the translation that best overlays ``b`` onto ``a`` (coarse 0.1 m grid over
+    +-``span``, then 0.02 m): the position error between the two frames' poses as the lidar sees it."""
+    from scipy.spatial import cKDTree
+    if len(a) < 100 or len(b) < 100:
+        return np.nan
+    tree = cKDTree(a)
+    q = b[rng.choice(len(b), min(len(b), n), replace=False)]
+    cost = lambda dx, dy: float(np.mean(np.minimum(tree.query(q + (dx, dy))[0], 0.4)))   # noqa: E731
+    g = np.arange(-span, span + 1e-9, 0.1)
+    _, bx, by = min((cost(x, y), x, y) for x in g for y in g)
+    h = np.arange(-0.08, 0.08 + 1e-9, 0.02)
+    _, bx, by = min((cost(bx + x, by + y), bx + x, by + y) for x in h for y in h)
+    return float(np.hypot(bx, by))
+
+
 def align_residual(a, b, rng):
     from scipy.spatial import cKDTree
     if len(a) < 50 or len(b) < 50:
@@ -164,6 +197,13 @@ def check_sequence(seq_dir, every, rng):
         if j < len(frames) and t[j] - t[i] < 1.0:
             res.append(align_residual(xy[i], xy[j], rng))
             res_t.append(t[i])
+    sxy = [scene_xy(f) for f in frames]
+    shift, shift_t = [], []
+    for i in range(len(frames)):
+        j = np.searchsorted(t, t[i] + 0.95)
+        if j < len(frames) and t[j] - t[i] < 1.5:
+            shift.append(pose_shift(sxy[i], sxy[j], rng))
+            shift_t.append(t[i])
     gap = lambda x: float(np.max(np.diff(x))) if len(x) > 1 else np.nan   # noqa: E731
     rate = lambda x: float((len(x) - 1) / (x[-1] - x[0])) if len(x) > 1 and x[-1] > x[0] else np.nan   # noqa: E731
     od = rd.odom
@@ -179,6 +219,9 @@ def check_sequence(seq_dir, every, rng):
              base_height=meta.get("base_height"), frames_checked=len(frames),
              align_m=float(np.nanmedian(res)) if res and np.isfinite(res).any() else np.nan,
              align_p90_m=float(np.nanpercentile(res, 90)) if res and np.isfinite(res).any() else np.nan,
+             shift_m=float(np.nanmedian(shift)) if shift and np.isfinite(shift).any() else np.nan,
+             shift_p90_m=float(np.nanpercentile(shift, 90)) if shift and np.isfinite(shift).any() else np.nan,
+             pose_source=meta.get("pose_source", "ins"),
              ground_z_m=float(np.nanmedian(gz)) if len(gz) else np.nan,
              tilt_deg=float(np.nanmedian(tilt)) if len(tilt) else np.nan,
              ins_step_m=float(steps.max()) if len(steps) else np.nan,
@@ -190,7 +233,7 @@ def check_sequence(seq_dir, every, rng):
     c["status"] = max(status.values(), key=lambda s: order[s])
     c["problems"] = " ".join("%s=%s" % (k, v) for k, v in status.items() if v in ("WARN", "FAIL"))
     return c, dict(frames=frames, xy=xy, mid=mid_frame, stamps=stamps, odom=od, speed=speed, res=res, res_t=res_t,
-                   gz=gz, tilt=tilt, step_t=step_t, steps=steps)
+                   gz=gz, tilt=tilt, step_t=step_t, steps=steps, shift=shift, shift_t=shift_t)
 
 
 def draw(path, c, d):
@@ -249,6 +292,8 @@ def draw(path, c, d):
         ax3.plot(od[:, 0] - t0, d["speed"], lw=0.8, label="speed [m/s]")
     if d["res"]:
         ax3.plot(np.array(d["res_t"]) - t0, d["res"], "o-", ms=3, lw=0.8, label="alignment [m]")
+    if d["shift"]:
+        ax3.plot(np.array(d["shift_t"]) - t0, d["shift"], "s-", ms=3, lw=0.8, c="C4", label="shift 1 s [m]")
     big = d["steps"] > 0.05
     if big.any():
         ax3.plot(d["step_t"][big] - t0, d["steps"][big], "v", c="C3", ms=4, label="INS position step [m]")
@@ -270,6 +315,7 @@ def draw(path, c, d):
                                                                   c["odom_hz"]),
         "pos_type %s, base height %.2f m" % (c["pos_type"] or "-", c["base_height"] or np.nan),
         "alignment %.3f m (p90 %.3f)" % (c["align_m"], c["align_p90_m"]),
+        "shift %.3f m (p90 %.3f), poses: %s" % (c["shift_m"], c["shift_p90_m"], c["pose_source"]),
         "ground z %.3f m, tilt %.2f deg" % (c["ground_z_m"], c["tilt_deg"]),
         "INS position steps: max %.2f m, %d over 0.1 m" % (c["ins_step_m"], c["ins_steps_over_10cm"]),
         "problems: %s" % (c["problems"] or "none")]
@@ -281,7 +327,7 @@ def draw(path, c, d):
 
 
 INDEX_COLUMNS = ["name", "status", "split", "scans", "duration_s", "path_m", "mean_speed", "pos_type", "align_m",
-                 "ground_z_m", "tilt_deg", "ins_step_m", "lidar_gap_s", "problems"]
+                 "shift_p90_m", "ground_z_m", "tilt_deg", "ins_step_m", "pose_source", "lidar_gap_s", "problems"]
 
 
 def write_index(out, rows):
@@ -323,9 +369,10 @@ def main():
         c, data = check_sequence(d, args.every, rng)
         draw(os.path.join(args.out, c["name"] + ".png"), c, data)
         rows.append(c)
-        print("%-40s %-4s %4d scans %6.1f s  align %.3f m  ground %.3f m  tilt %.2f deg  INS step %.2f m  %s" % (
-            c["name"], c["status"], c["scans"], c["duration_s"], c["align_m"], c["ground_z_m"], c["tilt_deg"],
-            c["ins_step_m"], c["problems"]), flush=True)
+        print("%-40s %-4s %4d scans %6.1f s  align %.3f m  shift p90 %.2f m  ground %.3f m  tilt %.2f deg  "
+              "INS step %.2f m  %s" % (c["name"], c["status"], c["scans"], c["duration_s"], c["align_m"],
+                                       c["shift_p90_m"], c["ground_z_m"], c["tilt_deg"], c["ins_step_m"],
+                                       c["problems"]), flush=True)
     write_index(args.out, rows)
     with open(os.path.join(args.out, "checks.json"), "w") as f:
         json.dump(rows, f, indent=1, default=float)

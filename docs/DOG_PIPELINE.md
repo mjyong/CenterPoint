@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（85 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（88 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -191,6 +191,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/bag_survey.py`, `sequence_preview.py` | 长 bag 体检、切场景（`segments.csv`）；转换后的序列逐个做可视化和数值检查，含 INS 位置跳变（[BAG_SPLIT.md](BAG_SPLIT.md)） |
 | `tools/dog/sequence_meta.py` | 不重转 bag，修正序列 `meta.json` 里的离地高度（多帧中位数或给定值）和雷达时间偏移 |
 | `tools/dog/time_offset_check.py` | 在转弯处测雷达和 INS 之间的时间差；仿真里能准确找回注入的 50 ms 偏差 |
+| `tools/dog/refine_poses.py` | KISS-ICP 激光里程计与 RTK 融合位姿：急停时 INS 超前约 0.45 m，由激光把两端可信的 INS 连起来；改写 `odom.npy`（原始的存为 `odom_ins.npy`）。验证用预览的 `shift` 检查（[BAG_SPLIT.md](BAG_SPLIT.md) 3.5 节） |
 | `tools/dog/split_check.py` | 多份录制的训练 / 验证划分：去掉静止的验证场景，从训练录制里留出离其余路线最远的一段做验证，按路线 10 m 内的重叠去掉代价小的一方；输出地图和 `split.csv` |
 | `tools/dog/run_sequence.py` | 录制数据回放，Pillar/Voxel 并行跑，输出结果、跟踪日志和帧数据 |
 | `tools/dog/auto_label.py`, `export_dataset.py` | 教师自动标注，导出为 DogDataset 并建 GT 库 |
@@ -342,6 +343,7 @@ python -m pytest tests/dog -q
 - **没有真实 XT32 数据和 nuScenes 预训练权重**（官方权重托管在 OneDrive，本环境无法下载）。所有检测相关的数字只验证了管线和一致性，Pillar 与 Voxel 的精度和延迟对比需要在你的机器上用步骤 1–2 实测。
 - 检测封装里的 Voxel 前向需要 CUDA 版 spconv（CPU 版 spconv 不支持带 bias 的卷积）。本环境只用 `profile_detector.py` 的 CPU 绕行办法跑通过前向，实测了逐层 shape 和计算量（[CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)），没有 GPU 上的耗时拆分。
 - 本环境没有 ROS，`ros2_node.py` 没有在真实 ROS 下运行过。`tests/dog/test_ros2_node.py` 用替身代替 rclpy 和消息包，把运动样例 bag 按到达顺序回放进 `robot:=kygi` 的节点，结果与训练序列的检测系点云逐帧一致。27 帧里有 20 帧中位差 < 5 mm；其余几帧差几厘米，因为 INS 位置正好在那时跳变：节点在线做插值，回放序列时只能外推。bag 转换器已用合成的 ROS2 bag 测试。
+- kygi 数据里狗沿检测系 +y 前进（INSPVAX 机身系的约定），进入网络系后相对 nuScenes 的习惯朝向转了 90°。在 nuScenes mini_val 上同样转 90°，预训练 Pillar 的 mAP 只从 0.663 降到 0.650，所以没有改；详见 [DATA_LINEAGE.md](DATA_LINEAGE.md) 的坐标系一节。
 - 本环境没有 Orin 和 TensorRT。导出的 ONNX 只用 onnxruntime 验证过；TensorRT 引擎的构建、FP16 精度和板上延迟都要在 Orin 上确认（第 8 节）。
 - 预处理、跟踪和预测是 Python 参考实现。在 x86 上实测，网络以外的部分合计约 90 ms（见 [DOG_DATAFLOW.md](DOG_DATAFLOW.md) 第 5 节）。Orin 的 ARM 核会更慢，所以上板时预处理必须搬到 GPU，见 8.3。
 - 仿真中的目标没有社交交互，所以第二档在真实数据上的收益（主要来自对机器人的避让等交互）需要用实车日志重新评估。

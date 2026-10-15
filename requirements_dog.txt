@@ -14,6 +14,7 @@ tqdm
 nuscenes-devkit
 # optional tools
 rosbags          # tools/dog/rosbag_to_sequence.py (no ROS install needed)
+kiss-icp         # tools/dog/refine_poses.py (lidar odometry fused with the RTK INS)
 onnx
 onnxruntime      # tools/dog/export_pillar_onnx.py --check
 matplotlib       # tools/dog/run_sim_demo.py --plot
