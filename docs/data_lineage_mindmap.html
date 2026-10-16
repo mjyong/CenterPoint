@@ -191,7 +191,7 @@ const TREE = {
         T("处理", "`sequence_meta.py` 改 base_height、lidar_time_offset", "不重转 bag：离地高度改成多帧中位数或给定值（旧值留在 base_height_first_sweep）；写入雷达时间偏移，读取时加到所有雷达时间上。"),
         T("处理", "`time_offset_check.py` 测时间差", "只在角速度变化的转弯处才看得出时间差：把雷达时间平移 −0.15…+0.15 s，取帧间错位最小的偏移。仿真里注入 50 ms，能准确找回。"),
         T("输出", "`split_check.py` → split.csv", "统一划分训练 / 验证：去掉静止的验证场景；从训练录制里留出离其余路线最远的一段做验证，两侧各丢一个缓冲；路线 10 m 内重叠时丢代价小的一方。--apply 才写 split.csv 和 meta 的 segment.split。"),
-        T("处理", "`refine_poses.py`：激光里程计 + RTK 融合位姿", "KISS-ICP 给出帧与帧之间的运动；INS 可信时由它定住轨迹，急停等不可信时由激光把两端可信的 INS 连起来；连不上的时段记为不可靠，不要标注。改写 odom.npy 的东北坐标和速度，原始 INS 存为 odom_ins.npy，meta 加 pose_source、pose_refine。运动样例 bag 上 1 s 帧对的位姿误差 p90 从 0.55 m 降到 0.14 m。"),
+        T("处理", "`refine_poses.py`：激光里程计 + RTK 融合位姿", "KISS-ICP（陀螺提供旋转先验）给出帧与帧之间的运动。两者都健康时激光管局部、INS 只消慢漂移；INS 不可信（急停）时由激光接管，激光不可信（转弯时来回跳、沿墙停住）时由 INS 接管；都不可信的时段记为不可靠，不要标注。改写 odom.npy 的东北坐标和速度，原始 INS 存为 odom_ins.npy，meta 加 pose_source、pose_refine。运动样例 bag 上 1 s 帧对的位姿误差 p90 从 0.55 m 降到 0.14 m。"),
       ] },
     { side: "R", f: "label", k: "stage", t: "④ 预处理 + 教师", s: "run_sequence.py",
       d: "把每帧点云处理成检测器的输入（和线上节点同一份代码），再用教师模型检测。",

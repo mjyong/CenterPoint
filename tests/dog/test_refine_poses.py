@@ -56,7 +56,7 @@ def test_fuse_bridges_braking_error():
     xy, corr, info, diag = refine_poses.fuse(stamps, poses, odom)
     e = np.linalg.norm(xy - truth, axis=1)
     assert ins_err.max() > 0.49 and corr.max() > 0.4
-    assert e.max() < 0.06, e.round(3)
+    assert e.max() < 0.1, e.round(3)              # the odometry drifts 2 %; the INS only removes it slowly
     assert info["bad_intervals"] == [] and 0.2 < info["ins_unhealthy_share"] < 0.5
     out = refine_poses.refined_odom(odom, stamps, xy)                # 100 Hz rows, heading untouched
     assert out.shape == odom.shape and np.array_equal(out[:, 3:8], odom[:, 3:8])
@@ -73,7 +73,42 @@ def test_fuse_keeps_good_odometry_while_the_ins_jumps():
     odom[:, 1] = 1.2 * t + saw                                    # truth along x plus the sawtooth only
     xy, corr, info, diag = refine_poses.fuse(stamps, poses, odom)
     e = np.linalg.norm(xy - truth, axis=1)
-    assert info["lo_steps_rejected"] == 0 and e.max() < 0.06, (info["lo_steps_rejected"], e.round(3))
+    assert info["lo_steps_rejected"] == 0 and e.max() < 0.1, (info["lo_steps_rejected"], e.round(3))
+
+
+def _lo_poses(xy):
+    poses = np.repeat(np.eye(4)[None], len(xy), axis=0)
+    poses[:, :2, 3] = xy[:, :2] - xy[0, :2]
+    return poses
+
+
+def test_fuse_lets_a_healthy_ins_carry_bad_odometry():
+    """KISS-ICP jumps back and forth when a turn starts or stops (0921: 53 % of the steps above
+    60 deg/s yaw rate) and can stall along a featureless wall. Where the INS is healthy it takes
+    over those stretches."""
+    stamps, poses, odom, truth, _ = _synthetic()
+    t = odom[:, 0]
+    odom = odom.copy()
+    odom[:, 1] = 1.2 * t                                          # INS healthy everywhere
+    lo = poses[:, :3, 3].copy()
+    lo[:, :2] += truth[0]
+    zig = (stamps > 4.0) & (stamps < 5.0)
+    lo[zig, 1] += np.where(np.arange(zig.sum()) % 2, 0.4, -0.4)   # +-0.4 m back and forth
+    stall = stamps > 5.5
+    lo[stall, 0] = lo[np.argmax(stall), 0]                         # sees no motion along x
+    xy, corr, info, diag = refine_poses.fuse(stamps, _lo_poses(lo), odom)
+    e = np.linalg.norm(xy - truth, axis=1)
+    assert info["ins_unhealthy_share"] == 0 and info["lo_unhealthy_share"] > 0.3
+    assert e.max() < 0.15 and info["bad_intervals"] == [], (e.round(3), info["bad_intervals"])
+
+
+def test_gyro_rotation_integrates_the_body_rates():
+    from dog_perception.geometry import so3_log
+    t = np.arange(0.0, 1.0, 0.01)
+    imu = np.column_stack([t, np.full_like(t, 0.1), np.zeros_like(t), np.full_like(t, 0.5)])
+    rv = so3_log(refine_poses.gyro_rotation(imu, 0.2, 0.3))
+    assert np.allclose(rv, [0.01, 0.0, 0.05], atol=1e-6)
+    assert np.allclose(refine_poses.gyro_rotation(np.zeros((0, 4)), 0.0, 0.1), np.eye(3))
 
 
 def test_fuse_reports_a_stalled_odometry():

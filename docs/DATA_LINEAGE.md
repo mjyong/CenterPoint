@@ -290,7 +290,7 @@ mindmap
 | 脚本 | 读 | 写 | 改了什么数据 |
 |---|---|---|---|
 | `sequence_preview.py` | 序列（每 5 帧做一次和线上一样的预处理） | `data/preview/<录制>/`：每个场景一张 PNG，`checks.csv` / `checks.json`，`index.html` | 不改。检查项：帧间错位 `align_m`；激光测出的相隔 1 s 两帧的位姿误差 `shift_p90_m`（沿行进方向的误差也能测出）；地面高度 `ground_z_m`；倾斜 `tilt_deg`；各话题最大间隔；`rtk`；INS 位置跳变 `ins_step_m` |
-| `refine_poses.py` | 序列的 `scans/`、`odom.npy`（或已有的 `odom_ins.npy`） | `odom.npy`、`odom_ins.npy`；`--plots` 时每个场景一张轨迹和修正量图 | KISS-ICP 激光里程计与 RTK 融合：INS 可信时由 INS 定住轨迹、激光补帧与帧之间的运动；INS 不可信时（急停）由激光把两端可信的 INS 连起来。改 `odom.npy` 的东、北坐标和速度，`meta.json` 加 `pose_source`、`pose_refine` |
+| `refine_poses.py` | 序列的 `scans/`、`odom.npy`（或已有的 `odom_ins.npy`） | `odom.npy`、`odom_ins.npy`；`--plots` 时每个场景一张轨迹和修正量图 | KISS-ICP 激光里程计（陀螺提供旋转先验）与 RTK 融合：两者都健康时激光管帧与帧之间的运动、INS 只消除慢漂移；INS 不可信时（急停）由激光接管，激光不可信时（转弯时来回跳、沿墙停住）由 INS 接管；都不可信时标为不可靠。改 `odom.npy` 的东、北坐标和速度，`meta.json` 加 `pose_source`、`pose_refine` |
 | `sequence_meta.py` | `meta.json`，每 10 帧一个 `scans/*.npz` | `meta.json` | `base_height`（多帧中位数或给定值）、`base_height_sweeps`、`base_height_first_sweep`、`lidar_time_offset` |
 | `time_offset_check.py` | 有转弯的序列 | `time_offset.csv/json`、每个场景一张 PNG | 不改。在转弯处扫描雷达时间偏移，给出建议值；确认后用 `sequence_meta.py` 写入 |
 | `split_check.py` | 所有序列的 `meta.json` 和 `odom.npy` | `data/survey/split/`：`split_check.csv/json/png`；加 `--apply` 后还写 `split.csv` | 加 `--apply` 时改 `meta.json` 的 `segment.split`（`train` / `val` / `drop`），原值存进 `split_survey` |

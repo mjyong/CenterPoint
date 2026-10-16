@@ -246,6 +246,18 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 - 找到的一个原因：激光步是否失效，原来是和 INS 的位置步长比的。但 INS 不可信时，它的位置正在往回跳（最多 0.45 m），结果正常的激光步被拒掉，换成了带跳变的 INS 步长。
 - 已改为：激光步和 INS 速度积分、以及前后几步的激光自己**都**对不上，才算失效；替换时用 INS 速度积分。见 `test_fuse_keeps_good_odometry_while_the_ins_jumps`。
 
+**0921 第二次融合（5.5）**：
+- 三种位姿各自打分后，结论很清楚：纯激光里程计（`shift_lo`）在局部一致性上明显好于 INS 和融合结果。例如 s008 三者分别是 0.48 / 0.12 / 0.32 m，s028 是 0.59 / 0.11 / 0.37 m，164127_s003 是 0.34 / 0.10 / 0.34 m。
+- 融合结果被 INS 拉坏了：INS 即使在自身一致（"健康"）的时段，1 s 尺度上也有 0.2–0.9 m 的误差。
+- 激光里程计本身也有问题，但这是 `shift`（每 10 帧取一对）看不全的：s011 的激光路程 105.6 m，而 INS 只有 36.8 m。激光的单步在 0.5–1 m 之间来回跳。跳的比例随偏航角速度上升：< 5°/s 时 4%，> 60°/s 时 53%。这是 KISS-ICP 用上一帧运动来预测下一帧时，在转弯开始和停止时会出的问题。
+
+**第三版（当前）**：
+- KISS-ICP 的旋转预测改用两帧之间的陀螺积分（`--prior imu`）。样例 bag 上，激光估出的每帧偏航和陀螺积分的相关系数从 0.89 升到 0.99。
+- 给两个来源各自做健康判定（`lo_health`）：激光不能有超过 3.5 m/s 的跳步、不能来回锯齿、在健康 INS 显示正在走时不能停住。
+- 两者都健康时，INS 只用来消除激光的慢漂移（σ_ins = 1 m，时间常数约 5 s）；激光不健康时由 INS 接管；两者都不健康时标为不可靠。
+- 闭合检查失败的 INS 缺口，激光也降权后重新求解，避免错误扩散到前后健康的轨迹上。
+- 样例 bag：1 s 帧对 p90 0.13 m，2 s 帧对 0.14 m。合成数据覆盖急停、锯齿跳变、激光来回跳、激光停住几种情况，见 `tests/dog/test_refine_poses.py`。
+
 **预览的 `shift` 检查**：对相隔约 1 s 的两帧，取离地 0.3–3 m 的点（墙、杆、树、车），在 ±0.8 m 范围内做二维搜索，找到把一帧叠到另一帧上最合适的平移量。这就是激光看到的两帧位姿误差，沿行进方向的误差也能测出来。状态按 p90 判定：≤ 0.20 m 为 OK，≤ 0.40 m 为 WARN，更大为 FAIL。运动样例 bag 用 INS 位姿时是 0.51 m（FAIL），融合后是 0.12 m（OK）。
 
 ## 4. 之后：教师推理 + 自动标注（批量）
@@ -437,5 +449,25 @@ s005 也基本没动（0.27），有效验证只有约 100 s；两份录制是�
 - refine_poses.py 打印的整张表（含 "LO rej" 和 "shift p90 ins / lo / fused" 两列）和所有 "pose bad" 行；
 - shift_lo_p90 > 0.2 m 的场景（激光里程计本身不行），以及 fused 比 lo 差 0.05 m 以上的场景；
 - 预览里每个场景 shift_p90_m 和 status，与上一轮（5.4）对比；
+- 每步耗时。
+```
+
+### 5.6 第六轮：第三版融合（陀螺先验 + 双向健康判定）
+
+```text
+任务：用第三版 refine_poses.py 重新融合 0921 所有序列，提交诊断文件。不重转 bag，不进入第 4 步。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+
+1. 重新融合（输入自动取 odom_ins.npy），记下打印的整张表（新增 "LO bad" 和 "LO/INS path" 两列）：
+   python tools/dog/refine_poses.py --seq data/seq/0921_* --plots data/preview/poses
+2. 重跑预览：
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_165659_s*" --out data/preview/0921_165659
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_164127_s*" --out data/preview/0921_164127
+3. 提交 data/preview/poses（PNG、*_diag.npz、refine_summary.csv）和两个预览目录，推送到 claude/me/v01。
+   不要提交 data/seq。
+
+最后报告：
+- refine_poses.py 打印的整张表和所有 "pose bad" 行；
+- 预览里每个场景的 shift_p90_m 和 status，与上一轮（5.5）对比；
 - 每步耗时。
 ```
