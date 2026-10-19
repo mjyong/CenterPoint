@@ -43,14 +43,16 @@ How, per sequence:
    replaced), so the miss is absorbed inside the gap; such gaps and stretches where neither
    source is healthy are listed as bad in meta.json (do not label those frames). Gaps touching
    the start or end cannot be checked and are listed as unverified.
-5. Output: odom.npy keeps the INS rows (100 Hz times, heading-only attitude, height), at the body
-   origin, with east / north and the heading replaced by the fused ones (linear between scan stamps, so the
+5. Tilt (``--tilt lo``): the body roll / pitch from the odometry against the median body up of the
+   sequence (``lo_tilt``); the det frame's ``auto_level`` only has to remove what stays constant.
+6. Output: odom.npy keeps the INS rows (100 Hz times, height), at the body origin, with east /
+   north, the heading and the tilt replaced by the fused ones (linear between scan stamps, so the
    IMU propagation and deskew work exactly as before) and the velocity by its derivative. The INS
    original is kept once as odom_ins.npy and is always the input, so re-running is safe.
    meta.json gets ``pose_source = "kiss-icp+ins"`` and ``pose_refine`` (correction statistics,
    heading correction, health shares, lever arm, bad and unverified intervals, the per-source pose
    checks).
-6. With ``--plots``: per sequence a plot (trajectory; correction and health; the lidar shift
+7. With ``--plots``: per sequence a plot (trajectory; correction and health; the lidar shift
    check for INS / odometry / fused poses) and ``<seq>_diag.npz``; ``refine_summary.csv`` over all.
 
 Check the result with tools/dog/sequence_preview.py: its ``shift_p90_m`` (the lidar-measured
@@ -66,7 +68,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))          # sequence_preview (pose checks)
 
-from dog_perception.geometry import make_T, quat_to_R, rot_z, so3_exp, transform_points, yaw_of  # noqa: E402
+from dog_perception.geometry import make_T, quat_to_R, rot_z, rot_zyx, so3_exp, transform_points, yaw_of  # noqa: E402
 from dog_perception.inspvax import KYGI_INS_LEVER_ARM, apply_lever_arm  # noqa: E402
 from dog_perception.io import SequenceReader, load_scan  # noqa: E402
 from dog_perception.preprocess import SelfFilter, SelfFilterConfig, dedup_returns  # noqa: E402
@@ -396,15 +398,44 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
                                 p_ins=p_ins, yaw_ins=yaw_ins, yaw=yaw)
 
 
-def pose_checks(stamps, lo_poses, xy, diag, kept, gap=1.0, seed=0):
+def lo_tilt(lo_poses):
+    """(roll, pitch) [rad] per scan of the body against the median body "up" of the sequence, from
+    the odometry attitude, and the angle [rad] between that up and the odometry frame's z.
+
+    On 0921 (5.8) the fused x, y and heading matched the odometry to 1 cm and 0.05 deg over 1 s,
+    yet the fused pose check was up to 0.7 m worse than the odometry's, whose poses differ only by
+    their roll / pitch. Whether that tilt is real is not settled: on the moving sample bag the
+    body pitches 1.5 deg nose-down while braking (ground plane and gyro agree) and the odometry
+    pitch does not follow. So ``--tilt lo`` is optional (default: heading only, the det frame's
+    ``auto_level`` levels from the ground) and the pose checks compare both. The reference is the
+    median up (the robot stands level most of the time)."""
+    up = lo_poses[:, :3, 2]                                       # body z in the odometry frame
+    u = np.median(up, axis=0)
+    u /= np.linalg.norm(u)
+    axis = np.cross(u, [0.0, 0.0, 1.0])
+    ang = float(np.arctan2(np.linalg.norm(axis), u[2]))
+    R_ref = so3_exp(axis / np.linalg.norm(axis) * ang) if ang > 1e-9 else np.eye(3)
+    Rg = np.einsum("ij,njk->nik", R_ref, lo_poses[:, :3, :3])
+    roll = np.arctan2(Rg[:, 2, 1], Rg[:, 2, 2])
+    pitch = -np.arcsin(np.clip(Rg[:, 2, 0], -1.0, 1.0))
+    return roll, pitch, ang
+
+
+def pose_checks(stamps, lo_poses, xy, diag, kept, gap=1.0, seed=0, tilted=False):
     """Position error between scans ``gap`` seconds apart as the lidar sees it (the preview's
     shift check), for the INS, the lidar odometry alone and the fused poses: tells whether a
-    remaining error comes from the odometry or from the fusion."""
+    remaining error comes from the odometry or from the fusion. Also, to find out what makes
+    the odometry better than the fused poses where it is (5.8): the odometry without its roll /
+    pitch (``lo_flat``), and the fused poses with the odometry tilt (``fused_tilt``) and without
+    (``fused_flat``); ``fused`` is the one written (``tilted``)."""
     from sequence_preview import pose_shift
 
     p_ins, yaw_ins, yaw = diag["p_ins"], diag["yaw_ins"], diag["yaw"]
+    roll, pitch = diag["roll"], diag["pitch"]
     pose = dict(ins=lambda k: make_T(rot_z(yaw_ins[k]), p_ins[k]), lo=lambda k: lo_poses[k],
-                fused=lambda k: make_T(rot_z(yaw[k]), [xy[k, 0], xy[k, 1], p_ins[k, 2]]))
+                lo_flat=lambda k: make_T(rot_z(yaw_of(lo_poses[k][:3, :3])), lo_poses[k][:3, 3]),
+                fused_flat=lambda k: make_T(rot_z(yaw[k]), [xy[k, 0], xy[k, 1], p_ins[k, 2]]),
+                fused_tilt=lambda k: make_T(rot_zyx(yaw[k], pitch[k], roll[k]), [xy[k, 0], xy[k, 1], p_ins[k, 2]]))
     step = max(1, int(round(gap / max(np.median(np.diff(stamps)), 1e-3)))) if len(stamps) > 1 else 1
     pairs = [(i, i + step) for i in sorted(kept) if i + step in kept]
     out = dict(pair_t=np.array([stamps[i] - stamps[0] for i, _ in pairs]))
@@ -412,13 +443,35 @@ def pose_checks(stamps, lo_poses, xy, diag, kept, gap=1.0, seed=0):
         rng = np.random.default_rng(seed)
         w = {k: transform_points(T(k), kept[k].astype(np.float64))[:, :2] for k in kept}
         out[name] = np.array([pose_shift(w[i], w[j], rng) for i, j in pairs])
+    out["fused"] = out["fused_tilt" if tilted else "fused_flat"]
     return out
 
 
-def refined_odom(odom_ins, stamps, xy, yaw=None):
+def worst_pair_points(checks, kept, n=6, keep=3000, seed=0):
+    """Scene points (body frame, float16, ``keep`` per scan) of the scans in the ``n`` pairs where
+    the fused poses are furthest behind the odometry, so the diag file can answer why without
+    the sequence (a few hundred kB)."""
+    if not checks or not len(checks["pair_t"]):
+        return {}
+    gap = checks["fused"] - checks["lo"]
+    ks = sorted(kept)
+    step = ks[1] - ks[0] if len(ks) > 1 else 1
+    pairs = [(i, i + step) for i in ks if i + step in kept]
+    order = [int(i) for i in np.argsort(-np.nan_to_num(gap, nan=-1.0))[:n] if gap[i] > 0.1]
+    rng = np.random.default_rng(seed)
+    out = {}
+    for i in order:
+        for k in pairs[i]:
+            p = kept[k]
+            out["pts_%06d" % k] = p[rng.choice(len(p), min(len(p), keep), replace=False)].astype(np.float16)
+    return out
+
+
+def refined_odom(odom_ins, stamps, xy, yaw=None, tilt=None):
     """INS rows with east / north replaced by the fused trajectory (and its velocity), and with
     ``yaw`` (fused heading at the stamps) the heading too; outside the scans the INS rows plus the
-    correction at the first / last scan."""
+    correction at the first / last scan. ``tilt`` = (roll, pitch) at the stamps adds the body tilt
+    (linear between stamps, the first / last value outside)."""
     out = odom_ins.copy()
     t = odom_ins[:, 0]
     p_ins, yaw_ins = ins_at(odom_ins, stamps)
@@ -429,6 +482,10 @@ def refined_odom(odom_ins, stamps, xy, yaw=None):
         y_new = np.unwrap([yaw_of(quat_to_R(q)) for q in odom_ins[:, 4:8]]) + np.where(t < stamps[0], dy[0], dy[-1])
         y_new[inside] = np.interp(t[inside], stamps, yaw)
         out[:, 4:8] = np.column_stack([np.zeros_like(t), np.zeros_like(t), np.sin(y_new / 2), np.cos(y_new / 2)])
+        if tilt is not None:
+            from scipy.spatial.transform import Rotation
+            r, p = (np.interp(t, stamps, a) for a in tilt)          # clamped to the end values outside
+            out[:, 4:8] = Rotation.from_euler("ZYX", np.column_stack([y_new, p, r])).as_quat()
     for i in (0, 1):
         out[inside, 1 + i] = np.interp(t[inside], stamps, xy[:, i])
         out[~inside, 1 + i] = odom_ins[~inside, 1 + i] + np.where(t[~inside] < stamps[0], off[0, i], off[-1, i])
@@ -469,7 +526,9 @@ def draw(path, name, odom_ins, stamps, xy, corr, info, diag, checks=None):
         a2.legend(fontsize=8)
     if checks:
         a3 = axs[2]
-        for k, c in (("ins", "0.5"), ("lo", "tab:green"), ("fused", "tab:blue")):
+        for k, c in (("ins", "0.5"), ("lo", "tab:green"), ("fused", "tab:blue"), ("fused_flat", "tab:purple")):
+            if k not in checks:
+                continue
             a3.plot(checks["pair_t"], checks[k], "o-", ms=3, lw=0.8, c=c,
                     label="%s (p90 %.2f m)" % (k, np.nanpercentile(checks[k], 90) if len(checks[k]) else np.nan))
         a3.set_xlabel("time [s]")
@@ -482,10 +541,11 @@ def draw(path, name, odom_ins, stamps, xy, corr, info, diag, checks=None):
     plt.close(fig)
 
 
-def refine(seq_dir, plots=None, prior="imu", lever_arm=None, **kw):
+def refine(seq_dir, plots=None, prior="imu", lever_arm=None, tilt="none", **kw):
     """``lever_arm``: INS position point in the body frame (default: what the converter applied,
     ``meta["ins_lever_arm"]``; INSPVAX sequences converted before it have none and get the value
-    measured on 0921); whatever the converter applied already is taken into account."""
+    measured on 0921); whatever the converter applied already is taken into account. ``tilt``:
+    "lo" writes the odometry roll / pitch (``lo_tilt``) into odom.npy, "none" the heading only."""
     rd = SequenceReader(seq_dir)
     p_ins = os.path.join(seq_dir, ODOM_INS)
     odom_ins = np.load(p_ins) if os.path.exists(p_ins) else rd.odom
@@ -499,17 +559,24 @@ def refine(seq_dir, plots=None, prior="imu", lever_arm=None, **kw):
     stamps, poses, kept = lidar_odometry(rd, prior=None if prior == "none" else prior)
     xy, corr, info, diag = fuse(stamps, poses, odom_body, **kw)
     info["lever_arm"] = [round(float(a), 3) for a in lever_arm]
-    checks = pose_checks(stamps, poses, xy, diag, kept) if kept else None
+    diag["roll"], diag["pitch"], ref = lo_tilt(poses)                 # odometry tilt (written with --tilt lo)
+    tl = np.degrees(np.hypot(diag["roll"], diag["pitch"]))
+    k1 = 10 if len(stamps) > 10 else max(1, len(stamps) - 1)
+    dt = np.degrees(np.hypot(diag["roll"][k1:] - diag["roll"][:-k1], diag["pitch"][k1:] - diag["pitch"][:-k1]))
+    info.update(lo_tilt_ref_deg=round(float(np.degrees(ref)), 2), lo_tilt_p90_deg=round(float(np.percentile(tl, 90)), 2),
+                lo_tilt_max_deg=round(float(tl.max()), 2),
+                lo_tilt_change_1s_p90_deg=round(float(np.percentile(dt, 90)), 2) if len(dt) else 0.0)
+    checks = pose_checks(stamps, poses, xy, diag, kept, tilted=tilt == "lo") if kept else None
     if checks:
-        for k in ("ins", "lo", "fused"):
+        for k in ("ins", "lo", "fused", "lo_flat", "fused_flat", "fused_tilt"):
             v = checks[k][np.isfinite(checks[k])]
             info["shift_%s_p90_m" % k] = round(float(np.percentile(v, 90)), 3) if len(v) else None
             info["shift_%s_median_m" % k] = round(float(np.median(v)), 3) if len(v) else None
-    out = refined_odom(odom_body, stamps, xy, diag["yaw"])
+    out = refined_odom(odom_body, stamps, xy, diag["yaw"], (diag["roll"], diag["pitch"]) if tilt == "lo" else None)
     if not os.path.exists(p_ins):
         np.save(p_ins, odom_ins)
     np.save(os.path.join(seq_dir, "odom.npy"), out)
-    meta = dict(rd.meta, pose_source="kiss-icp+ins", pose_refine=dict(info, prior=prior, **kw))
+    meta = dict(rd.meta, pose_source="kiss-icp+ins", pose_refine=dict(info, prior=prior, tilt=tilt, **kw))
     with open(os.path.join(seq_dir, "meta.json") + ".tmp", "w") as f:
         json.dump(meta, f, indent=2)
     os.replace(os.path.join(seq_dir, "meta.json") + ".tmp", os.path.join(seq_dir, "meta.json"))
@@ -521,6 +588,8 @@ def refine(seq_dir, plots=None, prior="imu", lever_arm=None, **kw):
         np.savez_compressed(os.path.join(plots, name + "_diag.npz"), stamps=stamps, xy=xy,
                             lo_xyz=poses[:, :3, 3], lo_yaw=[yaw_of(T[:3, :3]) for T in poses],
                             p_ins=diag["p_ins"], yaw_ins=diag["yaw_ins"], yaw=diag["yaw"], healthy=diag["healthy"],
+                            roll=diag["roll"], pitch=diag["pitch"], lo_R=poses[:, :3, :3].astype(np.float32),
+                            **worst_pair_points(checks, kept),
                             rate_v=diag["rate_v"], bad_lo=diag["bad_lo"], bridged=diag["bridged"],
                             odom_ins=odom_body,                       # float64: unix times
                             **({"check_" + k: v for k, v in checks.items()} if checks else {}))
@@ -530,9 +599,9 @@ def refine(seq_dir, plots=None, prior="imu", lever_arm=None, **kw):
 def refine_one(job):
     """(sequence, info or None, seconds): one sequence for ``run_each``."""
     import time
-    seq, plots, prior, lever_arm, kw = job
+    seq, plots, prior, lever_arm, tilt, kw = job
     t0 = time.time()
-    return seq, refine(seq, plots, prior=prior, lever_arm=lever_arm, **kw), time.time() - t0
+    return seq, refine(seq, plots, prior=prior, lever_arm=lever_arm, tilt=tilt, **kw), time.time() - t0
 
 
 def main():
@@ -547,6 +616,9 @@ def main():
     ap.add_argument("--sigma-lo-bad", type=float, default=0.5, help="[m] trust in an unhealthy odometry step")
     ap.add_argument("--prior", choices=["imu", "none"], default="imu",
                     help="KISS-ICP motion prediction: gyro rotation (imu) or its own constant velocity (none)")
+    ap.add_argument("--tilt", choices=["lo", "none"], default="none",
+                    help="body roll / pitch in odom.npy: from the lidar odometry (lo, see lo_tilt) or none "
+                         "(heading only, the det frame levels from the ground)")
     ap.add_argument("--huber", type=float, default=0.3, help="[m] INS residual above which it is down-weighted")
     ap.add_argument("--gap-tol", type=float, default=0.5,
                     help="[m] a bridged INS gap may miss the INS at its far end by this (+ --gap-rel x its length) "
@@ -563,7 +635,7 @@ def main():
         "shift p90 ins / lo / fused"))
     rows = []
     seqs = [s for s in sorted(args.seq) if os.path.exists(os.path.join(s, "meta.json"))]
-    jobs = [(s, args.plots, args.prior, args.lever_arm, kw) for s in seqs]
+    jobs = [(s, args.plots, args.prior, args.lever_arm, args.tilt, kw) for s in seqs]
     for seq, info, _ in run_each(refine_one, jobs, args.jobs):
         if info is None:
             print("%-26s  too short - skipped" % os.path.basename(os.path.normpath(seq)))

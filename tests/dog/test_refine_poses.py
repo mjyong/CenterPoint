@@ -23,6 +23,7 @@ pytest.importorskip("kiss_icp")
 
 import refine_poses  # noqa: E402
 
+from dog_perception.geometry import quat_to_R  # noqa: E402
 from dog_perception.io import SequenceReader, odom_row  # noqa: E402
 
 BAG = "samples/rosbag2_2026_09_21-16_41_27_moving"
@@ -163,6 +164,29 @@ def test_heading_follows_the_odometry_after_a_fast_turn():
     inside = (t >= stamps[0]) & (t <= stamps[-1])
     yaw_rows = np.degrees(2 * np.arctan2(out[:, 6], out[:, 7]))
     assert np.ptp(yaw_rows[inside]) < 0.3 and np.allclose(out[:, 4:6], 0)
+
+
+def test_tilt_from_the_odometry_against_the_median_up():
+    """The odometry frame is the first scan's, tilted 3 deg here; the robot pitches up 12 deg for
+    1 s (a kerb, standing up) while turning. lo_tilt gives the tilt against the median body up:
+    ~0 while level, 12 deg on the kerb; refined_odom writes it with the fused heading."""
+    from dog_perception.geometry import rot_zyx, yaw_of
+    k = 60
+    stamps = 0.1 * np.arange(k)
+    yaw = np.radians(np.linspace(0, 90, k))
+    pitch = np.where((stamps > 2.0) & (stamps < 3.0), np.radians(12.0), 0.0)
+    R0 = rot_zyx(0.0, np.radians(3.0), np.radians(-1.0))           # first scan not level
+    poses = np.repeat(np.eye(4)[None], k, axis=0)
+    for i in range(k):
+        poses[i, :3, :3] = R0.T @ rot_zyx(yaw[i], pitch[i], 0.0)
+    roll, pit, ref = refine_poses.lo_tilt(poses)
+    assert abs(np.degrees(ref) - np.hypot(3.0, 1.0)) < 0.1
+    assert np.degrees(np.abs(roll)).max() < 0.1 and np.allclose(np.degrees(pit), np.degrees(pitch), atol=0.1)
+    odom = np.array([odom_row(t, np.eye(3), [0, 0, 0], [0, 0, 0]) for t in np.arange(-0.5, 6.5, 0.01)])
+    out = refine_poses.refined_odom(odom, stamps, np.zeros((k, 2)), yaw, (roll, pit))
+    for i in (5, 25, 55):
+        R = quat_to_R(out[np.argmin(np.abs(out[:, 0] - stamps[i])), 4:8])
+        assert abs(yaw_of(R) - yaw[i]) < 1e-3 and abs(-np.arcsin(R[2, 0]) - pit[i]) < 1e-3
 
 
 def _turning(L, k=300):
