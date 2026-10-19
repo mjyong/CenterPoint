@@ -30,6 +30,7 @@ from the view (body shadow, few structures), not from the poses.
 """
 import argparse
 import csv
+import functools
 import json
 import os
 import sys
@@ -38,6 +39,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from parallel import run_each  # noqa: E402
 from sequence_preview import align_residual, pipeline_for, structure_xy  # noqa: E402
 
 from dog_perception.io import SequenceReader  # noqa: E402
@@ -190,12 +192,14 @@ def main():
     ap.add_argument("--gap", type=float, default=0.5, help="[s] time between the two sweeps of a pair")
     ap.add_argument("--turn-dw", type=float, default=20.0, help="[deg/s] yaw-rate change that makes a turning pair")
     ap.add_argument("--min-pairs", type=int, default=3)
+    ap.add_argument("--jobs", type=int, default=0, help="sequences checked at once (0: one per core, 1: no subprocess)")
     args = ap.parse_args()
     lo, hi, step = args.offsets
     offsets = np.unique(np.round(np.r_[np.arange(lo, hi + step / 2, step), 0.0], 6)) + 0.0   # + 0.0: no -0.0
     os.makedirs(args.out, exist_ok=True)
 
-    results = [check(s, offsets, args.gap, args.turn_dw, args.min_pairs) for s in args.seq]
+    results = list(run_each(functools.partial(check, offsets=offsets, gap=args.gap, turn_dw=args.turn_dw,
+                                              min_pairs=args.min_pairs), args.seq, args.jobs))
     used = [r for r in results if r["rows"]]
     with open(os.path.join(args.out, "time_offset.csv"), "w", newline="") as f:
         cols = ["name", "offset", "n_turn", "turn_median_m", "turn_p90_m", "n_steady", "steady_median_m"]

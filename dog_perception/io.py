@@ -25,21 +25,38 @@ from .preprocess.pipeline import LidarScan
 class SequenceWriter:
     """Writes a sequence one scan at a time, so a long bag never has to fit in memory. IMU / odom
     rows are collected (small) and written by ``close`` together with ``meta.json``; a sequence
-    without ``meta.json`` was not finished."""
+    without ``meta.json`` was not finished.
 
-    def __init__(self, seq_dir):
+    With ``pool`` (a ``concurrent.futures`` thread pool) the scans are compressed and written in its
+    threads (zlib releases the GIL: compression took half of the converter's time), at most
+    ``max_pending`` at a time so memory stays bounded; the files are the same."""
+
+    def __init__(self, seq_dir, pool=None, max_pending=16):
         self.dir = seq_dir
         os.makedirs(os.path.join(seq_dir, "scans"), exist_ok=True)
         self.n_scans = 0
         self.imu, self.odom = [], []
+        self.pool, self.max_pending, self._pending = pool, max_pending, []
 
     def add_scan(self, s):
-        np.savez_compressed(os.path.join(self.dir, "scans", "%06d.npz" % self.n_scans), xyz=s.xyz.astype(np.float32),
-                            intensity=np.asarray(s.intensity, np.float32), t=np.asarray(s.point_times, np.float64),
-                            stamp=np.float64(s.stamp))
+        args = (os.path.join(self.dir, "scans", "%06d.npz" % self.n_scans),)
+        arrays = dict(xyz=s.xyz.astype(np.float32), intensity=np.asarray(s.intensity, np.float32),
+                      t=np.asarray(s.point_times, np.float64), stamp=np.float64(s.stamp))
         self.n_scans += 1
+        if self.pool is None:
+            np.savez_compressed(*args, **arrays)
+            return
+        self._pending.append(self.pool.submit(np.savez_compressed, *args, **arrays))
+        while len(self._pending) > self.max_pending:
+            self._pending.pop(0).result()
+
+    def flush(self):
+        """Wait for the scans still being written (raises their errors)."""
+        while self._pending:
+            self._pending.pop(0).result()
 
     def close(self, meta=None, imu=None, odom=None):
+        self.flush()
         imu = self.imu if imu is None else imu
         odom = self.odom if odom is None else odom
         if len(imu):

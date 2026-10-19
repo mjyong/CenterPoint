@@ -51,8 +51,9 @@ from dog_perception.ros_utils import scan_from_msg, stamp_of  # noqa: E402
 class Target:
     """One output sequence: scans in [t0, t1), IMU / localization rows in [t0 - pad, t1 + pad)."""
 
-    def __init__(self, name, out_dir, t0=-np.inf, t1=np.inf, pad=1.0, max_scans=None):
+    def __init__(self, name, out_dir, t0=-np.inf, t1=np.inf, pad=1.0, max_scans=None, pool=None):
         self.name, self.out_dir, self.t0, self.t1, self.pad, self.max_scans = name, out_dir, t0, t1, pad, max_scans
+        self.pool = pool
         self.writer = None
         self.heights = []        # base height seen by every k-th sweep
         self.pos_types = {}
@@ -66,7 +67,7 @@ class Target:
 
     def w(self):
         if self.writer is None:
-            self.writer = SequenceWriter(self.out_dir)
+            self.writer = SequenceWriter(self.out_dir, self.pool)
         return self.writer
 
 
@@ -112,6 +113,8 @@ def main():
     ap.add_argument("--t-start", type=float, default=None, help="header stamp [s]: first scan to keep")
     ap.add_argument("--t-end", type=float, default=None, help="header stamp [s]: keep scans before this")
     ap.add_argument("--pad", type=float, default=1.0, help="[s] IMU / localization kept around each window")
+    ap.add_argument("--write-threads", type=int, default=0,
+                    help="threads compressing and writing scans while the bag is read (0: min(8, cores), 1: none)")
     args = ap.parse_args()
     if not args.odom_topic and not args.inspvax_topic:
         ap.error("need --odom-topic or --inspvax-topic")
@@ -129,16 +132,23 @@ def main():
     T_bl = make_T(rot_zyx(args.extrinsic_rpy[2], args.extrinsic_rpy[1], args.extrinsic_rpy[0]), args.extrinsic_t)
     est_h = args.estimate_base_height or kygi
 
+    n_threads = min(8, os.cpu_count() or 1) if args.write_threads <= 0 else args.write_threads
+    pool = None
+    if n_threads > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        pool = ThreadPoolExecutor(n_threads)
+
     if args.segments:
         segs = read_segments(args.segments, args.only)
         if not segs:
             raise SystemExit("no segments with keep=1 in %s" % args.segments)
-        targets = [Target(n, os.path.join(args.out, n), a, b, args.pad) for n, a, b, _ in segs]
+        targets = [Target(n, os.path.join(args.out, n), a, b, args.pad, pool=pool) for n, a, b, _ in segs]
         splits = {n: sp for n, _, _, sp in segs}
     else:
         t0 = -np.inf if args.t_start is None else args.t_start
         t1 = np.inf if args.t_end is None else args.t_end
-        targets = [Target(os.path.basename(os.path.normpath(args.out)), args.out, t0, t1, args.pad, args.max_scans)]
+        targets = [Target(os.path.basename(os.path.normpath(args.out)), args.out, t0, t1, args.pad, args.max_scans,
+                          pool=pool)]
         splits = {}
     lo, hi = min(t.t0 for t in targets), max(t.t1 for t in targets)
 
@@ -267,6 +277,8 @@ def main():
         t.writer.close(meta, odom=odom)
         written += 1
         print("wrote %d scans, %d imu, %d odom -> %s" % (t.writer.n_scans, n_imu, len(odom), t.out_dir))
+    if pool is not None:
+        pool.shutdown()
     if not written:
         raise SystemExit("nothing written")
 

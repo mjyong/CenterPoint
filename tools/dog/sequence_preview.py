@@ -46,8 +46,10 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))          # parallel.py
 
 from dog_perception.io import SequenceReader  # noqa: E402
+from parallel import run_each, threads  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
 from dog_perception.preprocess import DetFrameConfig, PreprocessConfig  # noqa: E402
 
@@ -130,20 +132,25 @@ def scene_xy(frame, cell=0.05):
     return w[k, :2]
 
 
-def pose_shift(a, b, rng, n=2000, span=0.8):
+def pose_shift(a, b, rng, n=2000, span=0.8, cap=0.4):
     """Length [m] of the translation that best overlays ``b`` onto ``a`` (coarse 0.1 m grid over
-    +-``span``, then 0.02 m): the position error between the two frames' poses as the lidar sees it."""
+    +-``span``, then 0.02 m): the position error between the two frames' poses as the lidar sees it.
+    Cost of a shift: mean distance of ``n`` points of ``b`` to ``a``, capped at ``cap``. All shifts
+    of a grid go to the KD-tree in one query (several threads, ``parallel.threads``)."""
     from scipy.spatial import cKDTree
     if len(a) < 100 or len(b) < 100:
         return np.nan
     tree = cKDTree(a)
     q = b[rng.choice(len(b), min(len(b), n), replace=False)]
-    cost = lambda dx, dy: float(np.mean(np.minimum(tree.query(q + (dx, dy))[0], 0.4)))   # noqa: E731
+
+    def best(shifts):                             # first of the cheapest, as min() over (cost, x, y)
+        d = tree.query((q[None] + shifts[:, None]).reshape(-1, 2), distance_upper_bound=cap, workers=threads())[0]
+        return shifts[int(np.argmin(np.minimum(d, cap).reshape(len(shifts), len(q)).mean(axis=1)))]
     g = np.arange(-span, span + 1e-9, 0.1)
-    _, bx, by = min((cost(x, y), x, y) for x in g for y in g)
+    s = best(np.array([(x, y) for x in g for y in g]))
     h = np.arange(-0.08, 0.08 + 1e-9, 0.02)
-    _, bx, by = min((cost(bx + x, by + y), bx + x, by + y) for x in h for y in h)
-    return float(np.hypot(bx, by))
+    s = best(s + np.array([(x, y) for x in h for y in h]))
+    return float(np.hypot(s[0], s[1]))
 
 
 def align_residual(a, b, rng):
@@ -151,7 +158,7 @@ def align_residual(a, b, rng):
     if len(a) < 50 or len(b) < 50:
         return np.nan
     q = a[rng.choice(len(a), min(len(a), 4000), replace=False)]
-    d, _ = cKDTree(b).query(q)
+    d, _ = cKDTree(b).query(q, workers=threads())
     return float(np.median(d))
 
 
@@ -352,22 +359,29 @@ def write_index(out, rows):
         f.write(html)
 
 
+def preview_one(job):
+    """One sequence: checks and plot (own random generator: the result does not depend on the
+    order or on ``--jobs``)."""
+    seq_dir, out, every = job
+    c, data = check_sequence(seq_dir, every, np.random.default_rng(0))
+    draw(os.path.join(out, c["name"] + ".png"), c, data)
+    return c
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seq", nargs="+", required=True, help="sequence directories (globs are expanded)")
     ap.add_argument("--out", required=True)
     ap.add_argument("--every", type=int, default=5, help="check every n-th scan")
+    ap.add_argument("--jobs", type=int, default=0, help="sequences checked at once (0: one per core, 1: no subprocess)")
     args = ap.parse_args()
     dirs = sorted({d for pat in args.seq for d in (glob.glob(pat) or [pat])})
     dirs = [d for d in dirs if os.path.exists(os.path.join(d, "meta.json"))]
     if not dirs:
         raise SystemExit("no finished sequences (directories with meta.json) in %s" % args.seq)
     os.makedirs(args.out, exist_ok=True)
-    rng = np.random.default_rng(0)
     rows = []
-    for d in dirs:
-        c, data = check_sequence(d, args.every, rng)
-        draw(os.path.join(args.out, c["name"] + ".png"), c, data)
+    for c in run_each(preview_one, [(d, args.out, args.every) for d in dirs], args.jobs):
         rows.append(c)
         print("%-40s %-4s %4d scans %6.1f s  align %.3f m  shift p90 %.2f m  ground %.3f m  tilt %.2f deg  "
               "INS step %.2f m  %s" % (c["name"], c["status"], c["scans"], c["duration_s"], c["align_m"],

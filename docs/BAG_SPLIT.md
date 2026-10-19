@@ -12,6 +12,21 @@
 
 耗时按样例 bag 推算：3.2 MB/帧，10 Hz；30 GB 若只有这三个话题，约 9,400 帧、16 分钟。bag 里如果还有相机等话题，帧数会少一些。
 
+**并行（2026-10）**：各场景互不相关，按场景处理的工具都会同时跑多个场景（`tools/dog/parallel.py`）。
+- `refine_poses.py`、`sequence_preview.py`、`time_offset_check.py`：`--jobs`，默认 0 表示每个 CPU 核一个场景，1 表示不开子进程（调试用）。每个进程分到"核数 ÷ 场景数"个线程，给 KISS-ICP 和 KD 树查询用，不会互相抢核。结果和串行完全一样（预览改为每个场景各用一个固定的随机种子）。
+- `rosbag_to_sequence.py`：读 bag 只能顺序读，但压缩写盘以前占了一半时间，现在交给后台线程（`--write-threads`，默认 min(8, 核数)），写出的文件一字不差。
+- 帧对配准（`shift` 检查）以前对 289 + 81 个候选平移逐个查 KD 树，现在一次批量查询、多线程，结果一字不差。
+
+在这台 4 核机器上、用样例 bag 复制出的 4 个场景（每个 27 帧）实测：
+
+| 工具 | 改之前 | 现在，串行 | 现在，4 个场景并行 |
+|---|---|---|---|
+| `refine_poses.py`（每个场景） | 11.5 s | 4.1 s | 2.7 s |
+| `sequence_preview.py`（4 个场景合计） | 15.9 s | 10.4 s | 5.9 s |
+| `rosbag_to_sequence.py`（27 帧，含 1 s 启动） | 2.5 s | — | 1.7 s |
+
+场景越长、核越多，加速越明显（这里每个场景只有 27 帧，进程启动的开销占了不少）。服务器上 35 个 300 帧的场景：融合原来约 1 小时（每个场景约 100 s，其中 60 s 在配准检查），现在按核数并行，16 核以上预计 5–10 分钟。GPU 推理（第 4 步）是另一回事，按显卡算。
+
 ## 为什么切、怎么切
 
 - 一个序列装 1 万帧不好用：审核表、SUSTechPOINTS 场景、训练 / 验证划分都是按"录制"组织的。切成 30 s 一段（约 300 帧），每段就是一个独立的录制名。
@@ -558,6 +573,7 @@ s005 也基本没动（0.27），有效验证只有约 100 s；两份录制是�
 任务：修正老序列的 IMU 轴，再用第五版 refine_poses.py 重新融合 0921 所有序列，提交诊断文件。不重转 bag，不进入第 4 步。
 仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
 
+（这一轮起，refine_poses.py / sequence_preview.py 默认按 CPU 核数同时处理多个场景，不用加参数。）
 0. 修正 IMU 轴（只改 imu.npy 的陀螺 x、y 符号和 meta.json，重复运行不会再改）：
    python tools/dog/sequence_meta.py --seq data/seq/0921_* --fix-imu-axes
    核对：最后一列 imu axes 全部是 "OLD -> body"（再跑一次应全部是 "body"）。
@@ -575,5 +591,5 @@ s005 也基本没动（0.27），有效验证只有约 100 s；两份录制是�
 - refine_summary.csv 里每个场景的 heading_correction_p90_deg / heading_correction_max_deg；
 - shift p90 三列中 fused 比 lo 差 0.1 m 以上的场景；
 - 预览里每个场景的 shift_p90_m 和 status，与上一轮（5.7）对比；
-- 每步耗时。
+- 每步耗时，以及服务器的 CPU 核数（nproc）。
 ```
