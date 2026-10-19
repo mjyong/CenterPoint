@@ -1,0 +1,12 @@
+track_id,label,subclass,review,mean_score,frames,interpolated,t_first,t_last,min_range_m,moving_share,max_speed,action,from,to,note
+35,cyclist,cyclist,1,0.315,15,7,11.30,12.70,8.1,0.00,0.00,,,,
+79,cyclist,cyclist,1,0.325,34,3,24.30,27.60,20.9,0.00,0.00,,,,
+74,cyclist,cyclist,1,0.379,26,4,23.10,25.60,2.7,0.00,0.00,,,,
+32,cyclist,cyclist,1,0.398,184,8,10.70,30.20,20.8,0.03,0.67,,,,
+17,cyclist,cyclist,1,0.429,69,17,6.60,13.40,27.0,0.00,0.00,,,,
+86,vehicle,car,1,0.442,9,0,29.40,30.20,42.8,0.00,0.00,,,,
+2,vehicle,car,0,0.505,70,13,0.00,6.90,28.0,0.00,0.00,,,,
+1,vehicle,car,0,0.599,187,0,0.00,19.10,4.5,1.00,6.81,,,,
+66,vehicle,car,0,0.605,90,0,21.20,30.10,9.8,1.00,5.32,,,,
+54,pedestrian,pedestrian,0,0.695,47,9,18.90,24.70,1.9,1.00,1.61,,,,
+55,pedestrian,pedestrian,0,0.717,13,0,19.00,20.90,1.7,1.00,1.14,,,,

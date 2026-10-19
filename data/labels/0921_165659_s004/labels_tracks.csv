@@ -1,0 +1,6 @@
+track_id,label,subclass,review,mean_score,frames,interpolated,t_first,t_last,min_range_m,moving_share,max_speed,action,from,to,note
+24,cyclist,cyclist,1,0.317,26,15,5.00,7.50,26.6,0.08,0.41,,,,
+54,cyclist,cyclist,1,0.317,42,25,20.20,24.30,25.1,0.00,0.00,,,,
+63,pedestrian,pedestrian,1,0.346,43,7,23.30,27.50,35.3,0.00,0.00,,,,
+73,pedestrian,pedestrian,0,0.513,20,0,25.60,27.50,39.3,1.00,1.22,,,,
+1,pedestrian,pedestrian,0,0.773,276,0,0.00,27.50,16.2,1.00,1.24,,,,
