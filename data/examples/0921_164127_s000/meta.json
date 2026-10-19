@@ -1,0 +1,107 @@
+{
+  "T_body_lidar": [
+    [
+      -1.0,
+      -1.2246467991473532e-16,
+      0.0,
+      0.0
+    ],
+    [
+      1.2246467991473532e-16,
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "base_height": 0.3126944899559021,
+  "lidar": "XT32",
+  "source": "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/rosbag0921/rosbag2_2026_09_21-16_41_27",
+  "segment": {
+    "name": "0921_164127_s000",
+    "t_start": 1789980087.992099,
+    "t_end": 1789980116.767928,
+    "split": "val",
+    "split_survey": "val"
+  },
+  "lat0": 29.732480185320703,
+  "lon0": 106.78469809191927,
+  "h0": 216.90671907865442,
+  "inspvax_pos_type": {
+    "56": 2980
+  },
+  "det_frame": {
+    "auto_ground": true,
+    "auto_level": true
+  },
+  "base_height_first_sweep": 0.3140522241592407,
+  "base_height_sweeps": {
+    "n": 29,
+    "p10": 0.305,
+    "p90": 0.314,
+    "every": 10
+  },
+  "pose_source": "kiss-icp+ins",
+  "pose_refine": {
+    "scans": 288,
+    "lo_steps_rejected": 0,
+    "lo_steps_bridged": 0,
+    "lo_unhealthy_share": 0.0,
+    "lo_path_ratio": null,
+    "ins_unhealthy_share": 0.0,
+    "correction_median_m": 0.004,
+    "correction_p90_m": 0.01,
+    "correction_max_m": 0.024,
+    "heading_correction_p90_deg": 0.0,
+    "heading_correction_max_deg": 0.0,
+    "lo_vs_ins_1s_median_m": 0.004,
+    "lo_vs_ins_1s_p90_m": 0.012,
+    "bad_intervals": [],
+    "unverified_intervals": [],
+    "bad_share": 0.0,
+    "lo_path_m": 0.19,
+    "ins_path_m": 0.23,
+    "lever_residual_m": null,
+    "lever_arm": [
+      -0.06,
+      -0.54,
+      0.0
+    ],
+    "lo_tilt_ref_deg": 0.0,
+    "lo_tilt_p90_deg": 0.0,
+    "lo_tilt_max_deg": 0.01,
+    "lo_tilt_change_1s_p90_deg": 0.0,
+    "shift_ins_p90_m": 0.0,
+    "shift_ins_median_m": 0.0,
+    "shift_lo_p90_m": 0.0,
+    "shift_lo_median_m": 0.0,
+    "shift_fused_p90_m": 0.0,
+    "shift_fused_median_m": 0.0,
+    "shift_lo_flat_p90_m": 0.0,
+    "shift_lo_flat_median_m": 0.0,
+    "shift_fused_flat_p90_m": 0.0,
+    "shift_fused_flat_median_m": 0.0,
+    "shift_fused_tilt_p90_m": 0.0,
+    "shift_fused_tilt_median_m": 0.0,
+    "prior": "imu",
+    "tilt": "lo",
+    "sigma_lo": 0.02,
+    "sigma_ins": 1.0,
+    "sigma_lo_bad": 0.5,
+    "huber": 0.3,
+    "gap_tol": 0.5,
+    "gap_rel": 0.05
+  },
+  "imu_axes": "body"
+}

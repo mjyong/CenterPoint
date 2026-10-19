@@ -1,1 +1,3 @@
 work_dirs/pretrained/nusc_voxel.pth filter=lfs diff=lfs merge=lfs -text
+data/examples/**/*.npz filter=lfs diff=lfs merge=lfs -text
+data/examples/**/*.npy filter=lfs diff=lfs merge=lfs -text

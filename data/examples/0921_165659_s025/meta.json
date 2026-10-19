@@ -1,0 +1,116 @@
+{
+  "T_body_lidar": [
+    [
+      -1.0,
+      -1.2246467991473532e-16,
+      0.0,
+      0.0
+    ],
+    [
+      1.2246467991473532e-16,
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "base_height": 0.7314513325691223,
+  "lidar": "XT32",
+  "source": "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/rosbag0921/rosbag2_2026_09_21-16_56_59",
+  "segment": {
+    "name": "0921_165659_s025",
+    "t_start": 1789981768.07989,
+    "t_end": 1789981798.315186,
+    "split": "train",
+    "split_survey": "train"
+  },
+  "lat0": 29.735017849784658,
+  "lon0": 106.78275510290717,
+  "h0": 216.9332549663439,
+  "inspvax_pos_type": {
+    "56": 3224
+  },
+  "det_frame": {
+    "auto_ground": true,
+    "auto_level": true
+  },
+  "base_height_first_sweep": 0.6188241839408875,
+  "base_height_sweeps": {
+    "n": 31,
+    "p10": 0.612,
+    "p90": 0.851,
+    "every": 10
+  },
+  "pose_source": "kiss-icp+ins",
+  "pose_refine": {
+    "scans": 302,
+    "lo_steps_rejected": 14,
+    "lo_steps_bridged": 14,
+    "lo_unhealthy_share": 0.047,
+    "lo_path_ratio": 1.03,
+    "ins_unhealthy_share": 0.232,
+    "correction_median_m": 0.09,
+    "correction_p90_m": 0.241,
+    "correction_max_m": 0.461,
+    "heading_correction_p90_deg": 1.18,
+    "heading_correction_max_deg": 4.1,
+    "lo_vs_ins_1s_median_m": 0.094,
+    "lo_vs_ins_1s_p90_m": 0.159,
+    "bad_intervals": [
+      [
+        1789981771.37,
+        1789981772.768,
+        null
+      ]
+    ],
+    "unverified_intervals": [],
+    "bad_share": 0.046,
+    "lo_path_m": 36.01,
+    "ins_path_m": 37.26,
+    "lever_residual_m": [
+      0.19,
+      0.029
+    ],
+    "lever_arm": [
+      -0.06,
+      -0.54,
+      0.0
+    ],
+    "lo_tilt_ref_deg": 1.6,
+    "lo_tilt_p90_deg": 8.81,
+    "lo_tilt_max_deg": 23.71,
+    "lo_tilt_change_1s_p90_deg": 8.91,
+    "shift_ins_p90_m": 0.332,
+    "shift_ins_median_m": 0.138,
+    "shift_lo_p90_m": 0.057,
+    "shift_lo_median_m": 0.042,
+    "shift_fused_p90_m": 0.065,
+    "shift_fused_median_m": 0.045,
+    "shift_lo_flat_p90_m": 0.122,
+    "shift_lo_flat_median_m": 0.045,
+    "shift_fused_flat_p90_m": 0.146,
+    "shift_fused_flat_median_m": 0.045,
+    "shift_fused_tilt_p90_m": 0.065,
+    "shift_fused_tilt_median_m": 0.045,
+    "prior": "imu",
+    "tilt": "lo",
+    "sigma_lo": 0.02,
+    "sigma_ins": 1.0,
+    "sigma_lo_bad": 0.5,
+    "huber": 0.3,
+    "gap_tol": 0.5,
+    "gap_rel": 0.05
+  },
+  "imu_axes": "body"
+}

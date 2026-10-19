@@ -5,6 +5,7 @@
 data/*
 !data/survey/
 !data/preview/
+!data/examples/
 *.pyc
 venv/
 *.idea/
