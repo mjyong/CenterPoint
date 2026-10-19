@@ -4,7 +4,7 @@ Teacher: CenterPoint-Voxel with double-flip TTA (nuScenes weights first, your
 fine-tuned voxel model in later rounds). Either run it here or reuse the
 output of run_sequence.py (--results). Output ``labels.pkl``:
 
-    {"sequence": str, "frames": [{"stamp", "T_world_det",
+    {"sequence": str, "frames": [{"stamp", "T_world_det", "pose_bad",
         "objects": [{"track_id", "label", "subclass", "box" (7, det frame), "velocity" (2, det frame),
                      "score", "review", "interpolated"}]}]}
 
@@ -35,14 +35,14 @@ from dog_perception.label_review import write_track_table  # noqa: E402
 
 
 def teacher_frames(args):
-    """Returns list of (stamp, T_world_det, Detections in det frame)."""
+    """Returns list of (stamp, T_world_det, Detections in det frame, pose_bad)."""
     if args.results:
         with open(args.results, "rb") as f:
             res = pickle.load(f)
-        return [(r["stamp"], r["T_world_det"], r["detections"]) for r in res]
+        return [(r["stamp"], r["T_world_det"], r["detections"], bool(r.get("pose_bad", False))) for r in res]
 
     from dog_perception.detection.centerpoint import CenterPointDetector
-    from dog_perception.io import SequenceReader
+    from dog_perception.io import SequenceReader, pose_bad
     from dog_perception.pipeline import PerceptionPipeline
     from dog_perception.preprocess import DetFrameConfig, PreprocessConfig
 
@@ -62,7 +62,8 @@ def teacher_frames(args):
         else:
             frame = pipe.pre.process(ev[1])
             if frame is not None:
-                out.append((frame.stamp, frame.T_world_det, det(frame.points, frame.stamp)))
+                out.append((frame.stamp, frame.T_world_det, det(frame.points, frame.stamp),
+                            pose_bad(reader.meta, frame.stamp)))
     return out
 
 
@@ -80,11 +81,13 @@ def main():
     args = ap.parse_args()
 
     frames = teacher_frames(args)
-    world = [(s, d.transform(T, "world")) for s, T, d in frames]
+    # frames whose pose cannot be trusted (pose_refine.bad_intervals) give the tracker nothing: their
+    # boxes would sit off in the world frame and pull the static objects' fits
+    world = [(s, Detections(frame="world", stamp=s) if bad else d.transform(T, "world")) for s, T, d, bad in frames]
     labels = auto_label(world, AutoLabelConfig(min_track_len=args.min_track_len, min_mean_score=args.min_mean_score))
 
     out_frames = []
-    for stamp, T_wd, _ in frames:
+    for stamp, T_wd, _, bad in frames:
         objs = labels.get(round(float(stamp), 6), [])
         if objs:
             d = Detections(np.stack([o["box"] for o in objs]), np.stack([o["velocity"] for o in objs]),
@@ -95,7 +98,7 @@ def main():
                         box=d.boxes[i], velocity=d.velocities[i],
                         score=o["score"], review=o["review"], interpolated=o["interpolated"], moving=o["moving"])
                    for i, o in enumerate(objs)]
-        out_frames.append(dict(stamp=stamp, T_world_det=T_wd, objects=entries))
+        out_frames.append(dict(stamp=stamp, T_world_det=T_wd, objects=[] if bad else entries, pose_bad=bad))
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     result = dict(sequence=args.seq or args.results, frames=out_frames)
@@ -104,8 +107,9 @@ def main():
     table = os.path.splitext(args.out)[0] + "_tracks.csv"
     rows = write_track_table(table, result)
     n = sum(len(f["objects"]) for f in out_frames)
-    print("labelled %d frames, %d boxes, %d tracks (%d flagged for review) -> %s, %s"
-          % (len(out_frames), n, len(rows), sum(r["review"] for r in rows), args.out, table))
+    print("labelled %d frames (%d left out: pose not trusted), %d boxes, %d tracks (%d flagged for review) -> %s, %s"
+          % (len(out_frames), sum(f["pose_bad"] for f in out_frames), n, len(rows), sum(r["review"] for r in rows),
+             args.out, table))
 
 
 if __name__ == "__main__":

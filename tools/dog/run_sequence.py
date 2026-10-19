@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from dog_perception.detection import DEFAULT_SCORE_THRESHOLDS  # noqa: E402
 from dog_perception.geometry import transform_points  # noqa: E402
-from dog_perception.io import SequenceReader  # noqa: E402
+from dog_perception.io import SequenceReader, pose_bad  # noqa: E402
 from dog_perception.mcap_viz import McapViz  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
 from dog_perception.prediction.dataset import TrackLogger  # noqa: E402
@@ -105,6 +105,7 @@ def main():
             d = dets[n](frame.points, frame.stamp)
             out = run_back_half(pipes[n], frame, d)
             results[n].append(dict(stamp=frame.stamp, T_world_det=frame.T_world_det,
+                                   pose_bad=pose_bad(reader.meta, frame.stamp),
                                    T_world_body=frame.T_world_body, detections=d, tracks=out[0],
                                    predictions=out[1], timings=dict(frame.timings, **dets[n].last_timing)))
             logs[n].add(frame.stamp, out[0], frame.T_world_body, out[1])

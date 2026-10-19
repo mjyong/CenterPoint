@@ -259,7 +259,7 @@ mindmap
 |---|---|---|
 | `scans/000000.npz` … | 每帧一个 | `xyz` (N,3) float32，雷达系 L；`intensity` (N,) float32，0–255；`t` (N,) float64，每个点的绝对时间；`stamp` float64，扫描结束时刻 |
 | `imu.npy` | (M,4) float64 | `t, wx, wy, wz`：机身系角速度，rad/s |
-| `odom.npy` | (K,11) float64 | `t, x, y, z, qx, qy, qz, qw, vx, vy, vz`：W 系里机身原点的位置（ENU，m）、姿态（只有航向）、速度（东、北、天，m/s）。跑过 `refine_poses.py` 后，东、北坐标、航向和速度换成融合后的值 |
+| `odom.npy` | (K,11) float64 | `t, x, y, z, qx, qy, qz, qw, vx, vy, vz`：W 系里机身原点的位置（ENU，m）、姿态（只有航向）、速度（东、北、天，m/s）。跑过 `refine_poses.py` 后，东、北坐标、航向、横滚俯仰（激光里程计）和速度换成融合后的值 |
 | `odom_ins.npy` | (K,11) float64 | 只在跑过 `refine_poses.py` 后存在：融合前的 INS 原始数据，同样格式，是以后每次融合的输入 |
 | `meta.json` | JSON | 见下表。**最后写**，目录里没有它说明这个场景没写完 |
 
@@ -371,6 +371,7 @@ mindmap
 {"sequence": 来源,
  "frames": [{"stamp": 扫描结束时刻,
              "T_world_det": 4×4,
+             "pose_bad": 这帧在 pose_refine.bad_intervals 里（位姿不可信：不进跟踪、没有框，导出时跳过）,
              "objects": [{"track_id", "label"（vehicle/pedestrian/cyclist）,
                           "subclass"（car/truck/bus，非车辆与 label 相同，没有时为 None）,
                           "box"（7，D 系）, "velocity"（2，D 系）, "score",

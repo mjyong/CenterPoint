@@ -66,3 +66,21 @@ def test_azimuth_offset_heading_and_online_check():
 def quat_R(q):
     from dog_perception.geometry import quat_to_R
     return quat_to_R(q)
+
+
+def test_pose_bad_frames_are_left_out_of_the_dataset(tmp_path):
+    """Frames in pose_refine.bad_intervals (neither source trusted) are not exported."""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools", "dog"))
+    from export_dataset import export_recording
+
+    from dog_perception.io import pose_bad
+    meta = dict(pose_refine=dict(bad_intervals=[[10.0, 10.5, None]]))
+    assert pose_bad(meta, 10.2) and not pose_bad(meta, 10.6) and not pose_bad({}, 10.2)
+    frames = tmp_path / "frames"
+    frames.mkdir()
+    for s in (10.0, 10.1, 11.0):
+        np.save(frames / ("%.6f.npy" % s), np.zeros((10, 5), np.float32))
+    labels = dict(frames=[dict(stamp=s, T_world_det=np.eye(4), objects=[], pose_bad=pose_bad(meta, s))
+                          for s in (10.0, 10.1, 11.0)])
+    infos = export_recording(str(frames), labels, str(tmp_path / "out"), "rec")
+    assert [i["timestamp"] for i in infos] == [11.0]

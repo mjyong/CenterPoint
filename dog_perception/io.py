@@ -82,6 +82,13 @@ def odom_row(t, R, p, v=None):
     return np.concatenate([[t], p, R_to_quat(R), v])
 
 
+def pose_bad(meta, stamp):
+    """True when ``stamp`` lies in one of the sequence's ``pose_refine.bad_intervals`` (neither the
+    INS nor the lidar odometry could be trusted there, tools/dog/refine_poses.py): such frames are
+    left out of auto-labelling and the exported datasets."""
+    return any(g[0] <= stamp <= g[1] for g in (meta.get("pose_refine") or {}).get("bad_intervals", []))
+
+
 def load_scan(path):
     d = np.load(path)
     return LidarScan(xyz=d["xyz"], intensity=d["intensity"], point_times=d["t"], stamp=float(d["stamp"]))

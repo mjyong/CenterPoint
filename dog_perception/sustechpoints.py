@@ -112,6 +112,8 @@ def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_e
         rel = f["stamp"] - t0
         if k % every or (t_start is not None and rel < t_start - 1e-6) or (t_end is not None and rel > t_end + 1e-6):
             continue
+        if f.get("pose_bad"):                     # pose not trusted: not in the dataset, nothing to annotate
+            continue
         src = os.path.join(frames_dir, "%.6f.npy" % f["stamp"])
         if not os.path.exists(src):
             continue

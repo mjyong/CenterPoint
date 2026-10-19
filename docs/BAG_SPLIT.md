@@ -207,6 +207,8 @@ python tools/dog/split_check.py --seq data/seq/0921_* --out data/survey/split \
 - 验证路线落在训练路线 10 m 内的比例 ≤ 5%；
 - 因为重叠和缓冲去掉的训练数据不超过原训练时长的 15%。
 
+**0921 的结果（5.9，`--holdout 0921_165659 --holdout-s 90 --apply`）**：验证集 8 个场景（164127_s001–s004、165659_s003–s006），230.7 s，运动 207.7 s，占全部运动时间的 24.5%；验证路线离训练路线 10 m 内的比例 0%；去掉 4 个场景（164127_s000、s005 静止；165659_s002、s007 是留出块两侧的缓冲），训练集剩 23 个场景、690 s。三个目标都满足（验证运动 ≥ 150 s、占比 12–25%；重叠 ≤ 5%；因缓冲去掉的训练 ≤ 15%，实际约 7%）。
+
 ### 3.5 位姿融合：激光里程计 + RTK（`refine_poses.py`）
 
 **问题**：
@@ -325,7 +327,7 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 - 融合的 `shift` p90：中位数 0.14 m，超过 0.4 m 的从 6 个降到 0 个，超过 0.2 m 的从 14 个降到 10 个。预览里 165659 是 14 OK / 14 WARN / 1 FAIL（5.6 是 13 / 8 / 8）；唯一的 FAIL 是 s025 的 `tilt_deg`，不是位姿。164127_s003 仍是 FAIL（0.42 m）。
 - 剩下的差距来自航向，不是位置。把融合比激光差 0.1 m 以上的帧对拆开看：融合位置和激光的 1 s 位移只差 0–2 cm，但 INS 航向和激光航向在 1 s 内差 1–4°（10 m 处每度约 0.17 m）。按时间看 INS − 激光的航向差：急转弯（60–90°/s）之后，INS 航向偏 4–10°，再用 3–5 s 慢慢回来（164127_s003：+4.5、+8.2、+10.6、+8.0、+4.1、+2.1°）；这段时间 INS 位置的自检照样"健康"。这些帧对里激光的打分是 0.00–0.08 m，INS 是 0.31–0.38 m，所以错的是 INS 航向。
 
-**第五版（当前的输出）**：
+**第五版**：
 - 输出航向 = 激光航向 + 一个慢变的偏移（`heading_offset`）。偏移向 INS 航向靠拢，用最小二乘求：INS σ 2°，超过 1° 用 Huber 降权，只用 INS 健康的帧；偏移每帧最多变化 σ 0.02°，时间常数约 10 s。激光步转到 ENU 时也用这个航向。
 - `odom.npy` 的航向四元数换成融合航向（扫描时段之外是 INS 航向加上两端的修正量）。`pose_refine` 新增 `heading_correction_p90_deg` / `heading_correction_max_deg`。
 - 用 5.7 的诊断文件离线重放：1 s 航向变化和激光的差，p90 平均从 0.53° 降到 0.02°（164127_s003 3.1° → 0.04°）；航向修正最大 9.9°（164127_s003）。位置变化 p90 小于 4 cm（164127_s003 9 cm），不可靠时段只有 s024 有变化。
@@ -338,10 +340,20 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 - 剩余杠杆臂 (0.03, 0.01) m；不可靠时段占全部帧的 1.7%。
 - 还剩 5 个场景融合比纯激光差 0.1 m 以上（s001 0.32、s007 0.18、s019 0.16、s006 0.12、s014 0.11）。在这些帧对里，融合的 x、y 和航向与激光在 1 s 内只差 ≤ 1 cm、≤ 0.05°，两者的位姿只差横滚、俯仰。但"激光的倾斜是对的"还不能下结论：样例 bag 急刹时，地面平面和陀螺都显示机身低头 1.5°，激光里程计的俯仰却没跟上（一直在 +0.2° 左右）。
 
-**第六版（诊断）**：
+**第六版（诊断，5.9）**：
 - 输出不变（`--tilt none`，默认只写航向，倾斜仍由检测系按地面找平）。`--tilt lo` 可以把激光的横滚、俯仰（相对整段的中位"上方向"，`lo_tilt`）写进 `odom.npy`，先不默认。
 - 位姿检查多了三种对照：`lo_flat`（激光去掉倾斜）、`fused_flat`（融合，只有航向，即当前输出）、`fused_tilt`（融合 + 激光倾斜）。下一轮看：`fused_tilt` ≈ `lo` 且 `lo_flat` ≈ `fused_flat`，说明差别确实来自倾斜；否则另有原因。
 - `_diag.npz` 新增激光的完整姿态（`lo_R`）、倾斜（`roll`、`pitch`），以及融合比激光差最多的 6 个帧对的场景点（`pts_*`，float16），不用序列也能离线复现这些帧对。
+
+**0921 第六次融合（5.9）：倾斜**：
+- 诊断的结论很清楚：差别就是倾斜。融合加上激光倾斜（`fused_tilt`）和纯激光（`lo`）只差中位 0.003 m、最多 0.037 m；激光去掉倾斜（`lo_flat`）和当前输出（`fused_flat`）一样差，最多比 `lo` 差 0.33 m。
+- 狗的倾斜比想象的大：相对整段的中位"上方向"，不少场景最大 15–24°（s025 23.7°、s008 22.5°、s019 20.7°），s001、s007、s008、s025、s026 里 1 s 内倾斜变化的 p90 有 8–14°（路沿、台阶、坡）。检测系的地面找平最多只补 5°，而且每帧只跟 20%，跟不上。
+- 加上激光倾斜后，融合 `shift` p90 中位数 0.092 → 0.072 m，超过 0.2 m 的场景 4 → 0 个（s001 0.385 → 0.089、s007 0.205 → 0.028、s019 0.231 → 0.10）；倾斜小的场景前后只差 ±0.01 m。
+- 样例 bag 急刹时 1.5° 的小俯仰激光看不出来，这类小而快的倾斜仍由地面找平处理。
+
+**第六版（当前）**：`--tilt lo` 改为默认，`odom.npy` 的姿态是融合航向 + 激光的横滚、俯仰（相对中位"上方向"），检测系的地面找平只修剩下的部分。线上节点还是只有航向（INS 的横滚、俯仰不可用）+ 地面找平，大倾斜时线上点云和训练数据会有差别，后面可以用陀螺 + 加速度计在线估倾斜来补。
+
+**位姿不可靠的帧**（`pose_refine.bad_intervals`，0921 约 1.7%）：`run_sequence.py` 给每帧记 `pose_bad`；`auto_label.py` 不让这些帧的检测进跟踪（它们在世界系里的位置不对，会拉偏静止物体），也不给它们出框；SUSTechPOINTS 导出和 `export_dataset.py` 都跳过它们。
 
 **预览的 `shift` 检查**：对相隔约 1 s 的两帧，取离地 0.3–3 m 的点（墙、杆、树、车），在 ±0.8 m 范围内做二维搜索，找到把一帧叠到另一帧上最合适的平移量。这就是激光看到的两帧位姿误差，沿行进方向的误差也能测出来。状态按 p90 判定：≤ 0.20 m 为 OK，≤ 0.40 m 为 WARN，更大为 FAIL。运动样例 bag 用 INS 位姿时是 0.51 m（FAIL），融合后是 0.12 m（OK）。
 
@@ -627,4 +639,33 @@ B.  按 docs/BAG_SPLIT.md 5.3 节的第 1–5 步执行（它的第 4 步会重�
 - 5.3 节要求的报告内容；
 - 预览里每个场景的 shift_p90_m 和 status，与上一轮（5.8）对比；
 - 每步耗时，以及服务器的 CPU 核数（nproc）。
+```
+
+### 5.10 第十轮：第六版融合（加倾斜）+ 预览；通过后进入第 4 步
+
+```text
+任务：A) 用第六版 refine_poses.py（默认 --tilt lo）重新融合 0921 所有序列并重跑预览；
+      B) 如果 A 的预览里没有 shift_p90_m=FAIL，接着做第 4 步（教师推理 + 自动标注）。不重转 bag。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+
+A1. python tools/dog/refine_poses.py --seq data/seq/0921_* --plots data/preview/poses
+A2. python tools/dog/sequence_preview.py --seq "data/seq/0921_165659_s*" --out data/preview/0921_165659
+    python tools/dog/sequence_preview.py --seq "data/seq/0921_164127_s*" --out data/preview/0921_164127
+A3. 提交 data/preview（poses 和两个预览目录），推送到 claude/me/v01。不要提交 data/seq。
+    报告：refine 的整张表和 "pose bad" 行；预览里每个场景的 shift_p90_m、tilt_deg 和 status，与上一轮（5.9）对比。
+    预览里有 shift_p90_m=FAIL 就到此为止。
+
+B0. 检查：df -h（--save-frames 每帧约 3.6 MB，0921 约 9,000 帧，约 35 GB）；
+    work_dirs/pretrained/nusc_voxel.pth 应约 103 MB（只有 134 字节说明是 Git LFS 指针，先 git lfs install && git lfs pull）；
+    nvidia-smi 能看到 GPU。任何一项不满足就停下报告。
+B1. 按 docs/BAG_SPLIT.md 第 4 节"用 split.csv 时"的循环，对 data/survey/split/split.csv 里不是 drop 的场景
+    跑 run_sequence.py（--detectors voxel --tta --save-frames --device cuda:0）和 auto_label.py。
+    先只跑一个场景（0921_165659_s008）确认能跑通、看一眼耗时，再跑全部。
+B2. 提交每个场景的 data/labels/<场景>/labels.pkl 和 labels_tracks.csv（不要提交 data/runs，太大），推送。
+
+最后报告：
+- A3 的报告内容；
+- B：每个场景的帧数、"left out: pose not trusted" 的帧数、框数、轨迹数、待审核轨迹数（auto_label.py 最后一行），
+  run_sequence.py 打印的每帧网络耗时；
+- 每步耗时，GPU 型号，用掉的磁盘空间（du -sh data/runs data/labels）。
 ```

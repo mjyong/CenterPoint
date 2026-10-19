@@ -43,7 +43,7 @@ def export_recording(frames_dir, labels, out_root, name, frame=None, skip_review
     infos = []
     for f in labels["frames"]:
         src = os.path.join(frames_dir, "%.6f.npy" % f["stamp"])
-        if not os.path.exists(src):
+        if f.get("pose_bad") or not os.path.exists(src):      # pose not trusted (refine_poses.py): left out
             continue
         objs = [o for o in f["objects"] if not (skip_review and o["review"])]
         pts = frame.points_to_model(np.load(src))

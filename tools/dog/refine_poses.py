@@ -404,10 +404,13 @@ def lo_tilt(lo_poses):
 
     On 0921 (5.8) the fused x, y and heading matched the odometry to 1 cm and 0.05 deg over 1 s,
     yet the fused pose check was up to 0.7 m worse than the odometry's, whose poses differ only by
-    their roll / pitch. Whether that tilt is real is not settled: on the moving sample bag the
-    body pitches 1.5 deg nose-down while braking (ground plane and gyro agree) and the odometry
-    pitch does not follow. So ``--tilt lo`` is optional (default: heading only, the det frame's
-    ``auto_level`` levels from the ground) and the pose checks compare both. The reference is the
+    their roll / pitch. 5.9 settled it: with the odometry tilt the fused check equals the
+    odometry's (at most 0.04 m apart over 35 scenes), without it the odometry is as bad as the
+    fused poses (up to 0.33 m worse); the robot tilts by up to 24 deg (kerbs, slopes) and by more
+    than 8 deg within 1 s in a tenth of some scenes, beyond what the det frame's ground levelling
+    (``auto_level``, 5 deg at most, 0.2 gain per sweep) follows. Small fast tilts are not seen
+    (moving sample bag: 1.5 deg while braking, ground plane and gyro agree, the odometry stays
+    flat); ``auto_level`` still corrects those and whatever stays constant. The reference is the
     median up (the robot stands level most of the time)."""
     up = lo_poses[:, :3, 2]                                       # body z in the odometry frame
     u = np.median(up, axis=0)
@@ -541,11 +544,11 @@ def draw(path, name, odom_ins, stamps, xy, corr, info, diag, checks=None):
     plt.close(fig)
 
 
-def refine(seq_dir, plots=None, prior="imu", lever_arm=None, tilt="none", **kw):
+def refine(seq_dir, plots=None, prior="imu", lever_arm=None, tilt="lo", **kw):
     """``lever_arm``: INS position point in the body frame (default: what the converter applied,
     ``meta["ins_lever_arm"]``; INSPVAX sequences converted before it have none and get the value
     measured on 0921); whatever the converter applied already is taken into account. ``tilt``:
-    "lo" writes the odometry roll / pitch (``lo_tilt``) into odom.npy, "none" the heading only."""
+    "lo" (default) writes the odometry roll / pitch (``lo_tilt``) into odom.npy, "none" the heading only."""
     rd = SequenceReader(seq_dir)
     p_ins = os.path.join(seq_dir, ODOM_INS)
     odom_ins = np.load(p_ins) if os.path.exists(p_ins) else rd.odom
@@ -616,7 +619,7 @@ def main():
     ap.add_argument("--sigma-lo-bad", type=float, default=0.5, help="[m] trust in an unhealthy odometry step")
     ap.add_argument("--prior", choices=["imu", "none"], default="imu",
                     help="KISS-ICP motion prediction: gyro rotation (imu) or its own constant velocity (none)")
-    ap.add_argument("--tilt", choices=["lo", "none"], default="none",
+    ap.add_argument("--tilt", choices=["lo", "none"], default="lo",
                     help="body roll / pitch in odom.npy: from the lidar odometry (lo, see lo_tilt) or none "
                          "(heading only, the det frame levels from the ground)")
     ap.add_argument("--huber", type=float, default=0.3, help="[m] INS residual above which it is down-weighted")
