@@ -19,6 +19,10 @@ and decides, in this order:
    val scene with overlaps, the cheaper side is dropped: the val scene if the overlapping train
    scenes are longer than it, otherwise those train scenes.
 
+With ``--no-drop`` nothing is dropped: static val scenes stay val, buffers go to train (the
+hold-out block then touches train at its two ends, as without buffers), train scenes overlapping
+val go to val and a val scene overlapping longer train scenes goes to train (see ``decide``).
+
 Output in ``--out``: split_check.csv (per scene: recording, seconds, path, moving share, split
 before / after, reason, share of the path within --radius of the other side), split_check.png
 (map: train blue, val orange, drop grey) and split_check.json (totals before / after, val share
@@ -136,10 +140,17 @@ def overlaps(a, b, radius, max_share):
     return near_share(a["xy"], b["xy"], radius) > max_share or near_share(b["xy"], a["xy"], radius) > max_share
 
 
-def decide(scenes, holdout=None, holdout_s=90.0, radius=10.0, max_share=0.1, min_moving=0.3):
+def decide(scenes, holdout=None, holdout_s=90.0, radius=10.0, max_share=0.1, min_moving=0.3, keep=False):
+    """``keep``: nothing is dropped. Static val scenes stay val (they stand where the next val
+    scene starts: in train they would overlap it). Buffers go to train and are not overlap-checked:
+    the hold-out block then touches train at its two ends, as without buffers (the same objects
+    seen seconds apart there; ``val_path_within_radius_of_train`` shows how much). Train scenes
+    overlapping a val scene go to val, a val scene overlapping longer train scenes goes to train."""
     for s in scenes:
         if s["after"] == "val" and s["moving"] < min_moving:
-            s["after"], s["reason"] = "drop", "static val scene (moving %.0f%% of the time)" % (100 * s["moving"])
+            s["after"], s["reason"] = ("val" if keep else "drop"), "static val scene (moving %.0f%% of the time)" % (
+                100 * s["moving"])
+    buffers = []
     if holdout:
         got = pick_holdout(scenes, holdout, holdout_s, radius, min_moving)
         if got is None:
@@ -150,17 +161,18 @@ def decide(scenes, holdout=None, holdout_s=90.0, radius=10.0, max_share=0.1, min
                 s["after"], s["reason"] = "val", "hold-out block (%.0f%% of its path within %.0f m of train)" % (
                     100 * share, radius)
             for s in buffers:
-                s["after"], s["reason"] = "drop", "buffer next to the hold-out block"
+                s["after"], s["reason"] = ("train" if keep else "drop"), "buffer next to the hold-out block"
     for v in [s for s in scenes if s["after"] == "val"]:
-        hits = [t for t in scenes if t["after"] == "train" and overlaps(v, t, radius, max_share)]
+        hits = [t for t in scenes if t["after"] == "train" and not any(t is b for b in buffers)
+                and overlaps(v, t, radius, max_share)]
         if not hits:
             continue
         names = ", ".join(t["name"] for t in hits)
         if sum(t["dur"] for t in hits) > v["dur"]:
-            v["after"], v["reason"] = "drop", "overlaps train %s (cheaper to drop this val scene)" % names
+            v["after"], v["reason"] = ("train" if keep else "drop"), "overlaps train %s (cheaper to move this val scene)" % names
         else:
             for t in hits:
-                t["after"], t["reason"] = "drop", "overlaps val %s" % v["name"]
+                t["after"], t["reason"] = ("val" if keep else "drop"), "overlaps val %s" % v["name"]
     val, train = [s for s in scenes if s["after"] == "val"], [s for s in scenes if s["after"] == "train"]
     for s in scenes:
         other = train if s["after"] == "val" else val
@@ -233,6 +245,8 @@ def main():
     ap.add_argument("--radius", type=float, default=10.0, help="[m] paths closer than this count as the same place")
     ap.add_argument("--max-share", type=float, default=0.1, help="share of a path near the other side that is allowed")
     ap.add_argument("--min-moving", type=float, default=0.3, help="val scenes moving less of the time are dropped")
+    ap.add_argument("--no-drop", action="store_true",
+                    help="keep every scene: static val scenes stay val, buffers go to train, overlapping scenes change side")
     ap.add_argument("--apply", action="store_true", help="write <out>/split.csv and segment.split into meta.json")
     args = ap.parse_args()
 
@@ -241,7 +255,7 @@ def main():
         raise SystemExit("no sequences")
     os.makedirs(args.out, exist_ok=True)
     before = totals(scenes, "before")
-    decide(scenes, args.holdout, args.holdout_s, args.radius, args.max_share, args.min_moving)
+    decide(scenes, args.holdout, args.holdout_s, args.radius, args.max_share, args.min_moving, keep=args.no_drop)
     after = totals(scenes, "after")
 
     cols = ["name", "recording", "seconds", "path_m", "moving_share", "split_before", "split_after", "near_other_share",

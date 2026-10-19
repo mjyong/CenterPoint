@@ -121,6 +121,8 @@ voxel_generator = dict(
 train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
+    # older sweeps shifted / turned as INS pose errors would (det3d/datasets/pipelines/dog_aug.py)
+    dict(type="SweepPoseJitter", prob=0.3, sigma_v=0.5, max_v=1.5, sigma_w_deg=3.0, max_w_deg=10.0),
     dict(type="Preprocess", cfg=train_preprocessor),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),

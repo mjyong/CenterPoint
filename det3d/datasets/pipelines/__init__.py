@@ -5,6 +5,7 @@ from .formating import Reformat
 from .loading import *
 from .test_aug import DoubleFlip
 from .preprocess import Preprocess, Voxelization
+from .dog_aug import SweepPoseJitter
 
 __all__ = [
     "Compose",
@@ -19,6 +20,7 @@ __all__ = [
     "LoadProposals",
     "PhotoMetricDistortion",
     "Preprocess",
+    "SweepPoseJitter",
     "Voxelization",
     "AssignTarget",
     "AssignLabel"

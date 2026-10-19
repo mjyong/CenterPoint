@@ -207,6 +207,8 @@ python tools/dog/split_check.py --seq data/seq/0921_* --out data/survey/split \
 - 验证路线落在训练路线 10 m 内的比例 ≤ 5%；
 - 因为重叠和缓冲去掉的训练数据不超过原训练时长的 15%。
 
+**不丢场景（`--no-drop`）**：静止的验证场景留在验证集（它和下一个验证场景在同一个地方，放进训练集就会重合）；缓冲场景放进训练集，不做重合检查，这时留出块两端直接挨着训练集，和没有缓冲一样，两端几秒内看到的是同一批物体（`val_path_within_radius_of_train` 会显示有多少）；和验证场景重合的训练场景改为验证，和更长的训练场景重合的验证场景改为训练。缓冲不放进验证集：录制是连续走的，缓冲进了验证集又会和下一个训练场景挨着，一路连下去。
+
 **0921 的结果（5.9，`--holdout 0921_165659 --holdout-s 90 --apply`）**：验证集 8 个场景（164127_s001–s004、165659_s003–s006），230.7 s，运动 207.7 s，占全部运动时间的 24.5%；验证路线离训练路线 10 m 内的比例 0%；去掉 4 个场景（164127_s000、s005 静止；165659_s002、s007 是留出块两侧的缓冲），训练集剩 23 个场景、690 s。三个目标都满足（验证运动 ≥ 150 s、占比 12–25%；重叠 ≤ 5%；因缓冲去掉的训练 ≤ 15%，实际约 7%）。
 
 ### 3.5 位姿融合：激光里程计 + RTK（`refine_poses.py`）
@@ -644,14 +646,17 @@ B.  按 docs/BAG_SPLIT.md 5.3 节的第 1–5 步执行（它的第 4 步会重�
 ### 5.10 第十轮：第六版融合（加倾斜）+ 预览；通过后进入第 4 步
 
 ```text
-任务：A) 用第六版 refine_poses.py（默认 --tilt lo）重新融合 0921 所有序列并重跑预览；
+任务：A) 不丢场景重新划分；用第六版 refine_poses.py（默认 --tilt lo）重新融合 0921 所有序列并重跑预览；
       B) 如果 A 的预览里没有 shift_p90_m=FAIL，接着做第 4 步（教师推理 + 自动标注）。不重转 bag。
 仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
 
+A0. 不丢场景，重新划分（静止场景留在验证集，缓冲场景进训练集）：
+    python tools/dog/split_check.py --seq data/seq/0921_* --out data/survey/split --holdout 0921_165659 --holdout-s 90 --no-drop --apply
+    报告打印的 after 行和最后一行（val_path_within_radius_of_train 会比 0 大一点，是留出块两端和缓冲场景挨着的部分）。
 A1. python tools/dog/refine_poses.py --seq data/seq/0921_* --plots data/preview/poses
 A2. python tools/dog/sequence_preview.py --seq "data/seq/0921_165659_s*" --out data/preview/0921_165659
     python tools/dog/sequence_preview.py --seq "data/seq/0921_164127_s*" --out data/preview/0921_164127
-A3. 提交 data/preview（poses 和两个预览目录），推送到 claude/me/v01。不要提交 data/seq。
+A3. 提交 data/survey/split 和 data/preview（poses 和两个预览目录），推送到 claude/me/v01。不要提交 data/seq。
     报告：refine 的整张表和 "pose bad" 行；预览里每个场景的 shift_p90_m、tilt_deg 和 status，与上一轮（5.9）对比。
     预览里有 shift_p90_m=FAIL 就到此为止。
 

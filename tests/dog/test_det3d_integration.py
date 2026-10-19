@@ -56,8 +56,9 @@ def test_dog_dataset_gt_sampling_and_training_step(sim_frames, tmp_path):
     for split in ("train", "val"):
         d = cfg.data[split]
         d.root_path, d.info_path, d.ann_file = root, os.path.join(root, "infos_%s.pkl" % split), None
-    cfg.data.train.pipeline[2].cfg.db_sampler.db_info_path = db
-    cfg.data.train.pipeline[2].cfg.db_sampler.db_prep_steps[0].filter_by_min_num_points = dict(
+    pre = next(p for p in cfg.data.train.pipeline if p.type == "Preprocess")
+    pre.cfg.db_sampler.db_info_path = db
+    pre.cfg.db_sampler.db_prep_steps[0].filter_by_min_num_points = dict(
         car=1, truck=1, bus=1, pedestrian=1, cyclist=1)       # no bus in the sim: sampler skips it
     np.random.seed(0)
     ds = build_dataset(cfg.data.train)

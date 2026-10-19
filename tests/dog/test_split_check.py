@@ -70,3 +70,27 @@ def test_static_holdout_and_overlap(tmp_path):
     seg = json.load(open(os.path.join(root, "rA_s004", "meta.json")))["segment"]
     assert seg["split"] == "val" and seg["split_survey"] == "train"
     assert os.path.getsize(tmp_path / "split" / "split_check.png") > 10000
+
+
+def test_no_drop_keeps_every_scene_on_the_safe_side(tmp_path):
+    """Same recordings as above with --no-drop: the static val scene stays val, the buffer goes to
+    train, the train scene overlapping a val scene goes to val; nothing is dropped. The hold-out
+    block now touches train (the buffer) at one end."""
+    root = str(tmp_path / "seq")
+    a, b = (LAT0, LON0, H0), (LAT0 + 100 / 110850.0, LON0, H0)
+    ends = [0, 30, 75, 120, 165, 210, 255]
+    for k in range(6):
+        xy, v = _walk((ends[k], 0), (ends[k + 1], 0), static=100 if k == 0 else 0)
+        _scene(root, "rA_s%03d" % k, "train", a, xy, 1000.0 + 30 * k, v)
+    for k, (p0, p1) in enumerate([((0, 0), (0, 0)), ((0, 0), (0, 45)), ((0, 45), (0, 90))]):
+        xy, v = _walk(p0, p1)
+        _scene(root, "rB_s%03d" % k, "val", b, xy, 2000.0 + 30 * k, v)
+    seqs = sorted(os.path.join(root, d) for d in os.listdir(root))
+    subprocess.run([sys.executable, "tools/dog/split_check.py", "--seq", *seqs, "--out", str(tmp_path / "split"),
+                    "--holdout", "rA", "--holdout-s", "55", "--no-drop"], check=True, capture_output=True)
+    rows = {r["name"]: r for r in csv.DictReader(open(tmp_path / "split" / "split_check.csv"))}
+    got = {n: r["split_after"] for n, r in rows.items()}
+    assert got == {"rA_s000": "val", "rA_s001": "train", "rA_s002": "train", "rA_s003": "train",
+                   "rA_s004": "val", "rA_s005": "val", "rB_s000": "val", "rB_s001": "val", "rB_s002": "val"}
+    s = json.load(open(tmp_path / "split" / "split_check.json"))
+    assert s["after"]["drop"]["scenes"] == 0 and 0 < s["val_path_within_radius_of_train"] < 0.2

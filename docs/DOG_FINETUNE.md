@@ -179,7 +179,7 @@ python tools/train.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir data/tra
 ```
 
 - 迁移：car ← car，truck ← truck（nuScenes task 1 的 truck 通道），bus ← bus（task 2 的 bus 通道），pedestrian ← pedestrian，cyclist ← bicycle；其余层原样。task 从 `--config` 读（默认 `configs/dog/dog_centerpoint_pp_xt32.py`，Voxel 的 head 布局相同），旧的 3 类配置传 `--config configs/dog/dog_centerpoint_pp_xt32_3cls.py`（vehicle ← car）。配置里 `load_from` 指向迁移后的权重。
-- 配置：5 个 task（car、truck、bus、行人、骑行者各一个），输出时 car / truck / bus 合并为 vehicle，见第 12 节；20 个 epoch，one-cycle 最大学习率 5e-4，GT 采样（car 2、truck 2、bus 2、人 4、骑行 4；GT 库里没有的类别跳过），±45° 旋转、±5% 缩放、±2° 俯仰/横滚增强。
+- 配置：5 个 task（car、truck、bus、行人、骑行者各一个），输出时 car / truck / bus 合并为 vehicle，见第 12 节；20 个 epoch，one-cycle 最大学习率 5e-4，GT 采样（car 2、truck 2、bus 2、人 4、骑行 4；GT 库里没有的类别跳过），±45° 旋转、±5% 缩放、±2° 俯仰/横滚增强；另有 30% 的帧把历史 4 帧按随机的速度误差（σ 0.5 m/s，最多 1.5 m/s）和角速度误差（σ 3°/s，最多 10°/s）挪动（`SweepPoseJitter`，`det3d/datasets/pipelines/dog_aug.py`）：线上用 INS 位姿拼帧，急刹、急转时历史帧会错开 0.2–0.6 m、几度，训练帧用的是修正后的位姿，这样网络见过这种重影。当前帧和标注框不动，所以标注仍然对。
 - 单卡（RTX 4090）直接运行；中断后用 `--resume_from <work_dir>/epoch_N.pth` 续训。多卡命令（`torch.distributed.launch`）在 torch 2.x 上没有验证过。没有 GPU 时同一条命令会在 CPU 上跑，只适合检查流程。
 - 配置要点、日志怎么看、怎么选 epoch，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) 第 4 节。
 
