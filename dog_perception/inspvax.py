@@ -30,7 +30,12 @@ straight at 1.5-2.5 m/s, see docs/DOG_PIPELINE.md section 9):
   by more than 45 deg: (-0.06, -0.54) m, every leave-one-out fit within 3 cm
   (docs/BAG_SPLIT.md 5.6). ``apply_lever_arm`` moves the rows to the body
   origin; the height of the point does not matter with a heading-only
-  attitude.
+  attitude. The robot's calibration puts the IMU only 0.18 m behind the lidar
+  (lidar -> IMU: T = (-0.0213, 0.18, 0.009) m, R = 180 deg yaw; in the body
+  frame (0.02, -0.18) m). That value explains less of the 0921 offsets (rms
+  0.086 m against 0.076 m, 0.097 m without a lever arm), so the INSPVAX point
+  is not the IMU centre; most likely the GNSS antenna, if the INS has no or a
+  wrong IMU -> antenna offset configured. The fitted value is used.
 """
 from pathlib import Path
 
