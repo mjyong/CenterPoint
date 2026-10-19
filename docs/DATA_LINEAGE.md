@@ -101,8 +101,8 @@ mindmap
 
 | 记号 | 名称 | 定义 | 出现在哪里 |
 |---|---|---|---|
-| L | 雷达系 | XT32 自己的坐标系（bag 里的 `frame_id: hesai_lidar`） | bag 点云、`scans/*.npz` |
-| B | 机身系 | INSPVAX 的约定：`yaw = 180° − azimuth`，只有航向、没有横滚俯仰。L 到 B 是绕 z 转 180°（`T_body_lidar`，`KYGI_LIDAR_RPY`） | 去畸变、IMU |
+| L | 雷达系 | XT32 自己的坐标系（bag 里的 `frame_id: hesai_lidar`）：x 左、y 后、z 上 | bag 点云、`scans/*.npz` |
+| B | 机身系 | 轴和 IMU 相同：x 右、y 前、z 上，原点在雷达。INSPVAX 的约定：`yaw = 180° − azimuth`，只有航向、没有横滚俯仰。L 到 B 是绕 z 转 180°（`T_body_lidar`，`KYGI_LIDAR_RPY`）。机器人本体系（x 前、y 左、z 上）是 B 绕 z 转 +90° | 去畸变、IMU |
 | W | 世界系 | ENU（东、北、天），原点是这份录制第一个 `ins_status = 3` 的定位点；同一录制的所有场景共用这个原点 | `odom.npy`、跟踪、地图 |
 | D | 检测系 | 重力对齐，航向跟机身，原点在机身正下方的地面（机身原点下移 `base_height`），再用近处地面在线修正高度和倾斜（`auto_ground` / `auto_level`） | 预处理输出、教师检测、标签、审核 |
 | M | 网络系 | 虚拟 nuScenes 雷达：`x_M = Rz(+90°)·x_D`，`z_M = z_D − 1.84 m`，以沿用 nuScenes 预训练模型的 z 先验 | 训练数据集、网络输入输出 |
