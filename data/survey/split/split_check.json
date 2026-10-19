@@ -25,25 +25,25 @@
   },
   "after": {
     "train": {
-      "scenes": 23,
-      "seconds": 690.1,
-      "moving_seconds": 639.5,
-      "path_m": 854.7
+      "scenes": 25,
+      "seconds": 747.9,
+      "moving_seconds": 697.1,
+      "path_m": 927.3
     },
     "val": {
-      "scenes": 8,
-      "seconds": 230.7,
+      "scenes": 10,
+      "seconds": 288.3,
       "moving_seconds": 207.7,
-      "path_m": 301.3
+      "path_m": 301.9
     },
     "drop": {
-      "scenes": 4,
-      "seconds": 115.4,
-      "moving_seconds": 57.7,
-      "path_m": 73.2
+      "scenes": 0,
+      "seconds": 0,
+      "moving_seconds": 0,
+      "path_m": 0
     }
   },
-  "val_path_within_radius_of_train": 0.0,
-  "val_share_of_moving": 0.245,
+  "val_path_within_radius_of_train": 0.07,
+  "val_share_of_moving": 0.23,
   "applied": true
 }

@@ -1,18 +1,18 @@
 name,split,reason
-0921_164127_s000,drop,static val scene (moving 0% of the time)
+0921_164127_s000,val,static val scene (moving 0% of the time)
 0921_164127_s001,val,
 0921_164127_s002,val,
 0921_164127_s003,val,
 0921_164127_s004,val,
-0921_164127_s005,drop,static val scene (moving 0% of the time)
+0921_164127_s005,val,static val scene (moving 0% of the time)
 0921_165659_s000,train,
 0921_165659_s001,train,
-0921_165659_s002,drop,buffer next to the hold-out block
+0921_165659_s002,train,buffer next to the hold-out block
 0921_165659_s003,val,hold-out block (0% of its path within 10 m of train)
 0921_165659_s004,val,hold-out block (0% of its path within 10 m of train)
 0921_165659_s005,val,hold-out block (0% of its path within 10 m of train)
 0921_165659_s006,val,hold-out block (0% of its path within 10 m of train)
-0921_165659_s007,drop,buffer next to the hold-out block
+0921_165659_s007,train,buffer next to the hold-out block
 0921_165659_s008,train,
 0921_165659_s009,train,
 0921_165659_s010,train,
