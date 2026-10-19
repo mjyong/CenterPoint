@@ -5,11 +5,17 @@
 Why: the kygi INS position is right while the robot walks steadily, but when it brakes hard the
 INS velocity overshoots (2.5 m/s) and the position runs ~0.5 m ahead for a second or more; the
 backward steps that follow only partly correct it (moving sample bag: 0.44 m ahead at 2.1 s,
-measured by registering lidar frames). Sweeps stacked across that time show ghosts, and
-auto-labels that pin a static object in the world frame land ~0.5 m off the points there.
+measured by registering lidar frames). And its position is that of a point 0.54 m behind the
+lidar, which swings around the robot in every turn. Sweeps stacked across those times show ghosts,
+and auto-labels that pin a static object in the world frame land up to ~0.5 m off the points there.
 
 How, per sequence:
 
+0. INS lever arm: the INSPVAX position is that of a point 0.54 m behind the lidar (the body
+   origin), so it swings around the robot whenever it turns (dog_perception/inspvax.py). The
+   rows are moved to the body origin (``--lever-arm``, default the measured kygi value; sequences
+   converted with it already, ``meta["ins_lever_arm"]``, are not moved twice). The lever arm
+   left over is fitted per sequence (``lever_residual_m``, sequences turning > 45 deg) as a check.
 1. Lidar odometry: every scan (same de-duplication and self filter as the online preprocessing,
    body frame, per-point times) goes through KISS-ICP, which deskews it to the scan end (our
    stamp) and registers it against its local map. Its motion prediction gets the rotation from
@@ -25,20 +31,21 @@ How, per sequence:
 
    with d_k the odometry step turned into ENU with the INS heading (which agrees with the gyro).
    Both healthy: the odometry carries the motion and the INS (sigma_ins 1 m) only removes its
-   slow drift - on the 0921 data the INS is 0.2-0.9 m off at the 1 s scale even where it is
-   self-consistent, the odometry is not. INS unhealthy: w_k = 0. Odometry unhealthy: its step is
-   replaced by the INS velocity with ``sigma_lo_bad`` and the INS takes over.
-4. Self-check: an INS gap whose odometry does not close on the INS at its far end within
-   ``--gap-tol`` (+5 % of its length) has its odometry distrusted too and is re-solved, so the
-   error stays inside; such gaps and stretches where neither source is healthy are listed as bad
-   in meta.json (do not label those frames). Gaps touching the start or end cannot be checked
-   and are listed as unverified.
-5. Output: odom.npy keeps the INS rows (100 Hz times, heading-only attitude, height), with east /
-   north replaced by the fused trajectory (linear between scan stamps, so the IMU propagation and
-   deskew work exactly as before) and the velocity by its derivative. The INS original is kept
-   once as odom_ins.npy and is always the input, so re-running is safe. meta.json gets
-   ``pose_source = "kiss-icp+ins"`` and ``pose_refine`` (correction statistics, health shares,
-   bad and unverified intervals, the per-source pose checks).
+   slow drift - on the 0921 data the INS is 0.2-0.5 m off at the 1 s scale even where it is
+   self-consistent, the odometry is not. INS unhealthy: w_k = 0. A run of unhealthy odometry
+   steps: the INS velocity where the INS is healthy along the whole run, else the net odometry
+   motion over the run spread evenly (``sigma_lo_bad``).
+4. Self-check: an INS gap whose odometry misses the INS at its far end by more than
+   ``--gap-tol`` + ``--gap-rel`` x its length gets its odometry steps down-weighted (kept, not
+   replaced), so the miss is absorbed inside the gap; such gaps and stretches where neither
+   source is healthy are listed as bad in meta.json (do not label those frames). Gaps touching
+   the start or end cannot be checked and are listed as unverified.
+5. Output: odom.npy keeps the INS rows (100 Hz times, heading-only attitude, height), at the body
+   origin, with east / north replaced by the fused trajectory (linear between scan stamps, so the
+   IMU propagation and deskew work exactly as before) and the velocity by its derivative. The INS
+   original is kept once as odom_ins.npy and is always the input, so re-running is safe.
+   meta.json gets ``pose_source = "kiss-icp+ins"`` and ``pose_refine`` (correction statistics,
+   health shares, lever arm, bad and unverified intervals, the per-source pose checks).
 6. With ``--plots``: per sequence a plot (trajectory; correction and health; the lidar shift
    check for INS / odometry / fused poses) and ``<seq>_diag.npz``; ``refine_summary.csv`` over all.
 
@@ -56,6 +63,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))          # sequence_preview (pose checks)
 
 from dog_perception.geometry import make_T, quat_to_R, rot_z, so3_exp, transform_points, yaw_of  # noqa: E402
+from dog_perception.inspvax import KYGI_INS_LEVER_ARM, apply_lever_arm  # noqa: E402
 from dog_perception.io import SequenceReader, load_scan  # noqa: E402
 from dog_perception.preprocess import SelfFilter, SelfFilterConfig, dedup_returns  # noqa: E402
 
@@ -168,6 +176,24 @@ def _runs(mask):
     return out
 
 
+def lever_check(stamps, lo_cum, p_ins, yaw_ins, ok, min_turn=45.0):
+    """Lever arm left between the INS rows and the odometry, body frame [m]: least squares of
+    p_ins - lo_cum = c + v t + R(yaw) L over the scans in ``ok`` (an offset and a slow drift of the
+    odometry, plus the INS point turning with the robot). ~0 once the INS rows refer to the body
+    origin. None when those scans turn by less than ``min_turn`` deg (not observable)."""
+    if ok.sum() < 20 or np.degrees(np.ptp(yaw_ins[ok])) < min_turn:
+        return None
+    t, c, s = stamps[ok] - stamps[0], np.cos(yaw_ins[ok]), np.sin(yaw_ins[ok])
+    one, zero = np.ones_like(t), np.zeros_like(t)
+    A = np.concatenate([np.column_stack([one, zero, t, zero, c, -s]), np.column_stack([zero, one, zero, t, s, c])])
+    b = np.concatenate([p_ins[ok, 0] - lo_cum[ok, 0], p_ins[ok, 1] - lo_cum[ok, 1]])
+    w = np.ones(len(b))
+    for _ in range(5):                                            # robust: a few bad samples do not move it
+        x = np.linalg.lstsq(A * w[:, None], b * w, rcond=None)[0]
+        w = np.sqrt(np.minimum(1.0, 0.1 / np.maximum(np.abs(A @ x - b), 1e-9)))
+    return [round(float(x[4]), 3), round(float(x[5]), 3)]
+
+
 def ins_health(odom_ins, stamps, lo_cum, window=0.5, max_rate=0.4, margin=0.3, min_island=1.0):
     """True where the INS position can be trusted: over ``window``-long intervals it agrees with
     its own velocity integral (it does not while the robot brakes: 1 m/s apart in the moving sample
@@ -229,19 +255,25 @@ def lo_health(d, vel_step, stamps, ins_ok=None, max_speed=3.5, window=0.6, zigza
 
 
 def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=0.5, huber=0.3, gap_tol=0.5,
-         iters=6):
-    """Fused east / north at the scan stamps, plus diagnostics.
+         gap_rel=0.05, iters=6):
+    """Fused east / north at the scan stamps, plus diagnostics. ``odom_ins`` must already refer to
+    the body origin (``apply_lever_arm``).
 
     Two sources, each with its own health. Where both are healthy, the odometry carries the
     motion from scan to scan and the INS only removes its slow drift (``sigma_ins`` = 1 m against
     0.02 m per odometry step: a time constant of ~5 s). On the 0921 data the INS is off by
-    0.2-0.9 m at the 1 s scale even where it is self-consistent, while the odometry is not, so it
+    0.2-0.5 m at the 1 s scale even where it is self-consistent, while the odometry is not, so it
     must not pull harder. Where the INS is not healthy (braking: position and velocity disagree)
-    its weight is zero; where the odometry is not healthy (``lo_health``), its steps are replaced
-    by the INS velocity with ``sigma_lo_bad`` and the INS takes over. Where neither is, the
-    stretch is reported as bad (do not label it). A gap in the INS bridged by the odometry that
-    does not close on the INS at its far end within ``gap_tol`` (+5 % of its length) is reported
-    as bad too; gaps that touch the start or end cannot be checked and are listed as unverified."""
+    its weight is zero. A run of unhealthy odometry steps (``lo_health``) is replaced by the INS
+    velocity where the INS is healthy all along the run, else by the net odometry motion over the
+    run spread evenly (a zigzag of KISS-ICP keeps its net motion; the INS velocity is what
+    overshoots there), with ``sigma_lo_bad``. Where neither source is healthy the stretch is
+    reported as bad (do not label it). A gap in the INS bridged by the odometry that misses the
+    INS at its far end by more than ``gap_tol`` + ``gap_rel`` x its length is reported as bad too
+    and its odometry steps get ``sigma_lo_bad``, so the miss is absorbed inside the gap instead of
+    shifting the healthy stretches around it (the steps themselves are kept: on the 0921 data the
+    odometry was right in every such gap, see docs/BAG_SPLIT.md 5.6). Gaps that touch the start or
+    end cannot be checked and are listed as unverified."""
     p_ins, yaw_ins = ins_at(odom_ins, stamps)
     yaw_lo = np.array([yaw_of(T[:3, :3]) for T in lo_poses])
     step = np.diff(lo_poses[:, :2, 3], axis=0)
@@ -258,14 +290,21 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
     healthy, rate_v, rate_lo = ins_health(odom_ins, stamps, np.concatenate([[[0.0, 0.0]], np.cumsum(d, axis=0)]))
     lo_ok = lo_health(d, vel_step, stamps, healthy)
     bad_lo = ~lo_ok
-    d_used = np.where(bad_lo[:, None], vel_step, d)
+    ins_ok_step = healthy[1:] & healthy[:-1]
+    d_used, bridged = d.copy(), np.zeros(len(d), bool)
+    for i0, i1 in _runs(bad_lo):
+        if ins_ok_step[i0:i1 + 1].all():
+            d_used[i0:i1 + 1] = vel_step[i0:i1 + 1]
+        else:
+            d_used[i0:i1 + 1] = d[i0:i1 + 1].sum(axis=0) / (i1 - i0 + 1)
+            bridged[i0:i1 + 1] = True
     w_lo = np.where(bad_lo, 1.0 / sigma_lo_bad ** 2, 1.0 / sigma_lo ** 2)
     lo_cum = np.concatenate([[[0.0, 0.0]], np.cumsum(d_used, axis=0)])
     if not healthy.any():                                         # keep the problem anchored
         healthy[:] = True
     base = np.where(healthy, 1.0, 0.0)
 
-    def solve(d_used, w_lo):
+    def solve(w_lo):
         w = base.copy()
         for _ in range(iters):
             xy = np.column_stack([_solve(d_used[:, i], w_lo, p_ins[:, i], np.maximum(w, 1e-6) / sigma_ins ** 2)
@@ -274,7 +313,7 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
             w = base * np.minimum(1.0, huber / np.maximum(r, 1e-9))
         return xy
 
-    def gaps(lo_cum):
+    def gaps():
         """INS gaps: (t0, t1, closure or None if unverifiable, step range)."""
         out = []
         for i0, i1 in _runs(~healthy):
@@ -284,20 +323,14 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
             a_, b_ = i0 - 1, i1 + 1
             closure = float(np.linalg.norm((lo_cum[b_] - lo_cum[a_]) - (p_ins[b_, :2] - p_ins[a_, :2])))
             length = float(np.sum(np.linalg.norm(d_used[a_:b_], axis=1)))
-            out.append((float(stamps[i0]), float(stamps[i1]), closure if closure > gap_tol + 0.05 * length else 0.0,
+            out.append((float(stamps[i0]), float(stamps[i1]), closure if closure > gap_tol + gap_rel * length else 0.0,
                         (a_, b_)))
         return out
 
-    xy = solve(d_used, w_lo)
-    # an INS gap the odometry does not close: its steps are not trusted either, so that the error
-    # stays inside the gap instead of spreading over the healthy stretches around it
-    failed = [g for g in gaps(lo_cum) if g[2]]
-    if failed:
-        for _, _, _, (a_, b_) in failed:
-            bad_lo[a_:b_] = True
-        d_used = np.where(bad_lo[:, None], vel_step, d)
-        w_lo = np.where(bad_lo, 1.0 / sigma_lo_bad ** 2, 1.0 / sigma_lo ** 2)
-        xy = solve(d_used, w_lo)
+    failed = [g for g in gaps() if g[2]]
+    for _, _, _, (a_, b_) in failed:
+        w_lo[a_:b_] = np.minimum(w_lo[a_:b_], 1.0 / sigma_lo_bad ** 2)
+    xy = solve(w_lo)
     corr = np.linalg.norm(xy - p_ins[:, :2], axis=1)
     # odometry quality where it can be checked: 1 s displacement against the healthy INS
     k1 = max(1, int(round(1.0 / max(np.median(np.diff(stamps)), 1e-3)))) if len(stamps) > 1 else 1
@@ -305,7 +338,7 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
     lo_err = np.array([np.linalg.norm((lo_cum[i + k1] - lo_cum[i]) - (p_ins[i + k1, :2] - p_ins[i, :2])) for i in ok])
     lo_ok_scan = np.concatenate([[True], lo_ok]) & np.concatenate([lo_ok, [True]])
     bad_gaps = [[round(t0, 3), round(t1, 3), round(c, 3)] for t0, t1, c, _ in failed]
-    unverified = [[round(t0, 3), round(t1, 3)] for t0, t1, c, _ in gaps(lo_cum) if c is None]
+    unverified = [[round(t0, 3), round(t1, 3)] for t0, t1, c, _ in gaps() if c is None]
     for i0, i1 in _runs(~healthy & ~lo_ok_scan):                   # neither source
         t0, t1 = float(stamps[i0]), float(stamps[i1])
         if t1 - t0 >= 0.2 and not any(g[0] <= t0 and t1 <= g[1] for g in bad_gaps):
@@ -315,7 +348,8 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
     for g in bad_gaps:
         in_bad |= (stamps >= g[0]) & (stamps <= g[1])
     vlen = float(np.sum(np.linalg.norm(vel_step, axis=1)))
-    info = dict(scans=int(len(stamps)), lo_steps_rejected=int(bad_lo.sum()),
+    raw_cum = np.concatenate([[[0.0, 0.0]], np.cumsum(d, axis=0)])
+    info = dict(scans=int(len(stamps)), lo_steps_rejected=int(bad_lo.sum()), lo_steps_bridged=int(bridged.sum()),
                 lo_unhealthy_share=round(float(np.mean(bad_lo)), 3) if len(bad_lo) else 0.0,
                 lo_path_ratio=round(float(np.sum(np.linalg.norm(d, axis=1)) / vlen), 2) if vlen > 0.5 else None,
                 ins_unhealthy_share=round(float(np.mean(~healthy)), 3),
@@ -326,9 +360,10 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
                 lo_vs_ins_1s_p90_m=round(float(np.percentile(lo_err, 90)), 3) if len(lo_err) else None,
                 bad_intervals=bad_gaps, unverified_intervals=unverified, bad_share=round(float(in_bad.mean()), 3),
                 lo_path_m=round(float(np.sum(np.linalg.norm(d_used, axis=1))), 2),
-                ins_path_m=round(float(np.sum(np.linalg.norm(ins_step, axis=1))), 2))
-    return xy, corr, info, dict(healthy=healthy, rate_v=rate_v, rate_lo=rate_lo, bad_lo=bad_lo, p_ins=p_ins,
-                                yaw_ins=yaw_ins)
+                ins_path_m=round(float(np.sum(np.linalg.norm(ins_step, axis=1))), 2),
+                lever_residual_m=lever_check(stamps, raw_cum, p_ins, yaw_ins, healthy & lo_ok_scan))
+    return xy, corr, info, dict(healthy=healthy, rate_v=rate_v, rate_lo=rate_lo, bad_lo=bad_lo, bridged=bridged,
+                                p_ins=p_ins, yaw_ins=yaw_ins)
 
 
 def pose_checks(stamps, lo_poses, xy, diag, kept, gap=1.0, seed=0):
@@ -410,21 +445,30 @@ def draw(path, name, odom_ins, stamps, xy, corr, info, diag, checks=None):
     plt.close(fig)
 
 
-def refine(seq_dir, plots=None, prior="imu", **kw):
+def refine(seq_dir, plots=None, prior="imu", lever_arm=None, **kw):
+    """``lever_arm``: INS position point in the body frame (default: the kygi value for INSPVAX
+    sequences, else none); whatever the converter applied already (``meta["ins_lever_arm"]``,
+    sequences converted before it have none) is taken into account."""
     rd = SequenceReader(seq_dir)
     p_ins = os.path.join(seq_dir, ODOM_INS)
     odom_ins = np.load(p_ins) if os.path.exists(p_ins) else rd.odom
     if len(rd) < 2 or len(odom_ins) < 2:
         return None
+    applied = np.asarray(rd.meta.get("ins_lever_arm", [0.0, 0.0, 0.0]), np.float64)
+    if lever_arm is None:
+        lever_arm = KYGI_INS_LEVER_ARM if "lat0" in rd.meta else applied
+    lever_arm = np.asarray(lever_arm, np.float64)
+    odom_body = apply_lever_arm(odom_ins, lever_arm - applied)     # INS rows of the body origin
     stamps, poses, kept = lidar_odometry(rd, prior=None if prior == "none" else prior)
-    xy, corr, info, diag = fuse(stamps, poses, odom_ins, **kw)
+    xy, corr, info, diag = fuse(stamps, poses, odom_body, **kw)
+    info["lever_arm"] = [round(float(a), 3) for a in lever_arm]
     checks = pose_checks(stamps, poses, xy, diag, kept) if kept else None
     if checks:
         for k in ("ins", "lo", "fused"):
             v = checks[k][np.isfinite(checks[k])]
             info["shift_%s_p90_m" % k] = round(float(np.percentile(v, 90)), 3) if len(v) else None
             info["shift_%s_median_m" % k] = round(float(np.median(v)), 3) if len(v) else None
-    out = refined_odom(odom_ins, stamps, xy)
+    out = refined_odom(odom_body, stamps, xy)
     if not os.path.exists(p_ins):
         np.save(p_ins, odom_ins)
     np.save(os.path.join(seq_dir, "odom.npy"), out)
@@ -435,12 +479,13 @@ def refine(seq_dir, plots=None, prior="imu", **kw):
     name = os.path.basename(os.path.normpath(seq_dir))
     if plots:
         os.makedirs(plots, exist_ok=True)
-        draw(os.path.join(plots, name + ".png"), name, odom_ins, stamps, xy, corr, info, diag, checks)
+        draw(os.path.join(plots, name + ".png"), name, odom_body, stamps, xy, corr, info, diag, checks)
         # everything needed to look at one sequence again without its point clouds (a few tens of kB)
         np.savez_compressed(os.path.join(plots, name + "_diag.npz"), stamps=stamps, xy=xy,
                             lo_xyz=poses[:, :3, 3], lo_yaw=[yaw_of(T[:3, :3]) for T in poses],
                             p_ins=diag["p_ins"], yaw_ins=diag["yaw_ins"], healthy=diag["healthy"],
-                            rate_v=diag["rate_v"], bad_lo=diag["bad_lo"], odom_ins=odom_ins.astype(np.float32),
+                            rate_v=diag["rate_v"], bad_lo=diag["bad_lo"], bridged=diag["bridged"],
+                            odom_ins=odom_body,                       # float64: unix times
                             **({"check_" + k: v for k, v in checks.items()} if checks else {}))
     return info
 
@@ -458,10 +503,15 @@ def main():
                     help="KISS-ICP motion prediction: gyro rotation (imu) or its own constant velocity (none)")
     ap.add_argument("--huber", type=float, default=0.3, help="[m] INS residual above which it is down-weighted")
     ap.add_argument("--gap-tol", type=float, default=0.5,
-                    help="[m] (+5%% of its length) a bridged gap may miss the INS at its far end before it counts as bad")
+                    help="[m] a bridged INS gap may miss the INS at its far end by this (+ --gap-rel x its length) "
+                         "before it counts as bad")
+    ap.add_argument("--gap-rel", type=float, default=0.05, help="see --gap-tol")
+    ap.add_argument("--lever-arm", type=float, nargs=3, default=None,
+                    help="[m] INS position point in the body frame (default: the measured kygi value for INSPVAX "
+                         "sequences)")
     args = ap.parse_args()
     kw = dict(sigma_lo=args.sigma_lo, sigma_ins=args.sigma_ins, sigma_lo_bad=args.sigma_lo_bad, huber=args.huber,
-              gap_tol=args.gap_tol)
+              gap_tol=args.gap_tol, gap_rel=args.gap_rel)
     print("%-26s %5s  %-28s %8s %7s %8s %9s  %-24s" % (
         "sequence", "scans", "correction med / p90 / max [m]", "INS bad", "LO bad", "pose bad", "LO/INS path",
         "shift p90 ins / lo / fused"))
@@ -469,7 +519,7 @@ def main():
     for seq in sorted(args.seq):
         if not os.path.exists(os.path.join(seq, "meta.json")):
             continue
-        info = refine(seq, args.plots, prior=args.prior, **kw)
+        info = refine(seq, args.plots, prior=args.prior, lever_arm=args.lever_arm, **kw)
         if info is None:
             print("%-26s  too short - skipped" % os.path.basename(os.path.normpath(seq)))
             continue
@@ -480,11 +530,17 @@ def main():
             100 * info["ins_unhealthy_share"], 100 * info["lo_unhealthy_share"], 100 * info["bad_share"],
             f("lo_path_ratio"), " / ".join(f("shift_%s_p90_m" % k) for k in ("ins", "lo", "fused"))), flush=True)
         for g in info["bad_intervals"]:
-            why = "neither source healthy" if g[2] is None else "odometry misses the INS by %.2f m across the gap" % g[2]
+            why = "neither source healthy" if g[2] is None else \
+                "odometry misses the INS by %.2f m across the gap (absorbed inside it)" % g[2]
             print("    pose bad %.3f .. %.3f: %s" % (g[0], g[1], why))
-        rows.append(dict(name=name, **{k: v for k, v in info.items() if not isinstance(v, list)},
+        rows.append(dict(name=name, **{k: v for k, v in info.items() if not isinstance(v, list) and "lever" not in k},
+                         lever_arm=json.dumps(info["lever_arm"]), lever_residual_m=json.dumps(info["lever_residual_m"]),
                          bad_intervals=json.dumps(info["bad_intervals"]),
                          unverified_intervals=json.dumps(info["unverified_intervals"])))
+    fits = np.array([json.loads(r["lever_residual_m"]) for r in rows if r["lever_residual_m"] != "null"])
+    if len(fits):
+        print("INS lever arm left over, median of %d sequences turning > 45 deg: (%.2f, %.2f) m (should be ~0; "
+              "else add it to --lever-arm)" % (len(fits), *np.median(fits, axis=0)))
     if args.plots and rows:
         import csv
         cols = list(dict.fromkeys(k for r in rows for k in r))

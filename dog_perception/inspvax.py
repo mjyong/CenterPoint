@@ -22,13 +22,21 @@ straight at 1.5-2.5 m/s, see docs/DOG_PIPELINE.md section 9):
   lidar -y while the INS puts it on body +y, so ``T_body_lidar`` has a
   180 deg yaw (``KYGI_LIDAR_RPY``). A static recording cannot show this; a
   wrong yaw there only rotates the map, while the robot moves it shifts the
-  older sweeps the wrong way and static objects get the robot's speed.
+  older sweeps the wrong way and static objects get the robot's speed;
+* the INSPVAX position is not that of the lidar (the body origin) but of a
+  point 0.54 m behind it (``KYGI_INS_LEVER_ARM``): against the lidar
+  odometry, the INS position moves by R(yaw) @ lever arm whenever the robot
+  turns (up to 1.1 m after a U-turn). Fitted on the 14 0921 scenes that turn
+  by more than 45 deg: (-0.06, -0.54) m, every leave-one-out fit within 3 cm
+  (docs/BAG_SPLIT.md 5.6). ``apply_lever_arm`` moves the rows to the body
+  origin; the height of the point does not matter with a heading-only
+  attitude.
 """
 from pathlib import Path
 
 import numpy as np
 
-from .geometry import rot_z
+from .geometry import quat_to_R, rot_z
 from .ros_utils import stamp_of
 
 INS_SOLUTION_GOOD = 3
@@ -36,6 +44,7 @@ INS_RTKFIXED = 56                        # pos_type of an RTK-fixed INS solution
 KYGI_GYRO_SCALE = np.pi / 180.0          # deg/s -> rad/s
 R_BODY_KYGI_IMU = rot_z(np.pi)           # IMU / INS axes in the body frame
 KYGI_LIDAR_RPY = (0.0, 0.0, np.pi)       # XT32 orientation in the body frame (roll, pitch, yaw) [rad]
+KYGI_INS_LEVER_ARM = (-0.06, -0.54, 0.0)  # INSPVAX position point in the body frame [m]
 _A = 6378137.0
 _E2 = 6.69437999014e-3
 
@@ -87,13 +96,32 @@ def gyro_from_kygi_imu(msg):
     return R_BODY_KYGI_IMU @ (np.array([w.x, w.y, w.z], dtype=np.float64) * KYGI_GYRO_SCALE)
 
 
-def pose_from_inspvax(msg, origin):
-    """Return (t, R, p, v) or None when the INS solution is not good."""
+def pose_from_inspvax(msg, origin, lever_arm=None):
+    """Return (t, R, p, v) or None when the INS solution is not good. With ``lever_arm`` (the INS
+    position point in the body frame) p is the body origin; v stays that of the INS point (off by
+    yaw rate x lever arm, 0.3 m/s at 30 deg/s: ``apply_lever_arm`` corrects both on a whole series)."""
     if int(msg.ins_status.data) != INS_SOLUTION_GOOD:
         return None
     if origin is None:
         raise ValueError("origin is required")
     p = origin.enu(msg.latitude, msg.longitude, msg.height)
-    yaw = (-float(msg.azimuth) + 180.0) * np.pi / 180.0
+    R = rot_z((-float(msg.azimuth) + 180.0) * np.pi / 180.0)
+    if lever_arm is not None:
+        p = p - R @ np.asarray(lever_arm, np.float64)
     v = np.array([msg.east_velocity, msg.north_velocity, msg.up_velocity], dtype=np.float64)
-    return stamp_of(msg.header), rot_z(yaw), p, v
+    return stamp_of(msg.header), R, p, v
+
+
+def apply_lever_arm(odom, lever_arm):
+    """Odometry rows (t, xyz, quat xyzw, vel; the sequence ``odom.npy``) of the INS point -> rows of
+    the body origin: position minus R @ lever_arm, velocity minus its time derivative (central
+    differences). Returns a float64 copy; a zero lever arm returns it unchanged."""
+    out = np.array(odom, np.float64, copy=True)
+    L = np.asarray(lever_arm, np.float64)
+    if len(out) == 0 or not np.any(L):
+        return out
+    off = np.array([quat_to_R(q) @ L for q in out[:, 4:8]])
+    out[:, 1:4] -= off
+    if len(out) > 1 and np.isfinite(out[:, 8:11]).all():
+        out[:, 8:11] -= np.gradient(off, out[:, 0], axis=0)
+    return out

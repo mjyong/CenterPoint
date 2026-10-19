@@ -10,8 +10,9 @@ Frames: "body" is the frame the LIO odometry reports (usually the IMU frame,
 e.g. FAST-LIO), so ``--extrinsic-*`` is lidar-in-body (FAST-LIO's
 extrinsic_T / extrinsic_R) and the IMU gyro must be expressed in it too.
 With ``--inspvax-topic`` (kygi665 RTK unit) the IMU is read as deg/s in the
-INS axes, the lidar extrinsic defaults to the measured 180 deg yaw and the
-sequence is marked for ground levelling (see ``dog_perception/inspvax.py``), and the base height
+INS axes, the lidar extrinsic defaults to the measured 180 deg yaw, the INS rows are moved from
+the INS point to the body origin (``--ins-lever-arm``, default the measured 0.54 m behind the lidar),
+the sequence is marked for ground levelling (see ``dog_perception/inspvax.py``), and the base height
 is the median ground height over every ``--base-height-every``-th sweep of the sequence.
 Per-point time: Hesai ROS driver 2.0 publishes an absolute float64
 ``timestamp`` field (``--time-mode absolute``); drivers that publish offsets
@@ -91,6 +92,9 @@ def main():
     ap.add_argument("--extrinsic-t", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     ap.add_argument("--extrinsic-rpy", type=float, nargs=3, default=None,
                     help="radians; default 0 0 0, or the measured kygi value with --inspvax-topic")
+    ap.add_argument("--ins-lever-arm", type=float, nargs=3, default=None,
+                    help="[m] INSPVAX position point in the body frame; its rows are moved to the body origin "
+                         "(default: the measured kygi value with --inspvax-topic)")
     ap.add_argument("--base-height", type=float, default=0.45)
     ap.add_argument("--estimate-base-height", action="store_true",
                     help="replace --base-height by the median ground height over the sweeps "
@@ -111,10 +115,13 @@ def main():
     from rosbags.highlevel import AnyReader
     from rosbags.typesys import Stores, get_typestore
 
-    from dog_perception.inspvax import KYGI_LIDAR_RPY, EnuOrigin, gyro_from_kygi_imu, pose_from_inspvax, register_kygi
+    from dog_perception.inspvax import (KYGI_INS_LEVER_ARM, KYGI_LIDAR_RPY, EnuOrigin, apply_lever_arm,
+                                        gyro_from_kygi_imu, pose_from_inspvax, register_kygi)
 
     if args.extrinsic_rpy is None:
         args.extrinsic_rpy = list(KYGI_LIDAR_RPY) if kygi else [0.0, 0.0, 0.0]
+    if args.ins_lever_arm is None:
+        args.ins_lever_arm = list(KYGI_INS_LEVER_ARM) if kygi else [0.0, 0.0, 0.0]
     T_bl = make_T(rot_zyx(args.extrinsic_rpy[2], args.extrinsic_rpy[1], args.extrinsic_rpy[0]), args.extrinsic_t)
     est_h = args.estimate_base_height or kygi
 
@@ -220,15 +227,18 @@ def main():
             meta.update(lat0=origin.lat, lon0=origin.lon, h0=origin.h, inspvax_pos_type=t.pos_types)
         if kygi:
             meta["det_frame"] = dict(auto_ground=True, auto_level=True)    # INS attitude is heading only
+            meta["ins_lever_arm"] = [float(a) for a in args.ins_lever_arm]  # already applied to odom.npy
         h, info = median_base_height(t.heights)
         if h is not None:
             meta["base_height"] = h
             meta["base_height_sweeps"] = dict(info, every=args.base_height_every)
         odom = np.asarray(t.writer.odom, np.float64).reshape(-1, 11)
+        if kygi:
+            odom = apply_lever_arm(odom, args.ins_lever_arm)
         print("%s: odom t %.3f .. %.3f  span %.1fs  pos_type %s  base_height %.2f" % (
             t.name, odom[0, 0], odom[-1, 0], odom[-1, 0] - odom[0, 0], t.pos_types or "-", meta["base_height"]))
         n_imu = len(t.writer.imu)
-        t.writer.close(meta)
+        t.writer.close(meta, odom=odom)
         written += 1
         print("wrote %d scans, %d imu, %d odom -> %s" % (t.writer.n_scans, n_imu, len(odom), t.out_dir))
     if not written:

@@ -64,7 +64,9 @@ def test_one_pass_split_matches_the_whole_bag(split):
             b = np.load(by_stamp[float(a["stamp"])])
             assert np.array_equal(a["xyz"], b["xyz"]) and np.array_equal(a["t"], b["t"])
         t0, t1 = float(r["t_start"]), float(r["t_end"])
-        assert np.array_equal(seq.odom, full.odom[(full.odom[:, 0] >= t0 - 1) & (full.odom[:, 0] < t1 + 1)])
+        ref = full.odom[(full.odom[:, 0] >= t0 - 1) & (full.odom[:, 0] < t1 + 1)]
+        # the lever-arm velocity term is a central difference: one-sided on the first and last row
+        assert np.array_equal(seq.odom[:, :8], ref[:, :8]) and np.array_equal(seq.odom[1:-1], ref[1:-1])
         assert seq.meta["lat0"] == full.meta["lat0"] and seq.meta["segment"]["split"] == r["split"]
     assert total == len(full)
 

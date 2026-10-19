@@ -157,7 +157,7 @@ const TREE = {
       c: [
         T("字段", "`ins_status`：3 = 可用", "INS_SOLUTION_GOOD。不是 3 的行直接丢掉；第一个是 3 的行作为整份录制共用的 ENU 原点（lat0/lon0/h0）。"),
         T("字段", "`pos_type`：56 = RTK 固定解", "按 NovAtel 标准 56 = INS_RTKFIXED，55 = 浮点解，实测 56 的位置标准差 1.3 cm，确认是固定解。仓库里的 msg 文件常量名把 55/56 写反了。只用于质量统计：体检选可用区间、meta 的 inspvax_pos_type、预览的 rtk 检查。"),
-        T("字段", "`latitude` `longitude` `height`", "经纬度（度）和高程（m），换算成相对原点的 ENU 坐标（东、北、天，m），写进 odom.npy 的 x y z。"),
+        T("字段", "`latitude` `longitude` `height`", "经纬度（度）和高程（m），换算成相对原点的 ENU 坐标（东、北、天，m），写进 odom.npy 的 x y z。这是激光雷达后方约 0.54 m 处一个点的位置，转换时挪到机身原点（杠杆臂）。"),
         T("字段", "`azimuth`：航向", "从正北顺时针（度）。机身航向 yaw = 180° − azimuth（ENU 下从东向逆时针），写成只有 yaw 的四元数。雷达系与这个机身系差 180°（T_body_lidar）。"),
         T("字段", "`north/east/up_velocity`", "m/s，按（东、北、天）写进 odom.npy 的 vx vy vz；去畸变外推和自动标注之外，预览用它算 INS 位置跳变。"),
         T("字段", "`roll` `pitch`：不用", "加减速时不可信：0.6 s 内 pitch 从 +2.8° 跳到 −9.9°，而陀螺积分不到 2°。倾斜改由点云在线找平（auto_level）。"),
@@ -177,7 +177,7 @@ const TREE = {
       d: "整个 bag 只读一遍，按 segments.csv 里 keep = 1 的行，每个场景写一个序列目录 data/seq/<场景>/。点云不做几何处理。",
       c: [
         T("处理", "按 header.stamp 分配场景，其余不解码", "落在 [t_start, t_end) 的帧写进对应场景；去掉无效点、丢掉 ring。"),
-        T("处理", "IMU、INSPVAX 换算，前后多留 1 s", "IMU：deg/s → rad/s，转到机身系。INSPVAX：丢掉 ins_status ≠ 3 的行，经纬高 → ENU，azimuth → 航向。去畸变和位姿插值要用前后各 1 s。"),
+        T("处理", "IMU、INSPVAX 换算，前后多留 1 s", "IMU：deg/s → rad/s，转到机身系。INSPVAX：丢掉 ins_status ≠ 3 的行，经纬高 → ENU，azimuth → 航向；位置减去 R(航向)·(-0.06, -0.54, 0) m，从 INS 参考点挪到机身原点（meta.ins_lever_arm）。去畸变和位姿插值要用前后各 1 s。"),
         T("处理", "离地高度：每 10 帧估一次取中位数", "2–15 m 环内取 z 第 5 百分位附近点的中位数作为地面。只看一帧会受地形影响：0921 的 29 个场景第一帧估出 0.59–1.05 m，真实约 0.72 m。"),
         T("输出", "`scans/*.npz`：xyz, intensity, t, stamp", "雷达系 L，原样保存；t 是每点绝对时间，stamp 是扫描结束时刻。约 0.6 MB/帧。"),
         T("输出", "`imu.npy` (M,4)：t, wx, wy, wz", "机身系角速度，rad/s。"),
@@ -191,7 +191,7 @@ const TREE = {
         T("处理", "`sequence_meta.py` 改 base_height、lidar_time_offset", "不重转 bag：离地高度改成多帧中位数或给定值（旧值留在 base_height_first_sweep）；写入雷达时间偏移，读取时加到所有雷达时间上。"),
         T("处理", "`time_offset_check.py` 测时间差", "只在角速度变化的转弯处才看得出时间差：把雷达时间平移 −0.15…+0.15 s，取帧间错位最小的偏移。仿真里注入 50 ms，能准确找回。"),
         T("输出", "`split_check.py` → split.csv", "统一划分训练 / 验证：去掉静止的验证场景；从训练录制里留出离其余路线最远的一段做验证，两侧各丢一个缓冲；路线 10 m 内重叠时丢代价小的一方。--apply 才写 split.csv 和 meta 的 segment.split。"),
-        T("处理", "`refine_poses.py`：激光里程计 + RTK 融合位姿", "KISS-ICP（陀螺提供旋转先验）给出帧与帧之间的运动。两者都健康时激光管局部、INS 只消慢漂移；INS 不可信（急停）时由激光接管，激光不可信（转弯时来回跳、沿墙停住）时由 INS 接管；都不可信的时段记为不可靠，不要标注。改写 odom.npy 的东北坐标和速度，原始 INS 存为 odom_ins.npy，meta 加 pose_source、pose_refine。运动样例 bag 上 1 s 帧对的位姿误差 p90 从 0.55 m 降到 0.14 m。"),
+        T("处理", "`refine_poses.py`：激光里程计 + RTK 融合位姿", "老序列先补上 INS 杠杆臂。KISS-ICP（陀螺提供旋转先验）给出帧与帧之间的运动。两者都健康时激光管局部、INS 只消慢漂移；INS 不可信（急停）时由激光接管，激光不可信（转弯时来回跳、沿墙停住）时由 INS 接管；都不可信的时段记为不可靠，不要标注。改写 odom.npy 的东北坐标和速度，原始 INS 存为 odom_ins.npy，meta 加 pose_source、pose_refine。运动样例 bag 上 1 s 帧对的位姿误差 p90 从 0.55 m 降到 0.14 m。"),
       ] },
     { side: "R", f: "label", k: "stage", t: "④ 预处理 + 教师", s: "run_sequence.py",
       d: "把每帧点云处理成检测器的输入（和线上节点同一份代码），再用教师模型检测。",

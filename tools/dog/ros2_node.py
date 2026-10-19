@@ -66,6 +66,7 @@ class DogPerceptionNode(Node):
         self.publish_cloud = bool(g("publish_cloud"))
         self.kygi_imu = g("imu_convention") == "kygi"
         self.lidar_time_offset = float(g("lidar_time_offset"))
+        self.ins_lever_arm = np.asarray(g("ins_lever_arm"), np.float64)
 
         best_effort = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
         self.create_subscription(Imu, g("imu_topic"), self.on_imu, 400)
@@ -115,7 +116,7 @@ class DogPerceptionNode(Node):
                 return
             self.origin = EnuOrigin(msg.latitude, msg.longitude, msg.height)
             self.get_logger().info("ENU origin %.8f %.8f %.2f" % (msg.latitude, msg.longitude, msg.height))
-        got = pose_from_inspvax(msg, self.origin)
+        got = pose_from_inspvax(msg, self.origin, self.ins_lever_arm)
         if got is None:
             self.get_logger().warn("INS solution not good (ins_status %d)" % int(msg.ins_status.data),
                                    throttle_duration_sec=2.0)

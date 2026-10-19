@@ -2,7 +2,9 @@
 
 * the fusion on synthetic data with ground truth: an INS that runs 0.5 m ahead for 1.5 s (as the kygi
   INS does while the robot brakes) is corrected back to the truth, and a gap where the odometry
-  also fails is reported as bad;
+  also fails is reported as bad; an odometry zigzag inside such a gap keeps its net motion;
+* the INS lever arm: rows of a point 0.54 m behind the body origin circle around it while the
+  robot turns; the fusion reports the lever arm left over, and none once it is applied;
 * the moving sample bag: the preview's lidar shift check fails with the INS poses and passes after
   refinement; re-running is a no-op.
 """
@@ -124,6 +126,56 @@ def test_fuse_reports_a_stalled_odometry():
     assert e[outside].max() < 0.08, e.round(3)
 
 
+def test_fuse_bridges_an_odometry_zigzag_inside_an_ins_gap():
+    """While the robot brakes, the INS velocity overshoots (here: twice the true speed) and its
+    position is not trusted; if KISS-ICP zigzags there too, its net motion over the zigzag is the
+    best there is (v3 took the INS velocity there: 0.46 m off)."""
+    stamps, poses, odom, truth, _ = _synthetic()
+    t = odom[:, 0]
+    odom = odom.copy()
+    odom[(t > 2.0) & (t < 3.7), 8] *= 2.0
+    lo = poses[:, :3, 3].copy()
+    lo[:, :2] += truth[0]
+    zig = (stamps > 2.6) & (stamps < 3.2)
+    lo[zig, 1] += np.where(np.arange(zig.sum()) % 2, 0.3, -0.3)
+    xy, corr, info, diag = refine_poses.fuse(stamps, _lo_poses(lo), odom)
+    e = np.linalg.norm(xy - truth, axis=1)
+    assert info["lo_steps_bridged"] >= zig.sum() and e.max() < 0.15, (info["lo_steps_bridged"], e.round(3))
+
+
+def _turning(L, k=300):
+    """30 s at 10 Hz: the robot walks 0.8 m/s along a figure of eight (heading spans 360 deg);
+    INS rows (100 Hz) of the point ``L`` (body frame), odometry = truth."""
+    from dog_perception.geometry import rot_z
+    t = np.arange(0.0, 31.0, 0.01)
+    yaw = np.pi / 2 + 2 * np.pi * np.sin(2 * np.pi * t / 30.0)
+    vel = 0.8 * np.column_stack([np.cos(yaw), np.sin(yaw), 0 * t])
+    p = np.concatenate([[[0.0, 0.0, 0.0]], np.cumsum(0.5 * (vel[1:] + vel[:-1]) * 0.01, axis=0)])
+    ins = np.array([odom_row(ti, rot_z(y), pi + rot_z(y) @ L, vi) for ti, y, pi, vi in zip(t, yaw, p, vel)])
+    ins[:, 8:11] = np.gradient(ins[:, 1:4], t, axis=0)                  # the INS point's velocity
+    stamps = 0.5 + 0.1 * np.arange(k)
+    truth = np.column_stack([np.interp(stamps, t, p[:, i]) for i in (0, 1, 2)])
+    R0 = rot_z(-np.interp(stamps[0], t, yaw))                           # odometry frame = first scan
+    poses = np.repeat(np.eye(4)[None], k, axis=0)
+    for i, s in enumerate(stamps):
+        poses[i, :3, :3] = R0 @ rot_z(np.interp(s, t, yaw))
+        poses[i, :3, 3] = R0 @ (truth[i] - truth[0])
+    return stamps, poses, ins, truth[:, :2]
+
+
+def test_lever_arm_is_reported_and_removed():
+    from dog_perception.inspvax import KYGI_INS_LEVER_ARM, apply_lever_arm
+    L = np.array(KYGI_INS_LEVER_ARM)
+    stamps, poses, ins, truth = _turning(L)
+    xy, _, info, _ = refine_poses.fuse(stamps, poses, ins)
+    assert np.allclose(info["lever_residual_m"], L[:2], atol=0.02), info["lever_residual_m"]
+    body = apply_lever_arm(ins, L)
+    assert np.abs(np.hypot(body[:, 8], body[:, 9]) - 0.8).max() < 0.01        # the body origin's speed
+    xy, _, info, _ = refine_poses.fuse(stamps, poses, body)
+    assert np.allclose(info["lever_residual_m"], 0.0, atol=0.02) and np.abs(xy - truth).max() < 0.02
+    assert np.array_equal(apply_lever_arm(ins, [0, 0, 0]), ins)
+
+
 @pytest.fixture(scope="module")
 def moving_seq(tmp_path_factory):
     pytest.importorskip("rosbags")
@@ -149,6 +201,7 @@ def test_sample_bag_shift_check_before_and_after(moving_seq, tmp_path):
                    capture_output=True)
     rd = SequenceReader(str(root / "refined"))
     assert rd.meta["pose_source"] == "kiss-icp+ins" and np.array_equal(np.load(root / "refined" / "odom_ins.npy"), odom0)
+    assert rd.meta["ins_lever_arm"] == rd.meta["pose_refine"]["lever_arm"] == [-0.06, -0.54, 0.0]   # applied once
     assert rd.meta["pose_refine"]["correction_max_m"] > 0.4                 # the braking at the end of the bag
     first = rd.odom.copy()
     refine_poses.refine(str(root / "refined"))                              # input stays odom_ins.npy
