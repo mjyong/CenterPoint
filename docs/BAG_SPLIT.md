@@ -355,6 +355,12 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 
 **第六版（当前）**：`--tilt lo` 改为默认，`odom.npy` 的姿态是融合航向 + 激光的横滚、俯仰（相对中位"上方向"），检测系的地面找平只修剩下的部分。线上节点还是只有航向（INS 的横滚、俯仰不可用）+ 地面找平，大倾斜时线上点云和训练数据会有差别，后面可以用陀螺 + 加速度计在线估倾斜来补。
 
+**0921 第七次融合（5.10，第六版 + 倾斜，位姿到此定稿）**：
+- 融合 `shift` p90 中位数 0.072 m，最大 0.155 m，没有超过 0.2 m 的；和纯激光的差都在 0.05 m 以内。
+- 预览：165659 是 22 OK / 6 WARN / 1 FAIL（5.9 是 15 / 13 / 1），`shift` p90 中位数 0.086 m、最大 0.20 m，原来 6 个 `shift` WARN 全部消失（s001 0.32 → 0.10、s007 0.24 → 0.04、s008 0.22 → 0.04）；164127 全部 OK。剩下的 WARN 是 `tilt_deg`（2–3°，s004、s005、s017、s018、s024，多半是路面本身有坡）和 `rtk`（s004、s005、s028 有少量非 RTK 固定解）。
+- s025 的 FAIL（`tilt_deg` 4.3°、`ground_z_m` 0.18 m）不是位姿问题：世界地图的墙很锐利，`shift` 0.04 m、对齐 0.02 m；机器人在两面墙之间的窄巷里，能看到的地面很少，地面估计不准。教师检测在同样的帧上跑，框和点云的高度是一致的，保留在训练集。
+- 划分（`--no-drop`）：训练 25 个场景 748 s，验证 10 个场景 288 s（运动 208 s，占全部运动时间的 23%），没有丢场景；验证路线离训练路线 10 m 内的比例 7%，就是留出块两端和缓冲场景挨着的部分（s003 30%、s006 24%）。
+
 **位姿不可靠的帧**（`pose_refine.bad_intervals`，0921 约 1.7%）：`run_sequence.py` 给每帧记 `pose_bad`；`auto_label.py` 不让这些帧的检测进跟踪（它们在世界系里的位置不对，会拉偏静止物体），也不给它们出框；SUSTechPOINTS 导出和 `export_dataset.py` 都跳过它们。
 
 **预览的 `shift` 检查**：对相隔约 1 s 的两帧，取离地 0.3–3 m 的点（墙、杆、树、车），在 ±0.8 m 范围内做二维搜索，找到把一帧叠到另一帧上最合适的平移量。这就是激光看到的两帧位姿误差，沿行进方向的误差也能测出来。状态按 p90 判定：≤ 0.20 m 为 OK，≤ 0.40 m 为 WARN，更大为 FAIL。运动样例 bag 用 INS 位姿时是 0.51 m（FAIL），融合后是 0.12 m（OK）。
@@ -687,4 +693,34 @@ B2. 提交每个场景的 data/labels/<场景>/labels.pkl、labels_tracks.csv �
 - B：--dry-run 打印的卡表；data/labels/batch_summary.csv 全文；用了几张卡、--per-gpu 几、总耗时；
   一个场景 run_sequence.log 最后几行（每帧网络耗时）；失败的场景及其日志最后 20 行；
 - 每步耗时，GPU 型号，用掉的磁盘空间（du -sh data/runs data/labels）。
+```
+
+### 5.11 第十一轮：第 4 步，多卡教师推理 + 自动标注（0921）
+
+5.10 的 A 部分（不丢场景的划分、加倾斜的融合、预览）已完成，预览没有 `shift` FAIL，这一轮只做第 4 步。
+
+```text
+任务：用 tools/dog/batch_label.py 在所有空闲的 GPU 上，对 0921 的全部 35 个场景跑教师推理和自动标注。不重转 bag，不改位姿。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+
+0. 检查：df -h（--save-frames 每帧约 3.6 MB，0921 约 10,000 帧，约 36 GB）；
+   work_dirs/pretrained/nusc_voxel.pth 应约 103 MB（只有 134 字节说明是 Git LFS 指针，先 git lfs install && git lfs pull）。
+   任何一项不满足就停下报告。
+1. 看哪些卡空闲、怎么分（不运行）：
+     python tools/dog/batch_label.py --split data/survey/split/split.csv --dry-run
+   没有空闲卡就停下，报告打印的卡表。
+2. 只跑一个场景试通，跑的时候另开终端每隔几秒看一次 nvidia-smi 的利用率：
+     python tools/dog/batch_label.py --seq data/seq/0921_165659_s008
+   看 data/runs/0921_165659_s008/run_sequence.log 最后几行（每帧网络耗时）和 data/labels/0921_165659_s008/auto_label.log。
+   利用率大多不到 50% 就在第 3 步加 --per-gpu 2。
+3. 全部场景（s008 已跑过会跳过）：
+     python tools/dog/batch_label.py --split data/survey/split/split.csv [--per-gpu 2]
+4. 提交 data/labels/<场景>/labels.pkl、labels_tracks.csv 和 data/labels/batch_summary.csv，推送到 claude/me/v01。
+   不要提交 data/runs（帧太大）和 data/seq。
+
+最后报告：
+- 第 1 步的卡表；第 2 步的利用率、每帧网络耗时、这个场景的耗时；
+- data/labels/batch_summary.csv 全文；用了几张卡、--per-gpu 几、总耗时；
+- 失败的场景及其日志最后 20 行；
+- 用掉的磁盘空间（du -sh data/runs data/labels）。
 ```
