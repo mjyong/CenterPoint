@@ -67,7 +67,7 @@
 
 ```
 Imu.angular_velocity          ─► ImuPropagator.on_imu(t, gyro(3,))             pose_buffer.py:156
-  （kygi RTK IMU 先经 gyro_from_kygi_imu：deg/s → rad/s，INS 轴 → body 轴）     inspvax.py
+  （kygi RTK IMU 先经 gyro_from_kygi_imu：deg/s → rad/s，轴已是 body 轴）     inspvax.py
                                    └─ _propagate: R ← R·Exp((ω−b)·dt),  p ← p0 + v0·(t−t0)   :166
                                       └─ PoseBuffer.add(t, R(3,3), p(3,))
 Odometry / INSPVAX            ─► ImuPropagator.on_odometry(t, R(3,3), p(3,), v(3,)|None)   :132

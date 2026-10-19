@@ -13,6 +13,10 @@ robot. The value it replaces is kept once as ``base_height_first_sweep``.
 ``--lidar-time-offset`` sets the offset that ``SequenceReader`` adds to the lidar times (measure it
 with ``tools/dog/time_offset_check.py``). Both only change meta.json: run the preview / auto-label
 again afterwards.
+
+``--fix-imu-axes``: kygi sequences converted before 2026-10 have the gyro x and y negated in
+imu.npy (``dog_perception/inspvax.py``); this flips them once and sets ``meta["imu_axes"] = "body"``.
+Run it before refine_poses.py, the preview and auto-labelling.
 """
 import argparse
 import json
@@ -49,11 +53,13 @@ def main():
     ap.add_argument("--base-height", default=None, help="'auto' (median over sweeps) or a value in metres")
     ap.add_argument("--every", type=int, default=10, help="with --base-height auto: use every k-th sweep")
     ap.add_argument("--lidar-time-offset", type=float, default=None, help="[s] added to the lidar times on reading")
+    ap.add_argument("--fix-imu-axes", action="store_true",
+                    help="kygi sequences converted before 2026-10: flip the gyro x / y in imu.npy once")
     ap.add_argument("--dry-run", action="store_true", help="print what would change, write nothing")
     args = ap.parse_args()
 
-    print("%-26s %-5s %5s  %-24s %-15s %s" % ("sequence", "split", "scans", "base_height [m]", "sweeps p10-p90",
-                                             "lidar_time_offset [s]"))
+    print("%-26s %-5s %5s  %-24s %-15s %-22s %s" % ("sequence", "split", "scans", "base_height [m]", "sweeps p10-p90",
+                                                   "lidar_time_offset [s]", "imu axes"))
     for seq in sorted(args.seq):
         if not os.path.exists(os.path.join(seq, "meta.json")):
             print("%-26s  no meta.json (unfinished conversion) - skipped" % os.path.basename(os.path.normpath(seq)))
@@ -74,8 +80,20 @@ def main():
                 meta["base_height"], meta["base_height_sweeps"] = h, spread
         if args.lidar_time_offset is not None:
             meta["lidar_time_offset"] = args.lidar_time_offset
+        kygi = "lat0" in meta
+        imu_txt = meta.get("imu_axes", "OLD (x, y negated)" if kygi else "-")
+        flip = args.fix_imu_axes and kygi and "imu_axes" not in meta
+        if flip:
+            meta["imu_axes"] = "body"
+            imu_txt = "OLD -> body"
         changed = meta != rd.meta
         if changed and not args.dry_run:
+            if flip:
+                p_imu = os.path.join(seq, "imu.npy")
+                imu = np.load(p_imu)
+                imu[:, 1:3] *= -1.0
+                np.save(p_imu + ".tmp.npy", imu)
+                os.replace(p_imu + ".tmp.npy", p_imu)
             write_meta(seq, meta)
         h_txt = "%.3f" % meta["base_height"] if meta.get("base_height") is not None else "-"
         if old_h is not None and meta.get("base_height") != old_h:
@@ -85,9 +103,9 @@ def main():
         dt_txt = "%+.3f" % meta.get("lidar_time_offset", 0.0)
         if meta.get("lidar_time_offset", 0.0) != old_dt:
             dt_txt = "%+.3f -> %s" % (old_dt, dt_txt)
-        print("%-26s %-5s %5d  %-24s %-15s %s%s" % (os.path.basename(os.path.normpath(seq)),
-                                                   meta.get("segment", {}).get("split", ""), len(rd), h_txt, sp,
-                                                   dt_txt, "   (dry run)" if changed and args.dry_run else ""))
+        print("%-26s %-5s %5d  %-24s %-15s %-22s %s%s" % (os.path.basename(os.path.normpath(seq)),
+                                                         meta.get("segment", {}).get("split", ""), len(rd), h_txt, sp,
+                                                         dt_txt, imu_txt, "   (dry run)" if changed and args.dry_run else ""))
 
 
 if __name__ == "__main__":

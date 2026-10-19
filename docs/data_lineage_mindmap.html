@@ -148,7 +148,7 @@ const TREE = {
     { side: "L", f: "data", k: "stage", t: "IMU 话题", s: "/rte/rdap/rtk/imus/data_raw",
       d: "sensor_msgs/Imu，100 Hz，frame_id imu_link。只用到角速度。",
       c: [
-        T("字段", "`angular_velocity`：deg/s，INS 轴", "乘 π/180 转成 rad/s，再绕 z 转 180° 到机身系 B（gyro_from_kygi_imu）。存进 imu.npy，用于去畸变时在两个定位点之间插值姿态。"),
+        T("字段", "`angular_velocity`：deg/s，轴同机身系", "乘 π/180 转成 rad/s（gyro_from_kygi_imu）；轴就是机身系 B 的 x 右、y 前、z 上。存进 imu.npy，用于去畸变时在两个定位点之间插值姿态。"),
         T("字段", "`linear_acceleration`：不用", "数值看起来以 g 为单位（静止时 z ≈ 0.88），流水线没有用到。"),
         T("字段", "`orientation`：没有提供", "四元数为 (0,0,0,1)，协方差全 0。"),
       ] },

@@ -116,7 +116,7 @@ def main():
     from rosbags.typesys import Stores, get_typestore
 
     from dog_perception.inspvax import (KYGI_INS_LEVER_ARM, KYGI_LIDAR_RPY, EnuOrigin, apply_lever_arm,
-                                        gyro_from_kygi_imu, pose_from_inspvax, register_kygi)
+                                        forward_speed, gyro_from_kygi_imu, pose_from_inspvax, register_kygi)
 
     if args.extrinsic_rpy is None:
         args.extrinsic_rpy = list(KYGI_LIDAR_RPY) if kygi else [0.0, 0.0, 0.0]
@@ -228,6 +228,7 @@ def main():
         if kygi:
             meta["det_frame"] = dict(auto_ground=True, auto_level=True)    # INS attitude is heading only
             meta["ins_lever_arm"] = [float(a) for a in args.ins_lever_arm]  # already applied to odom.npy
+            meta["imu_axes"] = "body"                                        # gyro_from_kygi_imu
         h, info = median_base_height(t.heights)
         if h is not None:
             meta["base_height"] = h
@@ -235,6 +236,11 @@ def main():
         odom = np.asarray(t.writer.odom, np.float64).reshape(-1, 11)
         if kygi:
             odom = apply_lever_arm(odom, args.ins_lever_arm)
+            fwd = forward_speed(odom)
+            if fwd is not None and fwd < 0:
+                print("WARNING %s: the robot walks backwards in the body frame (median %.2f m/s): the INSPVAX "
+                      "azimuth convention changed (INS mounting fixed?); heading must become -azimuth, see "
+                      "dog_perception/inspvax.py" % (t.name, fwd))
         print("%s: odom t %.3f .. %.3f  span %.1fs  pos_type %s  base_height %.2f" % (
             t.name, odom[0, 0], odom[-1, 0], odom[-1, 0] - odom[0, 0], t.pos_types or "-", meta["base_height"]))
         n_imu = len(t.writer.imu)

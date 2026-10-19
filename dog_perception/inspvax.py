@@ -15,14 +15,29 @@ straight at 1.5-2.5 m/s, see docs/DOG_PIPELINE.md section 9):
 * the RTK IMU (``/rte/rdap/rtk/imus/data_raw``) publishes angular velocity
   in deg/s and acceleration in g, not the sensor_msgs units (gyro z
   integrates to the azimuth change at scale 1.06 when read as deg/s; |acc| is
-  1.0 at rest). Its axes are the INS axes: x right, y along the azimuth, z up;
-* the body frame above (yaw = 180 deg - azimuth) is the INS frame turned by
-  180 deg about z, so body-frame rates are ``(-x, -y, z)``;
-* the XT32 axes match the INS axes as well: scan matching puts the motion on
-  lidar -y while the INS puts it on body +y, so ``T_body_lidar`` has a
-  180 deg yaw (``KYGI_LIDAR_RPY``). A static recording cannot show this; a
-  wrong yaw there only rotates the map, while the robot moves it shifts the
-  older sweeps the wrong way and static objects get the robot's speed;
+  1.0 at rest). Its axes are the body axes: x right, y forward, z up
+  (``R_BODY_KYGI_IMU`` is the identity). While the robot brakes, the ground
+  plane shows the body pitching nose-down by 1.5 deg and the integrated gyro
+  x by 1.6 deg (0.1-0.3 s changes correlate at 0.85-0.94); the accelerometer
+  y follows the forward acceleration of the lidar odometry (correlation
+  0.63, -2 to -4 m/s^2 while braking), x does not. The robot calibration
+  says the same (lidar -> IMU: 180 deg yaw, like ``KYGI_LIDAR_RPY``). Until
+  2026-10 x and y were negated here (taken from the azimuth below, which
+  only the yaw rate could confirm);
+* the INSPVAX azimuth points backwards, along the IMU's -y: the body frame
+  (yaw = 180 deg - azimuth) has +y forward, and the INS velocity in it is
+  along +y. The INS also integrates the braking the wrong way (its speed
+  goes 1.9 -> 2.5 m/s while the lidar odometry shows 2.1 -> 0.1 m/s), as
+  if it used the IMU turned by 180 deg about z: most likely its mounting is
+  configured that way (docs/BAG_SPLIT.md 3.5). If that gets fixed on the
+  robot, the azimuth points forward and the heading becomes -azimuth:
+  ``forward_speed`` (checked by the converter) turns negative then;
+* the XT32 axes are the IMU axes turned by 180 deg about z: scan matching
+  puts the motion on lidar -y while the INS puts it on body +y, so
+  ``T_body_lidar`` has a 180 deg yaw (``KYGI_LIDAR_RPY``). A static
+  recording cannot show this; a wrong yaw there only rotates the map, while
+  the robot moves it shifts the older sweeps the wrong way and static
+  objects get the robot's speed;
 * the INSPVAX position is not that of the lidar (the body origin) but of a
   point 0.54 m behind it (``KYGI_INS_LEVER_ARM``): against the lidar
   odometry, the INS position moves by R(yaw) @ lever arm whenever the robot
@@ -47,7 +62,7 @@ from .ros_utils import stamp_of
 INS_SOLUTION_GOOD = 3
 INS_RTKFIXED = 56                        # pos_type of an RTK-fixed INS solution
 KYGI_GYRO_SCALE = np.pi / 180.0          # deg/s -> rad/s
-R_BODY_KYGI_IMU = rot_z(np.pi)           # IMU / INS axes in the body frame
+R_BODY_KYGI_IMU = np.eye(3)              # RTK IMU axes in the body frame (x right, y forward, z up)
 KYGI_LIDAR_RPY = (0.0, 0.0, np.pi)       # XT32 orientation in the body frame (roll, pitch, yaw) [rad]
 KYGI_INS_LEVER_ARM = (-0.06, -0.54, 0.0)  # INSPVAX position point in the body frame [m]
 _A = 6378137.0
@@ -96,7 +111,8 @@ class EnuOrigin:
 
 
 def gyro_from_kygi_imu(msg):
-    """sensor_msgs/Imu from the kygi665 RTK unit -> body-frame angular velocity [rad/s]."""
+    """sensor_msgs/Imu from the kygi665 RTK unit -> body-frame angular velocity [rad/s]
+    (``meta["imu_axes"] = "body"`` marks sequences converted with these axes)."""
     w = msg.angular_velocity
     return R_BODY_KYGI_IMU @ (np.array([w.x, w.y, w.z], dtype=np.float64) * KYGI_GYRO_SCALE)
 
@@ -130,3 +146,14 @@ def apply_lever_arm(odom, lever_arm):
     if len(out) > 1 and np.isfinite(out[:, 8:11]).all():
         out[:, 8:11] -= np.gradient(off, out[:, 0], axis=0)
     return out
+
+
+def forward_speed(odom, min_speed=0.5):
+    """Median speed [m/s] along the body +y axis over the rows moving faster than ``min_speed``
+    (None if none): positive when the heading convention is right (the robot walks forward)."""
+    v = np.asarray(odom, np.float64)[:, 8:10]
+    m = np.isfinite(v).all(axis=1) & (np.hypot(v[:, 0], v[:, 1]) > min_speed)
+    if not m.any():
+        return None
+    fwd = [(quat_to_R(q)[:2, 1] @ vi) for q, vi in zip(np.asarray(odom)[m, 4:8], v[m])]
+    return float(np.median(fwd))

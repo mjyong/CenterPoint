@@ -172,12 +172,13 @@ def test_auto_level_removes_ground_tilt():
     assert abs(np.degrees(np.arctan2(T_wd[1, 0], T_wd[0, 0])) - np.degrees(0.7)) < 0.2   # heading kept
 
 
-def test_kygi_gyro_is_degrees_in_ins_axes():
+def test_kygi_gyro_is_degrees_in_body_axes():
+    """The RTK IMU axes are the body axes (x right, y forward, z up): dog_perception/inspvax.py."""
     from types import SimpleNamespace
 
     from dog_perception.inspvax import gyro_from_kygi_imu
     msg = SimpleNamespace(angular_velocity=SimpleNamespace(x=10.0, y=-20.0, z=30.0))
-    assert np.allclose(gyro_from_kygi_imu(msg), np.radians([-10.0, 20.0, 30.0]))
+    assert np.allclose(gyro_from_kygi_imu(msg), np.radians([10.0, -20.0, 30.0]))
 
 
 def test_extrapolation_ignores_tiny_end_segment():

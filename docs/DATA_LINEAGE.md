@@ -160,7 +160,7 @@ mindmap
 |---|---|---|---|
 | `header.stamp` | | 采样时刻 | 用 |
 | `header.frame_id` | `imu_link` | | 不用 |
-| `angular_velocity.x/y/z` | 例：−2.98, 0.38, −0.20 | 角速度，**单位是 deg/s**，在 INS 的坐标轴下 | 用：乘 π/180 转成 rad/s，再绕 z 转 180° 到机身系 B（`gyro_from_kygi_imu`） |
+| `angular_velocity.x/y/z` | 例：−2.98, 0.38, −0.20 | 角速度，**单位是 deg/s**，轴和机身系 B 相同（x 右、y 前、z 上） | 用：乘 π/180 转成 rad/s（`gyro_from_kygi_imu`）。2026-10 之前转换的序列 x、y 被取反了，用 `sequence_meta.py --fix-imu-axes` 修正（`meta.imu_axes`） |
 | `linear_acceleration` | z ≈ 0.88 | 加速度；看数值是以 g 为单位，不是 m/s² | 不用 |
 | `orientation`、各协方差 | (0, 0, 0, 1)、0 | 没有提供 | 不用 |
 
@@ -242,7 +242,7 @@ mindmap
   - 解码后去掉无效点（0 或 NaN），丢掉 `ring`；
   - 每个点保留绝对时间 `timestamp`，整帧时刻取最大值（扫描结束）；
   - 原样写盘，不做任何几何处理，仍在雷达系 L。
-- **IMU**：角速度从 deg/s 转成 rad/s，从 INS 轴转到机身系 B。只保留场景时间范围前后各多 1 s（`--pad`）的数据，去畸变和位姿插值要用。
+- **IMU**：角速度从 deg/s 转成 rad/s；IMU 的轴就是机身系 B 的轴，不用再转（`meta.imu_axes = "body"`）。只保留场景时间范围前后各多 1 s（`--pad`）的数据，去畸变和位姿插值要用。
 - **INSPVAX**：
   - `ins_status` 不是 3 的行丢掉；
   - 第一个状态好的点作为整份录制共用的 ENU 原点；
@@ -274,6 +274,7 @@ mindmap
 | `lat0` `lon0` `h0` | 转换器 | ENU 原点，同一录制的所有场景都一样 |
 | `inspvax_pos_type` | 转换器 | 场景内（含前后 1 s）各 pos_type 的计数 |
 | `det_frame` | 转换器 | kygi 是 `{"auto_ground": true, "auto_level": true}`：检测系用近处地面在线修正高度和倾斜 |
+| `imu_axes` | 转换器 / `sequence_meta.py --fix-imu-axes` | `body`：`imu.npy` 的陀螺按机身系的轴存。没有这个字段的 kygi 老序列 x、y 是反的 |
 | `ins_lever_arm` | 转换器 | 转换时已经从 INS 位置里扣掉的杠杆臂（机身系，m）。没有这个字段的老序列没扣过，`refine_poses.py` 会补上 |
 | `segment` | 转换器 / `split_check.py` | `name, t_start, t_end, split`；`split_check.py --apply` 会改 `split`，体检给的原值存在 `split_survey` |
 | `lidar_time_offset` | `sequence_meta.py`（可选） | 读取时加到所有雷达时间上的秒数，用来把雷达时钟对齐到 INS 时钟，默认 0 |

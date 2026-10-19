@@ -285,7 +285,18 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
   | 拟合杠杆臂 + 延迟（得 (−0.09, −0.44) m、0.07 s） | 0.075 m | 0.102 m |
 
   所以 INSPVAX 的位置不是 IMU 中心，而是它后方再约 0.36 m 的一个点。最可能是 GNSS 天线：INS 里没配或配错了 IMU→天线的杠杆臂时，输出位置会跟着天线走。雷达和 INS 的时钟没有问题：激光偏航角速度和 INS 航向变化率在 0 延迟处最吻合（18 个转弯场景中 16 个正好在 0，其余 ±0.02 s）。融合用拟合值；用标定值时离线重放同样没有闭合失败，替代指标 0.074 m（拟合值 0.064 m）。
-- 待确认：外参里雷达→IMU 是 180°，按它 IMU 话题的 x、y 轴应和机身系同向；代码里 IMU 角速度按 INS 轴读（x、y 取反，`R_BODY_KYGI_IMU`）。只影响去畸变里的横滚、俯仰角速度（狗走路时很小），偏航不受影响。样例 bag 太短（27 帧），定不下来。
+- IMU 话题的轴（已核实，2026-10）：x 右、y 前、z 上，和机身系 B 相同，和标定外参（雷达→IMU 绕 z 180°）一致。运动样例 bag 上：
+  - 急刹时，地面平面显示机身低头 1.5°，陀螺 x 积分是 1.6°；0.1–0.3 s 的变化相关 0.85–0.94；
+  - 加速度计 y 跟着激光里程计的前向加速度走（相关 0.63，急刹时 −2 到 −4 m/s²），x 不相关（−0.02）；z 静止时是 +1 g。
+
+  代码原来把陀螺 x、y 取反（照 INS 航向的约定推的，当时只能核对 z），已改为直接用（`R_BODY_KYGI_IMU` = 单位阵）。老序列用 `sequence_meta.py --fix-imu-axes` 修正一次 `imu.npy`。实际影响很小：INS 每 10 ms 重置一次姿态，陀螺的横滚、俯仰只积分 10 ms，样例 bag 上去畸变后的地面平整度没有变化；主要影响 KISS-ICP 的陀螺先验。
+- **INS 的安装配置很可能转了 180°**：
+  - INSPVAX 的航向（azimuth）指向 IMU 的 −y，也就是狗的后方，所以才有 `yaw = 180° − azimuth`；
+  - 急刹时，激光里程计显示速度从 2.1 降到 0.1 m/s（加速度计 y 为 −2 到 −4 m/s²），INS 速度却从 1.9 升到 2.5 m/s，像是把减速当成了加速；位置因此冲到前面约 0.45 m，再被 GNSS 一步步往回拉；
+  - 急转弯后航向偏 4–10°、急刹时俯仰摆 10°（地面只显示 1.5°），也都符合"INS 把 IMU 的水平方向看反了"；
+  - 杠杆臂对不上（数据要 0.54 m，标定的 IMU 只在 0.18 m）也可能有关：天线杠杆臂按反了的轴去扣，误差会翻倍。
+
+  建议在机器人上检查 INS 的 IMU 安装方向 / 车体系旋转和天线杠杆臂的配置。改正后 azimuth 会指向前方，航向要改成 `yaw = −azimuth`。转换脚本会自动发现这种变化：狗在机身系里"倒着走"时打印 WARNING（`inspvax.forward_speed`）。
 - 合成数据新增两项：INS 盲区里的激光锯齿（第三版误差 0.46 m，第四版 < 0.15 m）；绕"8"字行走时杠杆臂被测出并去掉（误差 < 2 cm）。
 
 **0921 第四次融合（5.7）**：
@@ -539,9 +550,12 @@ s005 也基本没动（0.27），有效验证只有约 100 s；两份录制是�
 ### 5.8 第八轮：第五版融合（航向也用激光）
 
 ```text
-任务：用第五版 refine_poses.py 重新融合 0921 所有序列，提交诊断文件。不重转 bag，不进入第 4 步。
+任务：修正老序列的 IMU 轴，再用第五版 refine_poses.py 重新融合 0921 所有序列，提交诊断文件。不重转 bag，不进入第 4 步。
 仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
 
+0. 修正 IMU 轴（只改 imu.npy 的陀螺 x、y 符号和 meta.json，重复运行不会再改）：
+   python tools/dog/sequence_meta.py --seq data/seq/0921_* --fix-imu-axes
+   核对：最后一列 imu axes 全部是 "OLD -> body"（再跑一次应全部是 "body"）。
 1. 重新融合（输入自动取 odom_ins.npy），记下打印的整张表和最后一行 "INS lever arm left over ..."：
    python tools/dog/refine_poses.py --seq data/seq/0921_* --plots data/preview/poses
 2. 重跑预览：
@@ -552,6 +566,7 @@ s005 也基本没动（0.27），有效验证只有约 100 s；两份录制是�
 
 最后报告：
 - refine_poses.py 打印的整张表、所有 "pose bad" 行，以及 "INS lever arm left over" 那一行；
+- 第 0 步打印的表；
 - refine_summary.csv 里每个场景的 heading_correction_p90_deg / heading_correction_max_deg；
 - shift p90 三列中 fused 比 lo 差 0.1 m 以上的场景；
 - 预览里每个场景的 shift_p90_m 和 status，与上一轮（5.7）对比；

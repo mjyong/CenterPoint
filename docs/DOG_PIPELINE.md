@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（94 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（96 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -173,7 +173,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | 路径 | 内容 |
 |---|---|
 | `dog_perception/pose_buffer.py` | IMU 频率位姿缓冲（SLERP），LIO + 陀螺积分传播 |
-| `dog_perception/inspvax.py` | INSPVAX → ENU 位姿；kygi RTK IMU 的单位和轴（deg/s、INS 轴）、雷达外参的实测值 |
+| `dog_perception/inspvax.py` | INSPVAX → ENU 位姿；kygi RTK IMU 的单位和轴（deg/s，轴与机身系相同）、INS 杠杆臂、雷达外参的实测值 |
 | `dog_perception/preprocess/` | 去畸变、自体滤除、检测系、地面高度估计、多帧累积、`Preprocessor` |
 | `dog_perception/detection/centerpoint.py` | det3d Pillar/Voxel 统一封装，支持范围/NMS 配置和双翻转 TTA |
 | `dog_perception/detection/pillar_export.py`, `decode.py` | Orin/TensorRT 两段切分和 NumPy 解码 |
@@ -505,7 +505,7 @@ polygraphy run deploy/rpn_head.onnx --trt --fp16 --onnxrt --atol 1e-2 --rtol 1e-
 
 | # | 问题 | 怎么发现的 | 影响 | 修复 |
 |---|---|---|---|---|
-| 1 | RTK IMU（`/rte/rdap/rtk/imus/data_raw`）的角速度单位是 **deg/s**，加速度单位是 g；代码按 sensor_msgs 的约定当成 rad/s | 按 deg/s 理解，陀螺 z 与 INS 航向变化率的相关系数为 0.99，比例 1.06；按 rad/s 理解，3 s 内积出 136°，而 INS 只转了 2.5° | INS 每 10 ms 重置一次位姿，锚点之间靠陀螺积分。行驶中 z 轴角速度最大 25°/s，被当成 25 rad/s，10 ms 内就差 14° | `inspvax.gyro_from_kygi_imu`：换算成 rad/s，并把 IMU 轴（与 INS 轴一致：x 右、y 沿 azimuth、z 上）转到 body 系 |
+| 1 | RTK IMU（`/rte/rdap/rtk/imus/data_raw`）的角速度单位是 **deg/s**，加速度单位是 g；代码按 sensor_msgs 的约定当成 rad/s | 按 deg/s 理解，陀螺 z 与 INS 航向变化率的相关系数为 0.99，比例 1.06；按 rad/s 理解，3 s 内积出 136°，而 INS 只转了 2.5° | INS 每 10 ms 重置一次位姿，锚点之间靠陀螺积分。行驶中 z 轴角速度最大 25°/s，被当成 25 rad/s，10 ms 内就差 14° | `inspvax.gyro_from_kygi_imu`：换算成 rad/s。IMU 轴就是 body 轴（x 右、y 前、z 上；2026-10 核实，之前 x、y 被取反，见 [BAG_SPLIT.md](BAG_SPLIT.md) 3.5 节） |
 | 2 | 雷达坐标系与 INSPVAX 的 body 系（`yaw = 180° − azimuth`）差 **180° yaw**，而外参默认是单位阵 | 去掉地面后做多初值 ICP：雷达系里机器人每 0.4 s 沿 −y 移动 0.60–0.67 m；INS 在 body 系里给出的是沿 +y 移动 0.63–0.67 m | 拼接时旧帧被往反方向挪，0.4 s 前那帧错开约 2 × 0.6 m；检测速度头和跟踪器都把静止物体当成以接近机器人的速度运动 | `KYGI_LIDAR_RPY = (0, 0, π)`，作为 `run_bag_mcap.py` 和 `rosbag_to_sequence.py --inspvax-topic` 的默认外参 |
 | 3 | 位姿外推只用最后一段。INS 锚点常比 IMU 样本晚约 0.1 ms，两者之间几厘米的锚点修正被当成了速度 | 最后一帧检测系原点跳了 6.6 m（bag 里 INS 比最后一帧扫描早 6 ms 截止，需要外推） | 实时运行时，扫描常需要外推几毫秒，任何一次锚点修正都可能让整帧跳几米。静止时位置不变，所以静止 bag 看不出来 | `PoseBuffer` 外推时用最近 20 ms 的运动估计速度，并跳过短于 1 ms 的末段 |
 | 4 | INS 只用了航向，机身和安装的倾斜没有去掉 | 检测系内拟合地面：pitch −1.0°（静止 bag）/ −1.7°（运动 bag），roll 约 −0.55° | 20 m 处地面高度偏 0.3–0.6 m | `DetFrameConfig.auto_level`：用 1.5–8 m 环内的地面点拟合平面，慢速（EMA）找平检测系 |
