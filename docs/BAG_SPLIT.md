@@ -376,7 +376,16 @@ done
 - 训练集场景至少按轨迹审核；
 - 验证集场景（`segments.csv` 里 `split = val`）用 SUSTechPOINTS 逐框看，导出时加 `--every 5`。
 
-用 3.4 节的 `split.csv` 时，循环换成它列出的场景（`drop` 的不跑）：
+**多卡批量（推荐）**：`tools/dog/batch_label.py` 先用 nvidia-smi 看每张卡的显存占用、利用率和上面有没有进程，只用空闲的卡（默认显存占用 < 2000 MB、利用率 < 20%、没有计算进程；`--gpus 0,2` 可以直接指定）。每张卡一个进程，从队列里取场景跑教师推理（最长的场景先跑，各卡差不多同时结束）；自动标注在 CPU 上另开线程跑，卡不用等它。已经跑过的场景会跳过，中断后重跑同一条命令即可接着跑；某个场景失败不影响其他场景，最后列出来。每个场景的日志在 `data/runs/<场景>/run_sequence.log` 和 `data/labels/<场景>/auto_label.log`，汇总在 `data/labels/batch_summary.csv`。
+
+```bash
+python tools/dog/batch_label.py --split data/survey/split/split.csv --dry-run      # 看哪些卡空闲、怎么分
+python tools/dog/batch_label.py --split data/survey/split/split.csv                # 全部场景，用所有空闲卡
+```
+
+一张卡上一个进程时，如果 `nvidia-smi` 显示利用率不到一半（卡在等 CPU 做预处理），加 `--per-gpu 2`，每张卡同时跑两个场景。
+
+单卡逐个跑的写法（和上面等价）：用 3.4 节的 `split.csv` 时，循环换成它列出的场景（`drop` 的不跑）：
 
 ```bash
 SPLIT=data/survey/split/split.csv
@@ -663,14 +672,19 @@ A3. 提交 data/survey/split 和 data/preview（poses 和两个预览目录）�
 B0. 检查：df -h（--save-frames 每帧约 3.6 MB，0921 约 9,000 帧，约 35 GB）；
     work_dirs/pretrained/nusc_voxel.pth 应约 103 MB（只有 134 字节说明是 Git LFS 指针，先 git lfs install && git lfs pull）；
     nvidia-smi 能看到 GPU。任何一项不满足就停下报告。
-B1. 按 docs/BAG_SPLIT.md 第 4 节"用 split.csv 时"的循环，对 data/survey/split/split.csv 里不是 drop 的场景
-    跑 run_sequence.py（--detectors voxel --tta --save-frames --device cuda:0）和 auto_label.py。
-    先只跑一个场景（0921_165659_s008）确认能跑通、看一眼耗时，再跑全部。
-B2. 提交每个场景的 data/labels/<场景>/labels.pkl 和 labels_tracks.csv（不要提交 data/runs，太大），推送。
+B1. 多卡批量（docs/BAG_SPLIT.md 第 4 节）。先看哪些卡空闲、怎么分：
+      python tools/dog/batch_label.py --split data/survey/split/split.csv --dry-run
+    再只跑一个场景试通，跑的时候另开终端看 nvidia-smi 的利用率：
+      python tools/dog/batch_label.py --seq data/seq/0921_165659_s008
+    利用率不到 50% 就在下一步加 --per-gpu 2。然后跑全部（已跑过的会跳过）：
+      python tools/dog/batch_label.py --split data/survey/split/split.csv
+    没有空闲卡就停下报告 --dry-run 打印的表。
+B2. 提交每个场景的 data/labels/<场景>/labels.pkl、labels_tracks.csv 和 data/labels/batch_summary.csv
+    （不要提交 data/runs，太大），推送。
 
 最后报告：
 - A3 的报告内容；
-- B：每个场景的帧数、"left out: pose not trusted" 的帧数、框数、轨迹数、待审核轨迹数（auto_label.py 最后一行），
-  run_sequence.py 打印的每帧网络耗时；
+- B：--dry-run 打印的卡表；data/labels/batch_summary.csv 全文；用了几张卡、--per-gpu 几、总耗时；
+  一个场景 run_sequence.log 最后几行（每帧网络耗时）；失败的场景及其日志最后 20 行；
 - 每步耗时，GPU 型号，用掉的磁盘空间（du -sh data/runs data/labels）。
 ```

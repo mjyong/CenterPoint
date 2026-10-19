@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（103 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（106 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -191,6 +191,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/bag_survey.py`, `sequence_preview.py` | 长 bag 体检、切场景（`segments.csv`）；转换后的序列逐个做可视化和数值检查，含 INS 位置跳变（[BAG_SPLIT.md](BAG_SPLIT.md)） |
 | `tools/dog/sequence_meta.py` | 不重转 bag，修正序列 `meta.json` 里的离地高度（多帧中位数或给定值）和雷达时间偏移 |
 | `tools/dog/time_offset_check.py` | 在转弯处测雷达和 INS 之间的时间差；仿真里能准确找回注入的 50 ms 偏差 |
+| `tools/dog/batch_label.py` | 教师推理 + 自动标注的多卡批量：nvidia-smi 选空闲卡，每卡一个（或 `--per-gpu` 个）进程，自动标注在 CPU 上并行，可断点续跑（[BAG_SPLIT.md](BAG_SPLIT.md) 第 4 节） |
 | `tools/dog/parallel.py` | 按场景并行：`refine_poses.py`、`sequence_preview.py`、`time_offset_check.py` 的 `--jobs`（默认每核一个场景，结果与串行相同） |
 | `tools/dog/refine_poses.py` | 先把 INS 位置从杠杆臂点（激光雷达后方 0.54 m）挪到机身原点，再把 KISS-ICP 激光里程计（陀螺提供旋转先验）与 RTK 融合（位置和航向都是激光管局部、INS 管长期）：两者都健康时激光管局部、INS 只消慢漂移；一方不健康时由另一方接管；都不健康时标为不可靠。改写 `odom.npy`（原始的存为 `odom_ins.npy`）。验证用预览的 `shift` 检查（[BAG_SPLIT.md](BAG_SPLIT.md) 3.5 节） |
 | `tools/dog/split_check.py` | 多份录制的训练 / 验证划分：去掉静止的验证场景，从训练录制里留出离其余路线最远的一段做验证，按路线 10 m 内的重叠去掉代价小的一方；输出地图和 `split.csv` |
