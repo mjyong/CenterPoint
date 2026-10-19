@@ -19,10 +19,13 @@ SMI = """0, NVIDIA GeForce RTX 4090, 23500, 24564, 98
 def test_free_gpus_from_nvidia_smi():
     gpus = bl.parse_gpus(SMI)
     assert [g["index"] for g in gpus] == [0, 1, 2, 3] and gpus[0]["mem_used"] == 23500
-    assert bl.pick_gpus(gpus) == [1, 2]                              # 0 busy, 3 utilisation unknown
-    assert bl.pick_gpus(gpus, busy={2}) == [1]                       # a compute process on 2
+    assert bl.pick_gpus(gpus) == [1, 2]                              # 0 full and busy, 3 utilisation unknown
+    assert bl.pick_gpus(gpus, busy={2}) == [1, 2]                    # a resident process does not exclude 2
     assert bl.pick_gpus(gpus, max_mem_mb=1000) == [1]
     assert bl.pick_gpus(gpus, visible={2, 3}) == [2]                 # CUDA_VISIBLE_DEVICES already set
+    shared = bl.parse_gpus("4, NVIDIA GeForce RTX 4090, 14000, 23028, 0\n"
+                           "5, NVIDIA GeForce RTX 4090, 21000, 23028, 0\n")
+    assert bl.pick_gpus(shared, busy={4, 5}) == [4]                  # 5 has under 8 GB free
 
 
 def test_run_batch_keeps_every_worker_busy_and_labels_on_the_side():

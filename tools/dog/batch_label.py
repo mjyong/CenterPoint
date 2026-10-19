@@ -3,10 +3,12 @@
     python tools/dog/batch_label.py --split data/survey/split/split.csv --seq-root data/seq \
         --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth [--gpus auto] [--per-gpu 1] [--dry-run]
 
-1. GPUs: ``--gpus auto`` asks nvidia-smi for every card's memory in use and utilisation (and
-   which processes run on it) and takes the free ones: less than ``--max-mem-mb`` in use and
-   ``--max-util`` % busy. ``--gpus 0,2`` takes those. A ``CUDA_VISIBLE_DEVICES`` already set
-   limits the choice. Indices are nvidia-smi's (``CUDA_DEVICE_ORDER=PCI_BUS_ID`` for the workers).
+1. GPUs: ``--gpus auto`` asks nvidia-smi for every card's memory and utilisation and takes the
+   free ones: at least ``--min-free-mb`` free (default 8 GB, enough for voxel + TTA), at most
+   ``--max-mem-mb`` in use, and at most ``--max-util`` % busy. Another process sitting on the card
+   does not by itself make it busy. ``--gpus 0,2`` takes those cards without this check. A
+   ``CUDA_VISIBLE_DEVICES`` already set limits the choice. Indices are nvidia-smi's
+   (``CUDA_DEVICE_ORDER=PCI_BUS_ID`` for the workers).
 2. Scenes: the ``split.csv`` rows that are not ``drop`` (or ``--seq``), longest first so the
    cards finish together.
 3. One worker per free card (``--per-gpu`` workers per card when one process leaves the card
@@ -52,16 +54,17 @@ def parse_gpus(text):
     return out
 
 
-def pick_gpus(gpus, max_mem_mb=2000.0, max_util=20.0, busy=(), visible=None):
-    """Indices of the free cards: little memory in use, little utilisation, no compute process
-    (``busy``: indices that have one) and, when ``visible`` is given, among those."""
+def pick_gpus(gpus, max_mem_mb=16000.0, max_util=20.0, busy=(), visible=None, min_free_mb=8192.0):
+    """Indices of the free cards: at least ``min_free_mb`` free, at most ``max_mem_mb`` in use,
+    utilisation at most ``max_util`` (unknown utilisation counts as busy). A compute process
+    (``busy``) does not by itself exclude the card. ``visible`` limits the choice."""
+    del busy  # presence is printed by the caller; memory left and utilisation decide
     free = []
     for g in gpus:
         if visible is not None and g["index"] not in visible:
             continue
-        if g["index"] in busy:
-            continue
-        if not (g["mem_used"] <= max_mem_mb) or not (g["util"] <= max_util):   # nan counts as busy
+        free_mb = g["mem_total"] - g["mem_used"]
+        if not (g["mem_used"] <= max_mem_mb and free_mb >= min_free_mb and g["util"] <= max_util):
             continue
         free.append(g["index"])
     return free
@@ -177,7 +180,8 @@ def main():
     ap.add_argument("--no-tta", action="store_true")
     ap.add_argument("--gpus", default="auto", help="'auto' (free cards), a list like 0,2, or 'cpu'")
     ap.add_argument("--per-gpu", type=int, default=1, help="workers per card")
-    ap.add_argument("--max-mem-mb", type=float, default=2000.0, help="auto: a card using more memory is busy")
+    ap.add_argument("--max-mem-mb", type=float, default=16000.0, help="auto: a card using more memory than this is busy")
+    ap.add_argument("--min-free-mb", type=float, default=8192.0, help="auto: a card with less than this free is busy")
     ap.add_argument("--max-util", type=float, default=20.0, help="auto: a card busier than this [%%] is busy")
     ap.add_argument("--label-jobs", type=int, default=0, help="auto_label.py at once (0: cores // 4, at least 1)")
     ap.add_argument("--force", action="store_true", help="redo scenes that already have results / labels")
@@ -199,15 +203,15 @@ def main():
         if not gpus:
             raise SystemExit("nvidia-smi found no GPU (use --gpus cpu to run on the CPU)")
         vis = visible_devices()
-        free = pick_gpus(gpus, args.max_mem_mb, args.max_util, busy, vis)
+        free = pick_gpus(gpus, args.max_mem_mb, args.max_util, busy, vis, args.min_free_mb)
         print("%-4s %-28s %10s %6s %6s  %s" % ("gpu", "name", "memory MB", "util", "procs", "use"))
         for g in gpus:
             print("%-4d %-28s %5.0f/%-5.0f %5.0f%% %6s  %s" % (
                 g["index"], g["name"][:28], g["mem_used"], g["mem_total"], g["util"],
                 "yes" if g["index"] in busy else "-", "FREE" if g["index"] in free else "busy"))
         if not free:
-            raise SystemExit("no free GPU (less than %.0f MB in use and %.0f %% busy, no process)" % (
-                args.max_mem_mb, args.max_util))
+            raise SystemExit("no free GPU (at most %.0f MB in use, at least %.0f MB free, at most %.0f%% busy)" % (
+                args.max_mem_mb, args.min_free_mb, args.max_util))
         cards = ["cuda:%d" % i for i in free]
     else:
         cards = ["cuda:%d" % int(x) for x in args.gpus.split(",") if x.strip()]

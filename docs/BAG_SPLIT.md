@@ -384,7 +384,7 @@ done
 - 训练集场景至少按轨迹审核；
 - 验证集场景（`segments.csv` 里 `split = val`）用 SUSTechPOINTS 逐框看，导出时加 `--every 5`。
 
-**多卡批量（推荐）**：`tools/dog/batch_label.py` 先用 nvidia-smi 看每张卡的显存占用、利用率和上面有没有进程，只用空闲的卡（默认显存占用 < 2000 MB、利用率 < 20%、没有计算进程；`--gpus 0,2` 可以直接指定）。每张卡一个进程，从队列里取场景跑教师推理（最长的场景先跑，各卡差不多同时结束）；自动标注在 CPU 上另开线程跑，卡不用等它。已经跑过的场景会跳过，中断后重跑同一条命令即可接着跑；某个场景失败不影响其他场景，最后列出来。每个场景的日志在 `data/runs/<场景>/run_sequence.log` 和 `data/labels/<场景>/auto_label.log`，汇总在 `data/labels/batch_summary.csv`。
+**多卡批量（推荐）**：`tools/dog/batch_label.py` 先用 nvidia-smi 看每张卡的显存和利用率，只用空闲的卡（默认至少剩 8 GB、占用不超过 16 GB、利用率不超过 20%；别的进程占着但卡在空转、还剩够显存的也算空闲。`--gpus 0,2` 可以直接指定，不再做这个检查）。每张卡一个进程，从队列里取场景跑教师推理（最长的场景先跑，各卡差不多同时结束）；自动标注在 CPU 上另开线程跑，卡不用等它。已经跑过的场景会跳过，中断后重跑同一条命令即可接着跑；某个场景失败不影响其他场景，最后列出来。每个场景的日志在 `data/runs/<场景>/run_sequence.log` 和 `data/labels/<场景>/auto_label.log`，汇总在 `data/labels/batch_summary.csv`。
 
 ```bash
 python tools/dog/batch_label.py --split data/survey/split/split.csv --dry-run      # 看哪些卡空闲、怎么分
