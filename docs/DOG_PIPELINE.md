@@ -262,7 +262,7 @@ python3 tools/dog/ros2_node.py --ros-args -p detector:=dog_pillar -p checkpoint:
     -p predictor_model:=work_dirs/pred/gru.pt -p extrinsic_t:="[0.2,0.0,0.15]" -p base_height:=0.45
 # kygi665（RTK INSPVAX 定位）：检测系和训练数据完全一致（离地 0.72 m，auto_ground + auto_level）
 python3 tools/dog/ros2_node.py --ros-args -p robot:=kygi -p config:=dog_pillar -p checkpoint:=<权重>
-# INS 双天线改接正之后再加：-p ins_azimuth_offset_deg:=0.0 -p ins_lever_arm:="[0.0213, -0.18, 0.0]"
+# INS 双天线改接正之后再加：-p ins_azimuth_offset_deg:=0.0（杠杆臂随之换成标定的 IMU 位置；要指定就加 -p ins_lever_arm:="[x, y, z]"）
 # （偏置不对时节点会报错：机器人在机身系里"倒着走"）
 
 # 仿真演示和测试

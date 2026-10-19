@@ -34,7 +34,7 @@ from visualization_msgs.msg import Marker, MarkerArray  # noqa: E402
 
 from dog_perception.geometry import quat_to_R  # noqa: E402
 from dog_perception.inspvax import INS_RTKFIXED, INS_SOLUTION_GOOD, EnuOrigin, HeadingCheck, pose_from_inspvax  # noqa: E402
-from dog_perception.node_config import node_parameters, preprocess_config  # noqa: E402
+from dog_perception.node_config import ins_lever_arm, node_parameters, preprocess_config  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
 from dog_perception.ros_utils import scan_from_msg  # noqa: E402
 
@@ -66,8 +66,11 @@ class DogPerceptionNode(Node):
         self.publish_cloud = bool(g("publish_cloud"))
         self.kygi_imu = g("imu_convention") == "kygi"
         self.lidar_time_offset = float(g("lidar_time_offset"))
-        self.ins_lever_arm = np.asarray(g("ins_lever_arm"), np.float64)
+        self.ins_lever_arm = ins_lever_arm(params)
         self.ins_azimuth_offset = float(g("ins_azimuth_offset_deg"))
+        if g("localization") == "inspvax":
+            self.get_logger().info("INS: heading = %.0f deg - azimuth, lever arm %s m" % (
+                self.ins_azimuth_offset, np.round(self.ins_lever_arm, 3).tolist()))
         self.heading_check, self.heading_warned = HeadingCheck(), False
 
         best_effort = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)

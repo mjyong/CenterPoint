@@ -7,8 +7,10 @@ the body origin), the RTK IMU in deg/s and INS axes, the 180 deg lidar yaw, the 
 Without them the network input online sits ~0.3 m off and keeps the 1-2 deg tilt the training data
 does not have. Parameters given explicitly still override the preset.
 """
+import numpy as np
+
 from .geometry import make_T, rot_zyx
-from .inspvax import KYGI_INS_LEVER_ARM, KYGI_LIDAR_RPY
+from .inspvax import KYGI_LIDAR_RPY, default_lever_arm
 from .preprocess import DetFrameConfig, PreprocessConfig
 
 # lidar height above the ground of the standing kygi robot: median of the per-scene estimates of
@@ -24,7 +26,8 @@ NODE_DEFAULTS = dict(
     localization="odom",              # odom: nav_msgs/Odometry (LIO) | inspvax: kygi665_msgs/INSPVAX
     odom_topic="/Odometry", odom_twist="none",
     inspvax_topic="/rte/rdap/rtk/inspvax",
-    ins_lever_arm=[0.0, 0.0, 0.0],    # [m] INSPVAX position point in the body frame (moved to the body origin)
+    ins_lever_arm=[float("nan")] * 3,  # [m] INSPVAX position point in the body frame (moved to the body origin);
+                                       # nan: follows ins_azimuth_offset_deg (``ins_lever_arm``)
     ins_azimuth_offset_deg=180.0,     # heading = offset - azimuth: 180 with the dual antennas swapped, 0 once fixed
     extrinsic_t=[0.0, 0.0, 0.0], extrinsic_rpy=[0.0, 0.0, 0.0],
     base_height=0.45, auto_ground=False, auto_level=False,
@@ -35,7 +38,7 @@ ROBOT_PRESETS = {
     "kygi": dict(
         lidar_topic="/robot/topic/rdap/top_point_cloud2",
         imu_topic="/rte/rdap/rtk/imus/data_raw", imu_convention="kygi",
-        localization="inspvax", ins_lever_arm=[float(a) for a in KYGI_INS_LEVER_ARM],
+        localization="inspvax",
         extrinsic_rpy=[float(a) for a in KYGI_LIDAR_RPY],
         base_height=KYGI_STANDING_BASE_HEIGHT, auto_ground=True, auto_level=True,
     ),
@@ -47,6 +50,14 @@ def node_parameters(robot=""):
     if robot and robot not in ROBOT_PRESETS:
         raise ValueError("unknown robot %r (have: %s)" % (robot, ", ".join(sorted(ROBOT_PRESETS))))
     return {**NODE_DEFAULTS, **ROBOT_PRESETS.get(robot, {})}
+
+
+def ins_lever_arm(params):
+    """The INS lever arm the node applies: ``ins_lever_arm`` if given, else the one that goes with
+    the antenna wiring (``ins_azimuth_offset_deg``): fitted on 0921 with the antennas swapped (180),
+    the calibrated IMU centre once they are fixed (0). So after the fix only the offset changes."""
+    L = np.asarray(params["ins_lever_arm"], np.float64)
+    return L if L.shape == (3,) and np.isfinite(L).all() else np.asarray(default_lever_arm(params["ins_azimuth_offset_deg"]))
 
 
 def preprocess_config(params):

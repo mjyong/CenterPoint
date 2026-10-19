@@ -284,7 +284,7 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 - 另一个发现：`_diag.npz` 里的 `odom_ins` 存成了 float32，unix 时间精度只剩 128 s。分析时按 100 Hz 从位置反推出了时间（残差中位 0.3 ms）；已改为 float64。
 
 **第四版**：
-- INS 杠杆臂修正，三处一致：转换（`rosbag_to_sequence.py --ins-lever-arm`，写入 `meta.ins_lever_arm`）、融合（老序列在 `refine_poses.py` 里补上）、线上节点（`robot:=kygi` 的 `ins_lever_arm` 参数，`bag_replay` 同样）。
+- INS 杠杆臂修正，三处一致：转换（`rosbag_to_sequence.py --ins-lever-arm`，写入 `meta.ins_lever_arm`）、融合（老序列在 `refine_poses.py` 里补上）、线上节点（`robot:=kygi` 的 `ins_lever_arm` 参数，`bag_replay` 同样）。三处的默认值都跟着天线接法走：接反（0921，航向偏置 180°）用拟合值 (−0.06, −0.54) m，接正（偏置 0°）用标定的 IMU 位置 (0.02, −0.18) m。0921 的数据不能用标定值：INS 实际报的点在 IMU 后方再约 0.36 m，用标定值时残差 0.086 m，拟合值 0.076 m，剩余杠杆臂还有约 0.36 m。
 - 激光不健康的一段，INS 不是整段健康时，用激光净位移摊开，不再用 INS 速度。
 - 闭合失败的缺口：激光降权但保留原值，不再换成 INS 速度。
 - 用 5.6 的 `_diag.npz` 离线重放（不需要点云；拿"融合与激光 1 s 位移之差"代替 `shift`，它和服务器的 `shift_fused` 走势一致）：闭合失败从 8 个降到 0 个；这个差值的 p90 平均从 0.23 m 降到 0.06 m，超过 0.2 m 的场景从 12 个降到 4 个（s007、s009、s011、s019）。剩下的都在激光自己也不对的时段（1 s 打分里激光 0.3–1.0 m），这些地方由 INS 接管，或已标为不可靠。
@@ -314,7 +314,7 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 **天线改接正之后**：
   - 机器人侧：azimuth 会指向前方。车上 `parse_inspvx` 的 `yaw = 180° − azimuth` 要改成 `yaw = −azimuth`（右前上的坐标系；本体 x 前的坐标系是 `90° − azimuth`）。INS 里的天线杠杆臂也一起核对。
   - 转换：`rosbag_to_sequence.py --azimuth-offset auto`（默认）按"狗往前走"自动选偏置（180° 或 0°），打印并写入 `meta.ins_azimuth_offset_deg`；选 0° 时杠杆臂默认用标定的 IMU 位置 (0.02, −0.18) m。
-  - 在线节点：加 `-p ins_azimuth_offset_deg:=0.0 -p ins_lever_arm:="[0.0213, -0.18, 0.0]"`。偏置不对时节点会报错（`HeadingCheck`：运动中的 INS 速度大多朝机身后方）。
+  - 在线节点：加 `-p ins_azimuth_offset_deg:=0.0`，杠杆臂会跟着换成标定的 IMU 位置（`node_config.ins_lever_arm`；也可以用 `-p ins_lever_arm:=...` 指定）。偏置不对时节点会报错（`HeadingCheck`：运动中的 INS 速度大多朝机身后方）。
   - 第一份接正后的录制：跑 `refine_poses.py`，看 "INS lever arm left over" 那一行。接近 0 说明 INSPVAX 报的就是 IMU 中心；否则把剩下的量加到 `--ins-lever-arm` 上。同时看 INS 自己的 `shift`（`shift_ins_p90_m`）、急刹和转弯后的航向修正量（`heading_correction_max_deg`），预期会比 0921 小很多。
   - 0921 的数据没法补救 INS 本身，继续靠 `refine_poses.py`（激光里程计 + 杠杆臂 + 航向融合）。
 - 合成数据新增两项：INS 盲区里的激光锯齿（第三版误差 0.46 m，第四版 < 0.15 m）；绕"8"字行走时杠杆臂被测出并去掉（误差 < 2 cm）。

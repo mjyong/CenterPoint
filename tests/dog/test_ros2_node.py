@@ -26,6 +26,12 @@ def test_presets_override_with_the_declared_types():
             if isinstance(v, list):
                 assert all(isinstance(x, float) for x in v), (robot, k)
     assert node_parameters("")["base_height"] == 0.45 and not node_parameters("")["auto_level"]
+    from dog_perception.inspvax import KYGI_IMU_IN_BODY, KYGI_INS_LEVER_ARM
+    from dog_perception.node_config import ins_lever_arm
+    kygi = node_parameters("kygi")
+    assert np.allclose(ins_lever_arm(kygi), KYGI_INS_LEVER_ARM)                       # antennas swapped (0921)
+    assert np.allclose(ins_lever_arm(dict(kygi, ins_azimuth_offset_deg=0.0)), KYGI_IMU_IN_BODY)   # fixed
+    assert np.allclose(ins_lever_arm(dict(kygi, ins_lever_arm=[0.1, -0.2, 0.0])), [0.1, -0.2, 0.0])
     with pytest.raises(ValueError):
         node_parameters("spot")
 
