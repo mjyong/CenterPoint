@@ -1,0 +1,49 @@
+{
+  "radius_m": 10.0,
+  "max_share": 0.1,
+  "holdout": "0921_165659",
+  "holdout_s": 90.0,
+  "before": {
+    "train": {
+      "scenes": 29,
+      "seconds": 863.5,
+      "moving_seconds": 812.7,
+      "path_m": 1091.6
+    },
+    "val": {
+      "scenes": 6,
+      "seconds": 172.7,
+      "moving_seconds": 92.1,
+      "path_m": 137.6
+    },
+    "drop": {
+      "scenes": 0,
+      "seconds": 0,
+      "moving_seconds": 0,
+      "path_m": 0
+    }
+  },
+  "after": {
+    "train": {
+      "scenes": 23,
+      "seconds": 690.1,
+      "moving_seconds": 639.5,
+      "path_m": 854.7
+    },
+    "val": {
+      "scenes": 8,
+      "seconds": 230.7,
+      "moving_seconds": 207.7,
+      "path_m": 301.3
+    },
+    "drop": {
+      "scenes": 4,
+      "seconds": 115.4,
+      "moving_seconds": 57.7,
+      "path_m": 73.2
+    }
+  },
+  "val_path_within_radius_of_train": 0.0,
+  "val_share_of_moving": 0.245,
+  "applied": true
+}

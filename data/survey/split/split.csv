@@ -1,0 +1,36 @@
+name,split,reason
+0921_164127_s000,drop,static val scene (moving 0% of the time)
+0921_164127_s001,val,
+0921_164127_s002,val,
+0921_164127_s003,val,
+0921_164127_s004,val,
+0921_164127_s005,drop,static val scene (moving 0% of the time)
+0921_165659_s000,train,
+0921_165659_s001,train,
+0921_165659_s002,drop,buffer next to the hold-out block
+0921_165659_s003,val,hold-out block (0% of its path within 10 m of train)
+0921_165659_s004,val,hold-out block (0% of its path within 10 m of train)
+0921_165659_s005,val,hold-out block (0% of its path within 10 m of train)
+0921_165659_s006,val,hold-out block (0% of its path within 10 m of train)
+0921_165659_s007,drop,buffer next to the hold-out block
+0921_165659_s008,train,
+0921_165659_s009,train,
+0921_165659_s010,train,
+0921_165659_s011,train,
+0921_165659_s012,train,
+0921_165659_s013,train,
+0921_165659_s014,train,
+0921_165659_s015,train,
+0921_165659_s016,train,
+0921_165659_s017,train,
+0921_165659_s018,train,
+0921_165659_s019,train,
+0921_165659_s020,train,
+0921_165659_s021,train,
+0921_165659_s022,train,
+0921_165659_s023,train,
+0921_165659_s024,train,
+0921_165659_s025,train,
+0921_165659_s026,train,
+0921_165659_s027,train,
+0921_165659_s028,train,
