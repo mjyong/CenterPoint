@@ -12,6 +12,8 @@ extrinsic_T / extrinsic_R) and the IMU gyro must be expressed in it too.
 With ``--inspvax-topic`` (kygi665 RTK unit) the IMU is read as deg/s in the
 INS axes, the lidar extrinsic defaults to the measured 180 deg yaw, the INS rows are moved from
 the INS point to the body origin (``--ins-lever-arm``, default the measured 0.54 m behind the lidar),
+the heading is ``--azimuth-offset`` minus the azimuth (180 deg while the dual antennas were swapped,
+as on 0921, 0 once fixed; ``auto`` picks the one that makes the robot walk forwards),
 the sequence is marked for ground levelling (see ``dog_perception/inspvax.py``), and the base height
 is the median ground height over every ``--base-height-every``-th sweep of the sequence.
 Per-point time: Hesai ROS driver 2.0 publishes an absolute float64
@@ -94,7 +96,10 @@ def main():
                     help="radians; default 0 0 0, or the measured kygi value with --inspvax-topic")
     ap.add_argument("--ins-lever-arm", type=float, nargs=3, default=None,
                     help="[m] INSPVAX position point in the body frame; its rows are moved to the body origin "
-                         "(default: the measured kygi value with --inspvax-topic)")
+                         "(default: the value measured on 0921 with the antennas swapped, else the IMU centre)")
+    ap.add_argument("--azimuth-offset", default="auto", choices=["auto", "180", "0"],
+                    help="[deg] heading = offset - azimuth: 180 with the dual antennas swapped (0921), 0 once "
+                         "fixed; auto: whichever makes the robot walk forwards")
     ap.add_argument("--base-height", type=float, default=0.45)
     ap.add_argument("--estimate-base-height", action="store_true",
                     help="replace --base-height by the median ground height over the sweeps "
@@ -115,13 +120,12 @@ def main():
     from rosbags.highlevel import AnyReader
     from rosbags.typesys import Stores, get_typestore
 
-    from dog_perception.inspvax import (KYGI_INS_LEVER_ARM, KYGI_LIDAR_RPY, EnuOrigin, apply_lever_arm,
-                                        forward_speed, gyro_from_kygi_imu, pose_from_inspvax, register_kygi)
+    from dog_perception.inspvax import (KYGI_AZIMUTH_OFFSET_DEG, KYGI_LIDAR_RPY, EnuOrigin, apply_lever_arm,
+                                        default_lever_arm, forward_speed, gyro_from_kygi_imu, pose_from_inspvax,
+                                        register_kygi, turn_heading)
 
     if args.extrinsic_rpy is None:
         args.extrinsic_rpy = list(KYGI_LIDAR_RPY) if kygi else [0.0, 0.0, 0.0]
-    if args.ins_lever_arm is None:
-        args.ins_lever_arm = list(KYGI_INS_LEVER_ARM) if kygi else [0.0, 0.0, 0.0]
     T_bl = make_T(rot_zyx(args.extrinsic_rpy[2], args.extrinsic_rpy[1], args.extrinsic_rpy[0]), args.extrinsic_t)
     est_h = args.estimate_base_height or kygi
 
@@ -211,6 +215,22 @@ def main():
                     if t.wants_row(tm):
                         t.w().odom.append(odom_row(tm, R, [p.x, p.y, p.z], v))
 
+    az_off = None
+    if kygi:
+        rows = [np.asarray(t.writer.odom, np.float64).reshape(-1, 11) for t in targets if t.writer is not None]
+        rows = np.concatenate(rows) if rows else np.zeros((0, 11))
+        if args.azimuth_offset == "auto":
+            fwd = forward_speed(rows)               # rows were read with KYGI_AZIMUTH_OFFSET_DEG
+            az_off = KYGI_AZIMUTH_OFFSET_DEG if fwd is None or fwd >= 0 else (KYGI_AZIMUTH_OFFSET_DEG + 180.0) % 360
+            print("INS azimuth offset %.0f deg (%s; median forward speed %s m/s)" % (
+                az_off, "antennas swapped as on 0921" if az_off == 180 else "antennas fixed",
+                "-" if fwd is None else "%+.2f" % fwd))
+        else:
+            az_off = float(args.azimuth_offset)
+        if args.ins_lever_arm is None:
+            args.ins_lever_arm = list(default_lever_arm(az_off))
+        print("INS lever arm %s m (body frame)" % args.ins_lever_arm)
+
     written = 0
     for t in targets:
         if t.writer is None or t.writer.n_scans == 0:
@@ -228,6 +248,7 @@ def main():
         if kygi:
             meta["det_frame"] = dict(auto_ground=True, auto_level=True)    # INS attitude is heading only
             meta["ins_lever_arm"] = [float(a) for a in args.ins_lever_arm]  # already applied to odom.npy
+            meta["ins_azimuth_offset_deg"] = az_off                         # heading = offset - azimuth
             meta["imu_axes"] = "body"                                        # gyro_from_kygi_imu
         h, info = median_base_height(t.heights)
         if h is not None:
@@ -235,12 +256,11 @@ def main():
             meta["base_height_sweeps"] = dict(info, every=args.base_height_every)
         odom = np.asarray(t.writer.odom, np.float64).reshape(-1, 11)
         if kygi:
-            odom = apply_lever_arm(odom, args.ins_lever_arm)
+            odom = apply_lever_arm(turn_heading(odom, np.radians(az_off - KYGI_AZIMUTH_OFFSET_DEG)), args.ins_lever_arm)
             fwd = forward_speed(odom)
             if fwd is not None and fwd < 0:
-                print("WARNING %s: the robot walks backwards in the body frame (median %.2f m/s): the INSPVAX "
-                      "azimuth convention changed (INS mounting fixed?); heading must become -azimuth, see "
-                      "dog_perception/inspvax.py" % (t.name, fwd))
+                print("WARNING %s: the robot walks backwards in the body frame (median %.2f m/s): wrong "
+                      "--azimuth-offset for this recording (see dog_perception/inspvax.py)" % (t.name, fwd))
         print("%s: odom t %.3f .. %.3f  span %.1fs  pos_type %s  base_height %.2f" % (
             t.name, odom[0, 0], odom[-1, 0], odom[-1, 0] - odom[0, 0], t.pos_types or "-", meta["base_height"]))
         n_imu = len(t.writer.imu)

@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（96 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（97 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -261,6 +261,8 @@ python3 tools/dog/ros2_node.py --ros-args -p detector:=dog_pillar -p checkpoint:
     -p predictor_model:=work_dirs/pred/gru.pt -p extrinsic_t:="[0.2,0.0,0.15]" -p base_height:=0.45
 # kygi665（RTK INSPVAX 定位）：检测系和训练数据完全一致（离地 0.72 m，auto_ground + auto_level）
 python3 tools/dog/ros2_node.py --ros-args -p robot:=kygi -p config:=dog_pillar -p checkpoint:=<权重>
+# INS 双天线改接正之后再加：-p ins_azimuth_offset_deg:=0.0 -p ins_lever_arm:="[0.0213, -0.18, 0.0]"
+# （偏置不对时节点会报错：机器人在机身系里"倒着走"）
 
 # 仿真演示和测试
 python tools/dog/run_sim_demo.py --frames 80 --plot 3 --out work_dirs/sim_demo

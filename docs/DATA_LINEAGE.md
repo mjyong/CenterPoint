@@ -178,7 +178,7 @@ mindmap
 | `undulation` | −38.0 m | 大地水准面差距 | 不用 |
 | `north_velocity` `east_velocity` `up_velocity` | 1.58, 0.47, −0.005 m/s | 北、东、天方向速度 | 用：写进 `odom.npy` 的速度列，按 (东, 北, 天) 排 |
 | `roll` `pitch` | 度 | 横滚、俯仰 | **不用**：加减速时不可信（0.6 s 内 pitch 从 +2.8° 跳到 −9.9°，陀螺积分不到 2°）。地面倾斜改由点云在线找平 |
-| `azimuth` | 196.8° | 航向，从正北顺时针 | 用：机身航向 `yaw = (180° − azimuth)`，换成弧度，在 ENU 下从东向逆时针 |
+| `azimuth` | 196.8° | 航向，从正北顺时针。0921 录制时双天线主、从接反，它指向狗的后方 | 用：机身航向 `yaw = 偏置 − azimuth`，换成弧度，在 ENU 下从东向逆时针。偏置 180°（天线接反，0921）或 0°（接正后）；转换器按"狗往前走"自动选，写入 `meta.ins_azimuth_offset_deg` |
 | `*_stdev` | 纬度 0.013 m，航向 0.20° | 各量的标准差 | 不用（只在核对定位质量时看） |
 | `ext_sol_status`、`time_since_update` | 2048、0 | 扩展解算状态、距上次更新的时间 | 不用 |
 
@@ -275,6 +275,7 @@ mindmap
 | `inspvax_pos_type` | 转换器 | 场景内（含前后 1 s）各 pos_type 的计数 |
 | `det_frame` | 转换器 | kygi 是 `{"auto_ground": true, "auto_level": true}`：检测系用近处地面在线修正高度和倾斜 |
 | `imu_axes` | 转换器 / `sequence_meta.py --fix-imu-axes` | `body`：`imu.npy` 的陀螺按机身系的轴存。没有这个字段的 kygi 老序列 x、y 是反的 |
+| `ins_azimuth_offset_deg` | 转换器 | 航向 = 这个值 − azimuth：180（双天线接反，0921）或 0（接正后） |
 | `ins_lever_arm` | 转换器 | 转换时已经从 INS 位置里扣掉的杠杆臂（机身系，m）。没有这个字段的老序列没扣过，`refine_poses.py` 会补上 |
 | `segment` | 转换器 / `split_check.py` | `name, t_start, t_end, split`；`split_check.py --apply` 会改 `split`，体检给的原值存在 `split_survey` |
 | `lidar_time_offset` | `sequence_meta.py`（可选） | 读取时加到所有雷达时间上的秒数，用来把雷达时钟对齐到 INS 时钟，默认 0 |

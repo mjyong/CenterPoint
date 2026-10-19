@@ -25,6 +25,7 @@ NODE_DEFAULTS = dict(
     odom_topic="/Odometry", odom_twist="none",
     inspvax_topic="/rte/rdap/rtk/inspvax",
     ins_lever_arm=[0.0, 0.0, 0.0],    # [m] INSPVAX position point in the body frame (moved to the body origin)
+    ins_azimuth_offset_deg=180.0,     # heading = offset - azimuth: 180 with the dual antennas swapped, 0 once fixed
     extrinsic_t=[0.0, 0.0, 0.0], extrinsic_rpy=[0.0, 0.0, 0.0],
     base_height=0.45, auto_ground=False, auto_level=False,
     num_sweeps=5, world_frame="camera_init", publish_cloud=False,

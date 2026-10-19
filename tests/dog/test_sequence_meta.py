@@ -33,3 +33,36 @@ def test_forward_speed_tells_the_heading_convention():
     flipped = np.array([odom_row(0.01 * k, rot_z(yaw + np.pi), [0, 0, 0], fwd) for k in range(50)])
     assert forward_speed(flipped) < 0
     assert forward_speed(np.column_stack([rows[:, :8], np.zeros((50, 3))])) is None   # standing still
+
+
+def test_azimuth_offset_heading_and_online_check():
+    """Dual antennas swapped (0921): heading = 180 deg - azimuth; fixed: -azimuth. The robot then
+    walks along body +y either way; HeadingCheck flags the wrong offset."""
+    from types import SimpleNamespace
+
+    from dog_perception.inspvax import (KYGI_IMU_IN_BODY, KYGI_INS_LEVER_ARM, EnuOrigin, HeadingCheck,
+                                        default_lever_arm, pose_from_inspvax, turn_heading)
+    origin = EnuOrigin(29.7, 106.8, 217.0)
+    travel = 30.0                                                   # azimuth of the direction of travel
+    v = 1.5 * np.array([np.sin(np.radians(travel)), np.cos(np.radians(travel)), 0.0])   # east, north
+
+    def msg(az):
+        return SimpleNamespace(ins_status=SimpleNamespace(data=3), latitude=29.7, longitude=106.8, height=217.0,
+                               azimuth=az, east_velocity=v[0], north_velocity=v[1], up_velocity=0.0,
+                               header=SimpleNamespace(stamp=SimpleNamespace(sec=1, nanosec=0)))
+    _, R_swapped, _, _ = pose_from_inspvax(msg(travel + 180.0), origin)            # 0921: points backwards
+    _, R_fixed, _, _ = pose_from_inspvax(msg(travel), origin, azimuth_offset_deg=0.0)
+    assert np.allclose(R_swapped, R_fixed) and R_fixed[:2, 1] @ v[:2] > 1.49        # body +y forward
+    _, R_wrong, _, _ = pose_from_inspvax(msg(travel), origin)                         # fixed antennas, old offset
+    check = HeadingCheck(min_rows=10)
+    for _ in range(10):
+        check.add(R_wrong, v)
+    assert check.wrong
+    rows = np.array([odom_row(0.0, R_wrong, [0, 0, 0], v)])
+    assert np.allclose(quat_R(turn_heading(rows, np.pi)[0, 4:8]), R_fixed)
+    assert default_lever_arm(180) == KYGI_INS_LEVER_ARM and default_lever_arm(0.0) == KYGI_IMU_IN_BODY
+
+
+def quat_R(q):
+    from dog_perception.geometry import quat_to_R
+    return quat_to_R(q)

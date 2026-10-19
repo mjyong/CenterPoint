@@ -13,8 +13,8 @@ How, per sequence:
 
 0. INS lever arm: the INSPVAX position is that of a point 0.54 m behind the lidar (the body
    origin), so it swings around the robot whenever it turns (dog_perception/inspvax.py). The
-   rows are moved to the body origin (``--lever-arm``, default the measured kygi value; sequences
-   converted with it already, ``meta["ins_lever_arm"]``, are not moved twice). The lever arm
+   rows are moved to the body origin (``--lever-arm``; default: what the converter applied,
+   ``meta["ins_lever_arm"]``, or the value measured on 0921 for sequences converted before it). The lever arm
    left over is fitted per sequence (``lever_residual_m``, sequences turning > 45 deg) as a check.
 1. Lidar odometry: every scan (same de-duplication and self filter as the online preprocessing,
    body frame, per-point times) goes through KISS-ICP, which deskews it to the scan end (our
@@ -481,17 +481,17 @@ def draw(path, name, odom_ins, stamps, xy, corr, info, diag, checks=None):
 
 
 def refine(seq_dir, plots=None, prior="imu", lever_arm=None, **kw):
-    """``lever_arm``: INS position point in the body frame (default: the kygi value for INSPVAX
-    sequences, else none); whatever the converter applied already (``meta["ins_lever_arm"]``,
-    sequences converted before it have none) is taken into account."""
+    """``lever_arm``: INS position point in the body frame (default: what the converter applied,
+    ``meta["ins_lever_arm"]``; INSPVAX sequences converted before it have none and get the value
+    measured on 0921); whatever the converter applied already is taken into account."""
     rd = SequenceReader(seq_dir)
     p_ins = os.path.join(seq_dir, ODOM_INS)
     odom_ins = np.load(p_ins) if os.path.exists(p_ins) else rd.odom
     if len(rd) < 2 or len(odom_ins) < 2:
         return None
     applied = np.asarray(rd.meta.get("ins_lever_arm", [0.0, 0.0, 0.0]), np.float64)
-    if lever_arm is None:
-        lever_arm = KYGI_INS_LEVER_ARM if "lat0" in rd.meta else applied
+    if lever_arm is None:                         # what the converter chose; older INSPVAX sequences: 0921 value
+        lever_arm = applied if "ins_lever_arm" in rd.meta or "lat0" not in rd.meta else KYGI_INS_LEVER_ARM
     lever_arm = np.asarray(lever_arm, np.float64)
     odom_body = apply_lever_arm(odom_ins, lever_arm - applied)     # INS rows of the body origin
     stamps, poses, kept = lidar_odometry(rd, prior=None if prior == "none" else prior)
@@ -542,8 +542,8 @@ def main():
                          "before it counts as bad")
     ap.add_argument("--gap-rel", type=float, default=0.05, help="see --gap-tol")
     ap.add_argument("--lever-arm", type=float, nargs=3, default=None,
-                    help="[m] INS position point in the body frame (default: the measured kygi value for INSPVAX "
-                         "sequences)")
+                    help="[m] INS position point in the body frame (default: meta ins_lever_arm from the "
+                         "converter, else the value measured on 0921)")
     args = ap.parse_args()
     kw = dict(sigma_lo=args.sigma_lo, sigma_ins=args.sigma_ins, sigma_lo_bad=args.sigma_lo_bad, huber=args.huber,
               gap_tol=args.gap_tol, gap_rel=args.gap_rel)

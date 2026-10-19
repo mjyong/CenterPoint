@@ -33,7 +33,7 @@ from sensor_msgs.msg import Imu, PointCloud2, PointField  # noqa: E402
 from visualization_msgs.msg import Marker, MarkerArray  # noqa: E402
 
 from dog_perception.geometry import quat_to_R  # noqa: E402
-from dog_perception.inspvax import INS_RTKFIXED, INS_SOLUTION_GOOD, EnuOrigin, pose_from_inspvax  # noqa: E402
+from dog_perception.inspvax import INS_RTKFIXED, INS_SOLUTION_GOOD, EnuOrigin, HeadingCheck, pose_from_inspvax  # noqa: E402
 from dog_perception.node_config import node_parameters, preprocess_config  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
 from dog_perception.ros_utils import scan_from_msg  # noqa: E402
@@ -67,6 +67,8 @@ class DogPerceptionNode(Node):
         self.kygi_imu = g("imu_convention") == "kygi"
         self.lidar_time_offset = float(g("lidar_time_offset"))
         self.ins_lever_arm = np.asarray(g("ins_lever_arm"), np.float64)
+        self.ins_azimuth_offset = float(g("ins_azimuth_offset_deg"))
+        self.heading_check, self.heading_warned = HeadingCheck(), False
 
         best_effort = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
         self.create_subscription(Imu, g("imu_topic"), self.on_imu, 400)
@@ -116,7 +118,7 @@ class DogPerceptionNode(Node):
                 return
             self.origin = EnuOrigin(msg.latitude, msg.longitude, msg.height)
             self.get_logger().info("ENU origin %.8f %.8f %.2f" % (msg.latitude, msg.longitude, msg.height))
-        got = pose_from_inspvax(msg, self.origin, self.ins_lever_arm)
+        got = pose_from_inspvax(msg, self.origin, self.ins_lever_arm, self.ins_azimuth_offset)
         if got is None:
             self.get_logger().warn("INS solution not good (ins_status %d)" % int(msg.ins_status.data),
                                    throttle_duration_sec=2.0)
@@ -124,6 +126,11 @@ class DogPerceptionNode(Node):
         if int(msg.pos_type.data) != INS_RTKFIXED:
             self.get_logger().warn("RTK not fixed (pos_type %d)" % int(msg.pos_type.data), throttle_duration_sec=5.0)
         t, R, p, v = got
+        self.heading_check.add(R, v)
+        if self.heading_check.wrong and not self.heading_warned:
+            self.heading_warned = True
+            self.get_logger().error("the robot walks backwards in the body frame: ins_azimuth_offset_deg %.0f does "
+                                    "not match the INS antennas (180 swapped as on 0921, 0 fixed)" % self.ins_azimuth_offset)
         self.pipe.on_odometry(t, R, p, v)
 
     def on_cloud(self, msg):

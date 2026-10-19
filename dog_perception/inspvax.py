@@ -24,14 +24,20 @@ straight at 1.5-2.5 m/s, see docs/DOG_PIPELINE.md section 9):
   says the same (lidar -> IMU: 180 deg yaw, like ``KYGI_LIDAR_RPY``). Until
   2026-10 x and y were negated here (taken from the azimuth below, which
   only the yaw rate could confirm);
-* the INSPVAX azimuth points backwards, along the IMU's -y: the body frame
-  (yaw = 180 deg - azimuth) has +y forward, and the INS velocity in it is
-  along +y. The INS also integrates the braking the wrong way (its speed
-  goes 1.9 -> 2.5 m/s while the lidar odometry shows 2.1 -> 0.1 m/s), as
-  if it used the IMU turned by 180 deg about z: most likely its mounting is
-  configured that way (docs/BAG_SPLIT.md 3.5). If that gets fixed on the
-  robot, the azimuth points forward and the heading becomes -azimuth:
-  ``forward_speed`` (checked by the converter) turns negative then;
+* the INSPVAX azimuth points backwards (179.5 deg off the direction of
+  travel): the dual-antenna master and slave were wired the wrong way round
+  on the 0921 recordings (confirmed by the robot team). So the heading is
+  ``yaw = azimuth_offset - azimuth`` with ``KYGI_AZIMUTH_OFFSET_DEG`` = 180;
+  once the antennas are fixed the offset is 0. Recordings tell which one
+  they need: the robot walks along body +y (``forward_speed`` > 0); the
+  converter picks the offset from that, the online node warns
+  (``HeadingCheck``). With its heading 180 deg off, the INS also projects
+  the IMU's horizontal acceleration the wrong way: its speed goes
+  1.9 -> 2.5 m/s while the lidar odometry shows the robot braking from 2.1
+  to 0.1 m/s, its position runs ~0.45 m ahead, its heading is off by
+  4-10 deg after fast turns and its pitch swings by 10 deg while braking.
+  Recordings with the antennas fixed should not need most of
+  tools/dog/refine_poses.py;
 * the XT32 axes are the IMU axes turned by 180 deg about z: scan matching
   puts the motion on lidar -y while the INS puts it on body +y, so
   ``T_body_lidar`` has a 180 deg yaw (``KYGI_LIDAR_RPY``). A static
@@ -64,7 +70,9 @@ INS_RTKFIXED = 56                        # pos_type of an RTK-fixed INS solution
 KYGI_GYRO_SCALE = np.pi / 180.0          # deg/s -> rad/s
 R_BODY_KYGI_IMU = np.eye(3)              # RTK IMU axes in the body frame (x right, y forward, z up)
 KYGI_LIDAR_RPY = (0.0, 0.0, np.pi)       # XT32 orientation in the body frame (roll, pitch, yaw) [rad]
-KYGI_INS_LEVER_ARM = (-0.06, -0.54, 0.0)  # INSPVAX position point in the body frame [m]
+KYGI_INS_LEVER_ARM = (-0.06, -0.54, 0.0)  # INSPVAX position point in the body frame [m], antennas swapped
+KYGI_IMU_IN_BODY = (0.0213, -0.18, 0.0)    # IMU centre in the body frame [m] (robot calibration; height unused)
+KYGI_AZIMUTH_OFFSET_DEG = 180.0           # yaw = offset - azimuth: 180 with the antennas swapped (0921), else 0
 _A = 6378137.0
 _E2 = 6.69437999014e-3
 
@@ -117,16 +125,17 @@ def gyro_from_kygi_imu(msg):
     return R_BODY_KYGI_IMU @ (np.array([w.x, w.y, w.z], dtype=np.float64) * KYGI_GYRO_SCALE)
 
 
-def pose_from_inspvax(msg, origin, lever_arm=None):
+def pose_from_inspvax(msg, origin, lever_arm=None, azimuth_offset_deg=KYGI_AZIMUTH_OFFSET_DEG):
     """Return (t, R, p, v) or None when the INS solution is not good. With ``lever_arm`` (the INS
     position point in the body frame) p is the body origin; v stays that of the INS point (off by
-    yaw rate x lever arm, 0.3 m/s at 30 deg/s: ``apply_lever_arm`` corrects both on a whole series)."""
+    yaw rate x lever arm, 0.3 m/s at 30 deg/s: ``apply_lever_arm`` corrects both on a whole series).
+    ``azimuth_offset_deg``: 180 with the dual antennas swapped (0921 recordings), 0 once fixed."""
     if int(msg.ins_status.data) != INS_SOLUTION_GOOD:
         return None
     if origin is None:
         raise ValueError("origin is required")
     p = origin.enu(msg.latitude, msg.longitude, msg.height)
-    R = rot_z((-float(msg.azimuth) + 180.0) * np.pi / 180.0)
+    R = rot_z((float(azimuth_offset_deg) - float(msg.azimuth)) * np.pi / 180.0)
     if lever_arm is not None:
         p = p - R @ np.asarray(lever_arm, np.float64)
     v = np.array([msg.east_velocity, msg.north_velocity, msg.up_velocity], dtype=np.float64)
@@ -157,3 +166,41 @@ def forward_speed(odom, min_speed=0.5):
         return None
     fwd = [(quat_to_R(q)[:2, 1] @ vi) for q, vi in zip(np.asarray(odom)[m, 4:8], v[m])]
     return float(np.median(fwd))
+
+
+def default_lever_arm(azimuth_offset_deg):
+    """INS lever arm to apply by default: fitted on the 0921 recordings (antennas swapped), else the
+    IMU centre from the calibration, where an INS reports by default. Check it on the first
+    recording with the antennas fixed: tools/dog/refine_poses.py prints the lever arm left over."""
+    return KYGI_INS_LEVER_ARM if round(float(azimuth_offset_deg)) % 360 == 180 else KYGI_IMU_IN_BODY
+
+
+def turn_heading(odom, angle):
+    """Odometry rows with the heading turned by ``angle`` [rad] (positions and velocities kept)."""
+    out = np.array(odom, np.float64, copy=True)
+    if len(out):
+        from .geometry import R_to_quat
+        out[:, 4:8] = [R_to_quat(rot_z(angle) @ quat_to_R(q)) for q in out[:, 4:8]]
+    return out
+
+
+class HeadingCheck:
+    """Online check of the azimuth offset: counts INS samples moving faster than ``min_speed``
+    along the body +y (forward) and -y. ``wrong`` once at least ``min_rows`` go backwards and
+    four times more than forwards (the robot rarely walks backwards for long)."""
+
+    def __init__(self, min_speed=0.5, min_rows=300):
+        self.min_speed, self.min_rows = min_speed, min_rows
+        self.n_fwd = self.n_back = 0
+
+    def add(self, R, v):
+        v = np.asarray(v, np.float64)[:2]
+        if np.isfinite(v).all() and np.hypot(*v) > self.min_speed:
+            if np.asarray(R)[:2, 1] @ v > 0:
+                self.n_fwd += 1
+            else:
+                self.n_back += 1
+
+    @property
+    def wrong(self):
+        return self.n_back >= self.min_rows and self.n_back > 4 * self.n_fwd

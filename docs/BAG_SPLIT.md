@@ -291,12 +291,17 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 
   代码原来把陀螺 x、y 取反（照 INS 航向的约定推的，当时只能核对 z），已改为直接用（`R_BODY_KYGI_IMU` = 单位阵）。老序列用 `sequence_meta.py --fix-imu-axes` 修正一次 `imu.npy`。实际影响很小：INS 每 10 ms 重置一次姿态，陀螺的横滚、俯仰只积分 10 ms，样例 bag 上去畸变后的地面平整度没有变化；主要影响 KISS-ICP 的陀螺先验。
 - **INS 的安装配置很可能转了 180°**：
-  - 三个坐标系和标定、数据都对得上：本体 x 前 y 左，雷达 x 左 y 后，IMU x 右 y 前（z 都朝上）。按这个，INS 的航向应该指向 IMU 的 +y（前方），实际却指向后方：运动样例里 azimuth 减去行进方向的中位数是 179.5°。所以才有 `yaw = 180° − azimuth`。最可能的来源是 INS 的航向基准差了 180°：双天线的主、从天线接反或基线方向配反，或者安装角配成了 180°；
+  - 三个坐标系和标定、数据都对得上：本体 x 前 y 左，雷达 x 左 y 后，IMU x 右 y 前（z 都朝上）。按这个，INS 的航向应该指向 IMU 的 +y（前方），实际却指向后方：运动样例里 azimuth 减去行进方向的中位数是 179.5°。所以才有 `yaw = 180° − azimuth`。**已确认：双天线的主、从天线接反了**（机器人团队，2026-10）；
   - 急刹时，激光里程计显示速度从 2.1 降到 0.1 m/s（加速度计 y 为 −2 到 −4 m/s²），INS 速度却从 1.9 升到 2.5 m/s，像是把减速当成了加速；位置因此冲到前面约 0.45 m，再被 GNSS 一步步往回拉；
   - 急转弯后航向偏 4–10°、急刹时俯仰摆 10°（地面只显示 1.5°），也都符合"INS 把 IMU 的水平方向看反了"；
   - 杠杆臂对不上（数据要 0.54 m，标定的 IMU 只在 0.18 m）也可能有关：天线杠杆臂按反了的轴去扣，误差会翻倍。
 
-  建议在机器人上检查 INS 的 IMU 安装方向 / 车体系旋转和天线杠杆臂的配置。改正后 azimuth 会指向前方，航向要改成 `yaw = −azimuth`。转换脚本会自动发现这种变化：狗在机身系里"倒着走"时打印 WARNING（`inspvax.forward_speed`）。
+**天线改接正之后**：
+  - 机器人侧：azimuth 会指向前方。车上 `parse_inspvx` 的 `yaw = 180° − azimuth` 要改成 `yaw = −azimuth`（右前上的坐标系；本体 x 前的坐标系是 `90° − azimuth`）。INS 里的天线杠杆臂也一起核对。
+  - 转换：`rosbag_to_sequence.py --azimuth-offset auto`（默认）按"狗往前走"自动选偏置（180° 或 0°），打印并写入 `meta.ins_azimuth_offset_deg`；选 0° 时杠杆臂默认用标定的 IMU 位置 (0.02, −0.18) m。
+  - 在线节点：加 `-p ins_azimuth_offset_deg:=0.0 -p ins_lever_arm:="[0.0213, -0.18, 0.0]"`。偏置不对时节点会报错（`HeadingCheck`：运动中的 INS 速度大多朝机身后方）。
+  - 第一份接正后的录制：跑 `refine_poses.py`，看 "INS lever arm left over" 那一行。接近 0 说明 INSPVAX 报的就是 IMU 中心；否则把剩下的量加到 `--ins-lever-arm` 上。同时看 INS 自己的 `shift`（`shift_ins_p90_m`）、急刹和转弯后的航向修正量（`heading_correction_max_deg`），预期会比 0921 小很多。
+  - 0921 的数据没法补救 INS 本身，继续靠 `refine_poses.py`（激光里程计 + 杠杆臂 + 航向融合）。
 - 合成数据新增两项：INS 盲区里的激光锯齿（第三版误差 0.46 m，第四版 < 0.15 m）；绕"8"字行走时杠杆臂被测出并去掉（误差 < 2 cm）。
 
 **0921 第四次融合（5.7）**：
