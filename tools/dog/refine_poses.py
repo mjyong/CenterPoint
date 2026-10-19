@@ -29,7 +29,10 @@ How, per sequence:
 
        sum_k v_k (x_k+1 - x_k - d_k)^2 / sigma_lo^2  +  sum_k w_k (x_k - p_ins,k)^2 / sigma_ins^2
 
-   with d_k the odometry step turned into ENU with the INS heading (which agrees with the gyro).
+   with d_k the odometry step turned into ENU with the fused heading: the odometry heading plus a
+   slowly varying offset to the INS heading (``heading_offset``, time constant 10 s). After a fast
+   turn the INS heading is off by up to 10 deg for 3-5 s while its position stays
+   self-consistent; the odometry heading is right from scan to scan.
    Both healthy: the odometry carries the motion and the INS (sigma_ins 1 m) only removes its
    slow drift - on the 0921 data the INS is 0.2-0.5 m off at the 1 s scale even where it is
    self-consistent, the odometry is not. INS unhealthy: w_k = 0. A run of unhealthy odometry
@@ -41,11 +44,12 @@ How, per sequence:
    source is healthy are listed as bad in meta.json (do not label those frames). Gaps touching
    the start or end cannot be checked and are listed as unverified.
 5. Output: odom.npy keeps the INS rows (100 Hz times, heading-only attitude, height), at the body
-   origin, with east / north replaced by the fused trajectory (linear between scan stamps, so the
+   origin, with east / north and the heading replaced by the fused ones (linear between scan stamps, so the
    IMU propagation and deskew work exactly as before) and the velocity by its derivative. The INS
    original is kept once as odom_ins.npy and is always the input, so re-running is safe.
    meta.json gets ``pose_source = "kiss-icp+ins"`` and ``pose_refine`` (correction statistics,
-   health shares, lever arm, bad and unverified intervals, the per-source pose checks).
+   heading correction, health shares, lever arm, bad and unverified intervals, the per-source pose
+   checks).
 6. With ``--plots``: per sequence a plot (trajectory; correction and health; the lidar shift
    check for INS / odometry / fused poses) and ``<seq>_diag.npz``; ``refine_summary.csv`` over all.
 
@@ -254,6 +258,26 @@ def lo_health(d, vel_step, stamps, ins_ok=None, max_speed=3.5, window=0.6, zigza
     return ~bad
 
 
+def heading_offset(yaw_lo, yaw_ins, ok, sigma_ins=2.0, sigma_drift=0.02, huber=1.0, iters=6):
+    """Slowly varying offset s_k [rad] with yaw_lo + s the fused heading: least squares of
+    s_k ~ yaw_ins,k - yaw_lo,k (weight 1 / sigma_ins^2 where ``ok``, Huber above ``huber`` deg) and
+    s_k+1 ~ s_k (1 / sigma_drift^2), sigmas in deg: a time constant of sigma_ins / sigma_drift
+    = 100 scans (10 s). The odometry heading is right from scan to scan (it registers the scans,
+    with the gyro as its prior); the INS heading is off by 4-10 deg for 3-5 s after a fast turn
+    (0921: 60-90 deg/s), while its position stays self-consistent, and only removes the slow drift
+    of the odometry heading."""
+    off = np.unwrap(yaw_ins - yaw_lo)
+    n = len(off)
+    if n == 0:
+        return off
+    base = np.where(ok, 1.0, 0.0) if ok.any() else np.ones(n)
+    w, si, sd = base.copy(), np.radians(sigma_ins), np.radians(sigma_drift)
+    for _ in range(iters):
+        s = _solve(np.zeros(n - 1), np.full(n - 1, 1.0 / sd ** 2), off, np.maximum(w, 1e-6) / si ** 2)
+        w = base * np.minimum(1.0, np.radians(huber) / np.maximum(np.abs(s - off), 1e-12))
+    return s
+
+
 def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=0.5, huber=0.3, gap_tol=0.5,
          gap_rel=0.05, iters=6):
     """Fused east / north at the scan stamps, plus diagnostics. ``odom_ins`` must already refer to
@@ -275,9 +299,11 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
     odometry was right in every such gap, see docs/BAG_SPLIT.md 5.6). Gaps that touch the start or
     end cannot be checked and are listed as unverified."""
     p_ins, yaw_ins = ins_at(odom_ins, stamps)
-    yaw_lo = np.array([yaw_of(T[:3, :3]) for T in lo_poses])
+    yaw_lo = np.unwrap([yaw_of(T[:3, :3]) for T in lo_poses])
+    ins_ok0, _, _ = ins_health(odom_ins, stamps, np.zeros((len(stamps), 2)))
+    yaw = yaw_lo + heading_offset(yaw_lo, yaw_ins, ins_ok0)      # fused heading
     step = np.diff(lo_poses[:, :2, 3], axis=0)
-    a = (yaw_ins - yaw_lo)[:-1]                                   # odometry frame -> ENU, per step
+    a = (yaw - yaw_lo)[:-1]                                       # odometry frame -> ENU, per step
     c, s = np.cos(a), np.sin(a)
     d = np.column_stack([c * step[:, 0] - s * step[:, 1], s * step[:, 0] + c * step[:, 1]])
     ins_step = np.diff(p_ins[:, :2], axis=0)
@@ -356,6 +382,8 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
                 correction_median_m=round(float(np.median(corr)), 3),
                 correction_p90_m=round(float(np.percentile(corr, 90)), 3),
                 correction_max_m=round(float(corr.max()), 3),
+                heading_correction_p90_deg=round(float(np.percentile(np.degrees(np.abs(yaw - yaw_ins)), 90)), 2),
+                heading_correction_max_deg=round(float(np.degrees(np.abs(yaw - yaw_ins)).max()), 2),
                 lo_vs_ins_1s_median_m=round(float(np.median(lo_err)), 3) if len(lo_err) else None,
                 lo_vs_ins_1s_p90_m=round(float(np.percentile(lo_err, 90)), 3) if len(lo_err) else None,
                 bad_intervals=bad_gaps, unverified_intervals=unverified, bad_share=round(float(in_bad.mean()), 3),
@@ -363,7 +391,7 @@ def fuse(stamps, lo_poses, odom_ins, sigma_lo=0.02, sigma_ins=1.0, sigma_lo_bad=
                 ins_path_m=round(float(np.sum(np.linalg.norm(ins_step, axis=1))), 2),
                 lever_residual_m=lever_check(stamps, raw_cum, p_ins, yaw_ins, healthy & lo_ok_scan))
     return xy, corr, info, dict(healthy=healthy, rate_v=rate_v, rate_lo=rate_lo, bad_lo=bad_lo, bridged=bridged,
-                                p_ins=p_ins, yaw_ins=yaw_ins)
+                                p_ins=p_ins, yaw_ins=yaw_ins, yaw=yaw)
 
 
 def pose_checks(stamps, lo_poses, xy, diag, kept, gap=1.0, seed=0):
@@ -372,9 +400,9 @@ def pose_checks(stamps, lo_poses, xy, diag, kept, gap=1.0, seed=0):
     remaining error comes from the odometry or from the fusion."""
     from sequence_preview import pose_shift
 
-    p_ins, yaw_ins = diag["p_ins"], diag["yaw_ins"]
+    p_ins, yaw_ins, yaw = diag["p_ins"], diag["yaw_ins"], diag["yaw"]
     pose = dict(ins=lambda k: make_T(rot_z(yaw_ins[k]), p_ins[k]), lo=lambda k: lo_poses[k],
-                fused=lambda k: make_T(rot_z(yaw_ins[k]), [xy[k, 0], xy[k, 1], p_ins[k, 2]]))
+                fused=lambda k: make_T(rot_z(yaw[k]), [xy[k, 0], xy[k, 1], p_ins[k, 2]]))
     step = max(1, int(round(gap / max(np.median(np.diff(stamps)), 1e-3)))) if len(stamps) > 1 else 1
     pairs = [(i, i + step) for i in sorted(kept) if i + step in kept]
     out = dict(pair_t=np.array([stamps[i] - stamps[0] for i, _ in pairs]))
@@ -385,13 +413,20 @@ def pose_checks(stamps, lo_poses, xy, diag, kept, gap=1.0, seed=0):
     return out
 
 
-def refined_odom(odom_ins, stamps, xy):
-    """INS rows with east / north replaced by the fused trajectory (and its velocity)."""
+def refined_odom(odom_ins, stamps, xy, yaw=None):
+    """INS rows with east / north replaced by the fused trajectory (and its velocity), and with
+    ``yaw`` (fused heading at the stamps) the heading too; outside the scans the INS rows plus the
+    correction at the first / last scan."""
     out = odom_ins.copy()
     t = odom_ins[:, 0]
-    p_ins, _ = ins_at(odom_ins, stamps)
+    p_ins, yaw_ins = ins_at(odom_ins, stamps)
     off = xy - p_ins[:, :2]                                       # correction at the scan stamps
     inside = (t >= stamps[0]) & (t <= stamps[-1])
+    if yaw is not None:
+        dy = yaw - yaw_ins                                        # heading correction at the stamps
+        y_new = np.unwrap([yaw_of(quat_to_R(q)) for q in odom_ins[:, 4:8]]) + np.where(t < stamps[0], dy[0], dy[-1])
+        y_new[inside] = np.interp(t[inside], stamps, yaw)
+        out[:, 4:8] = np.column_stack([np.zeros_like(t), np.zeros_like(t), np.sin(y_new / 2), np.cos(y_new / 2)])
     for i in (0, 1):
         out[inside, 1 + i] = np.interp(t[inside], stamps, xy[:, i])
         out[~inside, 1 + i] = odom_ins[~inside, 1 + i] + np.where(t[~inside] < stamps[0], off[0, i], off[-1, i])
@@ -468,7 +503,7 @@ def refine(seq_dir, plots=None, prior="imu", lever_arm=None, **kw):
             v = checks[k][np.isfinite(checks[k])]
             info["shift_%s_p90_m" % k] = round(float(np.percentile(v, 90)), 3) if len(v) else None
             info["shift_%s_median_m" % k] = round(float(np.median(v)), 3) if len(v) else None
-    out = refined_odom(odom_body, stamps, xy)
+    out = refined_odom(odom_body, stamps, xy, diag["yaw"])
     if not os.path.exists(p_ins):
         np.save(p_ins, odom_ins)
     np.save(os.path.join(seq_dir, "odom.npy"), out)
@@ -483,7 +518,7 @@ def refine(seq_dir, plots=None, prior="imu", lever_arm=None, **kw):
         # everything needed to look at one sequence again without its point clouds (a few tens of kB)
         np.savez_compressed(os.path.join(plots, name + "_diag.npz"), stamps=stamps, xy=xy,
                             lo_xyz=poses[:, :3, 3], lo_yaw=[yaw_of(T[:3, :3]) for T in poses],
-                            p_ins=diag["p_ins"], yaw_ins=diag["yaw_ins"], healthy=diag["healthy"],
+                            p_ins=diag["p_ins"], yaw_ins=diag["yaw_ins"], yaw=diag["yaw"], healthy=diag["healthy"],
                             rate_v=diag["rate_v"], bad_lo=diag["bad_lo"], bridged=diag["bridged"],
                             odom_ins=odom_body,                       # float64: unix times
                             **({"check_" + k: v for k, v in checks.items()} if checks else {}))

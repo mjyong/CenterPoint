@@ -143,6 +143,28 @@ def test_fuse_bridges_an_odometry_zigzag_inside_an_ins_gap():
     assert info["lo_steps_bridged"] >= zig.sum() and e.max() < 0.15, (info["lo_steps_bridged"], e.round(3))
 
 
+def test_heading_follows_the_odometry_after_a_fast_turn():
+    """After a fast turn the kygi INS heading is off by up to 10 deg and needs 3-5 s to come back
+    (0921), while its position stays self-consistent. The fused heading follows the odometry
+    (registered scans) from scan to scan; the INS only sets it in the long run."""
+    stamps, poses, odom, truth, _ = _synthetic()
+    odom = odom.copy()
+    t = odom[:, 0]
+    err = np.radians(np.interp(t, [0, 3.0, 3.3, 6.5, 99], [0, 0, 9.0, 0, 0]))   # INS heading excursion
+    odom[:, 4:8] = [[0, 0, np.sin(e / 2), np.cos(e / 2)] for e in err]
+    odom[:, 1] = 1.2 * t                                          # INS position healthy everywhere
+    xy, corr, info, diag = refine_poses.fuse(stamps, poses, odom)
+    # the excursion covers half of this 6 s sequence: it may tilt the whole of it by a degree or two,
+    # but not bend it (what stacked sweeps and pinned labels need)
+    assert info["heading_correction_max_deg"] > 6
+    yaw = np.degrees(diag["yaw"])
+    assert np.ptp(yaw) < 0.3 and np.abs(yaw).max() < 2.0, yaw.round(2)
+    out = refine_poses.refined_odom(odom, stamps, xy, diag["yaw"])
+    inside = (t >= stamps[0]) & (t <= stamps[-1])
+    yaw_rows = np.degrees(2 * np.arctan2(out[:, 6], out[:, 7]))
+    assert np.ptp(yaw_rows[inside]) < 0.3 and np.allclose(out[:, 4:6], 0)
+
+
 def _turning(L, k=300):
     """30 s at 10 Hz: the robot walks 0.8 m/s along a figure of eight (heading spans 360 deg);
     INS rows (100 Hz) of the point ``L`` (body frame), odometry = truth."""

@@ -268,7 +268,7 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 - 原因二，也是闭合失败的根源：INS 杠杆臂。把每个场景的"INS − 激光"偏移拟合成"常量 + 慢漂移 + R(航向)·L"，在转弯超过 45° 的 14 个场景里，L 一致落在机身后方约 0.54 m（稳健合并 (-0.06, -0.54) m，去掉任一场景重拟合，变化不超过 3 cm），残差减半（例如 164127_s004 0.17 → 0.04 m，s001 0.10 → 0.04 m）。闭合失败的 8 个场景里有 7 个转弯超过 50°，INS 打分差的也多是转弯多的场景。
 - 另一个发现：`_diag.npz` 里的 `odom_ins` 存成了 float32，unix 时间精度只剩 128 s。分析时按 100 Hz 从位置反推出了时间（残差中位 0.3 ms）；已改为 float64。
 
-**第四版（当前）**：
+**第四版**：
 - INS 杠杆臂修正，三处一致：转换（`rosbag_to_sequence.py --ins-lever-arm`，写入 `meta.ins_lever_arm`）、融合（老序列在 `refine_poses.py` 里补上）、线上节点（`robot:=kygi` 的 `ins_lever_arm` 参数，`bag_replay` 同样）。
 - 激光不健康的一段，INS 不是整段健康时，用激光净位移摊开，不再用 INS 速度。
 - 闭合失败的缺口：激光降权但保留原值，不再换成 INS 速度。
@@ -287,6 +287,18 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
   所以 INSPVAX 的位置不是 IMU 中心，而是它后方再约 0.36 m 的一个点。最可能是 GNSS 天线：INS 里没配或配错了 IMU→天线的杠杆臂时，输出位置会跟着天线走。雷达和 INS 的时钟没有问题：激光偏航角速度和 INS 航向变化率在 0 延迟处最吻合（18 个转弯场景中 16 个正好在 0，其余 ±0.02 s）。融合用拟合值；用标定值时离线重放同样没有闭合失败，替代指标 0.074 m（拟合值 0.064 m）。
 - 待确认：外参里雷达→IMU 是 180°，按它 IMU 话题的 x、y 轴应和机身系同向；代码里 IMU 角速度按 INS 轴读（x、y 取反，`R_BODY_KYGI_IMU`）。只影响去畸变里的横滚、俯仰角速度（狗走路时很小），偏航不受影响。样例 bag 太短（27 帧），定不下来。
 - 合成数据新增两项：INS 盲区里的激光锯齿（第三版误差 0.46 m，第四版 < 0.15 m）；绕"8"字行走时杠杆臂被测出并去掉（误差 < 2 cm）。
+
+**0921 第四次融合（5.7）**：
+- 杠杆臂对上了：14 个转弯场景拟合出的剩余杠杆臂中位数 (0.03, −0.04) m，和离线重放一致。
+- 闭合失败 0 个（5.6 是 8 个）；剩下的不可靠时段都是"两种来源同时不健康"，最长 3 s（s019 开头）。
+- 融合的 `shift` p90：中位数 0.14 m，超过 0.4 m 的从 6 个降到 0 个，超过 0.2 m 的从 14 个降到 10 个。预览里 165659 是 14 OK / 14 WARN / 1 FAIL（5.6 是 13 / 8 / 8）；唯一的 FAIL 是 s025 的 `tilt_deg`，不是位姿。164127_s003 仍是 FAIL（0.42 m）。
+- 剩下的差距来自航向，不是位置。把融合比激光差 0.1 m 以上的帧对拆开看：融合位置和激光的 1 s 位移只差 0–2 cm，但 INS 航向和激光航向在 1 s 内差 1–4°（10 m 处每度约 0.17 m）。按时间看 INS − 激光的航向差：急转弯（60–90°/s）之后，INS 航向偏 4–10°，再用 3–5 s 慢慢回来（164127_s003：+4.5、+8.2、+10.6、+8.0、+4.1、+2.1°）；这段时间 INS 位置的自检照样"健康"。这些帧对里激光的打分是 0.00–0.08 m，INS 是 0.31–0.38 m，所以错的是 INS 航向。
+
+**第五版（当前）**：
+- 输出航向 = 激光航向 + 一个慢变的偏移（`heading_offset`）。偏移向 INS 航向靠拢，用最小二乘求：INS σ 2°，超过 1° 用 Huber 降权，只用 INS 健康的帧；偏移每帧最多变化 σ 0.02°，时间常数约 10 s。激光步转到 ENU 时也用这个航向。
+- `odom.npy` 的航向四元数换成融合航向（扫描时段之外是 INS 航向加上两端的修正量）。`pose_refine` 新增 `heading_correction_p90_deg` / `heading_correction_max_deg`。
+- 用 5.7 的诊断文件离线重放：1 s 航向变化和激光的差，p90 平均从 0.53° 降到 0.02°（164127_s003 3.1° → 0.04°）；航向修正最大 9.9°（164127_s003）。位置变化 p90 小于 4 cm（164127_s003 9 cm），不可靠时段只有 s024 有变化。
+- 合成数据：INS 航向在转弯后偏 9°、3.5 s 回来，融合航向的起伏 < 0.3°。
 
 **预览的 `shift` 检查**：对相隔约 1 s 的两帧，取离地 0.3–3 m 的点（墙、杆、树、车），在 ±0.8 m 范围内做二维搜索，找到把一帧叠到另一帧上最合适的平移量。这就是激光看到的两帧位姿误差，沿行进方向的误差也能测出来。状态按 p90 判定：≤ 0.20 m 为 OK，≤ 0.40 m 为 WARN，更大为 FAIL。运动样例 bag 用 INS 位姿时是 0.51 m（FAIL），融合后是 0.12 m（OK）。
 
@@ -521,5 +533,27 @@ s005 也基本没动（0.27），有效验证只有约 100 s；两份录制是�
 - refine_poses.py 打印的整张表、所有 "pose bad" 行，以及 "INS lever arm left over" 那一行；
 - shift p90 三列中 fused 比 lo 差 0.1 m 以上的场景；
 - 预览里每个场景的 shift_p90_m 和 status，与上一轮（5.6）对比；
+- 每步耗时。
+```
+
+### 5.8 第八轮：第五版融合（航向也用激光）
+
+```text
+任务：用第五版 refine_poses.py 重新融合 0921 所有序列，提交诊断文件。不重转 bag，不进入第 4 步。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+
+1. 重新融合（输入自动取 odom_ins.npy），记下打印的整张表和最后一行 "INS lever arm left over ..."：
+   python tools/dog/refine_poses.py --seq data/seq/0921_* --plots data/preview/poses
+2. 重跑预览：
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_165659_s*" --out data/preview/0921_165659
+   python tools/dog/sequence_preview.py --seq "data/seq/0921_164127_s*" --out data/preview/0921_164127
+3. 提交 data/preview/poses（PNG、*_diag.npz、refine_summary.csv）和两个预览目录，推送到 claude/me/v01。
+   不要提交 data/seq。
+
+最后报告：
+- refine_poses.py 打印的整张表、所有 "pose bad" 行，以及 "INS lever arm left over" 那一行；
+- refine_summary.csv 里每个场景的 heading_correction_p90_deg / heading_correction_max_deg；
+- shift p90 三列中 fused 比 lo 差 0.1 m 以上的场景；
+- 预览里每个场景的 shift_p90_m 和 status，与上一轮（5.7）对比；
 - 每步耗时。
 ```

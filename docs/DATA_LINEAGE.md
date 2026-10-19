@@ -259,7 +259,7 @@ mindmap
 |---|---|---|
 | `scans/000000.npz` … | 每帧一个 | `xyz` (N,3) float32，雷达系 L；`intensity` (N,) float32，0–255；`t` (N,) float64，每个点的绝对时间；`stamp` float64，扫描结束时刻 |
 | `imu.npy` | (M,4) float64 | `t, wx, wy, wz`：机身系角速度，rad/s |
-| `odom.npy` | (K,11) float64 | `t, x, y, z, qx, qy, qz, qw, vx, vy, vz`：W 系里机身原点的位置（ENU，m）、姿态（只有航向）、速度（东、北、天，m/s）。跑过 `refine_poses.py` 后，东、北坐标和速度换成融合后的值 |
+| `odom.npy` | (K,11) float64 | `t, x, y, z, qx, qy, qz, qw, vx, vy, vz`：W 系里机身原点的位置（ENU，m）、姿态（只有航向）、速度（东、北、天，m/s）。跑过 `refine_poses.py` 后，东、北坐标、航向和速度换成融合后的值 |
 | `odom_ins.npy` | (K,11) float64 | 只在跑过 `refine_poses.py` 后存在：融合前的 INS 原始数据，同样格式，是以后每次融合的输入 |
 | `meta.json` | JSON | 见下表。**最后写**，目录里没有它说明这个场景没写完 |
 
@@ -278,7 +278,7 @@ mindmap
 | `segment` | 转换器 / `split_check.py` | `name, t_start, t_end, split`；`split_check.py --apply` 会改 `split`，体检给的原值存在 `split_survey` |
 | `lidar_time_offset` | `sequence_meta.py`（可选） | 读取时加到所有雷达时间上的秒数，用来把雷达时钟对齐到 INS 时钟，默认 0 |
 | `pose_source` | `refine_poses.py` | 没有这个字段表示用的是 INS 位姿；`kiss-icp+ins` 表示激光里程计 + RTK 融合 |
-| `pose_refine` | `refine_poses.py` | 修正量（中位、p90、最大）、所用杠杆臂 `lever_arm` 和拟合出的剩余杠杆臂 `lever_residual_m`、INS 不可信的时间占比、不可靠时段 `bad_intervals`（这些帧不要标注）、未验证时段 `unverified_intervals`、可信段里激光 1 s 位移和 INS 的差，以及所用参数 |
+| `pose_refine` | `refine_poses.py` | 修正量（中位、p90、最大）、航向修正量（`heading_correction_p90_deg` / `max_deg`）、所用杠杆臂 `lever_arm` 和拟合出的剩余杠杆臂 `lever_residual_m`、INS 不可信的时间占比、不可靠时段 `bad_intervals`（这些帧不要标注）、未验证时段 `unverified_intervals`、可信段里激光 1 s 位移和 INS 的差，以及所用参数 |
 | `lidar` `source` | 转换器 | `XT32`、来源 bag 的路径 |
 
 体积：一帧在 bag 里 3.17 MB，压缩成 npz 后约 0.6 MB。
@@ -292,7 +292,7 @@ mindmap
 | 脚本 | 读 | 写 | 改了什么数据 |
 |---|---|---|---|
 | `sequence_preview.py` | 序列（每 5 帧做一次和线上一样的预处理） | `data/preview/<录制>/`：每个场景一张 PNG，`checks.csv` / `checks.json`，`index.html` | 不改。检查项：帧间错位 `align_m`；激光测出的相隔 1 s 两帧的位姿误差 `shift_p90_m`（沿行进方向的误差也能测出）；地面高度 `ground_z_m`；倾斜 `tilt_deg`；各话题最大间隔；`rtk`；INS 位置跳变 `ins_step_m` |
-| `refine_poses.py` | 序列的 `scans/`、`odom.npy`（或已有的 `odom_ins.npy`） | `odom.npy`、`odom_ins.npy`；`--plots` 时每个场景一张轨迹和修正量图 | 老序列先补上 INS 杠杆臂；再把 KISS-ICP 激光里程计（陀螺提供旋转先验）与 RTK 融合：两者都健康时激光管帧与帧之间的运动、INS 只消除慢漂移；INS 不可信时（急停）由激光接管，激光不可信时（转弯时来回跳、沿墙停住）由 INS 接管；都不可信时标为不可靠。改 `odom.npy` 的东、北坐标和速度，`meta.json` 加 `pose_source`、`pose_refine` |
+| `refine_poses.py` | 序列的 `scans/`、`odom.npy`（或已有的 `odom_ins.npy`） | `odom.npy`、`odom_ins.npy`；`--plots` 时每个场景一张轨迹和修正量图 | 老序列先补上 INS 杠杆臂；再把 KISS-ICP 激光里程计（陀螺提供旋转先验）与 RTK 融合：两者都健康时激光管帧与帧之间的运动、INS 只消除慢漂移；INS 不可信时（急停）由激光接管，激光不可信时（转弯时来回跳、沿墙停住）由 INS 接管；都不可信时标为不可靠。改 `odom.npy` 的东、北坐标、航向和速度（航向 = 激光航向 + 向 INS 慢慢靠拢的偏移），`meta.json` 加 `pose_source`、`pose_refine` |
 | `sequence_meta.py` | `meta.json`，每 10 帧一个 `scans/*.npz` | `meta.json` | `base_height`（多帧中位数或给定值）、`base_height_sweeps`、`base_height_first_sweep`、`lidar_time_offset` |
 | `time_offset_check.py` | 有转弯的序列 | `time_offset.csv/json`、每个场景一张 PNG | 不改。在转弯处扫描雷达时间偏移，给出建议值；确认后用 `sequence_meta.py` 写入 |
 | `split_check.py` | 所有序列的 `meta.json` 和 `odom.npy` | `data/survey/split/`：`split_check.csv/json/png`；加 `--apply` 后还写 `split.csv` | 加 `--apply` 时改 `meta.json` 的 `segment.split`（`train` / `val` / `drop`），原值存进 `split_survey` |
