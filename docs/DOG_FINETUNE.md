@@ -121,7 +121,7 @@ python tools/dog/nusc_autolabel_eval.py --dataroot data/nuscenes_mini --scenes m
 ```bash
 python tools/dog/review_labels.py mcap --labels data/labels/rec_001/labels.pkl \
     --frames data/runs/rec_001/frames --results data/runs/rec_001/voxel/results.pkl \
-    --out data/labels/rec_001/review.mcap
+    --out data/labels/rec_001/rec_001_review.mcap
 ```
 
 | topic | 内容 |

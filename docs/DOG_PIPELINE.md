@@ -229,7 +229,7 @@ python tools/dog/run_sequence.py --seq data/rec_001 --detectors pillar,voxel \
 # 2) 离线教师自动标注 -> 在 Foxglove 里看、按轨迹表 labels_tracks.csv 修正 -> 对比两个检测器
 python tools/dog/auto_label.py --seq data/rec_001 --ckpt-voxel nusc_voxel.pth --tta --out data/rec_001/labels.pkl
 python tools/dog/review_labels.py mcap --labels data/rec_001/labels.pkl --frames work_dirs/rec_001/frames \
-    --out data/rec_001/review.mcap
+    --out data/rec_001/rec_001_review.mcap
 python tools/dog/review_labels.py apply --labels data/rec_001/labels.pkl --edits data/rec_001/labels_tracks.csv \
     --out data/rec_001/labels_reviewed.pkl
 python tools/dog/compare_detectors.py --labels data/rec_001/labels_reviewed.pkl \

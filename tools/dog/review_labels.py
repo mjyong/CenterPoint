@@ -3,7 +3,7 @@
     # 1) labels + point clouds (+ the teacher's raw boxes) -> Foxglove
     python tools/dog/review_labels.py mcap --labels data/labels/rec_001/labels.pkl \
         --frames work_dirs/rec_001/frames --results work_dirs/rec_001/voxel/results.pkl \
-        --out data/labels/rec_001/review.mcap
+        --out data/labels/rec_001/rec_001_review.mcap
 
     # 2) edit the "action" column of data/labels/rec_001/labels_tracks.csv
     #    (written by auto_label.py; regenerate with the "table" command)
@@ -37,7 +37,8 @@ def main():
     m.add_argument("--frames", default=None, help="run_sequence.py --save-frames output (<run>/frames)")
     m.add_argument("--results", default=None, help="run_sequence.py results.pkl: teacher boxes in grey")
     m.add_argument("--all-sweeps", action="store_true", help="draw the accumulated sweeps (larger file)")
-    m.add_argument("--out", required=True)
+    m.add_argument("--out", default=None,
+                   help="default: <labels dir>/<scene>_review.mcap, scene = the directory name")
     a = sub.add_parser("apply", help="apply the edited track table")
     a.add_argument("--labels", required=True)
     a.add_argument("--edits", required=True)
@@ -54,9 +55,13 @@ def main():
         if args.results:
             with open(args.results, "rb") as f:
                 results = pickle.load(f)
-        n = write_review_mcap(args.out, labels, args.frames, results, current_sweep_only=not args.all_sweeps)
+        out = args.out
+        if not out:
+            d = os.path.dirname(os.path.abspath(args.labels))
+            out = os.path.join(d, os.path.basename(d) + "_review.mcap")
+        n = write_review_mcap(out, labels, args.frames, results, current_sweep_only=not args.all_sweeps)
         print("%d messages -> %s (3D panel: display frame world or det; topics /lidar /labels /teacher, "
-              "Log panel on /log lists the tracks to review)" % (n, args.out))
+              "Log panel on /log lists the tracks to review)" % (n, out))
     else:
         out, counts = apply_edits(labels, read_edits(args.edits))
         with open(args.out, "wb") as f:

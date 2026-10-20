@@ -377,7 +377,7 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 
 ## 4. 之后：教师推理 + 自动标注（批量）
 
-验证通过后，对每个场景跑 [DOG_FINETUNE.md](DOG_FINETUNE.md) 的 ② ③。4090 上 Voxel + TTA 约 0.12 s/帧，1 万帧约 20 分钟；`--save-frames` 的帧约 3.6 MB/帧，1 万帧约 35 GB。`run_sequence.py` 默认还会写一个 Foxglove MCAP（`data/runs/<场景>/voxel.mcap`），可以直接在 Foxglove 里看每个场景的点云、检测和轨迹。
+验证通过后，对每个场景跑 [DOG_FINETUNE.md](DOG_FINETUNE.md) 的 ② ③。4090 上 Voxel + TTA 约 0.12 s/帧，1 万帧约 20 分钟；`--save-frames` 的帧约 3.6 MB/帧，1 万帧约 35 GB。`run_sequence.py` 默认还会写一个 Foxglove MCAP（`data/runs/<场景>/<场景>_voxel.mcap`），可以直接在 Foxglove 里看每个场景的点云、检测和轨迹。
 
 ```bash
 for d in data/seq/${NAME}_s*; do
@@ -746,17 +746,17 @@ B2. 提交每个场景的 data/labels/<场景>/labels.pkl、labels_tracks.csv �
 1. 每个场景一个审核用 MCAP（标注框 + 点云 + 教师原始框），8 个场景同时跑：
      ls data/labels | grep 0921_ | xargs -P 8 -I{} python tools/dog/review_labels.py mcap \
          --labels data/labels/{}/labels.pkl --frames data/runs/{}/frames \
-         --results data/runs/{}/voxel/results.pkl --out data/labels/{}/review.mcap
+         --results data/runs/{}/voxel/results.pkl --out data/labels/{}/{}_review.mcap
 2. 验证集场景导出 SUSTechPOINTS（每 5 帧取 1 帧）：
      for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' data/survey/split/split.csv); do
        python tools/dog/sustechpoints_convert.py export --labels data/labels/$r/labels.pkl \
            --frames data/runs/$r/frames --scene $r --every 5
      done
-3. 不要提交 review.mcap 和 SUSTechPOINTS 数据（太大），只报告。
+3. 不要提交 `<场景>_review.mcap` 和 SUSTechPOINTS 数据（太大），只报告。
 
 最后报告：
-- 每个场景 review.mcap 的大小；SUSTechPOINTS 每个验证场景导出的帧数；
+- 每个场景 `<场景>_review.mcap` 的大小；SUSTechPOINTS 每个验证场景导出的帧数；
 - 每步耗时；
-- 审核人员怎么打开：Foxglove 打开 data/labels/<场景>/review.mcap，对照 data/labels/<场景>/labels_tracks.csv 填 action 列；
+- 审核人员怎么打开：Foxglove 打开 data/labels/<场景>/<场景>_review.mcap，对照 data/labels/<场景>/labels_tracks.csv 填 action 列；
   SUSTechPOINTS 用 python tools/dog/sustechpoints_convert.py serve 启动（docs/LABELING_TUTORIAL.md 第 5 节）。
 ```

@@ -330,7 +330,7 @@ mindmap
 | `frames/<stamp>.npy` | （`--save-frames`）每帧 (N,5) float32 `[x, y, z, intensity, dt]`，D 系，就是检测器的输入。约 3.7 MB/帧 |
 | `voxel/results.pkl` | 列表，每帧一个 dict：`stamp`、`T_world_det`（D 到 W，4×4）、`T_world_body`、`detections`、`tracks`、`predictions`、`timings` |
 | `voxel/track_log.npz` | 跟踪日志（给轨迹预测模型训练用） |
-| `voxel.mcap` | Foxglove 可视化：点云、上报的检测、轨迹、位姿 |
+| `<场景>_voxel.mcap` | Foxglove 可视化：点云、上报的检测、轨迹、位姿 |
 
 `detections` 的结构（`Detections`）：
 
@@ -392,7 +392,7 @@ mindmap
 
 ### 7.1 轨迹级：`tools/dog/review_labels.py`
 
-1. `mcap`：把标签、点云（`frames/`）和教师的原始框（灰色）写成 `review.mcap`，在 Foxglove 里看。
+1. `mcap`：把标签、点云（`frames/`）和教师的原始框（灰色）写成 `<场景>_review.mcap`，在 Foxglove 里看。
 2. 人改 `labels_tracks.csv` 的 `action` 列。`from` / `to`（距录制开始的秒数）可以只改一段轨迹。
 3. `apply`：生成 `labels_reviewed.pkl`。
 

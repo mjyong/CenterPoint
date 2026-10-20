@@ -76,7 +76,7 @@ mcap data/runs/rec_static/pillar.mcap  28 frames
 mcap data/runs/rec_moving/pillar.mcap  27 frames
 ```
 
-`run_sequence.py` 默认还会写一个 Foxglove MCAP（第一个检测器的点云、上报的框、轨迹和位姿），路径是 `data/runs/<rec>/<检测器>.mcap`，不需要时加 `--no-mcap`。
+`run_sequence.py` 默认还会写一个 Foxglove MCAP（第一个检测器的点云、上报的框、轨迹和位姿），路径是 `data/runs/<rec>/<rec>_<检测器>.mcap`，不需要时加 `--no-mcap`。
 
 上报阈值（车 0.35、人 0.30、骑行 0.40）下的框数，以及 2 m 内同类框的重合比例：
 
@@ -89,7 +89,7 @@ mcap data/runs/rec_moving/pillar.mcap  27 frames
 
 这两段没有人工真值，不能在狗的数据上分出谁更准。nuScenes 验证集上，当前这两份权重的成绩是 Voxel mAP 59.6 / NDS 66.8，Pillar mAP 50.3 / NDS 60.2（`configs/nusc/README.md`）。走动的那段里 Pillar 多出来的框，大部分 Voxel 对不上，和它在 nuScenes 上更弱是一致的。TTA 把四次翻转拼成一次前向，所以只慢大约 10 ms；它和单次 Voxel 重合最高。仓库里没有第三份预训练权重。标完并微调之后，狗自己的 Voxel 权重量才会超过这个 nuScenes 教师。
 
-结果：`data/runs/<rec>/frames/*.npy`（预处理后的 5 帧拼接点云）、`data/runs/<rec>/{pillar,voxel}/results.pkl` 和 `data/runs/<rec>/pillar.mcap`。只跑 Pillar 时，两段一共约 205 MB（点云 190 MB，MCAP 14 MB）。第 3 步起用的是 `pillar/results.pkl`。自己的数据改用 `voxel` 加 `--tta` 的 `results.pkl`，见第 9 节。
+结果：`data/runs/<rec>/frames/*.npy`（预处理后的 5 帧拼接点云）、`data/runs/<rec>/{pillar,voxel}/results.pkl` 和 `data/runs/<rec>/<rec>_pillar.mcap`。只跑 Pillar 时，两段一共约 205 MB（点云 190 MB，MCAP 14 MB）。第 3 步起用的是 `pillar/results.pkl`。自己的数据改用 `voxel` 加 `--tta` 的 `results.pkl`，见第 9 节。
 
 ## 3. 自动标注
 
@@ -130,10 +130,10 @@ track_id,label,subclass,review,mean_score,frames,interpolated,t_first,t_last,min
 ```bash
 python tools/dog/review_labels.py mcap --labels data/labels/rec_moving/labels.pkl \
     --frames data/runs/rec_moving/frames --results data/runs/rec_moving/pillar/results.pkl \
-    --out data/labels/rec_moving/review.mcap
+    --out data/labels/rec_moving/rec_moving_review.mcap
 ```
 
-输出 `121 messages -> data/labels/rec_moving/review.mcap`，文件 14 MB（`rec_static` 同理，119 条消息、15 MB）。
+输出 `121 messages -> data/labels/rec_moving/rec_moving_review.mcap`，文件 14 MB（`rec_static` 同理，119 条消息、15 MB）。
 
 在 Foxglove 里打开这个文件：
 

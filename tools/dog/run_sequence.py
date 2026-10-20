@@ -7,7 +7,7 @@ saves, per detector, everything the other tools need:
                                 tracks, predictions, timings
     <out>/<name>/track_log.npz  tracker log for train_predictor.py
     <out>/frames/*.npy          (--save-frames) preprocessed clouds for auto_label / export
-    <out>/<first>.mcap          Foxglove view of the first detector (skip with --no-mcap)
+    <out>/<scene>_<first>.mcap  Foxglove view of the first detector (skip with --no-mcap)
 
     python tools/dog/run_sequence.py --seq data/rec_001 --detectors pillar,voxel \
         --ckpt-pillar pp.pth --ckpt-voxel voxel.pth --out work_dirs/rec_001
@@ -50,7 +50,7 @@ def main():
     ap.add_argument("--odom-latency", type=float, default=0.0)
     ap.add_argument("--save-frames", action="store_true")
     ap.add_argument("--mcap", default=None,
-                    help="Foxglove MCAP of the first detector (default: <out>/<first>.mcap): "
+                    help="Foxglove MCAP of the first detector (default: <out>/<scene>_<first>.mcap): "
                          "cloud, reported detections, tracks, pose")
     ap.add_argument("--no-mcap", action="store_true", help="do not write the Foxglove MCAP")
     ap.add_argument("--device", default=None)
@@ -82,7 +82,9 @@ def main():
     logs = {n: TrackLogger() for n in names}
     if args.save_frames:
         os.makedirs(os.path.join(args.out, "frames"), exist_ok=True)
-    mcap_path = None if args.no_mcap else (args.mcap or os.path.join(args.out, names[0] + ".mcap"))
+    scene = os.path.basename(os.path.normpath(args.seq))
+    mcap_path = None if args.no_mcap else (
+        args.mcap or os.path.join(args.out, "%s_%s.mcap" % (scene, names[0])))
     if mcap_path:
         os.makedirs(os.path.dirname(os.path.abspath(mcap_path)), exist_ok=True)
     viz = McapViz(mcap_path) if mcap_path else None

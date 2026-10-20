@@ -202,7 +202,7 @@ const TREE = {
         T("处理", "检测系 D + 拼 5 帧：约 19 万点", "D：重力对齐、航向跟机身、原点在机身下方地面（base_height），用 1.5–8 m 的地面修正高度（±0.3 m）和倾斜（±5°）。最近 5 帧（≤ 0.55 s）转到当前 D 系，每点加 dt 列。"),
         T("处理", "教师：CenterPoint-Voxel + TTA", "第一轮用 nuScenes 权重，之后用自己微调的 Voxel 模型；双翻转增强，分数阈值 0.1（低分框留给跟踪）。网络在 M 系运行，结果转回 D 系；5 个头合成车辆 / 行人 / 骑行者，car / truck / bus 留在 subclasses。"),
         T("输出", "`frames/<stamp>.npy` (N,5)", "[x, y, z, intensity, dt]，D 系，就是检测器的输入；约 3.7 MB/帧。"),
-        T("输出", "`voxel/results.pkl`", "每帧：stamp、T_world_det（D→W）、T_world_body、detections（boxes (N,7) [x,y,z,l,w,h,yaw]、velocities、scores、labels、subclasses）、tracks、predictions、timings。另有 track_log.npz 和 voxel.mcap（Foxglove）。"),
+        T("输出", "`voxel/results.pkl`", "每帧：stamp、T_world_det（D→W）、T_world_body、detections（boxes (N,7) [x,y,z,l,w,h,yaw]、velocities、scores、labels、subclasses）、tracks、predictions、timings。另有 track_log.npz 和 `<场景>_voxel.mcap`（Foxglove）。"),
       ] },
     { side: "R", f: "label", k: "stage", t: "⑤ 自动标注", s: "auto_label.py",
       d: "在世界系里跟踪，再利用整段录制对每条轨迹做非因果修正，人只需修剩下的问题。",
@@ -217,7 +217,7 @@ const TREE = {
     { side: "R", f: "review", k: "stage", t: "⑥ 轨迹级审核", s: "review_labels.py",
       d: "在 Foxglove 里看整条轨迹，在表格里一行改一条轨迹。只能改已有的，不能新增漏标的物体。",
       c: [
-        T("输出", "`review.mcap`", "标签、点云和教师原始框（灰色），在 Foxglove 里看。"),
+        T("输出", "`<场景>_review.mcap`", "标签、点云和教师原始框（灰色），在 Foxglove 里看。"),
         T("人工", "填 action：ok / drop / 类别 / car·truck·bus / flip / static", "ok 只清 review；drop 删掉轨迹（或 from–to 一段）；类别和子类改 label、subclass；flip 把 yaw 加 180°；static 速度置零、位置和朝向固定。可用 + 组合，如 cyclist+flip。"),
         T("输出", "`labels_reviewed.pkl`", "格式同 labels.pkl。改过的框 review = False、reviewed = True；仍标 review 的在导出时用 --skip-review 丢掉。"),
       ] },
