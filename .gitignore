@@ -19,6 +19,7 @@ venv/
 !work_dirs/pretrained/nusc_voxel.pth
 *.pkl
 !data/labels/**/*.pkl
+!data/examples/**/*.pkl
 *.zip
 *.bin
 .vscode/
