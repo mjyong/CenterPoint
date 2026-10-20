@@ -184,6 +184,8 @@ def main():
     ap.add_argument("--min-free-mb", type=float, default=8192.0, help="auto: a card with less than this free is busy")
     ap.add_argument("--max-util", type=float, default=20.0, help="auto: a card busier than this [%%] is busy")
     ap.add_argument("--label-jobs", type=int, default=0, help="auto_label.py at once (0: cores // 4, at least 1)")
+    ap.add_argument("--threads", type=int, default=0,
+                    help="CPU threads per process (0: cores // (workers + 1), at least 1)")
     ap.add_argument("--force", action="store_true", help="redo scenes that already have results / labels")
     ap.add_argument("--dry-run", action="store_true", help="show the cards and the plan, run nothing")
     args = ap.parse_args()
@@ -225,6 +227,14 @@ def main():
                   if k < len(slots) else "  %-26s %4d scans  -> next free worker" % (os.path.basename(s), scene_size(s)))
         return
 
+    # CPU threads per process: numpy / torch / numba start one per core in every process, and six
+    # workers on a shared machine then spent 10-20x longer in deskew and accumulation than one
+    # process alone (5.11: 250 ms vs 29 ms per frame)
+    n_threads = str(args.threads or max(1, (os.cpu_count() or 1) // (len(slots) + 1)))   # auto_label is brief
+    thread_env = {k: n_threads for k in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                                         "NUMBA_NUM_THREADS")}
+    print("CPU threads per process: %s" % n_threads)
+
     def infer(scene, slot):
         name = os.path.basename(os.path.normpath(scene))
         out = os.path.join(args.runs, name)
@@ -232,7 +242,7 @@ def main():
             return True, dict(skipped_inference=True)
         os.makedirs(out, exist_ok=True)
         card = slot.split("#")[0]
-        env = dict(os.environ, PYTHONPATH=ROOT + os.pathsep + os.environ.get("PYTHONPATH", ""))
+        env = dict(os.environ, PYTHONPATH=ROOT + os.pathsep + os.environ.get("PYTHONPATH", ""), **thread_env)
         cmd = [sys.executable, os.path.join(ROOT, "tools/dog/run_sequence.py"), "--seq", scene, "--detectors", "voxel",
                "--ckpt-voxel", args.ckpt_voxel, "--save-frames", "--out", out]
         if args.config_voxel:
@@ -256,7 +266,7 @@ def main():
         if not args.force and os.path.exists(dst) and os.path.exists(logf):
             return True, dict(parse_label_line(open(logf).read()), skipped_label=True)
         os.makedirs(out, exist_ok=True)
-        env = dict(os.environ, PYTHONPATH=ROOT + os.pathsep + os.environ.get("PYTHONPATH", ""))
+        env = dict(os.environ, PYTHONPATH=ROOT + os.pathsep + os.environ.get("PYTHONPATH", ""), **thread_env)
         cmd = [sys.executable, os.path.join(ROOT, "tools/dog/auto_label.py"),
                "--results", os.path.join(args.runs, name, "voxel", "results.pkl"), "--out", dst]
         with open(logf, "w") as fh:

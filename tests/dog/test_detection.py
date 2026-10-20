@@ -200,6 +200,18 @@ def test_tta_batches_four_flips(sim_frames):
     assert len(ex["num_voxels"]) == 4 and int(ex["coordinates"][:, 0].max()) == 3
     d = det(sim_frames["frames"][-1].points)
     assert d.boxes.shape[1] == 7
+    # the flips are mirrored from the cloud's voxels; voxelising each flipped cloud gives the same
+    pts = det.frame.points_to_model(sim_frames["frames"][-1].points)[:, :det.num_point_features].astype(np.float32)
+    slow = det._build_example_slow(det._flips(pts))
+
+    def voxels(e, b):
+        m = (e["coordinates"][:, 0] == b).numpy()
+        c, v, n = e["coordinates"][m, 1:].numpy(), e["voxels"][m].numpy(), e["num_points"][m].numpy()
+        return {tuple(ci): v[i, :n[i]].round(5).tobytes() for i, ci in enumerate(c)}
+    for b in range(4):
+        fast, ref = voxels(ex, b), voxels(slow, b)
+        differ = sum(fast.get(k) != w for k, w in ref.items()) + len(set(fast) - set(ref))
+        assert differ <= max(1, len(ref) // 1000), (b, differ, len(ref))
 
 
 @requires_det3d

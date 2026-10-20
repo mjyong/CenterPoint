@@ -363,6 +363,14 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 - 地面找平仍然需要：164127_s002（平路）去掉它后，近处（1.5–5 m）地面的倾斜中位数从 0.25° 变成 2.8°，这是雷达 / 机身相对地面的固定倾斜，激光倾斜（相对整段的中位"上方向"）不包含它。s025 上"激光倾斜 + 地面找平"近处地面倾斜中位数 2.7°，比只有航向时（3.3°）和不找平时（5.0°）都好，剩下的是坡道本身。
 - 划分（`--no-drop`）：训练 25 个场景 748 s，验证 10 个场景 288 s（运动 208 s，占全部运动时间的 23%），没有丢场景；验证路线离训练路线 10 m 内的比例 7%，就是留出块两端和缓冲场景挨着的部分（s003 30%、s006 24%）。
 
+**0921 第 4 步（5.11）：教师推理 + 自动标注**：
+- 35 个场景全部跑通，3 张卡（2、4、7）各 2 个进程。服务器是共享的，空闲卡的判断改成了"空闲显存 ≥ 8 GB、利用率低"（卡上常驻别人的进程不再排除）。
+- 10,363 帧，跳过位姿不可靠的 178 帧（1.7%），88,189 个框，1,238 条轨迹，其中 718 条（58%）待审核（平均分 < 0.5），占框数的 42%。
+- 按类别：行人 545 条（45% 待审，64% 在动）、骑行 316 条（89% 待审，只有 16% 在动，多半是停着的两轮车）、轿车 199 条（30%）、货车 132 条（70%）、公交 46 条（91%，最近距离中位 29 m）。分数 0.3–0.4 的 480 条、0.4–0.5 的 237 条全部待审，0.5 以上基本不用审。
+- 速度：每帧约 2 s，其中网络只占 43 ms，去畸变 247 ms、多帧拼接 268 ms、体素化 644 ms（中位数）。本地单进程同样的去畸变 + 拼接只要 29 + 12 ms，是 6 个进程和别人的任务一起抢 CPU（每个进程的 numpy / torch / numba 默认开满全部核的线程）。已改两处：
+  - TTA 的 3 个翻转不再各自体素化，直接由原点云的体素镜像得到（网格关于 0 对称，6,000 个体素里约有 1 个因浮点舍入落到相邻格），体素化 0.8 s → 0.14 s；
+  - `batch_label.py` 给每个进程限定线程数（`核数 // (进程数 + 1)`，`--threads` 可改）。
+
 **位姿不可靠的帧**（`pose_refine.bad_intervals`，0921 约 1.7%）：`run_sequence.py` 给每帧记 `pose_bad`；`auto_label.py` 不让这些帧的检测进跟踪（它们在世界系里的位置不对，会拉偏静止物体），也不给它们出框；SUSTechPOINTS 导出和 `export_dataset.py` 都跳过它们。
 
 **预览的 `shift` 检查**：对相隔约 1 s 的两帧，取离地 0.3–3 m 的点（墙、杆、树、车），在 ±0.8 m 范围内做二维搜索，找到把一帧叠到另一帧上最合适的平移量。这就是激光看到的两帧位姿误差，沿行进方向的误差也能测出来。状态按 p90 判定：≤ 0.20 m 为 OK，≤ 0.40 m 为 WARN，更大为 FAIL。运动样例 bag 用 INS 位姿时是 0.51 m（FAIL），融合后是 0.12 m（OK）。
@@ -725,4 +733,30 @@ B2. 提交每个场景的 data/labels/<场景>/labels.pkl、labels_tracks.csv �
 - data/labels/batch_summary.csv 全文；用了几张卡、--per-gpu 几、总耗时；
 - 失败的场景及其日志最后 20 行；
 - 用掉的磁盘空间（du -sh data/runs data/labels）。
+```
+
+### 5.12 第十二轮：准备人工审核材料（0921）
+
+5.11 的自动标注已完成。这一轮把审核要用的东西准备好，审核本身由人来做。
+
+```text
+任务：为 0921 的 35 个场景生成按轨迹审核用的 Foxglove 文件，为 10 个验证场景导出 SUSTechPOINTS 逐框审核数据。不改标注。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+
+1. 每个场景一个审核用 MCAP（标注框 + 点云 + 教师原始框），8 个场景同时跑：
+     ls data/labels | grep 0921_ | xargs -P 8 -I{} python tools/dog/review_labels.py mcap \
+         --labels data/labels/{}/labels.pkl --frames data/runs/{}/frames \
+         --results data/runs/{}/voxel/results.pkl --out data/labels/{}/review.mcap
+2. 验证集场景导出 SUSTechPOINTS（每 5 帧取 1 帧）：
+     for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' data/survey/split/split.csv); do
+       python tools/dog/sustechpoints_convert.py export --labels data/labels/$r/labels.pkl \
+           --frames data/runs/$r/frames --scene $r --every 5
+     done
+3. 不要提交 review.mcap 和 SUSTechPOINTS 数据（太大），只报告。
+
+最后报告：
+- 每个场景 review.mcap 的大小；SUSTechPOINTS 每个验证场景导出的帧数；
+- 每步耗时；
+- 审核人员怎么打开：Foxglove 打开 data/labels/<场景>/review.mcap，对照 data/labels/<场景>/labels_tracks.csv 填 action 列；
+  SUSTechPOINTS 用 python tools/dog/sustechpoints_convert.py serve 启动（docs/LABELING_TUTORIAL.md 第 5 节）。
 ```

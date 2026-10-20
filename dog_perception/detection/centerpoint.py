@@ -175,6 +175,8 @@ class CenterPointDetector:
             voxel_size=vg.voxel_size, point_cloud_range=vg.range,
             max_num_points=vg.max_points_in_voxel, max_voxels=vg.max_voxel_num[1])
         self.num_point_features = cfg.model.reader.get("num_input_features", 5)
+        r = np.asarray(vg.range, np.float64)
+        self._mirror = bool(np.allclose(r[0], -r[3]) and np.allclose(r[1], -r[4]))   # grid symmetric in x, y
         self.last_timing = {}
 
     # ------------------------------------------------------------------ input
@@ -194,7 +196,36 @@ class CenterPointDetector:
         return out
 
     def build_example(self, points_model):
+        """Voxels of the cloud and, with TTA, of its three flips. The flips are mirrored from the
+        voxels of the cloud (coordinates reflected, point x / y negated) instead of voxelising
+        each flipped cloud again: the grid is symmetric about 0, so this gives the same voxels
+        (a point within float rounding of a voxel border can land in the neighbour: about 1
+        voxel in 6,000 on the kygi data) at a quarter of the CPU time (0.8 s -> 0.14 s per
+        frame for 5 sweeps of the XT32)."""
         clouds = self._flips(points_model[:, :self.num_point_features].astype(np.float32))
+        if not self._mirror:
+            return self._build_example_slow(clouds)
+        v0, c0, n0 = self.voxel_generator.generate(clouds[0])
+        gx, gy = self.voxel_generator.grid_size[:2]
+        vox, coors, npts, nvox = [], [], [], []
+        for b, (fx, fy) in enumerate(((1, 1), (1, -1), (-1, 1), (-1, -1))[:len(clouds)]):
+            v, c = v0, c0
+            if b:
+                v, c = v0.copy(), c0.copy()                    # coordinates are (z, y, x)
+                v[:, :, 0] *= fx
+                v[:, :, 1] *= fy
+                if fx < 0:
+                    c[:, 2] = gx - 1 - c[:, 2]
+                if fy < 0:
+                    c[:, 1] = gy - 1 - c[:, 1]
+            vox.append(v)
+            coors.append(np.pad(c, ((0, 0), (1, 0)), constant_values=b))
+            npts.append(n0)
+            nvox.append(len(v))
+        return self._example(clouds, vox, coors, npts, nvox)
+
+    def _build_example_slow(self, clouds):
+        """Each cloud voxelised on its own (grids that are not symmetric about 0)."""
         vox, coors, npts, nvox = [], [], [], []
         for b, pts in enumerate(clouds):
             v, c, n = self.voxel_generator.generate(pts)
@@ -202,6 +233,9 @@ class CenterPointDetector:
             coors.append(np.pad(c, ((0, 0), (1, 0)), constant_values=b))
             npts.append(n)
             nvox.append(len(v))
+        return self._example(clouds, vox, coors, npts, nvox)
+
+    def _example(self, clouds, vox, coors, npts, nvox):
         dev = self.device
         grid = self.voxel_generator.grid_size
         return dict(
