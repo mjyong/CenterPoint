@@ -412,14 +412,14 @@ for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do
 done
 ```
 
-审核完导出数据集，验证集就是 `split = val` 的那些场景：
+审核完导出数据集，验证集就是 `split = val` 的那些场景。没审核、仍标着待审核的轨迹默认作忽略框（不当物体也不当背景，[DOG_FINETUNE.md](DOG_FINETUNE.md) ⑤）。**只训练车辆**（现在的要求）时加 `--classes vehicle`、输出到 `data/dog_veh`，用 `configs/dog/*_veh.py`，见 DOG_FINETUNE.md 第 13 节和下面 5.13 / 5.14。
 
 ```bash
 REC=$(for d in data/runs/${NAME}_s*; do r=$(basename $d); \
       f=data/labels/$r/labels_sustech.pkl; [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
       echo --recording $d $f; done)
 VAL=$(awk -F, 'NR>1 && $11==1 && $10=="val" {print $1}' data/survey/$NAME/segments.csv)
-python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v001 --gt-db --skip-review
+python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v001 --gt-db
 ```
 
 用 `split.csv` 时：
@@ -429,7 +429,7 @@ REC=$(for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do \
       f=data/labels/$r/labels_sustech.pkl; [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
       echo --recording data/runs/$r $f; done)
 VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
-python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v001 --gt-db --skip-review
+python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v001 --gt-db
 ```
 
 ## 5. 交给服务器上 AI Agent 的任务说明
@@ -737,6 +737,8 @@ B2. 提交每个场景的 data/labels/<场景>/labels.pkl、labels_tracks.csv �
 
 ### 5.12 第十二轮：准备人工审核材料（0921）
 
+**已被 5.13 取代**：现在只检车辆，审核材料只要车（5.13 的 A 部分）。下面保留原文备查。
+
 5.11 的自动标注已完成。这一轮把审核要用的东西准备好，审核本身由人来做。
 
 ```text
@@ -759,4 +761,119 @@ B2. 提交每个场景的 data/labels/<场景>/labels.pkl、labels_tracks.csv �
 - 每步耗时；
 - 审核人员怎么打开：Foxglove 打开 data/labels/<场景>/<场景>_review.mcap，对照 data/labels/<场景>/labels_tracks.csv 填 action 列；
   SUSTechPOINTS 用 python tools/dog/sustechpoints_convert.py serve 启动（docs/LABELING_TUTORIAL.md 第 5 节）。
+```
+
+### 5.13 第十三轮：只检车辆——审核材料 + 用自动标注先训一版（v0，0921）
+
+要求变了：行人、骑行者暂时不检，车辆必须检出、尽量准；0921 的"公交"其实都是大货车。新的配置只有 car、truck 两个 head，按框的尺寸分；拿不准的轨迹作忽略框（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节）。这一轮做两件事：A 给人准备只看车的审核材料；B 用未审核的自动标注先训一版 v0，把 GPU 训练流程跑通，并看大致效果（v0 不上线）。
+
+```text
+任务：A 为 0921 生成只看车辆的审核材料；B 导出只有车辆的数据集，在两张空闲 GPU 上同时训练 Voxel 和 Pillar 的车辆模型 v0，并评估。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+SPLIT=data/survey/split/split.csv
+
+0. 检查：df -h（B 的导出约 40 GB）；data/runs/<场景>/frames 和 data/runs/<场景>/voxel/results.pkl 在（5.11 的输出）；
+   python -m pytest tests/dog -q 全部通过。任何一项不满足就停下报告。
+
+A. 审核材料（不改标注）：
+A1. 每个场景一张只有车的轨迹表（要人定的 train_as=ignore 排在前面）：
+     for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do
+       python tools/dog/review_labels.py table --classes vehicle --labels data/labels/$r/labels.pkl \
+           --out data/labels/$r/labels_tracks_vehicle.csv
+     done
+A2. 每个场景一个只画车的 Foxglove 文件，8 个同时跑：
+     awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT | xargs -P 8 -I{} python tools/dog/review_labels.py mcap \
+         --vehicles-only --labels data/labels/{}/labels.pkl --frames data/runs/{}/frames \
+         --results data/runs/{}/voxel/results.pkl --out data/labels/{}/{}_review.mcap
+A3. 验证场景导出 SUSTechPOINTS（只有车，每 5 帧 1 帧）：
+     for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); do
+       python tools/dog/sustechpoints_convert.py export --vehicles-only --labels data/labels/$r/labels.pkl \
+           --frames data/runs/$r/frames --scene $r --every 5
+     done
+
+B. v0：
+B1. 迁移权重：
+     python tools/dog/convert_nusc_ckpt.py --src work_dirs/pretrained/nusc_voxel.pth --dst work_dirs/dog_voxel_veh_init.pth \
+         --config configs/dog/dog_centerpoint_voxel_xt32_veh.py
+     python tools/dog/convert_nusc_ckpt.py --src work_dirs/pretrained/nusc_pp.pth --dst work_dirs/dog_pp_veh_init.pth \
+         --config configs/dog/dog_centerpoint_pp_xt32_veh.py
+B2. 导出（未审核的自动标注；待审核的轨迹自动作忽略框）：
+     REC=$(for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do echo --recording data/runs/$r data/labels/$r/labels.pkl; done)
+     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
+     python tools/dog/export_dataset.py $REC --val-recordings $VAL --classes vehicle --out data/dog_veh --gt-db --jobs 8
+   记下最后几行（train / val boxes 各类的正样本和忽略数）。
+B3. 选两张空闲的卡（python tools/dog/batch_label.py --split $SPLIT --dry-run 会打印卡表），同时训练，各自写日志：
+     CUDA_VISIBLE_DEVICES=<卡1> nohup python tools/train.py configs/dog/dog_centerpoint_voxel_xt32_veh.py \
+         --work_dir data/train/dog_voxel_veh_v0 > data/train/dog_voxel_veh_v0.log 2>&1 &
+     CUDA_VISIBLE_DEVICES=<卡2> nohup python tools/train.py configs/dog/dog_centerpoint_pp_xt32_veh.py \
+         --work_dir data/train/dog_pp_veh_v0 > data/train/dog_pp_veh_v0.log 2>&1 &
+   开始 10 分钟后看一次日志：每次迭代耗时、一个 epoch 多少次迭代、loss 是不是有限值、显存。
+   按 20 个 epoch 估算总时长；超过 10 小时就停下报告，不要改配置。
+   出错（OOM、spconv、数据加载）就停下，报告日志最后 50 行。
+B4. 模型级评估（第 10、15、20 个 epoch 都评），结果存到 data/reports/veh_v0/（这个目录会提交）：
+     mkdir -p data/reports/veh_v0
+     for e in 10 15 20; do for m in voxel pp; do
+       python tools/dist_test.py configs/dog/dog_centerpoint_${m}_xt32_veh.py --work_dir data/train/dog_${m}_veh_v0/eval_e$e \
+           --checkpoint data/train/dog_${m}_veh_v0/epoch_$e.pth 2>&1 | grep -E "Evaluation|time per frame" \
+           > data/reports/veh_v0/dist_test_${m}_e$e.txt
+     done; done
+B5. 流水线级对比（验证场景）：车辆模型 v0（不加 TTA）和 nuScenes Pillar 各跑一遍，和已有的教师结果（nuScenes Voxel + TTA）比：
+     for r in $VAL; do
+       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar,voxel --no-mcap \
+           --ckpt-pillar data/train/dog_pp_veh_v0/latest.pth --ckpt-voxel data/train/dog_voxel_veh_v0/latest.pth \
+           --device cuda:0 --out data/runs_veh_v0/$r
+       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar --no-mcap \
+           --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --device cuda:0 --out data/runs_nusc_pp/$r
+     done
+     python tools/dog/compare_detectors.py --classes vehicle --labels $(for r in $VAL; do echo data/labels/$r/labels.pkl; done) \
+         --results $(for r in $VAL; do echo teacher=data/runs/$r/voxel/results.pkl nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl \
+                     veh_voxel=data/runs_veh_v0/$r/voxel/results.pkl veh_pp=data/runs_veh_v0/$r/pillar/results.pkl; done) \
+         | tee data/reports/veh_v0/compare_val.md
+   （CUDA_VISIBLE_DEVICES 设成一张空闲卡。）
+B6. 提交：把两个训练日志（data/train/*_veh_v0.log 和 work_dir 里的 *.log.json）复制到 data/reports/veh_v0/，
+   连同 B4、B5 的结果和 data/labels/<场景>/labels_tracks_vehicle.csv 一起提交，推送到 claude/me/v01。
+   不要提交 .pth、.pkl 和 mcap；权重留在服务器上。
+
+最后报告：
+- A：每个场景 labels_tracks_vehicle.csv 的行数和 train_as=ignore 的行数；mcap 大小；SUSTechPOINTS 每个验证场景的帧数；
+- B2 的最后几行（各类正样本 / 忽略数，和 "teacher subclass disagrees with size" 的个数）、data/dog_veh 的大小；
+- B3：GPU 型号和卡号、每次迭代耗时、每个 epoch 的迭代数、总耗时、显存；每个 epoch 最后一次的 loss（hm_loss、loc_loss 分开）；
+- B4：每个 epoch 的 merged/vehicle 一行（mAP、AP@0.5/1/2/4、ATE、ASE、AOE）和 car / truck 两行；
+- B5：compare_detectors 打印的两张表全文；
+- 每步耗时；用掉的磁盘空间（du -sh data/dog_veh data/train data/runs_veh_v0 data/runs_nusc_pp）。
+```
+
+### 5.14 第十四轮：审核后训练 v1（等人审完车辆）
+
+人按 5.13 A 的材料审完车辆以后再做（审核规则见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节"审核只看车"）。
+
+```text
+任务：应用车辆审核结果，重新导出只有车辆的数据集，训练 Voxel 和 Pillar 的车辆模型 v1，在审核过的验证集上和教师、v0 比。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+SPLIT=data/survey/split/split.csv
+
+1. 应用按轨迹的审核（每个场景）：
+     for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do
+       python tools/dog/review_labels.py apply --labels data/labels/$r/labels.pkl \
+           --edits data/labels/$r/labels_tracks_vehicle.csv --out data/labels/$r/labels_reviewed.pkl
+     done
+   验证场景导回 SUSTechPOINTS 的逐框结果：
+     for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); do
+       python tools/dog/sustechpoints_convert.py import --scene $r --out data/labels/$r/labels_sustech.pkl
+     done
+2. 导出（有 labels_sustech.pkl 用它，否则用 labels_reviewed.pkl），覆盖 data/dog_veh：
+     REC=$(for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do \
+           f=data/labels/$r/labels_sustech.pkl; [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
+           echo --recording data/runs/$r $f; done)
+     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
+     rm -rf data/dog_veh && python tools/dog/export_dataset.py $REC --val-recordings $VAL --classes vehicle \
+         --out data/dog_veh --gt-db --jobs 8
+3. 训练 v1：同 5.13 的 B3，work_dir 换成 data/train/dog_{voxel,pp}_veh_v1。
+4. 评估：同 5.13 的 B4（v1 的 epoch 10 / 15 / 20，外加 v0 的 latest.pth 在新验证集上评一次），结果存到 data/reports/veh_v1/；
+   B5 的 run_sequence 用 v1 的权重（--out data/runs_veh_v1/$r），compare_detectors 改用审核过的验证标签
+   （每个验证场景的 labels_sustech.pkl），结果加上 v1：
+     --results ... veh_voxel_v1=data/runs_veh_v1/$r/voxel/results.pkl veh_pp_v1=data/runs_veh_v1/$r/pillar/results.pkl
+5. 提交 data/reports/veh_v1/（日志、指标）和 labels_reviewed.pkl / labels_sustech.pkl，推送。权重留在服务器上，报告路径。
+
+最后报告：同 5.13 的 B 部分，另加：每个场景 apply 打印的那一行；导出的各类正样本 / 忽略数和 5.13 的对比。
 ```

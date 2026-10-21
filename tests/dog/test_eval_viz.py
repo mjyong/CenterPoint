@@ -56,6 +56,23 @@ def test_detection_error_metrics():
     assert list(tp) == [True, False] and list(gt_m) == [0]
 
 
+def test_ignored_ground_truth_is_not_scored():
+    """An ignored box is no miss, and a prediction on it (center within the threshold or inside the
+    footprint) is no false positive; a prediction elsewhere still is."""
+    gt = [dict(boxes=np.array([[10.0, 0, 0, 4, 2, 1.5, 0.0], [20.0, 5, 0, 12, 3, 4, 0.0]]), labels=np.array([0, 0]),
+               ignore=np.array([False, True]))]
+    hit = dict(boxes=np.array([[10.2, 0, 0, 4, 2, 1.5, 0]]), labels=np.array([0]), scores=np.array([0.5]))
+    on_ign = dict(boxes=np.array([[24.5, 5.5, 0, 4, 2, 1.5, 0]]), labels=np.array([0]), scores=np.array([0.9]))
+    far = dict(boxes=np.array([[-15.0, 0, 0, 4, 2, 1.5, 0]]), labels=np.array([0]), scores=np.array([0.9]))
+    cat = lambda *ds: [{k: np.concatenate([d[k] for d in ds]) for k in ds[0]}]    # noqa: E731
+    r = evaluate_detections(cat(hit, on_ign), gt, ["vehicle"])["vehicle"]
+    assert r["num_gt"] == 1 and r["AP@0.5"] == pytest.approx(1.0) and r["AP@2.0"] == pytest.approx(1.0)
+    r = evaluate_detections(cat(hit, far), gt, ["vehicle"])["vehicle"]
+    assert r["AP@2.0"] == pytest.approx(0.5)            # the higher-scored false positive comes first
+    r = evaluate_detections(cat(hit, on_ign), [dict(gt[0], ignore=np.array([False, False]))], ["vehicle"])["vehicle"]
+    assert r["num_gt"] == 2 and r["AP@2.0"] < 0.5        # not ignored: a miss and a false positive
+
+
 # ---------------------------------------------------------------- synthetic nuScenes
 def _q_yaw(yaw):
     return [float(np.cos(yaw / 2)), 0.0, 0.0, float(np.sin(yaw / 2))]

@@ -75,6 +75,26 @@ def test_vehicle_subclass_actions(tmp_path):
     assert {(o["label"], o["subclass"]) for o in t2} == {("vehicle", None)}
 
 
+def test_vehicle_table_shows_training_use(tmp_path):
+    """table --classes vehicle: vehicles only, with size and what training makes of them; a reviewed
+    track counts, a flagged one is to be decided."""
+    labels = _labels()
+    rows = write_track_table(str(tmp_path / "t.csv"), labels, "vehicle")
+    assert [(r["track_id"], r["train_as"], r["length_m"], r["height_m"]) for r in rows] == [(1, "ignore", "4.5", "1.6")]
+    out, _ = apply_edits(labels, _edit(str(tmp_path / "t.csv"), labels, [(1, "ok", "", "")]))
+    assert write_track_table(str(tmp_path / "t2.csv"), out, "vehicle")[0]["train_as"] == "car"
+    assert [r["train_as"] for r in write_track_table(str(tmp_path / "t3.csv"), labels)] == ["ignore", "cyclist"]
+
+
+def test_ignore_action(tmp_path):
+    """'ignore' clears the review flag and marks the track as an ignore box for training."""
+    labels = _labels()
+    out, counts = apply_edits(labels, _edit(str(tmp_path / "t.csv"), labels, [(1, "ignore", "", "")]))
+    t1 = [o for f in out["frames"] for o in f["objects"] if o["track_id"] == 1]
+    assert counts == {"ignore": 1} and all(o["ignore"] and not o["review"] and o["reviewed"] for o in t1)
+    assert not any(o.get("ignore") for f in out["frames"] for o in f["objects"] if o["track_id"] == 2)
+
+
 def test_unknown_action(tmp_path):
     with pytest.raises(ValueError):
         _edit(str(tmp_path / "t.csv"), _labels(), [(1, "remove", "", "")])

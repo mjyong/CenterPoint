@@ -263,6 +263,8 @@ def test_checkpoint_arch_tells_nuscenes_and_dog_models(tmp_path):
     assert checkpoint_arch(ckpt("c.pth", "backbone.conv_input.0.weight", 5)) == "dog_voxel"
     assert checkpoint_arch(ckpt("e.pth", "reader.pfn_layers.0.linear.weight", 3)) == "dog_pillar_3cls"
     assert checkpoint_arch(ckpt("f.pth", "backbone.conv_input.0.weight", 3)) == "dog_voxel_3cls"
+    assert checkpoint_arch(ckpt("g.pth", "reader.pfn_layers.0.linear.weight", 2)) == "dog_pillar_veh"
+    assert checkpoint_arch(ckpt("h.pth", "backbone.conv_input.0.weight", 2)) == "dog_voxel_veh"
     assert checkpoint_arch(ckpt("d.pth", "neck.blocks.0.weight", 6)) is None
 
 

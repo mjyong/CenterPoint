@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（106 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（113 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -89,6 +89,7 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 **微调**（`configs/dog/dog_centerpoint_{pp,voxel}_xt32.py`）：
 - 每个类别一个 task，车分成 car / truck / bus 三个 task（和 nuScenes 按尺寸分组一致），输出时合并为 vehicle。
 - 用 `tools/dog/convert_nusc_ckpt.py` 从 nuScenes 权重迁移 head（car、truck、bus、pedestrian、bicycle 各对各）。旧的单 vehicle head 配置保留为 `*_3cls.py`。
+- **只检车辆**（当前要求）：`*_veh.py` 只有 car、truck 两个 head，按框的尺寸分，公交归 truck；拿不准的标签作忽略框。输出类别不变，只是没有行人、骑行者。见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节。
 - GT-sampling 开启。在重力对齐、原点在地面的检测系下，采样粘贴的目标才会贴地。
 - 增加 ±2° 的俯仰/横滚增强（`global_pitch_roll_noise`，新加到 det3d 的 `Preprocess` 中）。
 - 训练数据直接保存**预处理后的多帧点云**，与线上使用同一份预处理代码，从源头保证训练和部署一致。
@@ -186,7 +187,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `dog_perception/pipeline.py` | 四段串联 `PerceptionPipeline` |
 | `dog_perception/sim.py` | XT32 + 足式步态仿真器（测试和演示用） |
 | `det3d/datasets/dog/` + pipeline 改动 | `DogDataset`、GT-sampling、俯仰/横滚增强 |
-| `configs/dog/` | Pillar/Voxel 微调配置（±40.8 m、5 帧；head 为 car / truck / bus / 行人 / 骑行者，输出 3 类）；`*_3cls.py` 是旧的单 vehicle head 布局 |
+| `configs/dog/` | Pillar/Voxel 微调配置（±40.8 m、5 帧；head 为 car / truck / bus / 行人 / 骑行者，输出 3 类）；`*_veh.py` 只检车辆（car / truck）；`*_3cls.py` 是旧的单 vehicle head 布局 |
 | `tools/dog/rosbag_to_sequence.py` | ROS1/ROS2 bag 转序列（无需安装 ROS，依赖 `rosbags`）；边读边写，`--segments` 一次切出多个场景 |
 | `tools/dog/bag_survey.py`, `sequence_preview.py` | 长 bag 体检、切场景（`segments.csv`）；转换后的序列逐个做可视化和数值检查，含 INS 位置跳变（[BAG_SPLIT.md](BAG_SPLIT.md)） |
 | `tools/dog/sequence_meta.py` | 不重转 bag，修正序列 `meta.json` 里的离地高度（多帧中位数或给定值）和雷达时间偏移 |
@@ -235,10 +236,11 @@ python tools/dog/review_labels.py apply --labels data/rec_001/labels.pkl --edits
 python tools/dog/compare_detectors.py --labels data/rec_001/labels_reviewed.pkl \
     --results pillar=work_dirs/rec_001/pillar/results.pkl voxel=work_dirs/rec_001/voxel/results.pkl
 
-# 3) 微调：导出数据集 + GT 库（--skip-review 丢掉没审核的低置信轨迹），迁移 head，用 det3d 训练
+# 3) 微调：导出数据集 + GT 库（没审核的低置信轨迹作忽略框），迁移 head，用 det3d 训练
+#    只检车辆：export 加 --classes vehicle --out data/dog_veh，配置用 configs/dog/*_veh.py（DOG_FINETUNE.md 第 13 节）
 python tools/dog/export_dataset.py --recording work_dirs/rec_001 data/rec_001/labels_reviewed.pkl \
     --recording work_dirs/rec_002 data/rec_002/labels_reviewed.pkl --val-recordings rec_002 --out data/dog \
-    --gt-db --skip-review
+    --gt-db
 python tools/dog/convert_nusc_ckpt.py --src nusc_pp.pth --dst work_dirs/dog_pp_init.pth
 python tools/train.py configs/dog/dog_centerpoint_pp_xt32.py    # 单卡；评估、对比、验收见 DEVELOPMENT_WORKFLOW.md
 python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir work_dirs/dog_pp --checkpoint work_dirs/dog_centerpoint_pp_xt32/latest.pth

@@ -11,14 +11,21 @@ one row per track in the track table (``write_track_table``): the
                                 ``subclass`` column shows the teacher's vote)
     flip                        turn the heading by 180 deg
     static                      the object does not move: zero velocity, one position, one heading
+    ignore                      cannot tell (too few points, half hidden): an ignore box in
+                                training, neither object nor background, and not scored
+
+The ``train_as`` column says what ``export_dataset.py`` will make of the
+track (class name, ``ignore``, or empty when left out): a reviewer decides the
+``ignore`` rows (``ok`` makes them count, ``drop`` removes them). With
+``--classes vehicle`` the table lists vehicles only, those rows first.
 
 Several actions combine with ``+`` (``cyclist+flip``). ``from`` / ``to``
 limit the action to part of the track (seconds since the recording start,
 as in the table's ``t_first`` / ``t_last``), e.g. to drop the frames after
 a track jumped to another object; copy the row to give the rest of the
 track its own action (rows are applied top to bottom). Any action other than drop clears the
-review flag; tracks still flagged after review are dropped by
-``export_dataset.py --skip-review``. Missing objects cannot be added here;
+review flag; tracks still flagged after review become ignore boxes in
+``export_dataset.py`` (``--review-policy``). Missing objects cannot be added here;
 use a 3D annotation tool for that (see docs/DOG_PIPELINE.md).
 """
 import copy
@@ -27,13 +34,59 @@ from collections import defaultdict
 
 import numpy as np
 
-from .detection.boxes import CLASSES, SUBCLASS_TO_CLASS, Detections
+from .detection.boxes import CLASSES, SUBCLASS_TO_CLASS, Detections, subclass_from_size, vehicle_head
 from .geometry import inv_T, wrap_angle
 
 VEHICLE_SUBCLASSES = tuple(k for k, v in SUBCLASS_TO_CLASS.items() if v == "vehicle")
-ACTIONS = ("ok", "drop", "flip", "static") + CLASSES + VEHICLE_SUBCLASSES
-TABLE_COLUMNS = ["track_id", "label", "subclass", "review", "mean_score", "frames", "interpolated", "t_first",
-                 "t_last", "min_range_m", "moving_share", "max_speed", "action", "from", "to", "note"]
+ACTIONS = ("ok", "drop", "flip", "static", "ignore") + CLASSES + VEHICLE_SUBCLASSES
+TABLE_COLUMNS = ["track_id", "label", "subclass", "review", "train_as", "mean_score", "frames", "interpolated",
+                 "t_first", "t_last", "min_range_m", "length_m", "height_m", "moving_share", "max_speed", "action",
+                 "from", "to", "note"]
+
+
+# ------------------------------------------------------------------ training labels
+# How a label object enters training (tools/dog/export_dataset.py); the track table shows it as
+# ``train_as`` so a reviewer sees which tracks still need a decision.
+def _count(counts, key):
+    if counts is not None:
+        counts[key] = counts.get(key, 0) + 1
+
+
+def gt_name(o, classes="sub", counts=None):
+    """Training class name of one label object, None to leave it out. ``classes``: 'sub' (car / truck /
+    bus / pedestrian / cyclist, the teacher's subclass, else from the size), 'coarse' (vehicle /
+    pedestrian / cyclist) or 'vehicle' (car / truck by size, ``vehicle_head``; vehicles only)."""
+    if classes == "vehicle":
+        return vehicle_head(o["box"][3], o["box"][5]) if o["label"] == "vehicle" else None
+    if classes == "coarse" or o["label"] != "vehicle":
+        return o["label"]
+    if o.get("subclass"):
+        return o["subclass"]
+    _count(counts, "vehicle subclass from size")
+    return subclass_from_size(o["box"][3], o["box"][5])
+
+
+def train_label(o, classes="sub", review_policy="ignore", counts=None):
+    """(class name or None to leave the object out, ignore flag) of one label object.
+
+    Ignore boxes get no loss either way and are not scored: tracks a reviewer marked ``ignore``;
+    tracks still flagged for review (mean score < 0.5, not reviewed) unless ``review_policy`` is
+    'drop' (left out) or 'keep' (positives); and with ``classes='vehicle'``, unreviewed vehicles whose
+    teacher subclass disagrees with their size (a 'truck' the size of a car)."""
+    name = gt_name(o, classes, counts)
+    if name is None:
+        return None, False
+    ignore = bool(o.get("ignore"))
+    if o.get("review"):
+        if review_policy == "drop":
+            return None, False
+        ignore |= review_policy == "ignore"
+    sub = o.get("subclass")
+    if classes == "vehicle" and sub and not o.get("reviewed") and (sub == "car") != (name == "car"):
+        _count(counts, "teacher subclass disagrees with size (ignored)")
+        ignore = True
+    _count(counts, name + (" ignored" if ignore else ""))
+    return name, ignore
 
 
 def _tracks(labels):
@@ -45,29 +98,38 @@ def _tracks(labels):
     return out
 
 
-def track_table(labels):
-    """One row per track, flagged tracks first."""
+def track_table(labels, classes="sub"):
+    """One row per track, flagged tracks first. ``train_as``: what export_dataset.py makes of the
+    track with these ``classes`` (class name, 'ignore', or empty when left out); with
+    ``classes='vehicle'`` only vehicles are listed, the ones that would be ignored first."""
     t0 = labels["frames"][0]["stamp"] if labels["frames"] else 0.0
     rows = []
     for tid, refs in _tracks(labels).items():
         objs = [labels["frames"][fi]["objects"][oi] for fi, oi in refs]
+        if classes == "vehicle" and objs[0]["label"] != "vehicle":
+            continue
         stamps = [labels["frames"][fi]["stamp"] for fi, _ in refs]
         speed = np.array([np.hypot(*o["velocity"]) for o in objs])
+        size = np.median(np.stack([o["box"][3:6] for o in objs]), axis=0)
+        name, ign = train_label(dict(objs[0], box=np.r_[objs[0]["box"][:3], size, objs[0]["box"][6]],
+                                     review=any(o["review"] for o in objs)), classes)
         rows.append(dict(
             track_id=tid, label=objs[0]["label"], subclass=objs[0].get("subclass") or "",
-            review=int(any(o["review"] for o in objs)),
+            review=int(any(o["review"] for o in objs)), train_as="ignore" if ign else name or "",
             mean_score="%.3f" % np.mean([o["score"] for o in objs]), frames=len(objs),
             interpolated=sum(bool(o["interpolated"]) for o in objs),
             t_first="%.2f" % (min(stamps) - t0), t_last="%.2f" % (max(stamps) - t0),
             min_range_m="%.1f" % min(np.hypot(*o["box"][:2]) for o in objs),
+            length_m="%.1f" % size[0], height_m="%.1f" % size[2],
             moving_share="%.2f" % np.mean([bool(o.get("moving", False)) for o in objs]),
             max_speed="%.2f" % speed.max(), action="", **{"from": "", "to": ""}, note=""))
-    rows.sort(key=lambda r: (-r["review"], float(r["mean_score"]), r["track_id"]))
+    rows.sort(key=lambda r: (r["train_as"] != "ignore" if classes == "vehicle" else 0, -r["review"],
+                             float(r["mean_score"]), r["track_id"]))
     return rows
 
 
-def write_track_table(path, labels):
-    rows = track_table(labels)
+def write_track_table(path, labels, classes="sub"):
+    rows = track_table(labels, classes)
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=TABLE_COLUMNS)
         w.writeheader()
@@ -128,6 +190,8 @@ def apply_edits(labels, edits):
                     o["label"], o["subclass"] = "vehicle", a
                 elif a == "flip":
                     o["box"][6] = wrap_angle(o["box"][6] + np.pi)
+                elif a == "ignore":
+                    o["ignore"] = True
             o["review"] = False
             o["reviewed"] = True
         for a in acts:

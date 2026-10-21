@@ -65,6 +65,8 @@ def main():
     e.add_argument("--every", type=int, default=1, help="export every n-th frame (5: 2 Hz from 10 Hz)")
     e.add_argument("--start", type=float, default=None, help="seconds since the recording start")
     e.add_argument("--end", type=float, default=None)
+    e.add_argument("--vehicles-only", action="store_true",
+                   help="export only the vehicle labels (the imported labels then hold vehicles only)")
     e.add_argument("--current-sweep", action="store_true",
                    help="only the current sweep (default: the accumulated sweeps the model sees)")
     i = sub.add_parser("import", help="SUSTechPOINTS scene -> labels.pkl")
@@ -87,6 +89,9 @@ def main():
     elif args.cmd == "export":
         with open(args.labels, "rb") as f:
             labels = pickle.load(f)
+        if args.vehicles_only:
+            labels = dict(labels, frames=[dict(f, objects=[o for o in f["objects"] if o["label"] == "vehicle"])
+                                          for f in labels["frames"]])
         n = export_scene(labels, args.frames, args.out, args.scene, args.every, args.start, args.end,
                          args.current_sweep)
         print("%d frames -> %s" % (n, os.path.join(args.out, args.scene)))

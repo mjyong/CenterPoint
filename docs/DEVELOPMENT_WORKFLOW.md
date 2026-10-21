@@ -106,7 +106,7 @@ python tools/dog/convert_nusc_ckpt.py --src work_dirs/pretrained/nusc_pp.pth --d
 
 nuScenes 模型有 6 个 task（10 类）。狗的配置有 5 个 task：车按尺寸分成 car / truck / bus 三个 head，再加行人、骑行者；输出时 car / truck / bus 合并成 vehicle，所以下游仍然只有三类。迁移时 car、truck、bus 分别继承 nuScenes 的 car、truck、bus head，pedestrian 继承 pedestrian，cyclist 继承 bicycle；backbone、neck 和共享卷积原样保留。配置里 `load_from` 指向这个文件。
 
-为什么车要分三个 head、实验结果和代价，见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 12 节。旧的单 vehicle head 只能继承 car 的 head，nuScenes 的卡车、公交能力全部丢掉（样例验证集上 vehicle AP@2m 从 0.80 掉到 0.16，第 9 节），新布局把它们原样带了过来。旧布局的配置保留为 `*_3cls.py`，迁移时加 `--config configs/dog/dog_centerpoint_pp_xt32_3cls.py`。
+为什么车要分三个 head、实验结果和代价，见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 12 节。旧的单 vehicle head 只能继承 car 的 head，nuScenes 的卡车、公交能力全部丢掉（样例验证集上 vehicle AP@2m 从 0.80 掉到 0.16，第 9 节），新布局把它们原样带了过来。旧布局的配置保留为 `*_3cls.py`，迁移时加 `--config configs/dog/dog_centerpoint_pp_xt32_3cls.py`。现在只检车辆，用 `*_veh.py`（car、truck 两个 head，按尺寸分），见 DOG_FINETUNE.md 第 13 节。
 
 ### 4.2 配置要点（`configs/dog/dog_centerpoint_pp_xt32.py`）
 

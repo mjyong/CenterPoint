@@ -123,3 +123,21 @@ def test_vehicle_subclass_types(tmp_path):
     assert subs == ["truck", "bus", "bus", "truck", "car", "bus", "car", "truck", "truck", "car"]
     assert {f["objects"][0]["label"] for f in out["frames"]} == {"vehicle"} and counts["vehicle"] == 10
 
+
+
+def test_ignore_attribute_round_trip(tmp_path):
+    """An ignored track is exported with obj_attr 'ignore'; setting it in the tool marks a box ignored."""
+    labels = _labels()
+    for f in labels["frames"]:
+        f["objects"][0]["ignore"] = True
+    export_scene(labels, _frames_dir(tmp_path, labels), str(tmp_path / "data"), "rec", current_sweep_only=True)
+    root = tmp_path / "data" / "rec"
+    names = sorted(os.listdir(root / "label"))
+    ann = json.load(open(root / "label" / names[0]))
+    assert [a["obj_attr"] for a in ann] == ["ignore", ""]
+    ann[1]["obj_attr"] = "Ignore"
+    json.dump(ann, open(root / "label" / names[0], "w"))
+    out, _ = import_scene(str(root))
+    flags = [(o["label"], o["ignore"]) for o in out["frames"][0]["objects"]]
+    assert flags == [("vehicle", True), ("pedestrian", True)]
+    assert not any(o["ignore"] for f in out["frames"][1:] for o in f["objects"] if o["label"] == "pedestrian")

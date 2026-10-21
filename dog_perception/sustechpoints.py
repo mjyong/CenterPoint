@@ -15,7 +15,8 @@ z = -1.8 (``public/js/editor.js``, ``add_box_on_mouse_pos``); without the
 shift new boxes land under our ground and cannot snap to the points. Import
 shifts back (``z_offset`` in ``dog_meta.json``). Frame names are the stamp
 in microseconds (sortable). The track id becomes ``obj_id``; flagged tracks get ``obj_attr = "review"`` so
-they stand out in the tool. ``dog_meta.json`` keeps what SUSTechPOINTS does
+they stand out in the tool. An object whose attribute contains ``ignore`` (set it in the tool for
+something that cannot be told apart) comes back as an ignore box for training (``export_dataset.py``). ``dog_meta.json`` keeps what SUSTechPOINTS does
 not: stamps, ``T_world_det`` per frame and the auto-label scores.
 
 Import reads the (corrected) labels back. Classes and vehicle subclasses map
@@ -129,7 +130,8 @@ def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_e
             box[2] -= LIDAR_HEIGHT
             otype = SUBCLASS_TO_TYPE.get(o.get("subclass")) or CLASS_TO_TYPE[o["label"]]
             objs.append({"obj_id": str(o["track_id"]), "obj_type": otype,
-                         "obj_attr": "review" if o.get("review") else "", "psr": box_to_psr(box)})
+                         "obj_attr": "ignore" if o.get("ignore") else "review" if o.get("review") else "",
+                         "psr": box_to_psr(box)})
             scores[o["track_id"]].append(float(o["score"]))
             exported[str(o["track_id"])] = dict(center=np.asarray(o["box"][:3], float).tolist(),
                                                 velocity=np.asarray(o["velocity"], float).tolist())
@@ -181,7 +183,8 @@ def import_scene(scene_dir, type_map=None, static_speed=0.2, velocity_window=0.5
             kept = ex is not None and np.hypot(*(box[:2] - ex["center"][:2])) <= moved_tol
             by_id[oid].append((len(frames), len(objs)))
             objs.append(dict(obj_id=oid, label=cls, subclass=sub, box=box,
-                             velocity=np.asarray(ex["velocity"]) if kept else None))
+                             velocity=np.asarray(ex["velocity"]) if kept else None,
+                             ignore="ignore" in str(a.get("obj_attr") or "").lower()))
             counts[cls] += 1
             counts["moved or new"] += not kept
         frames.append(dict(stamp=fm["stamp"], T_world_det=T, objects=objs))

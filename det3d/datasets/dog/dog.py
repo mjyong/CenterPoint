@@ -11,6 +11,7 @@ Info file (pickle, list of dicts):
     lidar_path  path relative to root_path of a float32 .npy (N, 5) [x, y, z, intensity, dt]
     gt_boxes    (M, 9) det3d convention [x, y, z, w, l, h, vx, vy, r] in the network frame
     gt_names    (M,) class names
+    gt_ignore   (M,) bool, optional: uncertain labels that get no loss and are not scored
     sequence    recording id (used for splitting)
     timestamp   seconds
 
@@ -29,9 +30,12 @@ class DogDataset(PointCloudDataset):
     NumPointFeatures = 5  # x, y, z, intensity, dt
 
     def __init__(self, info_path, root_path, nsweeps=5, cfg=None, pipeline=None, class_names=None,
-                 test_mode=False, load_interval=1, class_balanced=True, **kwargs):
+                 test_mode=False, load_interval=1, class_balanced=True, empty_frames=0.0, **kwargs):
+        """``empty_frames``: with ``class_balanced``, add frames without any (non-ignored) training
+        object, this fraction of the resampled set, so background-only scenes are seen too."""
         self.load_interval = load_interval
         self.class_balanced = class_balanced
+        self.empty_frames = empty_frames
         self.test_mode = test_mode
         self._class_names = class_names
         self.load_infos(info_path)   # before super().__init__, which calls len(self)
@@ -47,7 +51,9 @@ class DogDataset(PointCloudDataset):
             self._infos = infos
             return
         # CBGS-style frame resampling so rare classes (cyclists) are not drowned by pedestrians
-        per_cls = {n: [i for i in infos if n in set(i["gt_names"])] for n in self._class_names}
+        names = [set(np.asarray(i["gt_names"])[~np.asarray(i.get("gt_ignore", np.zeros(len(i["gt_names"]), bool)),
+                                                             dtype=bool)]) for i in infos]
+        per_cls = {n: [i for i, s in zip(infos, names) if n in s] for n in self._class_names}
         total = sum(len(v) for v in per_cls.values())
         self._infos = []
         if total == 0:
@@ -59,6 +65,10 @@ class DogDataset(PointCloudDataset):
                 continue
             ratio = frac / (len(lst) / total)
             self._infos += np.random.choice(lst, int(len(lst) * ratio)).tolist()
+        empty = [i for i, s in zip(infos, names) if not s & set(self._class_names)]
+        n_empty = min(len(empty), int(round(self.empty_frames * len(self._infos))))
+        if n_empty:
+            self._infos += np.random.choice(empty, n_empty, replace=False).tolist()
 
     def __len__(self):
         return len(self._infos)
@@ -105,7 +115,8 @@ class DogDataset(PointCloudDataset):
             gb, gv = det3d_to_standard(info["gt_boxes"])
             glab = np.array([names.index(n) if n in names else -1 for n in info["gt_names"]], dtype=np.int64)
             preds.append(dict(boxes=pb, velocities=pv, scores=score, labels=label.astype(np.int64)))
-            gts.append(dict(boxes=gb, velocities=gv, labels=glab))
+            gts.append(dict(boxes=gb, velocities=gv, labels=glab,
+                            ignore=np.asarray(info.get("gt_ignore", np.zeros(len(glab), bool)), dtype=bool)))
         res = evaluate_detections(preds, gts, names)
         merged = self._evaluate_merged(preds, gts, names)
         flat = {}

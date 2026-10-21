@@ -67,6 +67,8 @@ class Preprocess(object):
                 "gt_boxes": anno_dict["boxes"],
                 "gt_names": np.array(anno_dict["names"]).reshape(-1),
             }
+            if "ignore" in anno_dict:   # DogDataset: boxes that get no loss (AssignLabel)
+                gt_dict["gt_ignore"] = np.asarray(anno_dict["ignore"], dtype=bool).reshape(-1)
 
         if self.mode == "train" and not self.no_augmentation:
             selected = drop_arrays_by_name(
@@ -112,6 +114,10 @@ class Preprocess(object):
                     gt_boxes_mask = np.concatenate(
                         [gt_boxes_mask, sampled_gt_masks], axis=0
                     )
+                    if "gt_ignore" in gt_dict:
+                        gt_dict["gt_ignore"] = np.concatenate(
+                            [gt_dict["gt_ignore"], np.zeros(len(sampled_gt_names), dtype=bool)]
+                        )
 
 
                     points = np.concatenate([sampled_points, points], axis=0)
@@ -325,21 +331,28 @@ class AssignLabel(object):
                 )
                 flag += len(class_name)
 
+            ignore = gt_dict.get("gt_ignore")
+            if ignore is None:
+                ignore = np.zeros(len(gt_dict["gt_classes"]), dtype=bool)
             task_boxes = []
             task_classes = []
             task_names = []
+            task_ignores = []
             flag2 = 0
             for idx, mask in enumerate(task_masks):
                 task_box = []
                 task_class = []
                 task_name = []
+                task_ignore = []
                 for m in mask:
                     task_box.append(gt_dict["gt_boxes"][m])
                     task_class.append(gt_dict["gt_classes"][m] - flag2)
                     task_name.append(gt_dict["gt_names"][m])
+                    task_ignore.append(ignore[m])
                 task_boxes.append(np.concatenate(task_box, axis=0))
                 task_classes.append(np.concatenate(task_class))
                 task_names.append(np.concatenate(task_name))
+                task_ignores.append(np.concatenate(task_ignore))
                 flag2 += len(mask)
 
             for task_box in task_boxes:
@@ -352,6 +365,7 @@ class AssignLabel(object):
             gt_dict["gt_classes"] = task_classes
             gt_dict["gt_names"] = task_names
             gt_dict["gt_boxes"] = task_boxes
+            gt_dict["gt_ignore"] = task_ignores
 
             res["lidar"]["annotations"] = gt_dict
 
@@ -403,6 +417,11 @@ class AssignLabel(object):
                             continue 
 
                         draw_gaussian(hm[cls_id], ct, radius)
+                        # an ignored box is drawn on the heat map, which switches off the negative
+                        # loss around it, but gets no positive or regression target: a detection
+                        # there is neither rewarded nor penalised (FastFocalLoss)
+                        if task_ignores[idx][k]:
+                            continue
 
                         new_idx = k
                         x, y = ct_int[0], ct_int[1]
@@ -432,9 +451,11 @@ class AssignLabel(object):
                 inds.append(ind)
                 cats.append(cat)
 
-            # used for two stage code 
-            boxes = flatten(gt_dict['gt_boxes'])
-            classes = merge_multi_group_label(gt_dict['gt_classes'], num_classes_by_task)
+            # used for two stage code (ignored boxes left out)
+            keep = [~t for t in task_ignores]
+            boxes = flatten([b[m] for b, m in zip(gt_dict['gt_boxes'], keep)])
+            classes = merge_multi_group_label([c[m] for c, m in zip(gt_dict['gt_classes'], keep)],
+                                              num_classes_by_task)
 
             if res["type"] in ("NuScenesDataset", "DogDataset"):
                 gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)

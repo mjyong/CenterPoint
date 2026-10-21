@@ -142,10 +142,12 @@ python tools/dog/review_labels.py mcap --labels data/labels/rec_001/labels.pkl \
 | `car` / `truck` / `bus` | 是车，并指定子类（表里 `subclass` 列是教师投票的结果，错了就改） |
 | `flip` | 朝向转 180° |
 | `static` | 物体没动：速度置 0，位置和朝向固定为整段的中位数 / 均值 |
+| `ignore` | 看不清（点太少、被挡住一半，分不出是不是车）：训练时作忽略框，既不当物体也不当背景，评估时不计分 |
 
 - 多个动作用 `+` 连起来，例如 `cyclist+flip`。
 - `from` / `to` 列（秒，从录制开始算，对应表里的 `t_first` / `t_last`）把动作限制在一段时间内。例如轨迹在 3.2 s 后跳到了另一个物体上：这一行填 `drop`、`from` 填 3.2；再复制一行，`ok`、`to` 填 3.2。各行按从上到下的顺序执行。
 - 除 `drop` 外，任何动作都会清除待审核标记。
+- 表里 `train_as` 列是导出时这条轨迹的去向（训练类别名，或 `ignore`）；`length_m`、`height_m` 是框的长、高（中位数）。只训练车辆时用 `review_labels.py table --classes vehicle` 生成只有车的表，要定的（`train_as = ignore`）排在前面（第 13 节）。
 
 **应用**：
 
@@ -154,7 +156,7 @@ python tools/dog/review_labels.py apply --labels data/labels/rec_001/labels.pkl 
     --edits data/labels/rec_001/labels_tracks.csv --out data/labels/rec_001/labels_reviewed.pkl
 ```
 
-导出时加 `--skip-review`，没审核过的待审核轨迹就不会进训练集。
+没审核过、仍标着待审核的轨迹，导出时默认作忽略框（`--review-policy ignore`）：既不当物体，也不当背景。以前是直接丢掉（`--skip-review`，仍可用）：丢掉的如果是真车，训练时就成了"这里没有车"的负样本。
 
 按轨迹改不能**补**漏标的物体，也不能逐帧调框，这些在 ④b 里做（第 10 节）。
 
@@ -164,12 +166,14 @@ python tools/dog/review_labels.py apply --labels data/labels/rec_001/labels.pkl 
 python tools/dog/export_dataset.py \
     --recording data/runs/rec_001 data/labels/rec_001/labels_reviewed.pkl \
     --recording data/runs/rec_002 data/labels/rec_002/labels_sustech.pkl \
-    --val-recordings rec_002 --out data/dog --gt-db --skip-review
+    --val-recordings rec_002 --out data/dog --gt-db
 ```
+
+**忽略框**（`gt_ignore`）：没审核过的待审核轨迹（`--review-policy ignore`，默认；`drop` 丢掉，`keep` 当正样本）和审核时标了 `ignore` 的轨迹。训练时热图上照样画出它的高斯（于是周围不算负样本），但不给中心点和回归目标，所以网络在这里出不出框都不奖不罚；GT 采样库不收；评估时它既不算漏检，落在它上面的检测也不算误检（类似 KITTI 的 DontCare）。实现：`det3d/datasets/pipelines/preprocess.py`（`AssignLabel`）、`dog_perception/detection/evaluate.py`。
 
 点云和框都从检测系转到虚拟 nuScenes 雷达系（`ModelFrame`），和预训练模型的 z 先验一致。输出 `data/dog/infos_{train,val}.pkl`、`lidar/` 和 GT 采样库，路径与 `configs/dog/dog_centerpoint_pp_xt32.py` 一致。
 
-类别名用模型 head 的 5 个类：car / truck / bus / pedestrian / cyclist（取标签的 `subclass`）。没有子类的车（子类出现之前做的标签，或用旧的 3 类模型当教师）按尺寸补一个（长 ≥ 10 m 为 bus，长 ≥ 6.5 m 或高 ≥ 2.8 m 为 truck，否则 car），脚本会打印有多少个，最好重新跑一遍 `auto_label.py` 或在 ④ 里核对。旧的 3 类配置（`*_3cls.py`）要加 `--classes coarse`，类别名为 vehicle / pedestrian / cyclist。
+类别名用模型 head 的 5 个类：car / truck / bus / pedestrian / cyclist（取标签的 `subclass`）。只训练车辆的配置（`*_veh.py`，第 13 节）加 `--classes vehicle`：只导出车，按尺寸分 car / truck。没有子类的车（子类出现之前做的标签，或用旧的 3 类模型当教师）按尺寸补一个（长 ≥ 10 m 为 bus，长 ≥ 6.5 m 或高 ≥ 2.8 m 为 truck，否则 car），脚本会打印有多少个，最好重新跑一遍 `auto_label.py` 或在 ④ 里核对。旧的 3 类配置（`*_3cls.py`）要加 `--classes coarse`，类别名为 vehicle / pedestrian / cyclist。
 
 ## ⑥ head 权重迁移 + 训练
 
@@ -331,3 +335,82 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
 - **样本少**：卡车、公交的框少，对应的 head 主要靠迁移来的权重和 GT 采样（truck 2、bus 2）。如果录制里一辆公交都没有，bus head 在微调中只见到负样本，会越来越不出框。这种情况下旧布局同样检测不到公交（它的 vehicle head 来自 car head），但要知道新布局的优势只在有大车样本时才能保持，录数据时要包含一些有大车的场景。
 
 **旧布局**：配置保留为 `*_3cls.py`（预设名 `dog_pillar_3cls` / `dog_voxel_3cls`）。迁移时加 `--config configs/dog/dog_centerpoint_pp_xt32_3cls.py`，导出加 `--classes coarse`。已经按旧布局训练的权重照常能用，各工具按权重里的 task 数自动识别。
+
+## 13. 只检车辆的版本：car / truck 两个 head（2026-10）
+
+**要求**：行人、骑行者暂时不检，接口保留；车辆必须检出，而且尽量准。0921 的录制里大货车不少，公交基本没有，教师（nuScenes Voxel）却把大货车多半判成了公交。
+
+### 0921 自动标注里的车
+
+5.11 的自动标注，35 个场景，每条轨迹取框尺寸的中位数：
+
+| 教师给的子类 | 轨迹 | 框 | 长度 p10 / 中位 / p90 (m) | 高度中位 (m) | 平均分中位 | 待审核 |
+|---|---|---|---|---|---|---|
+| car | 199 | 19,161 | 4.4 / 4.7 / 5.0 | 1.85 | 0.59 | 30% |
+| truck | 132 | 12,874 | 2.7 / 5.9 / 12.4 | 2.68 | 0.42 | 70% |
+| bus | 46 | 3,498 | 7.3 / 12.4 / 16.0 | 4.02 | 0.36 | 91% |
+
+- **"公交"其实是大货车。** 中位长 12.4 m、高 4.0 m、宽 3.0 m。教师的 truck 里 ≥ 10 m 的还有 26 条，也就是说同样的大货车，教师有时给 truck，有时给 bus。按教师的子类分 head 训练，两个 head 会拿到互相矛盾的目标。
+- **小车很干净。** 长 4.4–5.4 m，高全部低于 2.5 m。所有 ≥ 6.5 m 的车都高于 2.5 m。
+- **教师的 truck 里混着不像货车的东西。** 45 条长不到 5 m，其中 28 条长 2.4–3.3 m、宽 1.4–1.7 m、高约 2.2 m，几乎都不动：可能是电动三轮车、岗亭之类，要人看。
+
+### 做法
+
+1. **head 只留 car、truck**（`configs/dog/dog_centerpoint_{pp,voxel}_xt32_veh.py`，预设 `dog_pillar_veh` / `dog_voxel_veh`，各工具按权重里的 task 数自动识别）。bus head 没有数据，留着只会在微调里学成"不出框"；行人、骑行者的 head 去掉。两个 head 分别从 nuScenes 的 car、truck head 迁移：在 0921 上，教师 truck head 给 ≥ 10 m 货车的平均分中位是 0.53，bus head 给它判成公交的那些只有 0.36。少了 3 个 task 的 head，按第 12 节的测量（每个 task 的 head：Pillar 约 2.4 GMAC，Voxel 约 4.2 GMAC）估算，Pillar 约 31.7 GMAC（5 个 head 时 38.9），Voxel 约 63.3 GMAC（75.9）。
+2. **按尺寸分 head，不再用教师的子类**：长 ≥ 5.5 m 或高 ≥ 2.5 m 为 truck，否则为 car（`dog_perception/detection/boxes.py` 的 `vehicle_head`）。公交、挂车、工程车都归 truck。同样大小的车永远进同一个 head，审核时也不用再改 car / truck / bus。
+3. **拿不准的轨迹作忽略框**（第 ⑤ 步，`gt_ignore`）：既不当正样本，也不当负样本，评估时不计分。哪些算拿不准：
+   - 还标着待审核（平均分 < 0.5）、没人审过的轨迹；
+   - 没人审过、教师子类和尺寸对不上的（教师说 truck / bus，尺寸却是小车）；
+   - 审核时填了 `ignore` 的（SUSTechPOINTS 里 attribute 写 `ignore`）。
+
+   以前是把待审核轨迹直接丢掉（`--skip-review`）。丢掉的如果是真车，训练时就成了"这里没有车"，正好和"车必须检出"相反：0921 的大货车 70–91% 都是待审核。
+4. **类平衡采样补回无车帧**：类平衡采样让 car、truck 各占一半，但会把不含车的帧全部排除，而 0921 训练集有一半的帧没有车。配置里 `empty_frames=0.25` 再补回相当于四分之一的无车帧，让网络也见到只有墙、树、行人的场景。
+5. **GT 采样**：car 2、truck 3（货车少）。其余（20 个 epoch、学习率、旋转缩放、`SweepPoseJitter`）和 5 个 head 的配置一样。
+6. **接口不变**：检测器输出的类别仍是 vehicle / pedestrian / cyclist，子类 car / truck 跟着输出。跟踪、预测、评估和 ROS 都不用改，只是不会出现行人和骑行者。以后要加回来：
+   - `labels.pkl` 里行人、骑行者的自动标注一直保留着；
+   - 配置里加 pedestrian、cyclist 两个 task，`convert_nusc_ckpt.py` 按配置里的 task 从 nuScenes 迁移；
+   - 审核行人和骑行者，再训练。
+
+### 按这个规则，0921 未审核的自动标注能进训练的车
+
+按场景划分（`data/survey/split/split.csv`），跳过位姿不可靠的帧：
+
+| | car 正样本 | car 忽略 | truck 正样本 | truck 忽略 |
+|---|---|---|---|---|
+| 训练（25 个场景，7,311 帧） | 121 条轨迹 / 12,902 框 | 79 / 4,422 | 13 / 1,668 | 56 / 4,084 |
+| 验证（10 个场景，2,874 帧） | 18 / 3,043 | 35 / 3,055 | 18 / 3,215 | 37 / 3,144 |
+
+其中 4,261 个框是因为"教师子类和尺寸对不上"被忽略的。不审核的话，训练集里 truck 的正样本只有 13 条轨迹，truck head 基本还是迁移来的样子。所以：
+
+### 审核只看车
+
+要人定的轨迹（表里 `train_as = ignore`）：训练集 135 条，验证集 72 条。原来所有类别要审 718 条。
+
+- **按轨迹**（训练集和验证集都做）：
+  ```bash
+  python tools/dog/review_labels.py table --classes vehicle --labels data/labels/$r/labels.pkl \
+      --out data/labels/$r/labels_tracks_vehicle.csv
+  python tools/dog/review_labels.py mcap --vehicles-only --labels data/labels/$r/labels.pkl \
+      --frames data/runs/$r/frames --results data/runs/$r/voxel/results.pkl
+  ```
+  表里只有车，要定的排在前面，带 `length_m`、`height_m`。每行：是车填 `ok`，不是车填 `drop`，看不清填 `ignore`（留空效果一样）。朝向反了加 `+flip`，停着的车加 `+static`。不用改 car / truck / bus，导出按尺寸分。
+- **逐框**（只做验证集）：`sustechpoints_convert.py export --vehicles-only ... --every 5`，补漏标的车、调框。导回的 `labels_sustech.pkl` 只有车；以后做行人、骑行者时，验证集要从 `labels.pkl` 重新导出逐框审核。
+- **先定一条规则**：电动三轮车、老年代步车、停着的挂车厢算不算"车"。定下来之前，标 `ignore`。
+
+### 训练和评估
+
+服务器上的步骤见 [BAG_SPLIT.md](BAG_SPLIT.md) 5.13（先用未审核的自动标注跑通一版，v0）和 5.14（审核后正式训练，v1）。要点：
+
+```bash
+python tools/dog/convert_nusc_ckpt.py --src work_dirs/pretrained/nusc_voxel.pth --dst work_dirs/dog_voxel_veh_init.pth \
+    --config configs/dog/dog_centerpoint_voxel_xt32_veh.py
+python tools/dog/export_dataset.py $REC --val-recordings $VAL --classes vehicle --out data/dog_veh --gt-db
+python tools/train.py configs/dog/dog_centerpoint_voxel_xt32_veh.py --work_dir data/train/dog_voxel_veh_v0
+python tools/dist_test.py configs/dog/dog_centerpoint_voxel_xt32_veh.py --work_dir data/train/dog_voxel_veh_v0/eval \
+    --checkpoint data/train/dog_voxel_veh_v0/latest.pth
+python tools/dog/compare_detectors.py --classes vehicle --labels <验证场景的标签> --results teacher=... v0=...
+```
+
+- 迁移后、微调前，两个 head 的输出和 nuScenes 模型的 car、truck head 一样：0921_164127_s005 的一帧上（Pillar，分数 ≥ 0.2），车辆模型的 2 个框在 nuScenes 模型里都有、中心完全重合；nuScenes 模型多出的 1 个来自 construction_vehicle 通道（迁移只取 truck 通道）。
+- 评估只算车（`merged/vehicle`，`compare_detectors.py --classes vehicle`），忽略框不计分。重点看召回（分距离段 AP、上报阈值处的召回），其次是框（ATE、ASE、AOE）。上报阈值（现在 vehicle 0.35）要按验证集重新定。
+- 验证集没有逐框审核时，标签就是教师给的，对教师有利，只能说明训练没跑坏；要不要替换线上模型，看审核过的验证集。

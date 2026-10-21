@@ -219,7 +219,7 @@ const TREE = {
       c: [
         T("输出", "`<场景>_review.mcap`", "标签、点云和教师原始框（灰色），在 Foxglove 里看。"),
         T("人工", "填 action：ok / drop / 类别 / car·truck·bus / flip / static", "ok 只清 review；drop 删掉轨迹（或 from–to 一段）；类别和子类改 label、subclass；flip 把 yaw 加 180°；static 速度置零、位置和朝向固定。可用 + 组合，如 cyclist+flip。"),
-        T("输出", "`labels_reviewed.pkl`", "格式同 labels.pkl。改过的框 review = False、reviewed = True；仍标 review 的在导出时用 --skip-review 丢掉。"),
+        T("输出", "`labels_reviewed.pkl`", "格式同 labels.pkl。改过的框 review = False、reviewed = True；动作 ignore 加 ignore = True。仍标 review 的在导出时默认作忽略框（--skip-review 则丢掉）。"),
       ] },
     { side: "R", f: "review", k: "stage", t: "⑥ 框级审核", s: "SUSTechPOINTS",
       d: "逐框精修，并能补上漏标的物体。验证集场景建议都走这一步。",
@@ -232,8 +232,8 @@ const TREE = {
       d: "每个场景给一对 run 目录和 labels 文件（优先 labels_sustech.pkl，否则 labels_reviewed.pkl），按录制分训练 / 验证。",
       c: [
         T("处理", "D 系 → 网络系 M", "x_M = Rz(+90°)·x_D，z_M = z_D − 1.84 m：变成虚拟 nuScenes 雷达，沿用预训练模型的 z 先验。点云和框都这样转。"),
-        T("处理", "框 → det3d [x,y,z,w,l,h,vx,vy,r]", "r = −yaw − π/2。类名用 subclass（car/truck/bus/pedestrian/cyclist）；旧标签没有子类时按尺寸猜。--skip-review 丢掉仍待审核的框。"),
-        T("输出", "`infos_train.pkl` / `infos_val.pkl`", "每帧：token, lidar_path, gt_boxes (M,9), gt_names, sequence, timestamp。"),
+        T("处理", "框 → det3d [x,y,z,w,l,h,vx,vy,r]", "r = −yaw − π/2。类名用 subclass（car/truck/bus/pedestrian/cyclist）；旧标签没有子类时按尺寸猜。--classes vehicle：只导出车，按尺寸分 car/truck（长 ≥ 5.5 m 或高 ≥ 2.5 m 为 truck）。仍待审核、审核标 ignore、子类与尺寸不符的框作忽略框（不当物体也不当背景）。"),
+        T("输出", "`infos_train.pkl` / `infos_val.pkl`", "每帧：token, lidar_path, gt_boxes (M,9), gt_names, gt_ignore, sequence, timestamp。"),
         T("输出", "`lidar/<场景>/<stamp>.npy`", "(N,5) float32 [x, y, z, intensity, dt]，M 系。"),
         T("输出", "`gt_database_5sweeps_withvelo/`、`dbinfos_train_*.pkl`", "--gt-db：每个训练框内的点（减去框中心）存成 .bin，dbinfos 按类记录路径、框、点数，给 GT 采样增强用。"),
       ] },

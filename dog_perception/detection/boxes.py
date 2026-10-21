@@ -64,6 +64,20 @@ def subclass_from_size(length, height):
     return "car"
 
 
+# Vehicle-only models (configs/dog/*_veh.py) have two heads, car and truck, assigned by box size so
+# every head sees one consistent size range. Buses, trailers and construction vehicles train the
+# truck head. On 0921 the teacher's car tracks are all < 5.4 m long and < 2.5 m high, and every
+# vehicle >= 6.5 m long is >= 2.5 m high (docs/DOG_FINETUNE.md, section 13).
+TRUCK_MIN_LENGTH = 5.5
+TRUCK_MIN_HEIGHT = 2.5
+
+
+def vehicle_head(length, height):
+    """Head of a vehicle box in the vehicle-only layout: 'truck' when >= 5.5 m long or >= 2.5 m
+    high, else 'car'."""
+    return "truck" if length >= TRUCK_MIN_LENGTH or height >= TRUCK_MIN_HEIGHT else "car"
+
+
 @dataclass
 class Detections:
     boxes: np.ndarray = field(default_factory=lambda: np.zeros((0, 7)))        # (N, 7) standard

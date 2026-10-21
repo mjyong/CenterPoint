@@ -102,7 +102,8 @@ def checkpoint_arch(path):
     """Preset name from the parameter names of a det3d checkpoint: 'pillar' / 'voxel' for the
     nuScenes models (6 head tasks), 'dog_pillar' / 'dog_voxel' for the fine-tuned dog models
     (5 tasks: car, truck, bus, pedestrian, cyclist), 'dog_pillar_3cls' / 'dog_voxel_3cls' for the
-    older 3-task ones (vehicle, pedestrian, cyclist), None if unknown."""
+    older 3-task ones (vehicle, pedestrian, cyclist), 'dog_pillar_veh' / 'dog_voxel_veh' for the
+    vehicle-only ones (2 tasks: car, truck), None if unknown."""
     keys = list(_load_state_dict(path).keys())
     if any(k.startswith("reader.pfn_layers") for k in keys):
         arch = "pillar"
@@ -111,7 +112,7 @@ def checkpoint_arch(path):
     else:
         return None
     tasks = {k.split(".")[2] for k in keys if k.startswith("bbox_head.tasks.")}
-    return {5: "dog_" + arch, 3: "dog_%s_3cls" % arch}.get(len(tasks), arch)
+    return {5: "dog_" + arch, 3: "dog_%s_3cls" % arch, 2: "dog_%s_veh" % arch}.get(len(tasks), arch)
 
 
 def check_checkpoint(net, path, arch=""):

@@ -210,6 +210,8 @@ class LoadPointCloudAnnotations(object):
                 "boxes": gt_boxes,
                 "names": np.asarray(info["gt_names"]),
             }
+            if "gt_ignore" in info:     # uncertain labels: no loss either way (AssignLabel)
+                res["lidar"]["annotations"]["ignore"] = np.asarray(info["gt_ignore"], dtype=bool).reshape(-1)
         elif res["type"] == 'WaymoDataset' and "gt_boxes" in info:
             res["lidar"]["annotations"] = {
                 "boxes": info["gt_boxes"].astype(np.float32),

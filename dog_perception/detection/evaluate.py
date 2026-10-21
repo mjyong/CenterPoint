@@ -7,6 +7,12 @@ which is where CenterPoint-Pillar and -Voxel differ most on a 32-beam lidar.
 True positives at 2 m also give nuScenes' error metrics: ATE (center), ASE
 (1 - IoU of the boxes aligned on center and heading), AOE (heading, rad) and
 AVE (velocity).
+
+Ground truth may carry an ``ignore`` mask (uncertain labels): those boxes are
+not counted, and a prediction that matches no other box but lies on one
+(within the distance threshold of its center, or inside its footprint
+grown by 0.5 m) is dropped instead of counted as a false positive, like
+KITTI's DontCare.
 """
 import numpy as np
 
@@ -33,12 +39,29 @@ def _ap(tp, n_gt):
     return float(np.sum((rec - r_prev) * prec))
 
 
+def _ignored(g):
+    ign = g.get("ignore")
+    return np.zeros(len(g["labels"]), dtype=bool) if ign is None else np.asarray(ign, dtype=bool)
+
+
+def _on_ignore(xy, boxes, thr, margin=0.5):
+    """Whether a point lies within ``thr`` of a box center or inside its BEV footprint grown by ``margin``."""
+    if len(boxes) == 0:
+        return False
+    d = xy - boxes[:, :2]
+    if np.any(np.hypot(d[:, 0], d[:, 1]) <= thr):
+        return True
+    c, s = np.cos(boxes[:, 6]), np.sin(boxes[:, 6])
+    u, v = c * d[:, 0] + s * d[:, 1], -s * d[:, 0] + c * d[:, 1]
+    return bool(np.any((np.abs(u) <= boxes[:, 3] / 2 + margin) & (np.abs(v) <= boxes[:, 4] / 2 + margin)))
+
+
 def _match(frames_pred, frames_gt, cls, thr, rng_bin=None):
     preds = []
     n_gt = 0
     gt_used = []
     for f, (p, g) in enumerate(zip(frames_pred, frames_gt)):
-        gm = g["labels"] == cls
+        gm = (g["labels"] == cls) & ~_ignored(g)
         pm = p["labels"] == cls
         if rng_bin is not None:
             gr = np.hypot(g["boxes"][:, 0], g["boxes"][:, 1])
@@ -54,26 +77,25 @@ def _match(frames_pred, frames_gt, cls, thr, rng_bin=None):
     for s, f, i in preds:
         g, p = frames_gt[f], frames_pred[f]
         free = np.nonzero(~gt_used[f])[0]
-        if len(free) == 0:
+        d = np.linalg.norm(g["boxes"][free, :2] - p["boxes"][i, :2], axis=1)
+        j = int(np.argmin(d)) if len(free) else -1
+        if j < 0 or d[j] > thr:
+            if _on_ignore(p["boxes"][i, :2], g["boxes"][_ignored(g)], thr):
+                continue        # on an uncertain label: neither TP nor FP
             tp.append(0)
             continue
-        d = np.linalg.norm(g["boxes"][free, :2] - p["boxes"][i, :2], axis=1)
-        j = int(np.argmin(d))
-        if d[j] <= thr:
-            gt_used[f][free[j]] = True
-            tp.append(1)
-            e = {"trans": d[j]}
-            gb, pb = g["boxes"][free[j]], p["boxes"][i]
-            if len(gb) >= 7 and len(pb) >= 7:
-                e["scale"] = scale_error(gb[3:6], pb[3:6])
-                e["orient"] = float(abs(wrap_angle(pb[6] - gb[6])))
-            if "velocities" in g and "velocities" in p:
-                gv = g["velocities"][free[j]]
-                if np.all(np.isfinite(gv)):
-                    e["vel"] = float(np.linalg.norm(gv - p["velocities"][i]))
-            errs.append(e)
-        else:
-            tp.append(0)
+        gt_used[f][free[j]] = True
+        tp.append(1)
+        e = {"trans": d[j]}
+        gb, pb = g["boxes"][free[j]], p["boxes"][i]
+        if len(gb) >= 7 and len(pb) >= 7:
+            e["scale"] = scale_error(gb[3:6], pb[3:6])
+            e["orient"] = float(abs(wrap_angle(pb[6] - gb[6])))
+        if "velocities" in g and "velocities" in p:
+            gv = g["velocities"][free[j]]
+            if np.all(np.isfinite(gv)):
+                e["vel"] = float(np.linalg.norm(gv - p["velocities"][i]))
+        errs.append(e)
     return np.asarray(tp), n_gt, errs
 
 
@@ -96,7 +118,7 @@ def evaluate_detections(frames_pred, frames_gt, class_names, dist_thresholds=(0.
                     if v:
                         r[metric] = float(np.mean(v))
         r["mAP"] = float(np.nanmean(aps)) if not np.all(np.isnan(aps)) else float("nan")
-        r["num_gt"] = int(sum(int((g["labels"] == c).sum()) for g in frames_gt))
+        r["num_gt"] = int(sum(int(((g["labels"] == c) & ~_ignored(g)).sum()) for g in frames_gt))
         for lo, hi in range_bins:
             tp, n_gt, _ = _match(frames_pred, frames_gt, c, 2.0, (lo, hi))
             r["AP@2.0[%d-%dm]" % (lo, hi)] = _ap(tp, n_gt)

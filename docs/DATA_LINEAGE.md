@@ -406,10 +406,13 @@ mindmap
 | `car` / `truck` / `bus` | `label = vehicle`，`subclass` 改成对应子类 |
 | `flip` | `box[6]`（yaw）加 180° |
 | `static` | 速度置零，位置和朝向固定为一个值 |
+| `ignore` | 加上 `ignore = True`：导出时作忽略框（不当物体也不当背景，评估不计分） |
 
 几个 action 可以用 `+` 组合，例如 `cyclist+flip`。凡是 `drop` 以外的动作，都会把 `review` 清掉，并加上 `reviewed = True`。
 
-审核后仍标着 `review` 的轨迹，在导出时用 `--skip-review` 丢掉。这一步只能改已有的轨迹，不能新增漏掉的物体。
+审核后仍标着 `review` 的轨迹，导出时默认作忽略框（`--review-policy ignore`）；`--skip-review` 则丢掉。这一步只能改已有的轨迹，不能新增漏掉的物体。
+
+`table --classes vehicle` 写只有车的表（`labels_tracks_vehicle.csv`），多出的列：`train_as`（导出时的去向：car / truck / ignore）、`length_m`、`height_m`。
 
 样例结果：静止 bag 删掉 1 条，运动 bag 删掉 3 条。
 
@@ -417,7 +420,7 @@ mindmap
 
 **`export`**：把标签和点云写成 SUSTechPOINTS 的场景 `third_party/SUSTechPOINTS/data/<场景>/`，`--every 5` 表示 10 Hz 里只取 2 Hz。
 - `lidar/<帧名>.pcd`：D 系点云，整体下移 1.8 m（这个工具假定雷达离地 1.8 m），强度缩放到 0–1；帧名是微秒时间戳。
-- `label/<帧名>.json`：每个框写成 `{obj_id（= track_id）, obj_type（Car/Truck/Bus/Pedestrian/BicycleRider）, obj_attr（待审核的写 "review"）, psr: {position, scale（l,w,h）, rotation.z（yaw）}}`。
+- `label/<帧名>.json`：每个框写成 `{obj_id（= track_id）, obj_type（Car/Truck/Bus/Pedestrian/BicycleRider）, obj_attr（待审核的写 "review"，忽略的写 "ignore"）, psr: {position, scale（l,w,h）, rotation.z（yaw）}}`。`--vehicles-only` 只导出车。
 - `dog_meta.json`：记下 SUSTechPOINTS 不保存的信息：每帧的 `stamp`、`T_world_det`、分数、z 偏移。
 
 **在 SUSTechPOINTS 里**：可以挪框、改尺寸、改朝向、改类型、删框，**也可以新增漏标的物体**。
@@ -426,7 +429,7 @@ mindmap
 - z 移回原位；
 - 类型映射回类别和子类：Car / Van → car；Truck 和各种工程车 → truck；Bus / Tram / LongVehicle → bus；
 - 中心没被挪动的框，保留导出时的速度；挪过的框和新加的框，按同一 `obj_id` 在 W 系的标注中心重新算速度（±0.5 s 差分，低于静止阈值的置零）；
-- 所有框都是 `review = False`、`reviewed = True`；
+- 所有框都是 `review = False`、`reviewed = True`；`obj_attr` 里有 `ignore` 的框加 `ignore = True`；
 - 只包含导出的那些帧（`--every 5` 就是 2 Hz）。
 
 ---
@@ -438,8 +441,9 @@ mindmap
 **处理**（逐帧，只处理 labels 里有、`frames/` 里也有的帧）：
 - 点云：`frames/<stamp>.npy` 从 D 系转到 M 系（`ModelFrame.points_to_model`：绕 z 转 +90°，z 减 1.84 m），存成 float32；
 - 框：从 D 系转到 M 系，再写成 det3d 格式 `[x, y, z, w, l, h, vx, vy, r]`（`r = −yaw − π/2`），float32；
-- 类名：默认是检测头的 5 类，车辆用 `subclass`。旧标签没有子类时按尺寸猜（长 ≥ 10 m 为 bus，长 ≥ 6.5 m 或高 ≥ 2.8 m 为 truck，否则 car），并打印数量提醒。`--classes coarse` 输出 3 类，给旧的 `*_3cls` 配置用；
-- `--skip-review`：丢掉仍标着 `review` 的框；
+- 类名：默认是检测头的 5 类，车辆用 `subclass`。旧标签没有子类时按尺寸猜（长 ≥ 10 m 为 bus，长 ≥ 6.5 m 或高 ≥ 2.8 m 为 truck，否则 car），并打印数量提醒。`--classes coarse` 输出 3 类，给旧的 `*_3cls` 配置用。`--classes vehicle` 只导出车，按尺寸分 car / truck（长 ≥ 5.5 m 或高 ≥ 2.5 m 为 truck），给只检车辆的 `*_veh` 配置用；
+- 忽略框（`gt_ignore`）：审核时标了 `ignore` 的框；仍标着 `review` 的框（`--review-policy ignore`，默认；`drop` 或 `--skip-review` 丢掉，`keep` 当正样本）；`--classes vehicle` 时，还有没审核过、教师子类和尺寸对不上的车；
+- 位姿不可靠的帧（`pose_bad`）跳过；`--jobs` 个场景同时导出；
 - 按录制分训练 / 验证，不按帧随机分。
 
 **输出**：`--out` 目录。训练配置默认读 `data/dog`；导到别的目录时，改配置里的 `data_root` 等路径，或者建软链接。
@@ -447,8 +451,8 @@ mindmap
 | 文件 | 内容 |
 |---|---|
 | `lidar/<场景>/<stamp>.npy` | (N,5) float32 `[x, y, z, intensity, dt]`，M 系 |
-| `infos_train.pkl`、`infos_val.pkl` | 列表，每帧一个 dict：`token`（`<场景>_<stamp>`）、`lidar_path`（相对路径）、`gt_boxes` (M,9)、`gt_names` (M,)、`sequence`、`timestamp` |
-| `gt_database_5sweeps_withvelo/<类>/<token>_<类>_<i>.bin` | （`--gt-db`）每个训练框内的点，float32 (K,5)，坐标减去框中心 |
+| `infos_train.pkl`、`infos_val.pkl` | 列表，每帧一个 dict：`token`（`<场景>_<stamp>`）、`lidar_path`（相对路径）、`gt_boxes` (M,9)、`gt_names` (M,)、`gt_ignore` (M,) bool、`sequence`、`timestamp` |
+| `gt_database_5sweeps_withvelo/<类>/<token>_<类>_<i>.bin` | （`--gt-db`）每个训练框（忽略框除外）内的点，float32 (K,5)，坐标减去框中心 |
 | `dbinfos_train_5sweeps_withvelo.pkl` | 按类分组的列表：`name, path, image_idx, gt_idx, box3d_lidar, num_points_in_gt, difficulty, group_id`，给 GT 采样增强用 |
 
 样例结果：训练 28 帧、验证 27 帧；框数 bus 111、car 127、cyclist 51、pedestrian 83、truck 106。

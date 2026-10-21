@@ -85,6 +85,8 @@ def create_groundtruth_database(
         annos = sensor_data["lidar"]["annotations"]
         gt_boxes = annos["boxes"]
         names = annos["names"]
+        if "ignore" in annos:       # uncertain labels are not pasted into other frames
+            gt_boxes, names = gt_boxes[~annos["ignore"]], names[~annos["ignore"]]
 
         if dataset_class_name == 'WAYMO':
             # waymo dataset contains millions of objects and it is not possible to store

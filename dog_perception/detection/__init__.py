@@ -13,6 +13,8 @@ PRESET_CONFIGS = {
     "dog_voxel": "configs/dog/dog_centerpoint_voxel_xt32.py",
     "dog_pillar_3cls": "configs/dog/dog_centerpoint_pp_xt32_3cls.py",    # older: vehicle, pedestrian, cyclist
     "dog_voxel_3cls": "configs/dog/dog_centerpoint_voxel_xt32_3cls.py",
+    "dog_pillar_veh": "configs/dog/dog_centerpoint_pp_xt32_veh.py",      # vehicles only: car, truck
+    "dog_voxel_veh": "configs/dog/dog_centerpoint_voxel_xt32_veh.py",
 }
 
 
