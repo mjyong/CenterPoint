@@ -253,7 +253,7 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
 - **点云**：默认导出 5 帧拼接（模型的输入），远处稀疏的物体更容易看清；运动物体会拖影，框要放在拖影最前端（当前帧）。`--current-sweep` 只导当前帧。强度除以 255。
 - **帧名**：时间戳的微秒数（16 位数字，按名字排序就是时间顺序）。`dog_meta.json` 保存每帧的时间戳、`T_world_det` 和自动标注的速度、分数，导入时要用，不要删。
 - **框**：position 为框中心，scale 为（长、宽、高），rotation.z 为航向；导入时忽略 rotation.x / y。
-- **类别**：车按子类导出为 Car / Truck / Bus（没有子类的车导出为 Car），行人为 Pedestrian，骑行者为 BicycleRider；待审核的轨迹 `obj_attr` 为 `review`，在工具里会显示出来。导入时按 `TYPE_TO_SUBCLASS` 映射：Car、Van、PoliceCar、TourCar 为 car；Truck、ConcreteTruck 和工程机械（Excavator、ForkLift、Crane、RoadRoller、Bulldozer）为 truck（皮卡没有单独的类型，选 Truck，和 nuScenes 一致）；Bus、Tram、LongVehicle 为 bus（和 nuScenes 一样，工程车归 truck，挂车这类长车归 bus）；三者都是 vehicle。Pedestrian、RoadWorker、Child 为 pedestrian；BicycleRider、MotorcyleRider、ScooterRider 以及停着的 Bicycle、Motorcycle、Scooter 为 cyclist（和 nuScenes 的映射一致）。其他类型（Cone、TrafficBarrier 等）跳过并计数；`--type-map Trimotorcycle=car` 可以补充。**标车的时候把类型选对**（Car / Truck / Bus），它决定训练哪个 head。
+- **类别**：车按子类导出为 Car / Truck / Bus（没有子类的车导出为 Car），行人为 Pedestrian，骑行者为 BicycleRider；待审核的轨迹 `obj_attr` 为 `review`，在工具里会显示出来。导入时按 `TYPE_TO_SUBCLASS` 映射：Car、Van、PoliceCar、TourCar 为 car；Truck、ConcreteTruck 和工程机械（Excavator、ForkLift、Crane、RoadRoller、Bulldozer）为 truck（皮卡没有单独的类型，选 Truck，和 nuScenes 一致）；Bus、Tram、LongVehicle 为 bus（和 nuScenes 一样，工程车归 truck，挂车这类长车归 bus）；三者都是 vehicle。Pedestrian、RoadWorker、Child 为 pedestrian；BicycleRider、MotorcyleRider、ScooterRider 以及停着的 Bicycle、Motorcycle、Scooter 为 cyclist（和 nuScenes 的映射一致），三轮车 Trimotorcycle、FreightTricycle 也是 cyclist（小三轮车、代步车不算车辆，2026-10-21）。其他类型（Cone、TrafficBarrier 等）跳过并计数；`--type-map` 可以补充或改写。**标车的时候把类型选对**（Car / Truck / Bus），它决定训练哪个 head。
 - **轨迹号**：数字 `obj_id`（自动标注的轨迹）原样保留；工具里新建、不是数字的 ID 分配新号。
 - **速度**：框没被挪动（中心偏移 ≤ 5 cm）就保留自动标注的速度，静止物体的处理不受影响；挪动过或新加的框，用同一 `obj_id` 在世界系的中心差分（±0.5 s）重算，低于 0.2 m/s 置 0。所以要改一条轨迹的位置时，用批量模式把整条轨迹一起挪；只挪其中一帧，那几帧的速度会算出一个跳变。
 
@@ -395,7 +395,7 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
   ```
   表里只有车，要定的排在前面，带 `length_m`、`height_m`。每行：是车填 `ok`，不是车填 `drop`，看不清填 `ignore`（留空效果一样）。朝向反了加 `+flip`，停着的车加 `+static`。不用改 car / truck / bus，导出按尺寸分。
 - **逐框**（只做验证集）：`sustechpoints_convert.py export --vehicles-only ... --every 5`，补漏标的车、调框。导回的 `labels_sustech.pkl` 只有车；以后做行人、骑行者时，验证集要从 `labels.pkl` 重新导出逐框审核。
-- **先定一条规则**：电动三轮车、老年代步车、停着的挂车厢算不算"车"。定下来之前，标 `ignore`。
+- **规则（2026-10-21 定）**：小三轮车、老年代步车不算车辆，算骑行者，动作填 `cyclist`；单独停着的挂车厢算车辆（`ok`，按尺寸进 truck）。SUSTechPOINTS 里三轮车选 Trimotorcycle / FreightTricycle（导回为 cyclist），挂车厢选 Truck 或 LongVehicle。
 
 ### 训练和评估
 

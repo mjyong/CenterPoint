@@ -32,6 +32,14 @@ def test_presets_override_with_the_declared_types():
     assert np.allclose(ins_lever_arm(kygi), KYGI_INS_LEVER_ARM)                       # antennas swapped (0921)
     assert np.allclose(ins_lever_arm(dict(kygi, ins_azimuth_offset_deg=0.0)), KYGI_IMU_IN_BODY)   # fixed
     assert np.allclose(ins_lever_arm(dict(kygi, ins_lever_arm=[0.1, -0.2, 0.0])), [0.1, -0.2, 0.0])
+    # the front Mid-360: its time format, noise tags, mounting and self filter, antennas fixed
+    from dog_perception.lidars import LIDARS
+    mid = node_parameters("kygi_mid360")
+    assert mid["time_mode"] == "absolute_ns" and mid["noise_tag_mask"] == 3 and mid["ins_azimuth_offset_deg"] == 0.0
+    cfg = preprocess_config(mid)
+    assert cfg.self_filter.body_boxes == tuple(tuple(b) for b in LIDARS["mid360"].self_filter["body_boxes"])
+    assert np.allclose(cfg.T_body_lidar[:3, :3] @ [0.304, -0.025, -0.952], [0, 0, 1], atol=1e-3)   # ground normal -> up
+    assert preprocess_config(kygi).self_filter == preprocess_config(node_parameters("")).self_filter
     with pytest.raises(ValueError):
         node_parameters("spot")
 

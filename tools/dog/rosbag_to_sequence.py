@@ -17,8 +17,18 @@ as on 0921, 0 once fixed; ``auto`` picks the one that makes the robot walk forwa
 the sequence is marked for ground levelling (see ``dog_perception/inspvax.py``), and the base height
 is the median ground height over every ``--base-height-every``-th sweep of the sequence.
 Per-point time: Hesai ROS driver 2.0 publishes an absolute float64
-``timestamp`` field (``--time-mode absolute``); drivers that publish offsets
-from the header stamp use ``relative`` (seconds) or ``relative_ns``.
+``timestamp`` field (``--time-mode absolute``), livox_ros_driver2 absolute
+nanoseconds (``absolute_ns``); drivers that publish offsets from the header
+stamp use ``relative`` (seconds) or ``relative_ns``.
+
+``--lidar`` picks the kygi665 lidar preset (``dog_perception/lidars.py``): topic, time format,
+noise tags, mounting and self filter. ``xt32`` is the Hesai on top (0921), ``mid360`` the Livox at
+the front (1016; mounting estimated from the data until calibrated, marked in meta.json); without
+``--lidar`` the preset whose topic is ``--lidar-topic`` is used, else ``xt32`` with INSPVAX.
+Camera streams (``--camera-topics``, default every CompressedVideo / CompressedImage topic) are
+copied unchanged (CDR, ROS 2 message definitions as schemas) into ``<seq>/cameras.mcap`` for the
+scene's time window, from ``--camera-pad`` seconds before it so the video starts on a key frame;
+``run_sequence.py`` and ``review_labels.py mcap`` put them next to the cloud and the boxes.
 
 Long bags: scans are written as they are read (memory stays small). With
 ``--segments`` (the ``segments.csv`` of ``tools/dog/bag_survey.py``, rows with
@@ -45,6 +55,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from dog_perception.geometry import make_T, quat_to_R, rot_zyx, transform_points  # noqa: E402
 from dog_perception.io import SequenceWriter, odom_row  # noqa: E402
+from dog_perception.lidars import LIDARS, register_compressed_video  # noqa: E402
 from dog_perception.preprocess import estimate_base_height, median_base_height  # noqa: E402
 from dog_perception.ros_utils import scan_from_msg, stamp_of  # noqa: E402
 
@@ -57,6 +68,9 @@ class Target:
         self.writer = None
         self.heights = []        # base height seen by every k-th sweep
         self.pos_types = {}
+        self.cams = None         # mcap Writer of <out_dir>/cameras.mcap
+        self.cam_channels = {}
+        self.cam_count = 0
 
     def wants_scan(self, t):
         full = self.max_scans is not None and self.writer is not None and self.writer.n_scans >= self.max_scans
@@ -69,6 +83,27 @@ class Target:
         if self.writer is None:
             self.writer = SequenceWriter(self.out_dir, self.pool)
         return self.writer
+
+    def add_camera(self, conn, msgdef, t, raw):
+        if self.cams is None:
+            from mcap.writer import CompressionType, Writer
+
+            os.makedirs(self.out_dir, exist_ok=True)
+            self._cam_fh = open(os.path.join(self.out_dir, "cameras.mcap"), "wb")
+            self.cams = Writer(self._cam_fh, compression=CompressionType.NONE)    # H.264 / JPEG: nothing to gain
+            self.cams.start(profile="ros2", library="tools/dog/rosbag_to_sequence.py")
+        ch = self.cam_channels.get(conn.topic)
+        if ch is None:
+            sid = self.cams.register_schema(conn.msgtype, "ros2msg", msgdef.encode())
+            ch = self.cam_channels[conn.topic] = self.cams.register_channel(conn.topic, "cdr", sid)
+        ns = int(round(t * 1e9))
+        self.cams.add_message(ch, ns, bytes(raw), ns)
+        self.cam_count += 1
+
+    def close_cameras(self):
+        if self.cams is not None:
+            self.cams.finish()
+            self._cam_fh.close()
 
 
 def read_segments(path, only=None):
@@ -83,13 +118,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bag", required=True, help="ROS2 bag directory or ROS1 .bag")
     ap.add_argument("--out", required=True, help="sequence directory (with --segments: the parent of one per scene)")
-    ap.add_argument("--lidar-topic", required=True)
+    ap.add_argument("--lidar", default=None, choices=sorted(LIDARS),
+                    help="kygi665 lidar preset (dog_perception/lidars.py); default: from --lidar-topic")
+    ap.add_argument("--lidar-topic", default=None, help="default: the --lidar preset's topic")
     ap.add_argument("--imu-topic", required=True)
+    ap.add_argument("--camera-topics", nargs="*", default=["auto"],
+                    help="camera topics copied to <seq>/cameras.mcap; auto: every foxglove CompressedVideo / "
+                         "sensor_msgs CompressedImage topic; none: no cameras")
+    ap.add_argument("--camera-pad", type=float, default=1.5,
+                    help="[s] camera messages kept before each scene (H.264 needs a key frame to start)")
     ap.add_argument("--odom-topic", default=None, help="nav_msgs/Odometry. Omit when --inspvax-topic is set")
     ap.add_argument("--inspvax-topic", default=None,
                     help="kygi665_msgs/INSPVAX used as localization instead of odometry")
-    ap.add_argument("--time-field", default="timestamp")
-    ap.add_argument("--time-mode", default="absolute", choices=["absolute", "relative", "relative_ns"])
+    ap.add_argument("--time-field", default=None, help="default: the preset's (timestamp)")
+    ap.add_argument("--time-mode", default=None, choices=["absolute", "absolute_ns", "relative", "relative_ns"],
+                    help="default: the preset's (xt32: absolute, mid360: absolute_ns)")
     ap.add_argument("--odom-twist", default="none", choices=["none", "body", "world"],
                     help="how to read Odometry.twist (FAST-LIO leaves it empty -> none)")
     ap.add_argument("--extrinsic-t", type=float, nargs=3, default=[0.0, 0.0, 0.0])
@@ -119,17 +162,38 @@ def main():
     if not args.odom_topic and not args.inspvax_topic:
         ap.error("need --odom-topic or --inspvax-topic")
     kygi = bool(args.inspvax_topic)
+    if args.lidar is None:
+        args.lidar = next((k for k, v in LIDARS.items() if v.topic == args.lidar_topic), "xt32" if kygi else None)
+    preset = LIDARS.get(args.lidar)
+    if args.lidar_topic is None:
+        if preset is None:
+            ap.error("need --lidar-topic or --lidar")
+        args.lidar_topic = preset.topic
+    args.time_field = args.time_field or (preset.time_field if preset else "timestamp")
+    args.time_mode = args.time_mode or (preset.time_mode if preset else "absolute")
+    noise_mask = preset.noise_tag_mask if preset else 0
+    print("lidar %s on %s (time %s %s%s)" % (preset.name if preset else "generic", args.lidar_topic, args.time_field,
+                                              args.time_mode, ", noise tags 0x%02x dropped" % noise_mask if noise_mask else ""))
 
     from rosbags.highlevel import AnyReader
     from rosbags.typesys import Stores, get_typestore
 
-    from dog_perception.inspvax import (KYGI_AZIMUTH_OFFSET_DEG, KYGI_LIDAR_RPY, EnuOrigin, apply_lever_arm,
+    from dog_perception.inspvax import (KYGI_AZIMUTH_OFFSET_DEG, EnuOrigin, apply_lever_arm,
                                         default_lever_arm, forward_speed, gyro_from_kygi_imu, pose_from_inspvax,
                                         register_kygi, turn_heading)
 
+    provisional = False
     if args.extrinsic_rpy is None:
-        args.extrinsic_rpy = list(KYGI_LIDAR_RPY) if kygi else [0.0, 0.0, 0.0]
+        if preset is not None and (kygi or args.lidar != "xt32"):
+            args.extrinsic_rpy, provisional = list(preset.rpy), preset.provisional
+            if not any(args.extrinsic_t):
+                args.extrinsic_t = list(preset.t)
+        else:
+            args.extrinsic_rpy = [0.0, 0.0, 0.0]
     T_bl = make_T(rot_zyx(args.extrinsic_rpy[2], args.extrinsic_rpy[1], args.extrinsic_rpy[0]), args.extrinsic_t)
+    if provisional:
+        print("NOTE: %s mounting rpy %s is an estimate from the data (dog_perception/lidars.py); pass the "
+              "calibration with --extrinsic-rpy / --extrinsic-t when known" % (preset.name, args.extrinsic_rpy))
     est_h = args.estimate_base_height or kygi
 
     n_threads = min(8, os.cpu_count() or 1) if args.write_threads <= 0 else args.write_threads
@@ -155,6 +219,8 @@ def main():
     typestore = get_typestore(Stores.ROS2_HUMBLE)
     if args.inspvax_topic:
         register_kygi(typestore)
+    register_compressed_video(typestore)
+    cam_lo = min(args.camera_pad, 30.0)
 
     origin = None
     n_read = 0
@@ -168,14 +234,27 @@ def main():
         missing = topics - {c.topic for c in conns}
         if missing:
             raise SystemExit("topics not in bag: %s (have: %s)" % (missing, sorted({c.topic for c in reader.connections})))
-        for conn, _, raw in reader.messages(connections=conns):
+        cams = camera_connections(reader.connections, args.camera_topics)
+        msgdefs = {c.msgtype: typestore.generate_msgdef(c.msgtype, ros_version=2)[0] for c in cams}
+        cam_ids = {c.id for c in cams}
+        if cams:
+            print("cameras -> <seq>/cameras.mcap: %s" % ", ".join(c.topic for c in cams))
+        for conn, t_log, raw in reader.messages(connections=conns + cams):
+            if conn.id in cam_ids:
+                msg = reader.deserialize(raw, conn.msgtype)
+                ts_ = getattr(msg, "timestamp", None) or getattr(getattr(msg, "header", None), "stamp", None)
+                t_cam = ts_.sec + ts_.nanosec * 1e-9 if ts_ is not None else t_log * 1e-9
+                for t in targets:
+                    if t.t0 - cam_lo <= t_cam < t.t1 + args.pad:
+                        t.add_camera(conn, msgdefs[conn.msgtype], t_cam, raw)
+                continue
             if conn.topic == args.lidar_topic:
                 # cheap pre-check on the header stamp (scan start) before decoding the cloud
                 ht = _header_stamp(raw)
                 if ht is not None and not any(t.t0 - 0.5 <= ht < t.t1 + 0.5 for t in targets):
                     continue
                 msg = reader.deserialize(raw, conn.msgtype)
-                scan = scan_from_msg(msg, args.time_field, args.time_mode)
+                scan = scan_from_msg(msg, args.time_field, args.time_mode, noise_tag_mask=noise_mask)
                 if n_read == 0 and scan.point_times is None:
                     print("WARNING: no per-point time field '%s': deskew will be disabled for this data"
                           % args.time_field)
@@ -230,26 +309,44 @@ def main():
         rows = [np.asarray(t.writer.odom, np.float64).reshape(-1, 11) for t in targets if t.writer is not None]
         rows = np.concatenate(rows) if rows else np.zeros((0, 11))
         if args.azimuth_offset == "auto":
-            fwd = forward_speed(rows)               # rows were read with KYGI_AZIMUTH_OFFSET_DEG
+            fwd, how = forward_speed(rows), "> 0.5 m/s"     # rows were read with KYGI_AZIMUTH_OFFSET_DEG
+            if fwd is None:     # a slow recording: walking > 0.15 m/s for at least 2 s (turning in place
+                fwd, how = forward_speed(rows, 0.15, min_rows=200), "> 0.15 m/s, less certain"  # moves the INS sideways)
             az_off = KYGI_AZIMUTH_OFFSET_DEG if fwd is None or fwd >= 0 else (KYGI_AZIMUTH_OFFSET_DEG + 180.0) % 360
-            print("INS azimuth offset %.0f deg (%s; median forward speed %s m/s)" % (
+            print("INS azimuth offset %.0f deg (%s; median forward speed %s m/s%s)" % (
                 az_off, "antennas swapped as on 0921" if az_off == 180 else "antennas fixed",
-                "-" if fwd is None else "%+.2f" % fwd))
+                "-" if fwd is None else "%+.2f" % fwd, "" if fwd is None else " while moving " + how))
+            if fwd is None:
+                print("WARNING: the robot hardly moves; offset %.0f is the 0921 default. Pass --azimuth-offset as "
+                      "decided on the other recordings of the same day" % az_off)
         else:
             az_off = float(args.azimuth_offset)
         if args.ins_lever_arm is None:
-            args.ins_lever_arm = list(default_lever_arm(az_off))
+            if args.lidar == "xt32":
+                args.ins_lever_arm = list(default_lever_arm(az_off))
+            else:       # measured for the XT32 origin only; another lidar is another body origin
+                args.ins_lever_arm = [0.0, 0.0, 0.0]
+                print("NOTE: no INS lever arm known for the %s origin: 0 (pass --ins-lever-arm, the IMU centre "
+                      "in the body frame, once the lidar-to-IMU extrinsic is known)" % preset.name)
         print("INS lever arm %s m (body frame)" % args.ins_lever_arm)
 
     written = 0
     for t in targets:
+        t.close_cameras()
         if t.writer is None or t.writer.n_scans == 0:
             print("%s: no scans in [%.3f, %.3f) - skipped" % (t.name, t.t0, t.t1))
             continue
         if not t.writer.odom:
             print("%s: no localization rows (INS solution not good, or empty odom topic) - skipped" % t.name)
             continue
-        meta = dict(T_body_lidar=T_bl, base_height=args.base_height, lidar="XT32", source=str(args.bag))
+        meta = dict(T_body_lidar=T_bl, base_height=args.base_height, lidar=preset.name if preset else "generic",
+                    source=str(args.bag))
+        if provisional:
+            meta["extrinsic_provisional"] = True
+        if preset is not None and preset.self_filter:
+            meta["self_filter"] = preset.self_filter
+        if t.cam_count:
+            meta["cameras"] = sorted(t.cam_channels)
         if np.isfinite(t.t0) or np.isfinite(t.t1):
             meta["segment"] = dict(name=t.name, t_start=t.t0 if np.isfinite(t.t0) else None,
                                    t_end=t.t1 if np.isfinite(t.t1) else None, split=splits.get(t.name, ""))
@@ -276,11 +373,29 @@ def main():
         n_imu = len(t.writer.imu)
         t.writer.close(meta, odom=odom)
         written += 1
-        print("wrote %d scans, %d imu, %d odom -> %s" % (t.writer.n_scans, n_imu, len(odom), t.out_dir))
+        print("wrote %d scans, %d imu, %d odom%s -> %s" % (
+            t.writer.n_scans, n_imu, len(odom), ", %d camera messages" % t.cam_count if t.cam_count else "",
+            t.out_dir))
     if pool is not None:
         pool.shutdown()
     if not written:
         raise SystemExit("nothing written")
+
+
+CAMERA_TYPES = ("foxglove_msgs/msg/CompressedVideo", "sensor_msgs/msg/CompressedImage")
+
+
+def camera_connections(connections, topics):
+    """Bag connections of the camera topics: ``["auto"]`` = every CAMERA_TYPES topic, ``["none"]`` or
+    ``[]`` = none, else the named topics."""
+    if not topics or topics == ["none"]:
+        return []
+    if topics == ["auto"]:
+        return [c for c in connections if c.msgtype in CAMERA_TYPES]
+    missing = set(topics) - {c.topic for c in connections}
+    if missing:
+        raise SystemExit("camera topics not in bag: %s" % sorted(missing))
+    return [c for c in connections if c.topic in set(topics)]
 
 
 def _header_stamp(raw):

@@ -7,7 +7,8 @@ saves, per detector, everything the other tools need:
                                 tracks, predictions, timings
     <out>/<name>/track_log.npz  tracker log for train_predictor.py
     <out>/frames/*.npy          (--save-frames) preprocessed clouds for auto_label / export
-    <out>/<scene>_<first>.mcap  Foxglove view of the first detector (skip with --no-mcap)
+    <out>/<scene>_<first>.mcap  Foxglove view of the first detector (skip with --no-mcap), with the
+                                sequence's camera streams when it has them (cameras.mcap)
 
     python tools/dog/run_sequence.py --seq data/rec_001 --detectors pillar,voxel \
         --ckpt-pillar pp.pth --ckpt-voxel voxel.pth --out work_dirs/rec_001
@@ -27,7 +28,6 @@ from dog_perception.io import SequenceReader, pose_bad  # noqa: E402
 from dog_perception.mcap_viz import McapViz  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
 from dog_perception.prediction.dataset import TrackLogger  # noqa: E402
-from dog_perception.preprocess import DetFrameConfig, PreprocessConfig  # noqa: E402
 
 PRESETS = {
     "pillar": "configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py",
@@ -68,9 +68,7 @@ def main():
 
     reader = SequenceReader(args.seq)
     base_h = args.base_height if args.base_height is not None else reader.meta.get("base_height", 0.45)
-    pcfg = PreprocessConfig(T_body_lidar=reader.T_body_lidar, num_sweeps=args.num_sweeps,
-                            deskew=not args.no_deskew,
-                            det_frame=DetFrameConfig(base_height=base_h, **reader.meta.get("det_frame", {})))
+    pcfg = reader.preprocess_config(base_h, num_sweeps=args.num_sweeps, deskew=not args.no_deskew)
 
     names = args.detectors.split(",")
     dets = {n: CenterPointDetector(getattr(args, "config_" + n), getattr(args, "ckpt_" + n),
@@ -132,6 +130,9 @@ def main():
         lat = [r["timings"].get("network_ms", np.nan) for r in results[n][1:]]
         print("[%s] %d frames, network %.1f ms (median)" % (n, len(results[n]), np.nanmedian(lat) if lat else np.nan))
     if viz is not None:
+        if reader.cameras and results[names[0]]:      # the recording's cameras next to the boxes
+            n_cam = viz.copy_from(reader.cameras, results[names[0]][0]["stamp"] - 1.5, results[names[0]][-1]["stamp"])
+            print("mcap: %d camera messages from %s" % (n_cam, reader.cameras))
         viz.close()
         print("mcap %s  %d frames" % (mcap_path, viz.frames))
 

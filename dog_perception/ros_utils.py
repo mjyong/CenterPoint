@@ -27,19 +27,28 @@ def cloud_to_array(msg):
     return data
 
 
-def scan_from_msg(msg, time_field, time_mode, intensity_field="intensity"):
+def scan_from_msg(msg, time_field, time_mode, intensity_field="intensity", noise_tag_mask=0):
+    """``time_mode``: per-point ``time_field`` in absolute seconds (Hesai ROS driver 2.0), absolute
+    nanoseconds (``absolute_ns``, livox_ros_driver2), or seconds / nanoseconds after the header stamp
+    (``relative`` / ``relative_ns``). ``noise_tag_mask``: drop points whose ``tag`` field has any of
+    these bits set (Livox: 0x03 = the spatial-position noise confidence bits). Points at the origin
+    (no return) are always dropped."""
     arr = cloud_to_array(msg)
     xyz = np.stack([arr["x"], arr["y"], arr["z"]], axis=1).astype(np.float32)
     inten = arr[intensity_field].astype(np.float32) if intensity_field in arr.dtype.names else np.zeros(len(arr), np.float32)
     header_t = stamp_of(msg.header)
     if time_field in arr.dtype.names:
         t = arr[time_field].astype(np.float64)
-        if time_mode == "relative":
+        if time_mode == "absolute_ns":
+            t = t * 1e-9
+        elif time_mode == "relative":
             t = header_t + t
         elif time_mode == "relative_ns":
             t = header_t + t * 1e-9
     else:
         t = None
     ok = np.isfinite(xyz).all(axis=1) & (np.abs(xyz).sum(axis=1) > 0)
+    if noise_tag_mask and "tag" in arr.dtype.names:
+        ok &= (arr["tag"].astype(np.int64) & int(noise_tag_mask)) == 0
     return LidarScan(xyz=xyz[ok], intensity=inten[ok], point_times=None if t is None else t[ok],
                      stamp=None if t is not None else header_t)

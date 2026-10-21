@@ -125,6 +125,8 @@ mindmap
 | `/rte/rdap/rtk/imus/data_raw` | `sensor_msgs/Imu` | 100 Hz | 角速度（去畸变、位姿插值） |
 | `/rte/rdap/rtk/inspvax` | `kygi665_msgs/INSPVAX` | 100 Hz | 位置、航向、速度（位姿） |
 
+1016 的 bag 换成前置的 Livox Mid-360（`/robot/topic/rdap/front_point_cloud2`：x y z intensity tag line，`timestamp` 为绝对纳秒），没有 XT32，另有三个鱼眼相机（`/robot/topic/rdap/{front,left,right}_sensor_camera`，`foxglove_msgs/CompressedVideo`，H.264，1920×1536，24 Hz）。见 [BAG_SPLIT.md](BAG_SPLIT.md) 3.6。
+
 **两种时间**：bag 给每条消息记了写入时刻（log time），消息头里还有传感器给的时间戳（`header.stamp`）。下游所有处理都用 `header.stamp`。
 - 雷达：写入时刻比 `header.stamp` 晚约 0.105 s，因为 `header.stamp` 是一圈扫描的开始，转完一圈（0.1 s）才发出来。
 - IMU、INS：两者相差不到 1 ms。
@@ -261,13 +263,14 @@ mindmap
 | `imu.npy` | (M,4) float64 | `t, wx, wy, wz`：机身系角速度，rad/s |
 | `odom.npy` | (K,11) float64 | `t, x, y, z, qx, qy, qz, qw, vx, vy, vz`：W 系里机身原点的位置（ENU，m）、姿态（只有航向）、速度（东、北、天，m/s）。跑过 `refine_poses.py` 后，东、北坐标、航向、横滚俯仰（激光里程计）和速度换成融合后的值 |
 | `odom_ins.npy` | (K,11) float64 | 只在跑过 `refine_poses.py` 后存在：融合前的 INS 原始数据，同样格式，是以后每次融合的输入 |
+| `cameras.mcap` | MCAP | 只在录制里有相机时存在（1016）：三路鱼眼的 `foxglove_msgs/CompressedVideo`（H.264）原样（CDR）拷贝，从场景开始前 1.5 s 到结束后 1 s。`run_sequence.py` 和 `review_labels.py mcap --cameras` 把它拷进自己的 Foxglove 文件 |
 | `meta.json` | JSON | 见下表。**最后写**，目录里没有它说明这个场景没写完 |
 
 `meta.json` 的字段：
 
 | 字段 | 写入者 | 含义 |
 |---|---|---|
-| `T_body_lidar` | 转换器 | 4×4 外参，L 到 B（kygi 是绕 z 转 180°） |
+| `T_body_lidar` | 转换器 | 4×4 外参，L 到 B（XT32 是绕 z 转 180°；Mid-360 倒装后斜向前上方约 18°，暂定值见 BAG_SPLIT.md 3.6） |
 | `base_height` | 转换器 / `sequence_meta.py` | 机身原点（这里就是雷达原点）离地高度，m |
 | `base_height_sweeps` | 同上 | 估计用了几帧（`n`）、p10 / p90、每几帧取一次（`every`）；手动指定时为 `{"fixed": true}` |
 | `base_height_first_sweep` | `sequence_meta.py` | 修正前只用第一帧估出的旧值（保留一份备查） |
@@ -281,7 +284,10 @@ mindmap
 | `lidar_time_offset` | `sequence_meta.py`（可选） | 读取时加到所有雷达时间上的秒数，用来把雷达时钟对齐到 INS 时钟，默认 0 |
 | `pose_source` | `refine_poses.py` | 没有这个字段表示用的是 INS 位姿；`kiss-icp+ins` 表示激光里程计 + RTK 融合 |
 | `pose_refine` | `refine_poses.py` | 修正量（中位、p90、最大）、航向修正量（`heading_correction_p90_deg` / `max_deg`）、所用杠杆臂 `lever_arm` 和拟合出的剩余杠杆臂 `lever_residual_m`、INS 不可信的时间占比、不可靠时段 `bad_intervals`（这些帧不要标注）、未验证时段 `unverified_intervals`、可信段里激光 1 s 位移和 INS 的差，以及所用参数 |
-| `lidar` `source` | 转换器 | `XT32`、来源 bag 的路径 |
+| `lidar` `source` | 转换器 | `XT32` 或 `MID360`（`--lidar`，`dog_perception/lidars.py`）、来源 bag 的路径 |
+| `extrinsic_provisional` | 转换器 | `true`：外参是从数据估的（Mid-360 的倒装），还没标定 |
+| `self_filter` | 转换器 | 机身遮挡框和最小距离（`SelfFilterConfig` 的字段）；没有时用 XT32 的默认值 |
+| `cameras` | 转换器 | `cameras.mcap` 里的相机话题 |
 
 体积：一帧在 bag 里 3.17 MB，压缩成 npz 后约 0.6 MB。
 

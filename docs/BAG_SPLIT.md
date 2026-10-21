@@ -375,6 +375,97 @@ python tools/dog/refine_poses.py --seq data/seq/${NAME}_s* --plots data/preview/
 
 **预览的 `shift` 检查**：对相隔约 1 s 的两帧，取离地 0.3–3 m 的点（墙、杆、树、车），在 ±0.8 m 范围内做二维搜索，找到把一帧叠到另一帧上最合适的平移量。这就是激光看到的两帧位姿误差，沿行进方向的误差也能测出来。状态按 p90 判定：≤ 0.20 m 为 OK，≤ 0.40 m 为 WARN，更大为 FAIL。运动样例 bag 用 INS 位姿时是 0.51 m（FAIL），融合后是 0.12 m（OK）。
 
+### 3.6 1016 的录制：前置 Livox Mid-360 + 三个鱼眼相机（2026-10）
+
+1016 在厂区采了 17 段（`sensor_recording_NN`），先传上来一段样例：`data/examples/rosbag1016/sensor_recording_03`。这一段 8.4 s，机器人原地右转了 34°，有一辆厢式货车从前方开过。
+
+**和 0921 不一样的地方：**
+
+| | 0921 | 1016 |
+|---|---|---|
+| 激光雷达 | 车顶 Hesai XT32（`top_point_cloud2`） | **前部 Livox Mid-360**（`front_point_cloud2`），录制里没有 XT32 |
+| 点的格式 | x y z intensity ring，`timestamp` 为绝对时间（秒） | x y z intensity **tag line(0–3)**，`timestamp` 为绝对时间（**纳秒**）；每帧约 20,000 个点，一半是空回波 |
+| 安装 | 水平，绕 z 转 180° | **倒装，并向前上方倾斜约 18°**，离地 0.52 m（地面拟合，见下） |
+| 相机 | 无 | 前、左、右三个鱼眼，1920×1536，H.264，24 Hz，约每 30 帧一个关键帧（`foxglove_msgs/CompressedVideo`） |
+| INS 天线 | 主从接反，航向偏 180° | **已经改好**：方位角和行进方向一致（差约 9°），航向偏移为 0 |
+| RTK | pos_type 56 | pos_type 56 |
+
+**Mid-360 的安装（暂定，等标定）**：
+- 用地面拟合：雷达坐标系里的"上"是 (0.304, −0.025, −0.952)，和雷达 +z 夹 162°。
+- 前方取雷达 +x 在地面上的方向，依据有两条：
+  - 视场：+x 一侧最高能看到水平线以上约 24°，远处有回波（40–54 m）；−x 一侧最高只到水平线以下 10°，1.3 m 内就被机身挡住。
+  - 相机：把点云按这个朝向投到前视鱼眼图上，行人、栏杆、货车车头都对得上（下图）。
+- 换算成 `rpy = (−178.5°, −17.7°, 90°)`，写在 `dog_perception/lidars.py` 的 `mid360` 预设里，用它转出的序列在 `meta.json` 里标 `extrinsic_provisional = true`。
+- 拿到标定的雷达到 IMU 外参以后，用 `--extrinsic-rpy` / `--extrinsic-t` / `--ins-lever-arm` 重转（很快）。在那之前 INS 杠杆臂按 0 算，因为机身原点换成了 Mid-360。
+
+![1016 三个相机](1016_rec03_cameras.jpg)
+
+![点云投到前视图（按距离着色，5 帧叠加，离地 0.15 m 以上）](1016_rec03_front_projection.jpg)
+
+**远处的点很少，这是最大的风险。** 倒装后 Mid-360 大部分视场打在机器人周围的地面上。每帧（单帧）各距离段的点数（中位数）：
+
+| | 全部点 | 0–3 m | 3–10 m | 10–20 m | 离地 0.3–4 m 的点：3–10 m | 10–20 m | 20–40 m |
+|---|---|---|---|---|---|---|---|
+| 1016 Mid-360 | 6,597 | 5,857 | 504 | 42 | 86 | 21 | 49 |
+| 0921 XT32（s005） | 48,658 | 36,929 | 10,588 | 735 | 6,931 | 630 | 9 |
+
+两个场景本身不同，所以只能看量级：3–20 m 范围内物体上的点，Mid-360 少了几十倍。
+- 那辆约 10 m 外的厢式货车，每帧只打到约 20 个点，5 帧叠加约 100 个。
+- nuScenes 教师（Pillar，CPU）在这段上只给出 1 条车辆轨迹，没有跟上货车。
+- 它还在机器人身边持续给出一个 15 m 长的"公交"误检：框里 8,000 多个点，都在 0.8–1.4 m 内、离地 0.1–0.7 m，是旁边站着的人和近处的地面。
+
+所以，**线上用哪个雷达做车辆检测，要先定下来**（见 3.7）。
+
+**转换**：`rosbag_to_sequence.py --lidar mid360`，它会做这些事：
+- 时间戳按纳秒读，`tag` 低两位（空间噪点置信度）不为 0 的点丢掉；
+- 机身遮挡框改成雷达后方 1.1 m、左右各 0.45 m；
+- 相机消息原样（CDR）写进每个序列的 `cameras.mcap`。窗口从场景开始前 1.5 s 起，保证视频从关键帧开始。
+
+`run_sequence.py` 生成的 Foxglove 文件和 `review_labels.py mcap --cameras` 都会把三路相机带上，在 Foxglove 里加三个 Image 面板就能对照着看框。在样例上这样生成（教师用 CPU 上的 Pillar，约 0.4 s / 帧）：
+
+```bash
+python tools/dog/rosbag_to_sequence.py --bag data/examples/rosbag1016/sensor_recording_03 --lidar mid360 \
+    --inspvax-topic /rte/rdap/rtk/inspvax --imu-topic /rte/rdap/rtk/imus/data_raw --out data/seq/1016_rec03
+python tools/dog/run_sequence.py --seq data/seq/1016_rec03 --detectors pillar \
+    --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --save-frames --out data/runs/1016_rec03
+# -> data/runs/1016_rec03/1016_rec03_pillar.mcap（点云、教师框、轨迹、三路相机，约 18 MB）
+```
+
+在样例上检查：
+- 预览：帧间对齐 0.045 m，1 s 平移检查 p90 0.14 m，地面残差 0.027 m；地面倾斜 3.6°，WARN，在 `auto_level` 的 5° 范围内。
+- 激光里程计：KISS-ICP 在这段上转了 33.7°，和 INS 方位角的变化一样。
+
+### 3.7 两天的数据合在一起：训练 / 验证 / 测试
+
+**原则：**
+1. **按整段录制分，不按帧分**：1016 每段（17 个 bag）整段归到一个集合。0921 沿用 3.4 的场景划分。
+2. **按地点隔离**：测试和验证的路线 10 m 内不能有训练路线（`split_check.py` 按经纬度把两天放进同一个坐标系检查）。和测试集重合的训练场景去掉，或用 `--no-drop` 时改成验证。
+3. **测试集只取部署场景**：厂区的车，**线上用的那个雷达**。测试集逐框人工标注（SUSTechPOINTS，对照相机），定下来以后就封存：不用它选 epoch、不用它调阈值，每发布一个模型只评一次。
+4. **验证集**：选 epoch、定上报阈值、比较模型都用它。同样逐框标注。
+5. **每段的内容要覆盖到**：车型（轿车、厢式货车、半挂 / 挂车厢）、车在动和停着、机器人在走和站着、厂区不同的区域。
+
+**比例（1016 的 17 段）**：测试约 25%（4–5 段），验证约 15–20%（3 段），其余 9–10 段训练。
+
+- **先自动选**：`split_check.py --test-from 1016_ --test-share 0.25 --val-from 1016_ --val-share 0.15 --no-drop`。从 1016 的各段里，先挑离训练路线最远的整段做测试，再挑验证。
+- **再人工调**：看每段 `labels_tracks_vehicle.csv` 里车的数量和种类，用 `--test 1016_recNN ...` / `--val ...` 指定，保证测试集里每种车都有。
+
+**0921（XT32）怎么用，取决于线上的雷达：**
+
+| 线上雷达 | 训练 | 验证 | 测试 |
+|---|---|---|---|
+| **Mid-360**（只有前置） | 1016 训练段 + 0921 全部 35 个场景（作补充数据） | 1016 验证段 | 1016 测试段 |
+| **XT32**（车顶） | 0921 训练场景 | 0921 验证场景（10 个） | **还没有**：1016 没录 XT32，要在厂区补录带 XT32（最好也带相机）的数据 |
+| **两个都用**（点云合并） | 需要两个雷达同时录的数据；现有两天的数据都不完整 | | |
+
+- **线上用 Mid-360**：两种雷达的点的分布差别很大。0921 数据能不能帮上忙，要实测：在 1016 验证段上比较"只用 1016 训练"和"1016 + 0921 一起训练"，选好的那个。
+  - 比较之前，先确认 1016 的车够多。17 段一共有多少车，要等 5.15 的自动标注和人工审核出来才知道。
+- **线上用 XT32**：1016 的相机数据仍然有用。它可以帮着确认场景里有哪些车，但不能当 XT32 模型的测试集。
+
+**类别规则（2026-10-21 定）**：
+- 小三轮车、老年代步车不算车辆，算骑行者（cyclist）。
+- 单独停着的挂车厢算车辆（按尺寸归 truck）。
+- SUSTechPOINTS 里三轮车选 Trimotorcycle 或 FreightTricycle，导回为 cyclist；挂车厢选 Truck 或 LongVehicle。
+
 ## 4. 之后：教师推理 + 自动标注（批量）
 
 验证通过后，对每个场景跑 [DOG_FINETUNE.md](DOG_FINETUNE.md) 的 ② ③。4090 上 Voxel + TTA 约 0.12 s/帧，1 万帧约 20 分钟；`--save-frames` 的帧约 3.6 MB/帧，1 万帧约 35 GB。`run_sequence.py` 默认还会写一个 Foxglove MCAP（`data/runs/<场景>/<场景>_voxel.mcap`），可以直接在 Foxglove 里看每个场景的点云、检测和轨迹。
@@ -876,4 +967,65 @@ SPLIT=data/survey/split/split.csv
 5. 提交 data/reports/veh_v1/（日志、指标）和 labels_reviewed.pkl / labels_sustech.pkl，推送。权重留在服务器上，报告路径。
 
 最后报告：同 5.13 的 B 部分，另加：每个场景 apply 打印的那一行；导出的各类正样本 / 忽略数和 5.13 的对比。
+```
+
+### 5.15 第十五轮：1016 的 17 段（Mid-360 + 相机）：解析、教师、审核材料、两天合并的划分方案
+
+新数据换了雷达（前置倒装的 Livox Mid-360）并带了三个鱼眼相机，见 3.6；划分原则见 3.7。这一轮把 17 段转好、跑教师和自动标注，生成带相机的审核文件，并给出训练 / 验证 / 测试的划分方案。**不训练，不 `--apply` 划分**，等人确认。
+
+```text
+任务：解析 1016 的 17 段录制（Livox Mid-360 + INSPVAX + 三个鱼眼相机），做预览、位姿融合、教师推理和自动标注，
+生成带相机的审核文件，并对 0921 + 1016 给出训练 / 验证 / 测试划分的方案（不写入）。
+仓库：CenterPoint，分支 claude/me/v01。先 git pull，所有命令在仓库根目录执行，export PYTHONPATH=.。
+BAGS=<放 17 个 sensor_recording_* 的目录>
+
+0. 检查：python -m pytest tests/dog -q 全部通过；df -h（相机每段每分钟约 70 MB，加上点云和帧，预留 100 GB）；
+   每个 bag 的 metadata.yaml：列出话题和时长；有没有哪段带 /robot/topic/rdap/top_point_cloud2（XT32）——有就单独报告。
+1. 体检（每段一个前缀 1016_recNN，NN 取 bag 名末尾的编号）：
+     for b in $BAGS/sensor_recording_*; do n=1016_rec${b##*_}
+       python tools/dog/bag_survey.py --bag $b --out data/survey/$n --prefix $n \
+           --lidar-topic /robot/topic/rdap/front_point_cloud2 --min-length 5
+     done
+   停止条件同 5.1（时钟、可用时间）；某段不满足就跳过它并报告，其余继续。
+2. 转换（--lidar mid360：纳秒时间戳、噪点 tag、暂定的倒装外参、相机写进 <序列>/cameras.mcap）：
+     for b in $BAGS/sensor_recording_*; do n=1016_rec${b##*_}
+       python tools/dog/rosbag_to_sequence.py --bag $b --lidar mid360 --inspvax-topic /rte/rdap/rtk/inspvax \
+           --imu-topic /rte/rdap/rtk/imus/data_raw --segments data/survey/$n/segments.csv --out data/seq 2>&1 | tee data/seq/$n.convert.log
+     done
+   看每段打印的 "INS azimuth offset" 行：天线已改好，应都是 0。某段打印了 WARNING（几乎没动）或和多数不同，
+   就用 --azimuth-offset <多数的值> 重转那一段。核对：每个场景写出的帧数等于 segments.csv 的 scans 列，且有 "camera messages"。
+3. 位姿融合：
+     python tools/dog/refine_poses.py --seq data/seq/1016_* --plots data/preview/poses_1016
+4. 预览：
+     python tools/dog/sequence_preview.py --seq "data/seq/1016_*" --out data/preview/1016 --jobs 8
+   打开 index.html、状态最差的 3 张和 1 张 OK 的 PNG：墙是不是细线，地面是不是贴着 z = 0。
+5. 教师推理 + 自动标注（Voxel + TTA，空闲的卡）：
+     python tools/dog/batch_label.py --seq data/seq/1016_*
+     # batch_label.py overwrites data/labels/batch_summary.csv (0921's, committed): keep both
+     mv data/labels/batch_summary.csv data/labels/batch_summary_1016.csv && git checkout data/labels/batch_summary.csv
+6. 审核材料（只看车；Foxglove 文件带三个相机）：
+     for d in data/seq/1016_*/; do r=$(basename $d)
+       python tools/dog/review_labels.py table --classes vehicle --labels data/labels/$r/labels.pkl \
+           --out data/labels/$r/labels_tracks_vehicle.csv
+       python tools/dog/review_labels.py mcap --vehicles-only --labels data/labels/$r/labels.pkl \
+           --frames data/runs/$r/frames --results data/runs/$r/voxel/results.pkl --cameras $d/cameras.mcap \
+           --out data/labels/$r/${r}_review.mcap
+     done
+7. 划分方案（两天一起，只看不写）：
+     python tools/dog/split_check.py --seq data/seq/0921_* data/seq/1016_* --out data/survey/split_2day \
+         --holdout 0921_165659 --holdout-s 90 --no-drop \
+         --test-from 1016_ --test-share 0.25 --val-from 1016_ --val-share 0.15
+8. 提交：data/survey/1016_rec*/（segments.csv、survey.png、survey.json）、data/preview/1016/、data/survey/split_2day/、
+   data/labels/1016_*/labels.pkl、labels_tracks.csv、labels_tracks_vehicle.csv、data/labels/batch_summary_1016.csv，
+   和一段车最多的场景的 data/runs/<场景>/<场景>_voxel.mcap（带相机，Git LFS 会自动处理 data/examples 下的文件，
+   所以把它复制到 data/examples/runs/<场景>/ 再提交）。不要提交 data/seq、data/runs 其余文件和 review mcap。推送到 claude/me/v01。
+
+最后报告：
+- 第 0 步的话题表（每段时长、有没有 XT32）；
+- 每段体检的摘要行（时长、速度、pos_type、场景数）；每段转换的 "INS azimuth offset" 行和 wrote 行；
+- refine_poses 的汇总，特别是每段的 lever_residual（Mid-360 原点下 INS 杠杆臂还没标定，按 0 转的，残差就是它的估计）；
+- 预览汇总行（OK / WARN / FAIL）和每个非 OK 场景的 problems 列；
+- batch_summary_1016.csv；每段 labels_tracks_vehicle.csv 的行数、train_as=ignore 的行数，以及按 subclass 的轨迹数；
+- split_check 打印的整张表、"recordings" 两行、各集合的秒数和 seconds by lidar；
+- 每步耗时，用掉的磁盘（du -sh data/seq/1016_* data/runs data/labels）。
 ```

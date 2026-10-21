@@ -9,6 +9,11 @@
       imu.npy              (M, 4)  t, wx, wy, wz        body-frame gyro [rad/s]
       odom.npy             (K, 11) t, x, y, z, qx, qy, qz, qw, vx, vy, vz   LIO world frame
                            (velocity columns NaN if the LIO does not publish a twist)
+      cameras.mcap         optional: the recording's camera streams (Foxglove CompressedVideo /
+                           CompressedImage, JSON), copied into the review and result MCAPs
+
+meta.json may also carry "lidar" (XT32 / MID360), "self_filter" (SelfFilterConfig fields) and
+"det_frame" (DetFrameConfig fields); ``SequenceReader.preprocess_config`` reads them.
 
 ``tools/dog/rosbag_to_sequence.py`` converts ROS1/ROS2 bags into this.
 """
@@ -115,6 +120,24 @@ class SequenceReader:
     @property
     def T_body_lidar(self):
         return np.asarray(self.meta.get("T_body_lidar", np.eye(4)))
+
+    @property
+    def cameras(self):
+        """Path of the camera MCAP of this sequence, or None."""
+        p = os.path.join(self.dir, "cameras.mcap")
+        return p if os.path.exists(p) else None
+
+    def preprocess_config(self, base_height=None, **overrides):
+        """PreprocessConfig as every tool runs it on this sequence: mounting, base height,
+        detection-frame options and self filter from meta.json; ``overrides`` replace fields."""
+        from .lidars import self_filter_config
+        from .preprocess import DetFrameConfig, PreprocessConfig
+
+        h = self.meta.get("base_height", 0.45) if base_height is None else base_height
+        kw = dict(T_body_lidar=self.T_body_lidar, self_filter=self_filter_config(self.meta),
+                  det_frame=DetFrameConfig(base_height=h, **self.meta.get("det_frame", {})))
+        kw.update(overrides)
+        return PreprocessConfig(**kw)
 
     def __len__(self):
         return len(self.scan_files)

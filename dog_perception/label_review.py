@@ -220,14 +220,15 @@ def _make_static(out, refs):
 
 
 # ------------------------------------------------------------------ Foxglove
-def write_review_mcap(path, labels, frames_dir=None, results=None, current_sweep_only=True, trail=3.0):
+def write_review_mcap(path, labels, frames_dir=None, results=None, current_sweep_only=True, trail=3.0, cameras=None):
     """Point cloud (``frames_dir/<stamp>.npy``, det frame), label boxes and track trails.
 
     Frames: ``world`` (localization) -> ``det`` (robot, gravity aligned). Labels and the
     point cloud are in ``det``; trails in ``world``, so static objects should stay put
     when the 3D panel's display frame is ``world``. Flagged tracks are drawn magenta
     with a thick outline, interpolated boxes faint. ``results`` (run_sequence.py
-    results.pkl) adds the teacher's raw boxes in grey."""
+    results.pkl) adds the teacher's raw boxes in grey; ``cameras`` (a sequence's cameras.mcap)
+    the camera streams over the labelled time span, for the Image panel."""
     import os
 
     from . import foxglove as fx
@@ -299,6 +300,8 @@ def write_review_mcap(path, labels, frames_dir=None, results=None, current_sweep
                                                   "%.2f" % d.scores[i], (0.7, 0.7, 0.7, 1), 9)])
                          for i in np.nonzero(keep)[0]]
                 w.write("/teacher", "foxglove.SceneUpdate", t, fx.scene_update(tents))
+        if cameras and labels["frames"]:
+            w.copy_from(cameras, labels["frames"][0]["stamp"] - 1.5, labels["frames"][-1]["stamp"])
     finally:
         w.close()
     return w.messages

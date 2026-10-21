@@ -2,7 +2,7 @@
 
 本文档包含三部分：(1) 对原方案的评审和优化点；(2) 优化后的方案与本仓库中的实现对应关系；(3) 使用方法、仿真验证结果与已知局限。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（113 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（115 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -207,7 +207,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/export_pillar_onnx.py` | 导出给 TensorRT 用的两段 ONNX，逐段校验，并打印上板建引擎的 `trtexec` 命令 |
 | `tools/dog/profile_detector.py` | 在一帧上测网络逐层的 shape、参数量、计算量（稀疏卷积按实际邻接对计）和各段耗时 |
 | `tools/dog/train_predictor.py` | 第二档训练，与 CV/IMM 对比 |
-| `tools/dog/ros2_node.py`（参数在 `dog_perception/node_config.py`） | 在线 ROS 2 节点（MarkerArray 可视化）。`-p robot:=kygi` 一次设好 kygi 的话题、INSPVAX 定位、外参、离地高度 0.72 m、`auto_ground` / `auto_level`，和训练序列的处理一致 |
+| `tools/dog/ros2_node.py`（参数在 `dog_perception/node_config.py`） | 在线 ROS 2 节点（MarkerArray 可视化）。`-p robot:=kygi` 一次设好 kygi 的话题、INSPVAX 定位、外参、离地高度 0.72 m、`auto_ground` / `auto_level`，和训练序列的处理一致；`robot:=kygi_mid360` 是换成前置 Livox Mid-360 的版本（纳秒时间戳、噪点 tag、暂定的倒装外参、机身遮挡框，天线已改好，见 BAG_SPLIT.md 3.6） |
 | `tools/dog/run_sim_demo.py` | 仿真端到端演示，输出各段指标 |
 | `tools/dog/nusc_clip_eval.py`（`dog_perception/nuscenes_clip.py`、`clip_viz.py`、`foxglove.py`） | 在 nuScenes 片段上跑检测、跟踪、预测，与真值对比，输出 Foxglove MCAP 和指标报告，见 [NUSC_CLIP_EVAL.md](NUSC_CLIP_EVAL.md) |
 

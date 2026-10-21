@@ -41,6 +41,8 @@ def main():
     m.add_argument("--results", default=None, help="run_sequence.py results.pkl: teacher boxes in grey")
     m.add_argument("--all-sweeps", action="store_true", help="draw the accumulated sweeps (larger file)")
     m.add_argument("--vehicles-only", action="store_true", help="draw only the vehicle labels")
+    m.add_argument("--cameras", default=None,
+                   help="camera MCAP to copy in (the sequence's cameras.mcap, e.g. data/seq/<scene>/cameras.mcap)")
     m.add_argument("--out", default=None,
                    help="default: <labels dir>/<scene>_review.mcap, scene = the directory name")
     a = sub.add_parser("apply", help="apply the edited track table")
@@ -67,7 +69,8 @@ def main():
         if args.vehicles_only:
             labels = dict(labels, frames=[dict(f, objects=[o for o in f["objects"] if o["label"] == "vehicle"])
                                           for f in labels["frames"]])
-        n = write_review_mcap(out, labels, args.frames, results, current_sweep_only=not args.all_sweeps)
+        n = write_review_mcap(out, labels, args.frames, results, current_sweep_only=not args.all_sweeps,
+                              cameras=args.cameras)
         print("%d messages -> %s (3D panel: display frame world or det; topics /lidar /labels /teacher, "
               "Log panel on /log lists the tracks to review)" % (n, out))
     else:

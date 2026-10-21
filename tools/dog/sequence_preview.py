@@ -51,7 +51,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))          # parall
 from dog_perception.io import SequenceReader  # noqa: E402
 from parallel import run_each, threads  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
-from dog_perception.preprocess import DetFrameConfig, PreprocessConfig  # noqa: E402
 
 # (ok_max, warn_max) per check; above warn_max is FAIL
 LIMITS = dict(align_m=(0.10, 0.20), shift_p90_m=(0.20, 0.40), ground_z_m=(0.10, 0.20), tilt_deg=(2.0, 4.0), lidar_gap_s=(0.2, 0.5),
@@ -164,9 +163,7 @@ def align_residual(a, b, rng):
 
 def pipeline_for(rd):
     """Preprocessing exactly as auto-labelling and the online node run it on this sequence."""
-    pcfg = PreprocessConfig(T_body_lidar=rd.T_body_lidar,
-                            det_frame=DetFrameConfig(base_height=rd.meta.get("base_height", 0.45),
-                                                     **rd.meta.get("det_frame", {})))
+    pcfg = rd.preprocess_config()
     return PerceptionPipeline(pcfg, detector=None)
 
 

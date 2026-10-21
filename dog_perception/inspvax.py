@@ -157,12 +157,13 @@ def apply_lever_arm(odom, lever_arm):
     return out
 
 
-def forward_speed(odom, min_speed=0.5):
+def forward_speed(odom, min_speed=0.5, min_rows=1):
     """Median speed [m/s] along the body +y axis over the rows moving faster than ``min_speed``
-    (None if none): positive when the heading convention is right (the robot walks forward)."""
-    v = np.asarray(odom, np.float64)[:, 8:10]
+    (None if fewer than ``min_rows``): positive when the heading convention is right (the robot
+    walks forward)."""
+    v = np.asarray(odom, np.float64).reshape(-1, 11)[:, 8:10]
     m = np.isfinite(v).all(axis=1) & (np.hypot(v[:, 0], v[:, 1]) > min_speed)
-    if not m.any():
+    if m.sum() < max(1, min_rows):
         return None
     fwd = [(quat_to_R(q)[:2, 1] @ vi) for q, vi in zip(np.asarray(odom)[m, 4:8], v[m])]
     return float(np.median(fwd))

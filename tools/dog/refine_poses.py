@@ -71,7 +71,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))          # sequen
 from dog_perception.geometry import make_T, quat_to_R, rot_z, rot_zyx, so3_exp, transform_points, yaw_of  # noqa: E402
 from dog_perception.inspvax import KYGI_INS_LEVER_ARM, apply_lever_arm  # noqa: E402
 from dog_perception.io import SequenceReader, load_scan  # noqa: E402
-from dog_perception.preprocess import SelfFilter, SelfFilterConfig, dedup_returns  # noqa: E402
+from dog_perception.lidars import self_filter_config  # noqa: E402
+from dog_perception.preprocess import SelfFilter, dedup_returns  # noqa: E402
 from parallel import run_each, threads  # noqa: E402
 
 ODOM_INS = "odom_ins.npy"
@@ -119,7 +120,7 @@ def lidar_odometry(rd, voxel=0.4, max_range=60.0, min_range=1.5, keep_every=10, 
     cfg.mapping.voxel_size = voxel
     cfg.registration.max_num_threads = max(0, threads(0))      # 0: all cores; fewer when sequences run in parallel
     odo = KissICP(cfg)
-    sf = SelfFilter(SelfFilterConfig(), rd.T_body_lidar)
+    sf = SelfFilter(self_filter_config(rd.meta), rd.T_body_lidar)
     stamps, poses, kept = [], [], {}
     base = float(rd.meta.get("base_height", 0.45))
     for k, f in enumerate(rd.scan_files):

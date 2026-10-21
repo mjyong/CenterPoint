@@ -225,7 +225,7 @@ class McapWriter:
         self._fh = open(path, "wb")
         self._w = Writer(self._fh, compression=comp)
         self._w.start(profile="", library="dog_perception.foxglove")
-        self._schemas, self._channels = {}, {}
+        self._schemas, self._channels, self._copied = {}, {}, {}
         self.path = path
         self.messages = 0
 
@@ -242,6 +242,34 @@ class McapWriter:
         self._w.add_message(ch, ns, json.dumps(msg, separators=(",", ":")).encode(), ns)
         self.messages += 1
 
+    def copy_from(self, src_path, t0=None, t1=None):
+        """Messages of another MCAP file in [t0, t1] (``copy_messages``), e.g. camera streams."""
+        n = copy_messages(src_path, self._w, t0, t1, self._copied)
+        self.messages += n
+        return n
+
     def close(self):
         self._w.finish()
         self._fh.close()
+
+
+def copy_messages(src_path, writer, t0=None, t1=None, cache=None):
+    """Copy the messages of an MCAP file (e.g. a sequence's ``cameras.mcap``) whose log time is in
+    [t0, t1] (seconds) into an open ``mcap.writer.Writer``, schemas and encodings unchanged.
+    ``cache`` (topic -> channel id) lets several calls share channels. Returns the message count."""
+    from mcap.reader import make_reader
+
+    cache = {} if cache is None else cache
+    lo = None if t0 is None else int(t0 * 1e9)
+    hi = None if t1 is None else int(t1 * 1e9) + 1
+    n = 0
+    with open(src_path, "rb") as f:
+        for schema, channel, msg in make_reader(f).iter_messages(start_time=lo, end_time=hi):
+            ch = cache.get(channel.topic)
+            if ch is None:
+                sid = writer.register_schema(schema.name, schema.encoding, schema.data) if schema else 0
+                ch = cache[channel.topic] = writer.register_channel(channel.topic, channel.message_encoding, sid,
+                                                                    dict(channel.metadata))
+            writer.add_message(ch, msg.log_time, msg.data, msg.publish_time)
+            n += 1
+    return n

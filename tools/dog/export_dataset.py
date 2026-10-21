@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))          # parall
 
 from dog_perception.detection.boxes import standard_to_det3d  # noqa: E402
 from dog_perception.detection.frame_adapter import ModelFrame  # noqa: E402
-from dog_perception.label_review import gt_name, train_label  # noqa: E402,F401  (gt_name: older callers)
+from dog_perception.label_review import train_label  # noqa: E402
 from parallel import run_each  # noqa: E402
 
 
@@ -88,6 +88,8 @@ def main():
     ap.add_argument("--recording", nargs=2, action="append", metavar=("RUN_DIR", "LABELS"), required=True,
                     help="run_sequence.py output dir (with frames/) and its labels.pkl")
     ap.add_argument("--val-recordings", nargs="*", default=[])
+    ap.add_argument("--test-recordings", nargs="*", default=[],
+                    help="written to infos_test.pkl (never used for training or for choosing a model)")
     ap.add_argument("--review-policy", choices=("ignore", "drop", "keep"), default="ignore",
                     help="tracks still flagged for review: ignore boxes (default), left out, or positives")
     ap.add_argument("--skip-review", action="store_true", help="same as --review-policy drop")
@@ -101,18 +103,20 @@ def main():
     args = ap.parse_args()
     policy = "drop" if args.skip_review else args.review_policy
 
-    train, val, counts = [], [], {}
+    train, val, test, counts = [], [], [], {}
     jobs = [(run_dir, lab_path, args.out, policy, args.classes) for run_dir, lab_path in args.recording]
     for name, infos, c in run_each(export_one, jobs, args.jobs):
-        (val if name in args.val_recordings else train).extend(infos)
+        (test if name in args.test_recordings else val if name in args.val_recordings else train).extend(infos)
         for k, v in c.items():
             counts[k] = counts.get(k, 0) + v
         print("%s: %d frames" % (name, len(infos)))
-    for split, infos in (("train", train), ("val", val)):
+    for split, infos in (("train", train), ("val", val), ("test", test)):
+        if split == "test" and not args.test_recordings:
+            continue
         with open(os.path.join(args.out, "infos_%s.pkl" % split), "wb") as f:
             pickle.dump(infos, f)
-    print("train %d / val %d frames -> %s" % (len(train), len(val), args.out))
-    for split, infos in (("train", train), ("val", val)):
+    print("train %d / val %d / test %d frames -> %s" % (len(train), len(val), len(test), args.out))
+    for split, infos in (("train", train), ("val", val), ("test", test)):
         if not infos:
             continue
         names = np.concatenate([i["gt_names"] for i in infos])

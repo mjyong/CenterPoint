@@ -53,7 +53,9 @@ TYPE_TO_SUBCLASS = {
     **{t: "truck" for t in ("Truck", "ConcreteTruck", "Excavator", "ForkLift", "Crane", "RoadRoller", "Bulldozer")},
     **{t: "bus" for t in ("Bus", "Tram", "LongVehicle")},
     **{t: "pedestrian" for t in ("Pedestrian", "RoadWorker", "Child")},
-    **{t: "cyclist" for t in ("BicycleRider", "MotorcyleRider", "ScooterRider", "Bicycle", "Motorcycle", "Scooter")},
+    # small tricycles and mobility scooters are not vehicles (2026-10): cyclist
+    **{t: "cyclist" for t in ("BicycleRider", "MotorcyleRider", "ScooterRider", "Bicycle", "Motorcycle", "Scooter",
+                              "Trimotorcycle", "FreightTricycle")},
 }
 TYPE_TO_CLASS = {t: SUBCLASS_TO_CLASS[s] for t, s in TYPE_TO_SUBCLASS.items()}
 

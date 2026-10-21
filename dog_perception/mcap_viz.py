@@ -77,6 +77,13 @@ class McapViz:
         self._tracks = self._w.register_channel("/tracks", "json", scene)
         self._pose = self._w.register_channel("/pose", "json", pose)
         self.frames = 0
+        self._copied = {}
+
+    def copy_from(self, src_path, t0=None, t1=None):
+        """Messages of another MCAP file in [t0, t1], e.g. the sequence's camera streams."""
+        from .foxglove import copy_messages
+
+        return copy_messages(src_path, self._w, t0, t1, self._copied)
 
     def add(self, stamp, xyz, intensity, detections, T_world_body, tracks=None, lifetime=0.15):
         """xyz (N, 3), boxes and tracks are already in the map / world frame.

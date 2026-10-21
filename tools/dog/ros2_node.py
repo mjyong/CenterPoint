@@ -63,6 +63,7 @@ class DogPerceptionNode(Node):
         self.world_frame = g("world_frame")
         self.odom_twist = g("odom_twist")
         self.time_field, self.time_mode = g("time_field"), g("time_mode")
+        self.noise_tag_mask = int(g("noise_tag_mask"))
         self.publish_cloud = bool(g("publish_cloud"))
         self.kygi_imu = g("imu_convention") == "kygi"
         self.lidar_time_offset = float(g("lidar_time_offset"))
@@ -137,7 +138,8 @@ class DogPerceptionNode(Node):
         self.pipe.on_odometry(t, R, p, v)
 
     def on_cloud(self, msg):
-        scan = scan_from_msg(msg, self.time_field, self.time_mode).shifted(self.lidar_time_offset)
+        scan = scan_from_msg(msg, self.time_field, self.time_mode,
+                             noise_tag_mask=self.noise_tag_mask).shifted(self.lidar_time_offset)
         out = self.pipe.on_scan(scan)
         if out is None:
             self.get_logger().warn("no pose for scan yet (waiting for odometry / IMU)", throttle_duration_sec=2.0)

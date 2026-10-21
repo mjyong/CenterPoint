@@ -142,7 +142,7 @@ test_pipeline = [
 
 train_anno = "data/dog_veh/infos_train.pkl"
 val_anno = "data/dog_veh/infos_val.pkl"
-test_anno = None
+test_anno = "data/dog_veh/infos_test.pkl"      # export_dataset.py --test-recordings; dist_test.py --testset
 
 data = dict(
     samples_per_gpu=4,
@@ -153,7 +153,7 @@ data = dict(
                nsweeps=nsweeps, class_names=class_names, pipeline=train_pipeline, empty_frames=0.25),
     val=dict(type=dataset_type, root_path=data_root, info_path=val_anno, test_mode=True, ann_file=val_anno,
              nsweeps=nsweeps, class_names=class_names, pipeline=test_pipeline),
-    test=dict(type=dataset_type, root_path=data_root, info_path=val_anno, test_mode=True, ann_file=val_anno,
+    test=dict(type=dataset_type, root_path=data_root, info_path=test_anno, test_mode=True, ann_file=test_anno,
               nsweeps=nsweeps, class_names=class_names, pipeline=test_pipeline),
 )
 
