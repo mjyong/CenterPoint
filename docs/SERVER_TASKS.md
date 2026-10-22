@@ -27,7 +27,7 @@
    - 按"提交"一项提交，推送到 `claude/me/v01`。
    - 权重（`.pth`）、点云帧、`.pkl`、mcap 都不提交。
 5. 选 GPU：`python tools/dog/batch_label.py --split $SPLIT --dry-run` 会打印每张卡的显存和占用。用空闲的卡，`CUDA_VISIBLE_DEVICES=<卡号>`。
-6. 大的输出写到 `/public/zjst/robot`（和 `data/seq`、`data/runs` 同一块盘）。空闲空间用 `df -h /public/zjst/robot` 看，至少 80 GB。不要用 `df -h .`：那是仓库所在盘，后面的导出、训练权重、推理结果都不写到那里。第一次往下面这些目录写之前，先链过去（已经是这个链接就不用再做）：
+6. 大的输出写到 `/public/zjst/robot`（仓库盘只剩约 27 GB，T0）（和 `data/seq`、`data/runs` 同一块盘）。空闲空间用 `df -h /public/zjst/robot` 看，至少 80 GB。不要用 `df -h .`：那是仓库所在盘，后面的导出、训练权重、推理结果都不写到那里。第一次往下面这些目录写之前，先链过去（已经是这个链接就不用再做）：
    ```bash
    for d in dog_veh train deploy runs_veh_v0 runs_nusc_pp runs_veh_v1 runs_veh_v1_view runs_r2 labels_r2 seq_lever; do
      mkdir -p /public/zjst/robot/centerpoint_data/$d
@@ -209,7 +209,7 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 2. 开始 10 分钟后检查两个日志（tail -30）：
    - loss 是有限值，hm_loss 在下降；
    - 每次迭代耗时、每个 epoch 多少次迭代，按 20 个 epoch 估算总时长；
-   - nvidia-smi 看显存。
+   - nvidia-smi 看显存和利用率。数据集在公共盘上，利用率长时间低于 50% 说明读数据跟不上，记下来报告（先不用改）。
 3. 等训练结束（每个 epoch 存一个 data/train/<名字>/epoch_N.pth），期间每小时看一次日志。
 
 停止条件（停下并报告日志最后 50 行，不要改配置重跑）：
@@ -323,7 +323,9 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
            f=data/labels/$r/labels_sustech.pkl; [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
            echo --recording data/runs/$r $f; done)
      VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
-     rm -rf data/dog_veh && python tools/dog/export_dataset.py $REC --val-recordings $VAL --classes vehicle \
+     rm -rf data/dog_veh/*      # 清空链接指向的公共盘目录里的 v0 数据集；不要写成 rm -rf data/dog_veh（只删掉链接，
+                                # 新的数据集就会写到仓库盘上）
+     python tools/dog/export_dataset.py $REC --val-recordings $VAL --classes vehicle \
          --out data/dog_veh --gt-db --jobs 8 2>&1 | tee data/reports/T5/export.txt
 
 验证集只有逐框审核过的帧（SUSTechPOINTS 每 5 帧取 1 帧，约 575 帧），这是预期的。
