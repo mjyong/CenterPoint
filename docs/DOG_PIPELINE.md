@@ -272,7 +272,8 @@ python3 tools/dog/ros2_node.py --ros-args -p robot:=kygi -p config:=dog_pillar -
 
 # 仿真演示和测试
 python tools/dog/run_sim_demo.py --frames 80 --plot 3 --out work_dirs/sim_demo
-python -m pytest tests/dog -q
+python -m pytest tests/dog -m "not slow" -n 4 -q    # 快速：约 1 分钟（pytest-xdist 并行，跳过 11 个慢测试）
+python -m pytest tests/dog -q                       # 完整：4 核约 3 分钟
 ```
 
 ---

@@ -138,6 +138,7 @@ def _offline_frames(seq_dir):
     return rd.meta, pcfg, frames
 
 
+@pytest.mark.slow
 def test_kygi_node_matches_the_training_sequences(monkeypatch, tmp_path):
     pytest.importorskip("rosbags")
     if not os.path.isdir(BAG):

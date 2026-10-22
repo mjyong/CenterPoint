@@ -117,6 +117,7 @@ def test_checkpoint_must_match_config():
         build_detector("voxel", checkpoint=PP_CKPT, device="cpu")
 
 
+@pytest.mark.slow
 @requires_det3d
 def test_sample_bag_regression(tmp_path):
     """Pretrained nuScenes pillar on the sample bag: raw output ~100 boxes/frame,
@@ -212,6 +213,7 @@ def _sweep_alignment(points):
     return float(np.median(cKDTree(new[:, :3]).query(old[:, :3])[0]))
 
 
+@pytest.mark.slow
 def test_moving_bag_sweeps_align():
     """Robot driving at ~1.5 m/s: with the measured kygi conventions (deg/s gyro,
     180 deg lidar yaw) the 5 accumulated sweeps line up and the ground is level;
@@ -239,6 +241,7 @@ def test_moving_bag_sweeps_align():
     assert tilt < 0.6 and old_tilt > 1.0
 
 
+@pytest.mark.slow
 @requires_det3d
 def test_moving_bag_static_scene_stays_static():
     """Most of what the detector sees is parked; in the world frame its speed

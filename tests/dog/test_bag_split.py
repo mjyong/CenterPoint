@@ -36,6 +36,7 @@ def split(tmp_path_factory):
     return root, rows
 
 
+@pytest.mark.slow
 def test_survey_proposes_scenes_with_val_and_buffer(split):
     root, _ = split
     rows = list(csv.DictReader(open(root / "survey" / "segments.csv")))
@@ -71,6 +72,7 @@ def test_one_pass_split_matches_the_whole_bag(split):
     assert total == len(full)
 
 
+@pytest.mark.slow
 def test_preview_passes_good_data_and_fails_a_wrong_extrinsic(split, tmp_path):
     root, _ = split
     bad = tmp_path / "bad_extrinsic"

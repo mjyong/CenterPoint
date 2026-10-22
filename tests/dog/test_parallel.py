@@ -13,7 +13,8 @@ from dog_perception.io import SequenceWriter  # noqa: E402
 from dog_perception.preprocess.pipeline import LidarScan  # noqa: E402
 
 
-def test_run_each_keeps_the_order_and_splits_the_cores():
+def test_run_each_keeps_the_order_and_splits_the_cores(monkeypatch):
+    monkeypatch.delenv("DOG_TOOL_THREADS", raising=False)     # conftest limits the threads of the test run
     assert list(parallel.run_each(abs, [-3, 1, -2], jobs=1)) == [3, 1, 2]
     per_job = str(max(1, (os.cpu_count() or 1) // 2))
     assert list(parallel.run_each(os.getenv, ["DOG_TOOL_THREADS"] * 3, jobs=2)) == [per_job] * 3

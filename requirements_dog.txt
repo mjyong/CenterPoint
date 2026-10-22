@@ -22,3 +22,4 @@ mcap             # Foxglove MCAP output (run_bag_mcap.py, run_sequence.py --mcap
 cherrypy         # third_party/SUSTechPOINTS (annotation tool)
 jinja2
 pytest
+pytest-xdist     # pytest -n 8: run the tests in parallel

@@ -48,6 +48,7 @@ def test_agent_frame_normalisation():
     assert np.isclose(meta["thetas"][0], np.pi / 2)
 
 
+@pytest.mark.slow
 def test_build_samples_and_online_imm(logs):
     s = build_samples(logs[0], SampleConfig())
     n = len(s["future"])
@@ -77,6 +78,7 @@ def test_model_forward_backward(encoder, raster):
     assert torch.isfinite(loss) and all(p.grad is not None for p in m.parameters() if p.requires_grad and p.grad is not None)
 
 
+@pytest.mark.slow
 def test_training_converges_and_runtime_wrapper(logs, tmp_path):
     train = build_samples(logs[0])
     for l in logs[1:2]:

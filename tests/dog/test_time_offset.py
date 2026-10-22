@@ -35,6 +35,7 @@ def lagged(tmp_path_factory):
     return path, _sim_sequence(path, LAG)
 
 
+@pytest.mark.slow
 def test_check_finds_the_injected_offset(lagged):
     path, _ = lagged
     res = toc.check(str(path), [-0.075, -0.05, -0.025, 0.0, 0.025])

@@ -240,6 +240,7 @@ def _preview(seqs, out):
     return {c["pose_source"]: c for c in json.load(open(out / "checks.json"))}
 
 
+@pytest.mark.slow
 def test_sample_bag_shift_check_before_and_after(moving_seq, tmp_path):
     root = moving_seq
     odom0 = np.load(root / "refined" / "odom.npy")

@@ -1,5 +1,6 @@
 """Fine-tuning plumbing: sim frames -> DogDataset -> GT database -> det3d training step."""
 import os
+import pytest
 import pickle
 
 import numpy as np
@@ -27,6 +28,7 @@ def _labels_from_sim(sim_frames, frames_dir):
     return labels
 
 
+@pytest.mark.slow
 @requires_det3d
 def test_dog_dataset_gt_sampling_and_training_step(sim_frames, tmp_path):
     import torch

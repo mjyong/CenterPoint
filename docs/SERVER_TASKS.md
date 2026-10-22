@@ -34,6 +34,14 @@
      ln -sfn /public/zjst/robot/centerpoint_data/$d data/$d
    done
    ```
+7. 测试：只在 T0、或者 `git pull` 拉到了代码改动（`dog_perception/`、`tools/`、`det3d/`、`configs/`）时跑，而且只跑快速的：
+   ```bash
+   pip install pytest-xdist       # 第一次
+   python -m pytest tests/dog -m "not slow" -n 8 -q --durations=10
+   ```
+   本地约 1 分钟。完整测试（多 11 个用样例 bag 和训练的慢测试）只在任务里写了时才跑：去掉 `-m "not slow"`。
+   每个测试进程最多用 4 个 CPU 线程（`tests/dog/conftest.py`，`DOG_TEST_THREADS` 可改）。之前 T0 跑了 29 分钟，
+   多半是每个进程都开了和核数一样多的线程，在共享服务器上互相抢。
 
 ## 状态
 
@@ -87,7 +95,8 @@
 任务 T0：检查服务器环境和 0921 的数据是否齐全。只检查，不改任何东西。
 先按 docs/SERVER_TASKS.md 的"通用约定"做（git pull、PYTHONPATH、SPLIT）。
 
-1. python -m pytest tests/dog -q：全部通过（有 GPU 时 Voxel 的测试也会跑）。
+1. pip install pytest-xdist；python -m pytest tests/dog -m "not slow" -n 8 -q --durations=10：全部通过
+   （有 GPU 时 Voxel 的测试也会跑；见通用约定第 7 条）。
 2. nvidia-smi；python -c "import torch, spconv; print(torch.__version__, torch.cuda.is_available(), spconv.__version__)"
 3. df -h /public/zjst/robot：至少 80 GB 空闲（T2 导出约 40 GB，训练权重约 5 GB，都写在这块盘上，见通用约定第 6 条）。
 4. ls -la work_dirs/pretrained/：nusc_voxel.pth 约 103 MB、nusc_pp.pth 约 72 MB。
