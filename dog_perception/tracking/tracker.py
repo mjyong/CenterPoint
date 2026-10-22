@@ -9,7 +9,11 @@ Association (SimpleTrack / ByteTrack style):
   1. high-score detections vs. all tracks (IMM-predicted centers, class gated)
   2. low-score detections vs. still unmatched confirmed tracks only
      (recovers occluded / far pedestrians without spawning false tracks)
-  3. unmatched high-score detections start tentative tracks
+  3. unmatched high-score detections start tentative tracks, unless the
+     detection is a second box on a track already kept this frame (its center
+     lies in that track's box, or the track center lies in the detection).
+     A long bus or truck often gets two boxes a few metres apart along its
+     length; one-to-one matching would otherwise open a second track.
 
 Life cycle: tentative -> confirmed after ``min_hits`` hits; tentative tracks
 tolerate a single missed frame; confirmed tracks coast on the IMM prediction for
@@ -65,6 +69,24 @@ class TrackerConfig:
     z_alpha: float = 0.3
     yaw_alpha: float = 0.4
     heading_from_velocity: float = 1.0   # [m/s] above this, box heading follows the velocity
+
+
+def _center_in_box(xy, center, size_lw, yaw):
+    """True when ``xy`` lies in the bird's-eye rectangle (center, length/width, yaw)."""
+    dx, dy = float(xy[0] - center[0]), float(xy[1] - center[1])
+    c, s = np.cos(float(yaw)), np.sin(float(yaw))
+    lx, ly = c * dx + s * dy, -s * dx + c * dy
+    return abs(lx) <= float(size_lw[0]) / 2 and abs(ly) <= float(size_lw[1]) / 2
+
+
+def _second_box_on_track(box, label, track):
+    """Same class, and one center lies inside the other box: one long vehicle, not a neighbour."""
+    if track.label != label:
+        return False
+    center = track.imm.state[0][:2]
+    if _center_in_box(box[:2], center, track.size[:2], track.yaw):
+        return True
+    return _center_in_box(center, box[:2], box[3:5], box[6])
 
 
 @dataclass
@@ -239,13 +261,17 @@ class MultiObjectTracker:
                 t.mark_missed()
 
         matched_d = set(matches[:, 0].tolist())
-        for d in high:
-            if d not in matched_d:
-                self.tracks.append(Track(self._next_id, int(dets.labels[d]), dets.boxes[d],
-                                         None if vel is None else vel[d], dets.scores[d], stamp,
-                                         self._params(int(dets.labels[d])), cfg))
-                self.last_matches[self._next_id] = int(d)
-                self._next_id += 1
+        fresh = sorted((int(d) for d in high if d not in matched_d), key=lambda d: float(dets.scores[d]),
+                       reverse=True)
+        for d in fresh:
+            box = dets.boxes[d]
+            label = int(dets.labels[d])
+            if any(_second_box_on_track(box, label, t) for t in self.tracks):
+                continue
+            self.tracks.append(Track(self._next_id, label, box, None if vel is None else vel[d],
+                                     dets.scores[d], stamp, self._params(label), cfg))
+            self.last_matches[self._next_id] = int(d)
+            self._next_id += 1
 
         self.tracks = [t for t in self.tracks if
                        (t.confirmed and t.time_since_update <= self._params(t.label).max_age)

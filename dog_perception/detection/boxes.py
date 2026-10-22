@@ -29,8 +29,9 @@ NUSC_TO_SUBCLASS = {
     "car": "car",
     "truck": "truck",
     "construction_vehicle": "truck",
-    "bus": "bus",
-    "trailer": "bus",
+    # nuScenes bus / trailer heads fire on the long trucks in this robot's data
+    "bus": "truck",
+    "trailer": "truck",
     "motorcycle": "cyclist",
     "bicycle": "cyclist",
     "pedestrian": "pedestrian",

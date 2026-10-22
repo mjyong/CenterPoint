@@ -1,4 +1,4 @@
-track_id,label,subclass,review,mean_score,frames,interpolated,t_first,t_last,min_range_m,moving_share,max_speed,action,from,to,note
-23,cyclist,cyclist,1,0.312,116,0,17.20,28.70,1.4,0.00,0.00,,,,
-17,cyclist,cyclist,1,0.353,228,6,6.00,28.70,24.8,0.00,0.00,,,,
-16,cyclist,cyclist,1,0.356,231,6,5.70,28.70,19.6,0.00,0.00,,,,
+track_id,label,subclass,review,train_as,mean_score,frames,interpolated,t_first,t_last,min_range_m,length_m,height_m,moving_share,max_speed,action,from,to,note
+23,cyclist,cyclist,1,ignore,0.312,116,0,17.20,28.70,1.4,1.6,1.0,0.00,0.00,,,,
+17,cyclist,cyclist,1,ignore,0.353,228,6,6.00,28.70,24.8,1.9,1.2,0.00,0.00,,,,
+16,cyclist,cyclist,1,ignore,0.356,231,6,5.70,28.70,19.6,2.3,1.4,0.00,0.00,,,,

@@ -93,8 +93,14 @@ def default_class_map(model_class_names):
     return NUSC_TO_DOG
 
 
-def model_subclass(name):
-    """Subclass of a model class name (None for the older dog models' 'vehicle')."""
+def model_subclass(name, nusc=False):
+    """Subclass of a model class name (None for the older dog models' 'vehicle').
+
+    ``nusc``: the nuScenes teacher. Its bus and trailer heads are recorded as truck
+    (``NUSC_TO_SUBCLASS``). A dog model's own bus head stays bus.
+    """
+    if nusc:
+        return NUSC_TO_SUBCLASS.get(name)
     return name if name in SUBCLASSES else NUSC_TO_SUBCLASS.get(name)
 
 
@@ -161,7 +167,8 @@ class CenterPointDetector:
         self.model_class_names = names
         self.label_map = np.array([class_index(class_map.get(n, "")) for n in names], dtype=np.int64)
         # subclass only where it agrees with the mapped class (a custom class_map may disagree)
-        subs = [model_subclass(n) for n in names]
+        nusc = not set(names) <= set(CLASSES) | set(SUBCLASSES)
+        subs = [model_subclass(n, nusc) for n in names]
         self.subclass_map = np.array([subclass_index(s) if s and SUBCLASS_TO_CLASS[s] == class_map.get(n) else -1
                                       for n, s in zip(names, subs)], dtype=np.int64)
 

@@ -92,6 +92,39 @@ def test_low_score_detections_do_not_spawn_tracks_and_tentative_die():
     assert trk.tracks == []
 
 
+def _vehicles(rows):
+    """rows: (x, y, length, width, yaw, score). Class 0 is vehicle."""
+    boxes = np.array([[x, y, 1.5, length, width, 4.0, yaw] for x, y, length, width, yaw, score in rows])
+    scores = np.array([score for *_, score in rows])
+    n = len(rows)
+    return Detections(boxes, np.zeros((n, 2)), scores, np.zeros(n, dtype=np.int64), "world")
+
+
+def test_long_vehicle_two_boxes_stay_one_track():
+    """A 16 m bus seen as two boxes a few metres apart must not open a second track."""
+    trk = MultiObjectTracker(TrackerConfig())
+    one = _vehicles([(0.0, 0.0, 16.0, 3.0, 0.0, 0.8)])
+    trk.step(one, 0.1)
+    trk.step(one, 0.2)                         # confirm the track
+    two = _vehicles([(0.0, 0.0, 16.0, 3.0, 0.0, 0.8), (3.0, 0.0, 16.0, 3.0, 0.0, 0.5)])
+    for k in range(10):
+        out = trk.step(two, 0.3 + 0.1 * k)
+    assert [s.track_id for s in out] == [1]
+    assert len(trk.tracks) == 1
+    # the same pair on the first frame, before any track exists, also stays one track
+    born = MultiObjectTracker(TrackerConfig())
+    born.step(two, 0.1)
+    assert len(born.tracks) == 1
+
+
+def test_vehicles_side_by_side_stay_two_tracks():
+    trk = MultiObjectTracker(TrackerConfig())
+    side = _vehicles([(0.0, 0.0, 4.5, 1.8, 0.0, 0.8), (0.0, 4.0, 4.5, 1.8, 0.0, 0.8)])
+    trk.step(side, 0.1)
+    out = trk.step(side, 0.2)
+    assert len(out) == 2
+
+
 def test_static_pedestrian_static_in_world_while_robot_turns():
     """Tracking in the world frame: the robot spinning in place must not create motion."""
     robot = RobotTrajectory(GaitModel(speed=0.0, yaw_rate=1.0))

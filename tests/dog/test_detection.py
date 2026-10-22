@@ -284,7 +284,7 @@ def test_default_class_map_keeps_dog_classes():
 @pytest.mark.parametrize("config, subclasses", [
     ("configs/dog/dog_centerpoint_pp_xt32.py", ["car", "truck", "bus", "pedestrian", "cyclist"]),
     ("configs/dog/dog_centerpoint_pp_xt32_3cls.py", [None, "pedestrian", "cyclist"]),
-    (PP_CFG, ["car", "truck", "truck", "bus", "bus", None, "cyclist", "cyclist", "pedestrian", None]),
+    (PP_CFG, ["car", "truck", "truck", "truck", "truck", None, "cyclist", "cyclist", "pedestrian", None]),
 ])
 def test_detector_outputs_three_classes_and_keeps_subclass(config, subclasses):
     """Heads car / truck / bus come out as vehicle, with the head kept in Detections.subclasses."""
