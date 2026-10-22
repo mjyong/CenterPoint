@@ -32,7 +32,7 @@
 
 | 编号 | 任务 | 谁做 | 依赖 | 预计耗时 | 状态 |
 |---|---|---|---|---|---|
-| T0 | 环境和数据检查 | Agent | — | 10 分钟 | 待做 |
+| T0 | 环境和数据检查 | Agent | — | 10 分钟 | 停在第 3 步 |
 | T1 | 车辆审核材料 | Agent | T0 | 30 分钟 | 待做 |
 | T2 | 导出 v0 数据集（未审核的自动标注） | Agent | T0 | 30 分钟 | 待做 |
 | T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T2 | 2–6 小时 | 待做 |
@@ -104,7 +104,13 @@
 
 ### T0 结果
 
-（待填）
+- 测试：`python -m pytest tests/dog -q`，120 passed，7 warnings，1729 秒，退出码 0。
+- GPU：8 张 NVIDIA GeForce RTX 4090。`--dry-run` 空闲的是 3、5、7。
+- torch 2.13.0+cu130，CUDA 13.0 可用，spconv 2.3.8。
+- 磁盘：`df -h .` 可用 27 GB（877 GB 里已用 806 GB），不到 80 GB。停在第 3 步，没有继续改数据。
+- 权重：`nusc_voxel.pth` 103 MB（107553302 字节），`nusc_pp.pth` 69 MB（71958666 字节），都是完整文件，不是 Git LFS 指针。
+- 划分：train 25，val 10。
+- 场景：35 个都有 frames、results、labels，没有 MISSING。帧数合计 10363。明细在 `data/reports/T0/scenes.txt`。
 
 ---
 
