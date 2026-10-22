@@ -259,7 +259,9 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 
 ## T4 评估 v0
 
-**注意**：验证集现在是没审核的自动标注，由教师自己生成，对教师有利。这一步只能说明训练没跑坏、和教师差多少；真正的比较在 T7。
+**注意**：
+- 验证集现在是没审核的自动标注，由教师自己生成，对教师有利。这一步只能说明训练没跑坏、和教师差多少；真正的比较在 T7。
+- v0 的 truck head 只见过 13 条 truck 轨迹（T2：1,668 个框，另有 4,084 个忽略），truck AP 低是预期的，要等 H1 审完、v1 再看。
 
 ```text
 任务 T4：评估 v0。模型级（验证集 infos_val）和流水线级（验证场景整段跑）都做，并扫描上报阈值。
@@ -308,7 +310,13 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 
 1. **按轨迹（全部 35 个场景）**：
    - 在 Foxglove 里打开 `data/labels/<场景>/<场景>_review.mcap`，对照 `data/labels/<场景>/labels_tracks_vehicle.csv` 填 `action` 列；
-   - 优先处理 `train_as = ignore` 的行：训练集 135 条、验证集 72 条。动作怎么填：
+   - 优先处理 `train_as = ignore` 的行：训练集 135 条、验证集 72 条。
+   - 先审训练集里**按尺寸算 truck**（`length_m` ≥ 5.5 或 `height_m` ≥ 2.5）的忽略行。
+     - 现在训练集能当正样本的 truck 只有 13 条轨迹、1,668 个框，比验证集的 18 条、3,215 个框还少；忽略着的 truck 尺寸轨迹有 56 条、4,084 个框。
+     - 其中 84% 在这 6 个场景（括号里是条数 / 框数）：0921_165659_s028（8 / 1,024）、s012（3 / 709）、s027（9 / 596）、s026（6 / 442）、s016（5 / 364）、s025（3 / 277）。
+     - 审完这 6 个场景、再加上验证集的逐框审核，就能先做 T5、T6。
+     - 其余场景 `action` 空着的行，导出时仍是忽略框；之后补审完，重跑 T5 就行。
+   - 动作怎么填：
 
      | 情况 | 填 |
      |---|---|
@@ -359,7 +367,7 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
      python tools/dog/export_dataset.py $REC --val-recordings $VAL --classes vehicle \
          --out data/dog_veh --gt-db --jobs 8 2>&1 | tee data/reports/T5/export.txt
 
-验证集只有逐框审核过的帧（SUSTechPOINTS 每 5 帧取 1 帧，约 575 帧），这是预期的。
+验证集只有逐框审核过的帧（SUSTechPOINTS 每 5 帧取 1 帧，T1 导出了 580 帧），这是预期的。
 停止条件：apply 报未知动作；某个验证场景导回的帧数和 T1 导出的不一致；任何报错。
 提交：data/labels/0921_*/labels_reviewed.pkl、labels_sustech.pkl、data/reports/T5/、本文档。
 报告（写进"T5 结果"）：每个场景 apply 打印的那一行（汇总成表）；import 的类别计数；
