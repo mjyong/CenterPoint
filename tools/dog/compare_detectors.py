@@ -3,6 +3,10 @@
     python tools/dog/compare_detectors.py --labels data/rec_001/labels.pkl \
         --results pillar=work_dirs/rec_001/pillar/results.pkl voxel=work_dirs/rec_001/voxel/results.pkl
 
+``--thresholds 0.1 0.15 ... 0.6`` also prints, per model and class, precision / recall / F1 at
+each score threshold (2 m match, 0-40 m and 0-20 m) and two candidate reporting thresholds: the
+best F1, and the highest threshold that still reaches ``--target-recall`` within 20 m.
+
 Several recordings at once: pass all their label files and repeat a name for
 each of its results files (``voxel=rec_001/... voxel=rec_002/...``); frames
 are matched by stamp.
@@ -22,7 +26,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.detection.boxes import CLASSES  # noqa: E402
-from dog_perception.detection.evaluate import evaluate_detections, format_table  # noqa: E402
+from dog_perception.detection.evaluate import evaluate_detections, format_table, threshold_sweep  # noqa: E402
 from dog_perception.label_review import train_label  # noqa: E402
 
 
@@ -36,11 +40,16 @@ def main():
                     help="classes to score (--classes vehicle for the vehicle-only models)")
     ap.add_argument("--review-policy", choices=("ignore", "keep"), default="ignore",
                     help="labels still flagged for review: not scored (as in training, default) or scored")
+    ap.add_argument("--thresholds", type=float, nargs="*", default=None,
+                    help="score thresholds for the precision / recall / F1 table")
+    ap.add_argument("--target-recall", type=float, default=0.9,
+                    help="recall within 20 m the suggested reporting threshold must keep")
     args = ap.parse_args()
     classes = list(args.classes)
     # which labels are uncertain: the same rule as export_dataset.py (vehicle-only: also a teacher
     # subclass that disagrees with the size)
     rule = "vehicle" if classes == ["vehicle"] else "coarse"
+    sweeps = {}
 
     gt_by_stamp = {}
     for path in args.labels:
@@ -82,6 +91,9 @@ def main():
                             ignore=np.array([train_label(o, rule, args.review_policy)[1] for o in objs],
                                             dtype=bool)))
         table[name] = evaluate_detections(preds, gts, classes)
+        if args.thresholds:
+            sweeps[name] = {c: {rng: threshold_sweep(preds, gts, ci, sorted(args.thresholds), rng_bin=rng)
+                                for rng in ((0, 40), (0, 20))} for ci, c in enumerate(classes)}
         net = [r["timings"].get("network_ms", np.nan) for r in timed]
         pre = [r["timings"].get("deskew_ms", 0) + r["timings"].get("accumulate_ms", 0) for r in timed]
         extra[name] = dict(frames=len(preds), mAP=table[name]["mAP"],
@@ -98,6 +110,24 @@ def main():
         print("| %s | %d | %.3f | %.1f | %.1f | %.1f | %d | %.1f |" % (
             name, e["frames"], e["mAP"], e["network_ms_median"], e["network_ms_p95"], e["preprocess_ms"],
             e["tracks"], e["mean_track_len"]))
+    for name, by_cls in sweeps.items():
+        for c, by_rng in by_cls.items():
+            print()
+            print("%s / %s: reported detections at each score threshold (2 m match)" % (name, c))
+            print("| threshold | precision 0-40 m | recall 0-40 m | F1 0-40 m | precision 0-20 m | recall 0-20 m | "
+                  "F1 0-20 m | FP 0-40 m |")
+            print("|---|---|---|---|---|---|---|---|")
+            far, near = by_rng[(0, 40)], by_rng[(0, 20)]
+            for a, b in zip(far, near):
+                print("| %.2f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %d |" % (
+                    a["threshold"], a["precision"], a["recall"], a["f1"], b["precision"], b["recall"], b["f1"],
+                    a["fp"]))
+            best = max(far, key=lambda r: r["f1"])
+            ok = [r for r in near if r["recall"] >= args.target_recall]
+            print("best F1 (0-40 m): threshold %.2f (F1 %.3f, recall %.3f); highest threshold with recall >= %.2f "
+                  "within 20 m: %s" % (best["threshold"], best["f1"], best["recall"], args.target_recall,
+                                       "%.2f (precision %.3f)" % (ok[-1]["threshold"], ok[-1]["precision"])
+                                       if ok else "none"))
 
 
 if __name__ == "__main__":

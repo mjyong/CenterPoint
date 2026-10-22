@@ -507,7 +507,7 @@ for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do
 done
 ```
 
-审核完导出数据集，验证集就是 `split = val` 的那些场景。没审核、仍标着待审核的轨迹默认作忽略框（不当物体也不当背景，[DOG_FINETUNE.md](DOG_FINETUNE.md) ⑤）。**只训练车辆**（现在的要求）时加 `--classes vehicle`、输出到 `data/dog_veh`，用 `configs/dog/*_veh.py`，见 DOG_FINETUNE.md 第 13 节和下面 5.13 / 5.14。
+审核完导出数据集，验证集就是 `split = val` 的那些场景。没审核、仍标着待审核的轨迹默认作忽略框（不当物体也不当背景，[DOG_FINETUNE.md](DOG_FINETUNE.md) ⑤）。**只训练车辆**（现在的要求）时加 `--classes vehicle`、输出到 `data/dog_veh`，用 `configs/dog/*_veh.py`，见 DOG_FINETUNE.md 第 13 节；服务器上的步骤见 [SERVER_TASKS.md](SERVER_TASKS.md)。
 
 ```bash
 REC=$(for d in data/runs/${NAME}_s*; do r=$(basename $d); \
@@ -528,6 +528,8 @@ python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v00
 ```
 
 ## 5. 交给服务器上 AI Agent 的任务说明
+
+> **2026-10-22 起，服务器任务改在 [SERVER_TASKS.md](SERVER_TASKS.md) 管理**（目标：只用 0921 训练车辆检测模型，拆成 T0–T10 逐个做）。下面的 5.1–5.11 是已经做完的数据准备，留作记录；5.12–5.15 已被它取代，不要再按这里的 5.12–5.15 执行。
 
 下面整段可以直接复制给 Agent（路径按服务器实际情况改）：
 
@@ -860,6 +862,8 @@ B2. 提交每个场景的 data/labels/<场景>/labels.pkl、labels_tracks.csv �
 
 ### 5.13 第十三轮：只检车辆——审核材料 + 用自动标注先训一版（v0，0921）
 
+> **已被 [SERVER_TASKS.md](SERVER_TASKS.md) 取代**（T1–T4）。
+
 要求变了：行人、骑行者暂时不检，车辆必须检出、尽量准；0921 的"公交"其实都是大货车。新的配置只有 car、truck 两个 head，按框的尺寸分；拿不准的轨迹作忽略框（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节）。这一轮做两件事：A 给人准备只看车的审核材料；B 用未审核的自动标注先训一版 v0，把 GPU 训练流程跑通，并看大致效果（v0 不上线）。
 
 ```text
@@ -939,6 +943,8 @@ B6. 提交：把两个训练日志（data/train/*_veh_v0.log 和 work_dir 里的
 ```
 
 ### 5.14 第十四轮：审核后训练 v1（等人审完车辆）
+
+> **已被 [SERVER_TASKS.md](SERVER_TASKS.md) 取代**（T5–T7）。
 
 人按 5.13 A 的材料审完车辆以后再做（审核规则见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节"审核只看车"）。
 

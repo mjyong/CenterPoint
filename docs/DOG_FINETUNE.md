@@ -401,7 +401,7 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
 
 ### 训练和评估
 
-服务器上的步骤见 [BAG_SPLIT.md](BAG_SPLIT.md) 5.13（先用未审核的自动标注跑通一版，v0）和 5.14（审核后正式训练，v1）。要点：
+服务器上的步骤见 [SERVER_TASKS.md](SERVER_TASKS.md)：T2–T4 先用未审核的自动标注跑通一版（v0），H1 人工审核后 T5–T7 正式训练（v1），T8 导出 ONNX。要点：
 
 ```bash
 python tools/dog/convert_nusc_ckpt.py --src work_dirs/pretrained/nusc_voxel.pth --dst work_dirs/dog_voxel_veh_init.pth \

@@ -73,6 +73,20 @@ def test_ignored_ground_truth_is_not_scored():
     assert r["num_gt"] == 2 and r["AP@2.0"] < 0.5        # not ignored: a miss and a false positive
 
 
+def test_threshold_sweep():
+    """Raising the reporting threshold drops the low-scored false positive first, then a true one."""
+    from dog_perception.detection.evaluate import threshold_sweep
+    gt = [dict(boxes=np.array([[10.0, 0, 0, 4, 2, 1.5, 0.0], [30.0, 0, 0, 4, 2, 1.5, 0.0]]), labels=np.array([0, 0]))]
+    pred = [dict(boxes=np.array([[10.2, 0, 0, 4, 2, 1.5, 0], [30.3, 0, 0, 4, 2, 1.5, 0], [-15.0, 0, 0, 4, 2, 1.5, 0]]),
+                 labels=np.array([0, 0, 0]), scores=np.array([0.8, 0.4, 0.2]))]
+    r = {x["threshold"]: x for x in threshold_sweep(pred, gt, 0, [0.1, 0.3, 0.5])}
+    assert (r[0.1]["tp"], r[0.1]["fp"], r[0.1]["recall"]) == (2, 1, 1.0)
+    assert (r[0.3]["tp"], r[0.3]["fp"], r[0.3]["precision"]) == (2, 0, 1.0)
+    assert (r[0.5]["tp"], r[0.5]["recall"]) == (1, 0.5) and r[0.5]["f1"] == pytest.approx(2 / 3)
+    near = threshold_sweep(pred, gt, 0, [0.1], rng_bin=(0, 20))[0]
+    assert (near["n_gt"], near["tp"], near["fp"]) == (1, 1, 1)
+
+
 # ---------------------------------------------------------------- synthetic nuScenes
 def _q_yaw(yaw):
     return [float(np.cos(yaw / 2)), 0.0, 0.0, float(np.sin(yaw / 2))]

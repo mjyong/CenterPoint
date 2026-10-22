@@ -73,7 +73,7 @@ def _match(frames_pred, frames_gt, cls, thr, rng_bin=None):
         for i in np.nonzero(pm)[0]:
             preds.append((p["scores"][i], f, i))
     preds.sort(key=lambda x: -x[0])
-    tp, errs = [], []
+    tp, errs, scores = [], [], []
     for s, f, i in preds:
         g, p = frames_gt[f], frames_pred[f]
         free = np.nonzero(~gt_used[f])[0]
@@ -83,9 +83,11 @@ def _match(frames_pred, frames_gt, cls, thr, rng_bin=None):
             if _on_ignore(p["boxes"][i, :2], g["boxes"][_ignored(g)], thr):
                 continue        # on an uncertain label: neither TP nor FP
             tp.append(0)
+            scores.append(s)
             continue
         gt_used[f][free[j]] = True
         tp.append(1)
+        scores.append(s)
         e = {"trans": d[j]}
         gb, pb = g["boxes"][free[j]], p["boxes"][i]
         if len(gb) >= 7 and len(pb) >= 7:
@@ -96,7 +98,7 @@ def _match(frames_pred, frames_gt, cls, thr, rng_bin=None):
             if np.all(np.isfinite(gv)):
                 e["vel"] = float(np.linalg.norm(gv - p["velocities"][i]))
         errs.append(e)
-    return np.asarray(tp), n_gt, errs
+    return np.asarray(tp), n_gt, errs, np.asarray(scores, dtype=np.float64)
 
 
 def evaluate_detections(frames_pred, frames_gt, class_names, dist_thresholds=(0.5, 1.0, 2.0, 4.0),
@@ -108,7 +110,7 @@ def evaluate_detections(frames_pred, frames_gt, class_names, dist_thresholds=(0.
         r = {}
         aps = []
         for thr in dist_thresholds:
-            tp, n_gt, errs = _match(frames_pred, frames_gt, c, thr)
+            tp, n_gt, errs, _ = _match(frames_pred, frames_gt, c, thr)
             ap = _ap(tp, n_gt)
             aps.append(ap)
             r["AP@%.1f" % thr] = ap
@@ -120,12 +122,28 @@ def evaluate_detections(frames_pred, frames_gt, class_names, dist_thresholds=(0.
         r["mAP"] = float(np.nanmean(aps)) if not np.all(np.isnan(aps)) else float("nan")
         r["num_gt"] = int(sum(int(((g["labels"] == c) & ~_ignored(g)).sum()) for g in frames_gt))
         for lo, hi in range_bins:
-            tp, n_gt, _ = _match(frames_pred, frames_gt, c, 2.0, (lo, hi))
+            tp, n_gt, _, _ = _match(frames_pred, frames_gt, c, 2.0, (lo, hi))
             r["AP@2.0[%d-%dm]" % (lo, hi)] = _ap(tp, n_gt)
         res[name] = r
     valid = [v["mAP"] for v in res.values() if not np.isnan(v["mAP"])]
     res["mAP"] = float(np.mean(valid)) if valid else float("nan")
     return res
+
+
+def threshold_sweep(frames_pred, frames_gt, cls, thresholds, dist=2.0, rng_bin=None):
+    """Precision, recall and F1 of class ``cls`` when only detections scoring >= each threshold are
+    reported (greedy matching by score within ``dist`` m, ignored ground truth not counted).
+    Returns a list of dicts (threshold, tp, fp, n_gt, precision, recall, f1)."""
+    tp, n_gt, _, scores = _match(frames_pred, frames_gt, cls, dist, rng_bin)
+    out = []
+    for t in thresholds:
+        keep = scores >= t
+        n_tp, n_fp = int(tp[keep].sum()), int((tp[keep] == 0).sum())
+        prec = n_tp / max(n_tp + n_fp, 1)
+        rec = n_tp / n_gt if n_gt else float("nan")
+        f1 = 2 * prec * rec / (prec + rec) if n_gt and prec + rec > 0 else 0.0
+        out.append(dict(threshold=float(t), tp=n_tp, fp=n_fp, n_gt=int(n_gt), precision=prec, recall=rec, f1=f1))
+    return out
 
 
 def format_table(results_by_model, class_names):
