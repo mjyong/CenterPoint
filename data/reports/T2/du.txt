@@ -1,0 +1,6 @@
+du -sh data/dog_veh
+0	data/dog_veh
+du -shL data/dog_veh
+46G	data/dog_veh
+du -sh /public/zjst/robot/centerpoint_data/dog_veh
+46G	/public/zjst/robot/centerpoint_data/dog_veh
