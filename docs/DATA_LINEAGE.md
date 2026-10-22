@@ -125,7 +125,9 @@ mindmap
 | `/rte/rdap/rtk/imus/data_raw` | `sensor_msgs/Imu` | 100 Hz | 角速度（去畸变、位姿插值） |
 | `/rte/rdap/rtk/inspvax` | `kygi665_msgs/INSPVAX` | 100 Hz | 位置、航向、速度（位姿） |
 
-1016 的 bag 换成前置的 Livox Mid-360（`/robot/topic/rdap/front_point_cloud2`：x y z intensity tag line，`timestamp` 为绝对纳秒），没有 XT32，另有三个鱼眼相机（`/robot/topic/rdap/{front,left,right}_sensor_camera`，`foxglove_msgs/CompressedVideo`，H.264，1920×1536，24 Hz）。见 [BAG_SPLIT.md](BAG_SPLIT.md) 3.6。
+所有传感器的型号、参数、外参和天线杠杆臂见 [SENSORS.md](SENSORS.md)。
+
+1016 的 bag 误录成了前置的 Livox Mid-360（暂不使用；`/robot/topic/rdap/front_point_cloud2`：x y z intensity tag line，`timestamp` 为绝对纳秒），没有 XT32，另有三个鱼眼相机（`/robot/topic/rdap/{front,left,right}_sensor_camera`，`foxglove_msgs/CompressedVideo`，H.264，1920×1536，24 Hz）。见 [BAG_SPLIT.md](BAG_SPLIT.md) 3.6。
 
 **两种时间**：bag 给每条消息记了写入时刻（log time），消息头里还有传感器给的时间戳（`header.stamp`）。下游所有处理都用 `header.stamp`。
 - 雷达：写入时刻比 `header.stamp` 晚约 0.105 s，因为 `header.stamp` 是一圈扫描的开始，转完一圈（0.1 s）才发出来。
@@ -175,7 +177,7 @@ mindmap
 | `kygi_header.*` | `message_name` INSPVAX，`gps_week_number` 2437，`time_status` 180 | 设备报文头（GPS 周、周内毫秒、时间状态） | 不用 |
 | `ins_status.data` | 3 | 组合导航状态，3 = `INS_SOLUTION_GOOD` | 用：不是 3 的行直接丢掉；第一个是 3 的行作为 ENU 原点 |
 | `pos_type.data` | 56 | 定位类型 | 用于质量统计（`meta.inspvax_pos_type`、预览的 `rtk` 检查），见下面的说明 |
-| `latitude` `longitude` | 度 | 纬度、经度（INS 的一个参考点，在激光雷达后方约 0.54 m） | 用：转成 ENU 坐标（相对原点，单位 m），再挪到机身原点（杠杆臂） |
+| `latitude` `longitude` | 度 | 纬度、经度（INS 的输出点：天线接对时是 IMU 中心；0921 天线接反，落在激光雷达后方约 0.5 m，见 SENSORS.md 3.2） | 用：转成 ENU 坐标（相对原点，单位 m），再挪到机身原点（杠杆臂） |
 | `height` | 217.1 m | 高程 | 用：参与 ENU 换算 |
 | `undulation` | −38.0 m | 大地水准面差距 | 不用 |
 | `north_velocity` `east_velocity` `up_velocity` | 1.58, 0.47, −0.005 m/s | 北、东、天方向速度 | 用：写进 `odom.npy` 的速度列，按 (东, 北, 天) 排 |

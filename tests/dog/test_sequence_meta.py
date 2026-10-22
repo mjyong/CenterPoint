@@ -84,3 +84,13 @@ def test_pose_bad_frames_are_left_out_of_the_dataset(tmp_path):
                           for s in (10.0, 10.1, 11.0)])
     infos = export_recording(str(frames), labels, str(tmp_path / "out"), "rec")
     assert [i["timestamp"] for i in infos] == [11.0]
+
+
+def test_swapped_antennas_explain_the_fitted_ins_point():
+    """With master and slave swapped the INS reports a point 0.294 m behind the IMU: (0.021, -0.474) in
+    the body frame, within 0.11 m of the point fitted on the 0921 turns (docs/SENSORS.md 3.2)."""
+    from dog_perception.inspvax import KYGI_INS_LEVER_ARM, ins_point_with_swapped_antennas
+
+    p = ins_point_with_swapped_antennas()
+    assert np.allclose(p, [0.0213, -0.18 - 0.294, 0.0], atol=1e-3)
+    assert np.hypot(*(p[:2] - np.asarray(KYGI_INS_LEVER_ARM)[:2])) < 0.11

@@ -6,9 +6,10 @@ extrinsic is a rotation only and ``base_height`` is the lidar's height above the
 ``xt32``: Hesai XT32 on top (0921 recordings), absolute float64 ``timestamp`` in seconds,
 mounted turned 180 deg about z.
 
-``mid360``: Livox Mid-360 at the front (1016 recordings, ``/robot/topic/rdap/front_point_cloud2``,
+``mid360``: Livox Mid-360 at the front, recorded by mistake instead of the XT32 on 1016 (that batch
+is not used; detection runs on the XT32, docs/SENSORS.md). ``/robot/topic/rdap/front_point_cloud2``,
 livox_ros_driver2 PointCloud2: x, y, z, intensity, tag, line 0-3, ``timestamp`` in absolute
-nanoseconds; ~20,000 points per 0.1 s of which about half are empty returns). Mounted upside down
+nanoseconds; ~20,000 points per 0.1 s of which about half are empty returns. Mounted upside down
 and tilted: on 1016 sensor_recording_03 the ground normal in the lidar frame is
 (0.304, -0.025, -0.952), 162 deg from the lidar's +z, and the lidar is 0.52 m above the ground.
 Its upward-looking side (+x, up to ~24 deg above the horizon) faces forward: towards -x the field

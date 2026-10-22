@@ -55,8 +55,13 @@ straight at 1.5-2.5 m/s, see docs/DOG_PIPELINE.md section 9):
   (lidar -> IMU: T = (-0.0213, 0.18, 0.009) m, R = 180 deg yaw; in the body
   frame (0.02, -0.18) m). That value explains less of the 0921 offsets (rms
   0.086 m against 0.076 m, 0.097 m without a lever arm), so the INSPVAX point
-  is not the IMU centre; most likely the GNSS antenna, if the INS has no or a
-  wrong IMU -> antenna offset configured. The fitted value is used.
+  is not the IMU centre. The antenna lever arms (robot team, 2026-10) explain
+  most of it: the antennas sit 0.180 m ahead of and 0.474 m behind the IMU
+  (``KYGI_GNSS_ANTENNA_*_IN_IMU``); with master and slave swapped the INS
+  removes the configured antenna offset turned by 180 deg and lands 0.294 m
+  behind the IMU, at (0.021, -0.474) in the body frame
+  (``ins_point_with_swapped_antennas``), 0.10 m from the fitted point. The
+  fitted value is still used for the swapped recordings (docs/SENSORS.md 3.2).
 """
 from pathlib import Path
 
@@ -72,6 +77,9 @@ R_BODY_KYGI_IMU = np.eye(3)              # RTK IMU axes in the body frame (x rig
 KYGI_LIDAR_RPY = (0.0, 0.0, np.pi)       # XT32 orientation in the body frame (roll, pitch, yaw) [rad]
 KYGI_INS_LEVER_ARM = (-0.06, -0.54, 0.0)  # INSPVAX position point in the body frame [m], antennas swapped
 KYGI_IMU_IN_BODY = (0.0213, -0.18, 0.0)    # IMU centre in the body frame [m] (robot calibration; height unused)
+# GNSS antennas in the IMU frame (x right, y forward, z up) [m], robot team 2026-10: 0.6546 m baseline
+KYGI_GNSS_ANTENNA_FRONT_IN_IMU = (0.0, 0.1802874, 0.0366027)
+KYGI_GNSS_ANTENNA_REAR_IN_IMU = (0.0, -0.4742920, 0.0366027)
 KYGI_AZIMUTH_OFFSET_DEG = 180.0           # yaw = offset - azimuth: 180 with the antennas swapped (0921), else 0
 _A = 6378137.0
 _E2 = 6.69437999014e-3
@@ -167,6 +175,17 @@ def forward_speed(odom, min_speed=0.5, min_rows=1):
         return None
     fwd = [(quat_to_R(q)[:2, 1] @ vi) for q, vi in zip(np.asarray(odom)[m, 4:8], v[m])]
     return float(np.median(fwd))
+
+
+def ins_point_with_swapped_antennas(imu_in_body=KYGI_IMU_IN_BODY, front=KYGI_GNSS_ANTENNA_FRONT_IN_IMU,
+                                    rear=KYGI_GNSS_ANTENNA_REAR_IN_IMU):
+    """Where the INS reports its position (body frame, height dropped) when master and slave antenna
+    are swapped: it takes the other antenna's position for its configured one and removes the
+    configured antenna offset with a heading 180 deg off, so the horizontal offsets of the two
+    antennas add up: IMU centre + (front + rear) along the IMU's horizontal axes (the IMU axes are
+    the body axes, ``R_BODY_KYGI_IMU``). The same whichever antenna is configured as the master."""
+    off = R_BODY_KYGI_IMU @ (np.asarray(front, float) + np.asarray(rear, float))
+    return np.asarray(imu_in_body, float) + np.array([off[0], off[1], 0.0])
 
 
 def default_lever_arm(azimuth_offset_deg):
