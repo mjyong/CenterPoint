@@ -48,8 +48,8 @@
 | 编号 | 任务 | 谁做 | 依赖 | 预计耗时 | 状态 |
 |---|---|---|---|---|---|
 | T0 | 环境和数据检查 | Agent | — | 10 分钟 | 完成 |
-| T1 | 车辆审核材料 | Agent | T0 | 30 分钟 | 待做 |
-| T2 | 导出 v0 数据集（未审核的自动标注） | Agent | T0 | 30 分钟 | 待做 |
+| T1 | 车辆审核材料 | Agent | T0 | 30 分钟 | 完成 |
+| T2 | 导出 v0 数据集（未审核的自动标注） | Agent | T0 | 30 分钟 | 完成 |
 | T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T2 | 2–6 小时 | 待做 |
 | T4 | 评估 v0 | Agent | T3 | 1 小时 | 待做 |
 | H1 | 人工审核车辆：按轨迹（全部场景）+ 逐框（10 个验证场景） | 人 | T1 | 几个小时 | 待做 |
@@ -143,14 +143,24 @@
        python tools/dog/review_labels.py table --classes vehicle --labels data/labels/$r/labels.pkl \
            --out data/labels/$r/labels_tracks_vehicle.csv
      done | tee data/reports/T1/tables.txt
-2. 每个场景一个只画车的 Foxglove 文件（点云 + 标注框 + 教师原始框），8 个同时跑：
+2. 每个场景一个只画车的 Foxglove 文件（点云 + 标注框 + 教师原始框），8 个同时跑。
+   mcap 约 6 GB，写到公共盘，再链回原来的审核路径（不要写到仓库盘，见通用约定第 6 条）：
+     mkdir -p /public/zjst/robot/centerpoint_data/review_mcap
      awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT | xargs -P 8 -I{} python tools/dog/review_labels.py mcap \
          --vehicles-only --labels data/labels/{}/labels.pkl --frames data/runs/{}/frames \
-         --results data/runs/{}/voxel/results.pkl --out data/labels/{}/{}_review.mcap
-3. 验证集的 10 个场景导出到 SUSTechPOINTS（只有车，每 5 帧取 1 帧）：
+         --results data/runs/{}/voxel/results.pkl \
+         --out /public/zjst/robot/centerpoint_data/review_mcap/{}_review.mcap
+     for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do
+       ln -sfn /public/zjst/robot/centerpoint_data/review_mcap/${r}_review.mcap data/labels/$r/${r}_review.mcap
+     done
+3. 验证集的 10 个场景导出到 SUSTechPOINTS（只有车，每 5 帧取 1 帧）。点云写到公共盘，再链到工具默认的 data/：
+     mkdir -p /public/zjst/robot/centerpoint_data/sustech
      for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); do
        python tools/dog/sustechpoints_convert.py export --vehicles-only --labels data/labels/$r/labels.pkl \
-           --frames data/runs/$r/frames --scene $r --every 5
+           --frames data/runs/$r/frames --scene $r --every 5 \
+           --out /public/zjst/robot/centerpoint_data/sustech
+       rm -rf third_party/SUSTechPOINTS/data/$r
+       ln -sfn /public/zjst/robot/centerpoint_data/sustech/$r third_party/SUSTechPOINTS/data/$r
      done | tee data/reports/T1/sustech.txt
 
 停止条件：任何命令报错。
@@ -162,7 +172,10 @@ SUSTechPOINTS 在服务器上 python tools/dog/sustechpoints_convert.py serve，
 
 ### T1 结果
 
-（待填）
+- 车辆轨迹（`data/labels/<场景>/labels_tracks_vehicle.csv`，和背景表一致）：训练 269 条，其中 `train_as = ignore` 135 条；验证 108 条，其中 `train_as = ignore` 72 条。表本身很小，留在仓库里提交。
+- review mcap：35 个，合计 6.3 GB，在 `/public/zjst/robot/centerpoint_data/review_mcap/`。`data/labels/<场景>/<场景>_review.mcap` 是指向该目录的符号链接（仓库盘上原先那份约 6.3 GB 的旧 mcap 已换成链接）。
+- SUSTechPOINTS（只有车，每 5 帧取 1 帧）在 `/public/zjst/robot/centerpoint_data/sustech/`，合计 2.0 GB。`third_party/SUSTechPOINTS/data/<场景>` 是指向它的符号链接。各验证场景帧数：0921_164127_s000 58、s001 57、s002 58、s003 57、s004 58、s005 58，0921_165659_s003 56、s004 56、s005 61、s006 61，合计 580。
+- 审核人员怎么打开：Foxglove 打开 `data/labels/<场景>/<场景>_review.mcap`。SUSTechPOINTS 在仓库根目录运行 `python tools/dog/sustechpoints_convert.py serve`，端口 8081。
 
 ---
 
@@ -198,7 +211,16 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 
 ### T2 结果
 
-（待填）
+- 权重迁移都打印 `tasks car, truck`：`work_dirs/dog_voxel_veh_init.pth` 341 tensors，`work_dirs/dog_pp_veh_init.pth` 241 tensors。权重不提交。
+- `export.txt` 末尾：
+  - `train 7311 / val 2874 / test 0 frames -> data/dog_veh`
+  - `train boxes: car 12902 (+4422 ignored), truck 1668 (+4084 ignored)`
+  - `val boxes: car 3043 (+3055 ignored), truck 3215 (+3144 ignored)`
+  - `note: 4261 boxes: teacher subclass disagrees with size (ignored)`
+  - GT 库：`load 12902 car database infos`，`load 1668 truck database infos`（`dbinfos_train_5sweeps_withvelo.pkl` 同样是 car 12902、truck 1668）
+- 帧数和框数与预期一致（差 0%）。点云帧 10185 个 npy（7311 + 2874）。
+- 大小：`data/dog_veh` 是指向 `/public/zjst/robot/centerpoint_data/dog_veh` 的链接，`du -sh data/dog_veh` 只看到链接本身，显示 0；`du -shL data/dog_veh` 和目标目录都是 46G。
+- 耗时：导出加 GT 库 213 秒（2026-10-22 16:24:11–16:27:44，+08:00）。
 
 ---
 

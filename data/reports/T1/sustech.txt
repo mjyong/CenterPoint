@@ -1,0 +1,13 @@
+start sustech 2026-10-22T16:27:04+08:00
+58 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_164127_s000
+57 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_164127_s001
+58 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_164127_s002
+57 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_164127_s003
+58 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_164127_s004
+58 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_164127_s005
+56 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_165659_s003
+56 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_165659_s004
+61 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_165659_s005
+61 frames -> /public/zjst/robot/centerpoint_data/sustech/0921_165659_s006
+end sustech 2026-10-22T16:27:26+08:00
+2.0G	/public/zjst/robot/centerpoint_data/sustech

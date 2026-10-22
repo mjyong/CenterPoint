@@ -1,0 +1,6 @@
+track_id,label,subclass,review,train_as,mean_score,frames,interpolated,t_first,t_last,min_range_m,length_m,height_m,moving_share,max_speed,action,from,to,note
+48,vehicle,truck,1,ignore,0.351,17,10,6.50,8.10,24.7,2.4,1.8,0.00,0.00,,,,
+289,vehicle,car,1,ignore,0.376,30,2,27.20,30.10,38.8,4.8,2.1,0.00,0.00,,,,
+310,vehicle,truck,1,ignore,0.378,8,0,29.40,30.10,15.5,2.7,2.1,0.00,0.00,,,,
+277,vehicle,car,0,car,0.542,46,0,25.60,30.10,34.2,4.6,1.8,0.00,0.00,,,,
+276,vehicle,car,0,car,0.551,48,2,25.40,30.10,34.4,4.8,1.9,0.00,0.00,,,,
