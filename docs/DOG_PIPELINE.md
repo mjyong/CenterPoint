@@ -4,7 +4,7 @@
 
 传感器（XT32、组合导航与天线、鱼眼相机）的参数、外参和录制清单见 [SENSORS.md](SENSORS.md)。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（116 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（119 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 

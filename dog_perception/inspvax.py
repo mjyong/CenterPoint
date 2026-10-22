@@ -61,7 +61,9 @@ straight at 1.5-2.5 m/s, see docs/DOG_PIPELINE.md section 9):
   removes the configured antenna offset turned by 180 deg and lands 0.294 m
   behind the IMU, at (0.021, -0.474) in the body frame
   (``ins_point_with_swapped_antennas``), 0.10 m from the fitted point. The
-  fitted value is still used for the swapped recordings (docs/SENSORS.md 3.2).
+  INS output point is the IMU centre (robot team, 2026-10-22), as this
+  assumes. The fitted value is still used for the swapped recordings
+  (docs/SENSORS.md 3.2).
 """
 from pathlib import Path
 
