@@ -27,12 +27,19 @@
    - 按"提交"一项提交，推送到 `claude/me/v01`。
    - 权重（`.pth`）、点云帧、`.pkl`、mcap 都不提交。
 5. 选 GPU：`python tools/dog/batch_label.py --split $SPLIT --dry-run` 会打印每张卡的显存和占用。用空闲的卡，`CUDA_VISIBLE_DEVICES=<卡号>`。
+6. 大的输出写到 `/public/zjst/robot`（和 `data/seq`、`data/runs` 同一块盘）。空闲空间用 `df -h /public/zjst/robot` 看，至少 80 GB。不要用 `df -h .`：那是仓库所在盘，后面的导出、训练权重、推理结果都不写到那里。第一次往下面这些目录写之前，先链过去（已经是这个链接就不用再做）：
+   ```bash
+   for d in dog_veh train deploy runs_veh_v0 runs_nusc_pp runs_veh_v1 runs_veh_v1_view runs_r2 labels_r2 seq_lever; do
+     mkdir -p /public/zjst/robot/centerpoint_data/$d
+     ln -sfn /public/zjst/robot/centerpoint_data/$d data/$d
+   done
+   ```
 
 ## 状态
 
 | 编号 | 任务 | 谁做 | 依赖 | 预计耗时 | 状态 |
 |---|---|---|---|---|---|
-| T0 | 环境和数据检查 | Agent | — | 10 分钟 | 停在第 3 步 |
+| T0 | 环境和数据检查 | Agent | — | 10 分钟 | 完成 |
 | T1 | 车辆审核材料 | Agent | T0 | 30 分钟 | 待做 |
 | T2 | 导出 v0 数据集（未审核的自动标注） | Agent | T0 | 30 分钟 | 待做 |
 | T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T2 | 2–6 小时 | 待做 |
@@ -82,7 +89,7 @@
 
 1. python -m pytest tests/dog -q：全部通过（有 GPU 时 Voxel 的测试也会跑）。
 2. nvidia-smi；python -c "import torch, spconv; print(torch.__version__, torch.cuda.is_available(), spconv.__version__)"
-3. df -h .：至少 80 GB 空闲（T2 导出约 40 GB，训练权重约 5 GB）。
+3. df -h /public/zjst/robot：至少 80 GB 空闲（T2 导出约 40 GB，训练权重约 5 GB，都写在这块盘上，见通用约定第 6 条）。
 4. ls -la work_dirs/pretrained/：nusc_voxel.pth 约 103 MB、nusc_pp.pth 约 72 MB。
    只有一百多字节说明是 Git LFS 指针，先 git lfs install && git lfs pull。
 5. awk -F, 'NR>1{print $2}' $SPLIT | sort | uniq -c：应为 train 25、val 10。
@@ -95,7 +102,7 @@
    每个场景都应有 frames（几百帧）、results 和 labels。
 7. python tools/dog/batch_label.py --split $SPLIT --dry-run：记下哪些卡空闲。
 
-停止条件：测试不通过；没有 CUDA 或 spconv；空间不足 80 GB；任何场景缺 frames / results / labels
+停止条件：测试不通过；没有 CUDA 或 spconv；`/public/zjst/robot` 空闲不足 80 GB；任何场景缺 frames / results / labels
 （缺的话报告是哪些，不要自己重跑教师）。
 提交：data/reports/T0/scenes.txt 和本文档（结果、状态）。
 报告（写进"T0 结果"）：测试结果一行；GPU 型号、数量、空闲的卡号；torch / CUDA / spconv 版本；
@@ -107,7 +114,7 @@
 - 测试：`python -m pytest tests/dog -q`，120 passed，7 warnings，1729 秒，退出码 0。
 - GPU：8 张 NVIDIA GeForce RTX 4090。`--dry-run` 空闲的是 3、5、7。
 - torch 2.13.0+cu130，CUDA 13.0 可用，spconv 2.3.8。
-- 磁盘：`df -h .` 可用 27 GB（877 GB 里已用 806 GB），不到 80 GB。停在第 3 步，没有继续改数据。
+- 磁盘：`df -h /public/zjst/robot` 可用 699 TB（950 TB 里已用 252 TB），超过 80 GB。
 - 权重：`nusc_voxel.pth` 103 MB（107553302 字节），`nusc_pp.pth` 69 MB（71958666 字节），都是完整文件，不是 Git LFS 指针。
 - 划分：train 25，val 10。
 - 场景：35 个都有 frames、results、labels，没有 MISSING。帧数合计 10363。明细在 `data/reports/T0/scenes.txt`。
