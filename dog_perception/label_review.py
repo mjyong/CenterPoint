@@ -16,7 +16,11 @@ one row per track in the track table (``write_track_table``): the
 
 The ``train_as`` column says what ``export_dataset.py`` will make of the
 track (class name, ``ignore``, or empty when left out): a reviewer decides the
-``ignore`` rows (``ok`` makes them count, ``drop`` removes them). With
+``ignore`` rows (``ok`` makes them count, ``drop`` removes them).
+``confident_frames``: the track's detections the teacher scored 0.6 or more
+(with 5 or more the track is not flagged). ``few_points``: frames whose box
+holds fewer than 5 points in the current sweep (occluded or far); those frames
+become ignore boxes, or are left out without any point, whatever the action. With
 ``--classes vehicle`` the table lists vehicles only, those rows first.
 
 Several actions combine with ``+`` (``cyclist+flip``). ``from`` / ``to``
@@ -36,12 +40,13 @@ import numpy as np
 
 from .detection.boxes import CLASSES, SUBCLASS_TO_CLASS, Detections, subclass_from_size, vehicle_head
 from .geometry import inv_T, wrap_angle
+from .visibility import visibility
 
 VEHICLE_SUBCLASSES = tuple(k for k, v in SUBCLASS_TO_CLASS.items() if v == "vehicle")
 ACTIONS = ("ok", "drop", "flip", "static", "ignore") + CLASSES + VEHICLE_SUBCLASSES
-TABLE_COLUMNS = ["track_id", "label", "subclass", "review", "train_as", "mean_score", "frames", "interpolated",
-                 "t_first", "t_last", "min_range_m", "length_m", "height_m", "moving_share", "max_speed", "action",
-                 "from", "to", "note"]
+TABLE_COLUMNS = ["track_id", "label", "subclass", "review", "train_as", "mean_score", "confident_frames", "frames",
+                 "interpolated", "few_points", "t_first", "t_last", "min_range_m", "length_m", "height_m",
+                 "moving_share", "max_speed", "action", "from", "to", "note"]
 
 
 # ------------------------------------------------------------------ training labels
@@ -70,11 +75,17 @@ def train_label(o, classes="sub", review_policy="ignore", counts=None):
     """(class name or None to leave the object out, ignore flag) of one label object.
 
     Ignore boxes get no loss either way and are not scored: tracks a reviewer marked ``ignore``;
-    tracks still flagged for review (mean score < 0.5, not reviewed) unless ``review_policy`` is
-    'drop' (left out) or 'keep' (positives); and with ``classes='vehicle'``, unreviewed vehicles whose
-    teacher subclass disagrees with their size (a 'truck' the size of a car)."""
+    tracks still flagged for review (not confident enough, not reviewed) unless ``review_policy`` is
+    'drop' (left out) or 'keep' (positives); with ``classes='vehicle'``, unreviewed vehicles whose
+    teacher subclass disagrees with their size (a 'truck' the size of a car); and boxes the cloud
+    hardly shows (``visibility``: fewer than ``MIN_POINTS`` in the current sweep). A box without a
+    single point in any sweep is left out."""
     name = gt_name(o, classes, counts)
     if name is None:
+        return None, False
+    vis = visibility(o)
+    if vis == "none":
+        _count(counts, "no points in the input (left out)")
         return None, False
     ignore = bool(o.get("ignore"))
     if o.get("review"):
@@ -84,6 +95,9 @@ def train_label(o, classes="sub", review_policy="ignore", counts=None):
     sub = o.get("subclass")
     if classes == "vehicle" and sub and not o.get("reviewed") and (sub == "car") != (name == "car"):
         _count(counts, "teacher subclass disagrees with size (ignored)")
+        ignore = True
+    if vis == "few":
+        _count(counts, "few points in the current sweep (ignored)")
         ignore = True
     _count(counts, name + (" ignored" if ignore else ""))
     return name, ignore
@@ -111,13 +125,18 @@ def track_table(labels, classes="sub"):
         stamps = [labels["frames"][fi]["stamp"] for fi, _ in refs]
         speed = np.array([np.hypot(*o["velocity"]) for o in objs])
         size = np.median(np.stack([o["box"][3:6] for o in objs]), axis=0)
-        name, ign = train_label(dict(objs[0], box=np.r_[objs[0]["box"][:3], size, objs[0]["box"][6]],
+        # the track's verdict: median size, any frame flagged; visibility is per frame (few_points)
+        track = {k: v for k, v in objs[0].items() if k not in ("points", "points_all")}
+        name, ign = train_label(dict(track, box=np.r_[objs[0]["box"][:3], size, objs[0]["box"][6]],
                                      review=any(o["review"] for o in objs)), classes)
+        vis = [visibility(o) for o in objs]
         rows.append(dict(
             track_id=tid, label=objs[0]["label"], subclass=objs[0].get("subclass") or "",
             review=int(any(o["review"] for o in objs)), train_as="ignore" if ign else name or "",
-            mean_score="%.3f" % np.mean([o["score"] for o in objs]), frames=len(objs),
+            mean_score="%.3f" % np.mean([o["score"] for o in objs]),
+            confident_frames=objs[0].get("confident_frames", ""), frames=len(objs),
             interpolated=sum(bool(o["interpolated"]) for o in objs),
+            few_points="" if vis[0] is None else sum(v in ("none", "few") for v in vis),
             t_first="%.2f" % (min(stamps) - t0), t_last="%.2f" % (max(stamps) - t0),
             min_range_m="%.1f" % min(np.hypot(*o["box"][:2]) for o in objs),
             length_m="%.1f" % size[0], height_m="%.1f" % size[2],

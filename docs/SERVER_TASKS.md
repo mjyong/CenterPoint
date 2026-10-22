@@ -48,11 +48,12 @@
 | 编号 | 任务 | 谁做 | 依赖 | 预计耗时 | 状态 |
 |---|---|---|---|---|---|
 | T0 | 环境和数据检查 | Agent | — | 10 分钟 | 完成 |
-| T1 | 车辆审核材料 | Agent | T0 | 30 分钟 | 完成 |
-| T2 | 导出 v0 数据集（未审核的自动标注） | Agent | T0 | 30 分钟 | 完成 |
-| T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T2 | 2–6 小时 | 待做 |
+| T1 | 车辆审核材料 | Agent | T0 | 30 分钟 | 完成；标注规则变了，T1R 里重做 |
+| T2 | 导出 v0 数据集（未审核的自动标注） | Agent | T0 | 30 分钟 | 完成；T1R 里重做 |
+| T1R | 按新规则重做自动标注（遮挡点数、待审核、静止毛刺），重做 T1、T2，统计 | Agent | T0 | 40 分钟 | 待做 |
+| T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T1R | 2–6 小时 | 待做 |
 | T4 | 评估 v0 | Agent | T3 | 1 小时 | 待做 |
-| H1 | 人工审核车辆：按轨迹（全部场景）+ 逐框（10 个验证场景） | 人 | T1 | 几个小时 | 待做 |
+| H1 | 人工审核车辆：先抽查新规则，再按轨迹（全部场景）+ 逐框（10 个验证场景） | 人 | T1R | 几个小时 | 待做 |
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 待做 |
 | T6 | 训练 v1 | Agent | T5 | 2–6 小时 | 待做 |
 | T7 | 评估 v1，选 epoch 和上报阈值 | Agent | T6 | 1 小时 | 待做 |
@@ -60,7 +61,8 @@
 | T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
 
-- T1 和 T2–T4 可以同时进行：T1 的材料给人审核（H1），v0 同时在训练。
+- T1R 之后，H1 和 T3–T4 可以同时进行：人审核（H1），v0 同时在训练。
+- 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
 - v0 只用未审核的自动标注，主要作用是把 GPU 训练流程跑通、得到一个基线，**不上线**。要上线的是 v1。
 
 ## 背景：已经有的东西
@@ -75,7 +77,7 @@
 
 验证集是这 10 个场景：0921_164127_s000–s005、0921_165659_s003–s006。
 
-按只检车辆的规则（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节），未审核时的车辆样本：
+按只检车辆的规则（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节），未审核时的车辆样本（T1R 之前的规则；新数字见 T1R 结果）：
 
 | | 帧（不含位姿不可靠的） | 车辆轨迹 | 其中要人定的（`train_as = ignore`） |
 |---|---|---|---|
@@ -224,11 +226,73 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 
 ---
 
+## T1R 按新规则重做自动标注，重做 T1、T2
+
+2026-10-22 自动标注改了三处（DOG_FINETUNE.md 第 14 节）：
+- 每个框记下框里的点数：遮挡、太远的框在导出时作忽略框或不要；
+- 待审核规则：平均分 < 0.5 **并且** ≥ 0.6 分的帧不到 5 帧；
+- 去掉短于 1 s 的假运动。
+
+教师结果（`data/runs/<场景>/voxel/results.pkl`）不用重跑，只重做自动标注（CPU），再重做 T1、T2。
+
+```text
+任务 T1R：按新规则重做 0921 的自动标注和审核材料，重新导出 v0 数据集，并统计待审核轨迹和在线运动状态。
+先按 docs/SERVER_TASKS.md 的"通用约定"做（这次拉到了代码改动，要跑快速测试）。
+前置：
+  - data/labels/0921_*/labels_tracks*.csv 的 action 列全是空的（H1 还没开始；不是就停下报告）；
+  - 如果 T3 已经在跑：停掉（它用的是旧标注），删掉 data/train/dog_voxel_veh_v0、data/train/dog_pp_veh_v0。
+
+1. 重做自动标注。覆盖 data/labels/<场景>/labels.pkl 和 labels_tracks.csv；只用 CPU，8 个同时跑：
+     mkdir -p data/reports/T1R
+     awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT | xargs -P 8 -I{} sh -c \
+       'python tools/dog/auto_label.py --results data/runs/{}/voxel/results.pkl --out data/labels/{}/labels.pkl \
+            > data/reports/T1R/auto_label_{}.txt 2>&1'
+     cat data/reports/T1R/auto_label_*.txt > data/reports/T1R/auto_label.txt && rm data/reports/T1R/auto_label_0921*.txt
+   每个场景一行 "labelled ... N tracks (M flagged for review)"。
+2. 检查新字段：
+     python -c "import pickle; L=pickle.load(open('data/labels/0921_165659_s016/labels.pkl','rb')); \
+       o=[o for f in L['frames'] for o in f['objects']][0]; print({k: o.get(k) for k in ('det_score','confident_frames','points','points_all')})"
+   points / points_all 是 None 就停下：说明没找到 data/runs/<场景>/frames。
+3. 重做 T1 第 1 步（车辆轨迹表），输出 tee 到 data/reports/T1R/tables.txt（不要覆盖 data/reports/T1/）。
+4. 校准待审核规则：
+     python tools/dog/review_labels.py confidence --vehicles-only \
+         --labels $(for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do echo data/labels/$r/labels.pkl; done) \
+         --spot-check data/reports/T1R/review_spot_check.csv | tee data/reports/T1R/confidence.txt
+5. 在线运动状态的基线（教师检测，离线修正过的位姿）：
+     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
+     TRAIN=$(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT)
+     python tools/dog/motion_eval.py $(for r in $VAL; do echo --scene data/labels/$r/labels.pkl data/runs/$r/voxel/results.pkl; done) \
+         --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 | tee data/reports/T1R/motion_val.txt
+     python tools/dog/motion_eval.py $(for r in $TRAIN; do echo --scene data/labels/$r/labels.pkl data/runs/$r/voxel/results.pkl; done) \
+         --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 | tee data/reports/T1R/motion_train.txt
+6. 重做 T1 第 2、3 步：review mcap 和 SUSTechPOINTS。直接覆盖公共盘上的旧文件，链接不用动；
+   输出 tee 到 data/reports/T1R/mcap.txt、data/reports/T1R/sustech.txt。
+7. 重做 T2 第 2、3 步（权重迁移不用重做）。导出前先清空旧数据集：
+     rm -rf data/dog_veh/*      # 不要写成 rm -rf data/dog_veh（那会删掉链接）
+   输出 tee 到 data/reports/T2/export.txt（覆盖第一次的），du 写到 data/reports/T2/du.txt。
+
+停止条件：任何报错；第 2 步没有点数；导出的帧数不是训练 7,311、验证 2,874。
+提交：data/labels/0921_*/labels.pkl、labels_tracks.csv、labels_tracks_vehicle.csv；data/reports/T1R/、data/reports/T2/；本文档。
+报告（写进"T1R 结果"）：
+- 待审核：各场景 train_as=ignore 条数汇总（训练 / 验证），和 T1 的 135 / 72 比；
+- confidence.txt 的表；review_spot_check.csv 有多少条；
+- motion_val.txt、motion_train.txt 的表；
+- export.txt 末尾：train / val boxes 两行，以及 note 行（"no points in the input (left out)"、
+  "few points in the current sweep (ignored)"、"teacher subclass disagrees with size" 各多少），和第一次 T2 比；
+- 耗时。
+```
+
+### T1R 结果
+
+（待填）
+
+---
+
 ## T3 训练 v0
 
 ```text
 任务 T3：在两张空闲 GPU 上同时训练只检车辆的 Voxel 和 Pillar 模型 v0（20 个 epoch）。
-先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T2 完成（data/dog_veh/infos_train.pkl 存在）。
+先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T1R 完成（data/dog_veh/infos_train.pkl 是 T1R 第 7 步导出的）。
 
 1. 选两张空闲的卡（batch_label.py --dry-run），各起一个训练：
      mkdir -p data/train data/reports/T3
@@ -289,12 +353,16 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
          --results $(for r in $VAL; do echo teacher=data/runs/$r/voxel/results.pkl nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl \
                      v0_voxel=data/runs_veh_v0/$r/voxel/results.pkl v0_pp=data/runs_veh_v0/$r/pillar/results.pkl; done) \
          --thresholds 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 | tee data/reports/T4/compare_val.md
+4. 在线运动状态，用 v0 Pillar 的检测（线上跑的就是 Pillar），和 T1R 里教师的基线比：
+     python tools/dog/motion_eval.py $(for r in $VAL; do echo --scene data/labels/$r/labels.pkl data/runs_veh_v0/$r/pillar/results.pkl; done) \
+         --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 | tee data/reports/T4/motion_v0_pp.txt
 
 停止条件：任何报错。
 提交：data/reports/T4/、本文档。
 报告（写进"T4 结果"）：
 - 每个模型每个 epoch 的 merged/vehicle 一行（mAP、AP@0.5/1/2/4、分距离段 AP、ATE、ASE、AOE），以及 car、truck 各一行；
 - compare_val.md 的两张表（AP 表、耗时表），以及每个模型的阈值表最后的推荐行；
+- motion_v0_pp.txt 的表；
 - 一句话结论：v0 比 nuScenes Pillar 好还是差、差在哪个距离段。
 ```
 
@@ -308,12 +376,19 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 
 只审车：不用管行人、骑行者，也不用改 car / truck / bus。规则见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节"审核只看车"，审核工具的用法见第 ④ 节和第 10 节。
 
+0. **先抽查新的待审核规则（约 15 分钟）**：
+   - `data/reports/T1R/review_spot_check.csv` 列的是平均分 < 0.5、但有 ≥ 5 帧 ≥ 0.6 分，因此不再要审的车辆轨迹；
+   - 随机抽 20 条，在对应场景的 review mcap 里看，`real_vehicle` 列填 `y` / `n`；
+   - 全是 `y`：规则可用，接着做第 1 步；
+   - 有 `n`：把 CSV 提交上来，先别往下审。我来提高分数或帧数，Agent 重跑 T1R 第 1、3、6、7 步，轨迹表会变。
 1. **按轨迹（全部 35 个场景）**：
    - 在 Foxglove 里打开 `data/labels/<场景>/<场景>_review.mcap`，对照 `data/labels/<场景>/labels_tracks_vehicle.csv` 填 `action` 列；
-   - 优先处理 `train_as = ignore` 的行：训练集 135 条、验证集 72 条。
+   - 只需处理 `train_as = ignore` 的行（条数见 T1R 结果；旧规则下训练集 135 条、验证集 72 条）。
+   - **按 `frames` 从多到少审，不到 20 帧的可以不审。** 旧规则下，不到 20 帧的占要审轨迹的 30%，框只占 4%；留空的仍是忽略框，不会被当成背景。
+   - `few_points` 列：这条轨迹有多少帧被挡住或太远。这些帧会自动作忽略框或不要，不用因为这些帧填 `ignore`。
    - 先审训练集里**按尺寸算 truck**（`length_m` ≥ 5.5 或 `height_m` ≥ 2.5）的忽略行。
-     - 现在训练集能当正样本的 truck 只有 13 条轨迹、1,668 个框，比验证集的 18 条、3,215 个框还少；忽略着的 truck 尺寸轨迹有 56 条、4,084 个框。
-     - 其中 84% 在这 6 个场景（括号里是条数 / 框数）：0921_165659_s028（8 / 1,024）、s012（3 / 709）、s027（9 / 596）、s026（6 / 442）、s016（5 / 364）、s025（3 / 277）。
+     - 旧规则下，训练集能当正样本的 truck 只有 13 条轨迹、1,668 个框，比验证集的 18 条、3,215 个框还少；忽略着的 truck 尺寸轨迹有 56 条、4,084 个框。
+     - 其中 84% 在这 6 个场景（旧规则下的条数 / 框数）：0921_165659_s028（8 / 1,024）、s012（3 / 709）、s027（9 / 596）、s026（6 / 442）、s016（5 / 364）、s025（3 / 277）。
      - 审完这 6 个场景、再加上验证集的逐框审核，就能先做 T5、T6。
      - 其余场景 `action` 空着的行，导出时仍是忽略框；之后补审完，重跑 T5 就行。
    - 动作怎么填：
@@ -324,7 +399,8 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
      | 不是车 | `drop` |
      | 看不清 | `ignore` |
      | 朝向反了 | 加 `+flip` |
-     | 停着的车 | 加 `+static` |
+     | 停着的车，表里 `moving_share` 却不是 0 | 加 `+static`（狗遇到运动的车才停，静止判断要准） |
+     | 在动的车，表里 `moving_share` 是 0 | 写在 `note` 列（现在没有动作能把静止改成运动） |
      | 小三轮车、老年代步车（算骑行者） | `cyclist` |
      | 单独停着的挂车厢（算车辆） | `ok` |
 
@@ -355,7 +431,8 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
      done 2>&1 | tee data/reports/T5/apply.txt
 2. 验证场景导回逐框审核的结果：
      for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); do
-       python tools/dog/sustechpoints_convert.py import --scene $r --out data/labels/$r/labels_sustech.pkl
+       python tools/dog/sustechpoints_convert.py import --scene $r --frames data/runs/$r/frames \
+           --out data/labels/$r/labels_sustech.pkl
      done 2>&1 | tee data/reports/T5/import.txt
 3. 导出（有 labels_sustech.pkl 用它，否则用 labels_reviewed.pkl）：
      REC=$(for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do \

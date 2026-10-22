@@ -18,6 +18,27 @@ Association (SimpleTrack / ByteTrack style):
 Life cycle: tentative -> confirmed after ``min_hits`` hits; tentative tracks
 tolerate a single missed frame; confirmed tracks coast on the IMM prediction for
 up to ``max_age`` seconds (occlusion) before being deleted.
+
+Motion state (``TrackState.motion``), what the robot acts on (it stops for a
+moving vehicle, not for a parked one):
+  static  -> moving   when, in ``motion_on_frames`` of the last ``motion_window``
+                      detections, both the track's own displacement (least-squares
+                      slope of its detected centers over the last
+                      ``motion_traj_window``) and the detector's velocity head read
+                      above ``motion_on_speed``. Each alone is fooled: a parked
+                      car's box drifts as the robot walks past (its visible side
+                      changes) or slides along a long truck; the velocity head
+                      comes from one multi-sweep frame and jumps with pose noise
+                      (on a sample bag it read 12 m/s on a parked car in the first
+                      frames). The IMM velocity is not used here: it starts from
+                      the velocity head, so it is not a second opinion
+  moving  -> stopped  when no detection was fast for ``motion_off_time`` and the
+                      displacement speed is below ``motion_off_speed`` (the velocity
+                      head is too noisy to ask it for a run of slow readings)
+  stopped -> static   after ``stop_memory`` without motion; until then a vehicle
+                      that just stopped (yielding, at a crossing) may go again
+  stopped -> moving   as static -> moving
+Coasting tracks keep their state.
 """
 from collections import deque
 from dataclasses import dataclass, field
@@ -69,6 +90,18 @@ class TrackerConfig:
     z_alpha: float = 0.3
     yaw_alpha: float = 0.4
     heading_from_velocity: float = 1.0   # [m/s] above this, box heading follows the velocity
+    # motion state (see the module docstring); speeds are floats or {class: speed}
+    motion_on_speed: object = field(default_factory=lambda: {"vehicle": 0.7, "pedestrian": 0.5, "cyclist": 0.7})
+    motion_off_speed: object = field(default_factory=lambda: {"vehicle": 0.3, "pedestrian": 0.2, "cyclist": 0.3})
+    motion_window: int = 5               # detections looked at
+    motion_traj_window: float = 1.0      # [s] detected centers the displacement speed is fitted to
+    motion_on_frames: int = 3            # of those, fast ones needed to switch to moving
+    motion_off_time: float = 1.0         # [s] no fast detection this long (and a slow IMM): moving -> stopped
+    stop_memory: float = 10.0            # [s] stopped this long: stopped -> static
+
+
+def _per_class(value, label):
+    return float(value.get(CLASSES[label], 0.0)) if isinstance(value, dict) else float(value)
 
 
 def _center_in_box(xy, center, size_lw, yaw):
@@ -105,10 +138,16 @@ class TrackState:
     hits: int
     coasting: bool
     history: np.ndarray        # (K, 6) [t, x, y, vx, vy, observed]
+    motion: str = "static"     # static / moving / stopped (module docstring)
+    time_since_moving: float = float("inf")   # [s] since the track was last moving
 
     @property
     def name(self):
         return CLASSES[self.label]
+
+    @property
+    def moving(self):
+        return self.motion == "moving"
 
 
 class Track:
@@ -128,7 +167,12 @@ class Track:
         self.hits = 1
         self.confirmed = params.min_hits <= 1
         self.history = deque()
+        self.motion, self.last_moving, self.last_fast = "static", None, None
+        self.fast = deque(maxlen=cfg.motion_window)
+        self.centers = deque()                  # (stamp, x, y) of the detections, for the displacement speed
+        self._add_center(box)
         self._record(True)
+        self._update_motion(vel if cfg.use_velocity else None)
 
     @property
     def time_since_update(self):
@@ -167,6 +211,43 @@ class Track:
         if self.hits >= p.min_hits:
             self.confirmed = True
         self._record(True)
+        self._add_center(box)
+        self._update_motion(vel if cfg.use_velocity else None)
+
+    def _add_center(self, box):
+        self.centers.append((self.stamp, float(box[0]), float(box[1])))
+        while self.centers[0][0] < self.stamp - self.cfg.motion_traj_window - 1e-6:
+            self.centers.popleft()
+
+    def displacement_speed(self):
+        """[m/s] least-squares slope of the detected centers over the last ``motion_traj_window``;
+        None until they span 0.3 s (shorter fits are too noisy)."""
+        c = np.asarray(self.centers)
+        if len(c) < 3 or c[-1, 0] - c[0, 0] < 0.3 - 1e-6:
+            return None
+        t = c[:, 0] - c[:, 0].mean()
+        return float(np.hypot(*(t @ (c[:, 1:] - c[:, 1:].mean(0)) / (t @ t))))
+
+    def _update_motion(self, det_vel):
+        """One detection's evidence: fast when the displacement speed and the velocity head (when there
+        is one) both read above the on speed."""
+        cfg = self.cfg
+        on, off = _per_class(cfg.motion_on_speed, self.label), _per_class(cfg.motion_off_speed, self.label)
+        traj = self.displacement_speed()
+        traj_speed = 0.0 if traj is None else traj
+        det_speed = traj_speed if det_vel is None else float(np.hypot(*det_vel))
+        fast = traj is not None and traj_speed > on and det_speed > on
+        self.fast.append(fast)
+        if fast:
+            self.last_fast = self.stamp
+        if sum(self.fast) >= cfg.motion_on_frames:
+            self.motion = "moving"
+        elif self.motion == "moving" and self.stamp - self.last_fast >= cfg.motion_off_time and traj_speed < off:
+            self.motion = "stopped"
+        if self.motion == "moving":
+            self.last_moving = self.stamp
+        elif self.motion == "stopped" and self.stamp - self.last_moving >= cfg.stop_memory:
+            self.motion = "static"
 
     def _update_yaw(self, yaw_det):
         cfg = self.cfg
@@ -202,7 +283,8 @@ class Track:
             position=np.array([x[0], x[1], self.z]), velocity=x[2:4].copy(), yaw=self.yaw,
             size=self.size.copy(), score=self.score, covariance=P[:4, :4].copy(),
             mode_probs=self.imm.mu.copy(), age=self.stamp - self.birth, hits=self.hits,
-            coasting=self.time_since_update > 1e-6, history=np.asarray(self.history))
+            coasting=self.time_since_update > 1e-6, history=np.asarray(self.history), motion=self.motion,
+            time_since_moving=float("inf") if self.last_moving is None else self.stamp - self.last_moving)
 
 
 class MultiObjectTracker:

@@ -20,6 +20,10 @@ Tracks a reviewer marked ``ignore`` are ignore boxes too. With ``--classes
 vehicle``, an unreviewed vehicle whose teacher subclass disagrees with its
 size (a "truck" the size of a car) is also ignored.
 
+Occlusion and range (``dog_perception/visibility.py``): the points inside each
+box are counted in the exported frame; a box with no point in any sweep is
+left out, one with fewer than 5 (vehicles) in the current sweep is an ignore box.
+
     python tools/dog/export_dataset.py --recording work_dirs/rec_001 data/rec_001/labels.pkl \
         --recording work_dirs/rec_002 data/rec_002/labels.pkl --val-recordings rec_002 --out data/dog --gt-db
 """
@@ -36,6 +40,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))          # parall
 from dog_perception.detection.boxes import standard_to_det3d  # noqa: E402
 from dog_perception.detection.frame_adapter import ModelFrame  # noqa: E402
 from dog_perception.label_review import train_label  # noqa: E402
+from dog_perception.visibility import annotate_points  # noqa: E402
 from parallel import run_each  # noqa: E402
 
 
@@ -48,14 +53,16 @@ def export_recording(frames_dir, labels, out_root, name, frame=None, review_poli
         src = os.path.join(frames_dir, "%.6f.npy" % f["stamp"])
         if f.get("pose_bad") or not os.path.exists(src):      # pose not trusted (refine_poses.py): left out
             continue
+        cloud = np.load(src)
         objs, names, ignore = [], [], []
-        for o in f["objects"]:
+        # counted here, on the exact input, so boxes moved by a reviewer are counted where they are now
+        for o in annotate_points(f["objects"], cloud):
             n, ign = train_label(o, classes, review_policy, counts)
             if n is not None:
                 objs.append(o)
                 names.append(n)
                 ignore.append(ign)
-        pts = frame.points_to_model(np.load(src))
+        pts = frame.points_to_model(cloud)
         rel = os.path.join("lidar", name, "%.6f.npy" % f["stamp"])
         np.save(os.path.join(out_root, rel), pts.astype(np.float32))
         if objs:
@@ -124,7 +131,7 @@ def main():
         print("%s boxes: " % split + (", ".join("%s %d (+%d ignored)" % (n, np.sum((names == n) & ~ign),
                                                                           np.sum((names == n) & ign))
                                                 for n in np.unique(names)) or "none"))
-    for k in sorted(c for c in counts if "disagrees" in c):
+    for k in sorted(c for c in counts if "disagrees" in c or "points" in c):
         print("note: %d boxes: %s" % (counts[k], k))
     if counts.get("vehicle subclass from size"):
         print("note: %d vehicle boxes had no subclass and got one from their size (car / truck / bus); "

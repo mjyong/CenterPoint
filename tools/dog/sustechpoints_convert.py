@@ -26,9 +26,12 @@ import os
 import pickle
 import sys
 
+import numpy as np
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.sustechpoints import export_scene, import_scene  # noqa: E402
+from dog_perception.visibility import annotate_points  # noqa: E402
 
 VENDORED = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "third_party", "SUSTechPOINTS"))
 
@@ -78,6 +81,9 @@ def main():
                    help="extra / changed type mappings, CLASS in car, truck, bus, pedestrian, cyclist "
                         "(or vehicle without a subclass), or 'skip'")
     i.add_argument("--static-speed", type=float, default=0.2, help="[m/s] slower boxes get zero velocity")
+    i.add_argument("--frames", default=None,
+                   help="the scene's run_sequence.py frames: count the points in each box (occluded / far boxes "
+                        "are then not scored by compare_detectors.py, as in export_dataset.py)")
     v = sub.add_parser("serve", help="start SUSTechPOINTS (works without TensorFlow)")
     v.add_argument("--app", default=VENDORED, help="SUSTechPOINTS checkout (default: the vendored copy)")
     v.add_argument("--host", default="127.0.0.1")
@@ -99,6 +105,11 @@ def main():
         tmap = dict(kv.split("=", 1) for kv in args.type_map)
         scene_dir = args.scene_dir or os.path.join(VENDORED, "data", args.scene)
         labels, counts = import_scene(scene_dir, tmap, args.static_speed)
+        if args.frames:
+            for fr in labels["frames"]:
+                cloud = os.path.join(args.frames, "%.6f.npy" % fr["stamp"])
+                if fr["objects"] and os.path.exists(cloud):
+                    fr["objects"] = annotate_points(fr["objects"], np.load(cloud))
         os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
         with open(args.out, "wb") as f:
             pickle.dump(labels, f)

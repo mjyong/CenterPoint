@@ -173,7 +173,7 @@ class DogPerceptionNode(Node):
             txt.pose.position.z = float(s.position[2] + s.size[2])
             txt.scale.z = 0.5
             txt.color.r = txt.color.g = txt.color.b = txt.color.a = 1.0
-            txt.text = "%s %d %.1fm/s" % (s.name[:3], s.track_id, float(np.hypot(*s.velocity)))
+            txt.text = "%s %d %.1fm/s %s" % (s.name[:3], s.track_id, float(np.hypot(*s.velocity)), s.motion)
             arr.markers.append(txt)
         self.pub_tracks.publish(arr)
 

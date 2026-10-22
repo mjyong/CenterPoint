@@ -82,14 +82,17 @@ def main():
             keep = d.scores >= args.min_score
             preds.append(dict(boxes=d.boxes[keep], labels=lut[d.labels[keep]], scores=d.scores[keep],
                               velocities=d.velocities[keep]))
-            objs = fr["objects"]
+            # labels the cloud does not show at all are left out, as in export_dataset.py
+            tl = [train_label(o, rule, args.review_policy) for o in fr["objects"]]
+            keep_gt = [n is not None or o["label"] not in classes for o, (n, _) in zip(fr["objects"], tl)]
+            objs = [o for o, k in zip(fr["objects"], keep_gt) if k]
+            ign = [t[1] for t, k in zip(tl, keep_gt) if k]
             gts.append(dict(boxes=np.array([o["box"] for o in objs]).reshape(-1, 7),
                             labels=np.array([classes.index(o["label"]) if o["label"] in classes else -1
                                              for o in objs], dtype=np.int64),
                             velocities=np.array([o["velocity"] for o in objs]).reshape(-1, 2),
                             # uncertain labels are not scored (export_dataset.py: ignore boxes)
-                            ignore=np.array([train_label(o, rule, args.review_policy)[1] for o in objs],
-                                            dtype=bool)))
+                            ignore=np.array(ign, dtype=bool)))
         table[name] = evaluate_detections(preds, gts, classes)
         if args.thresholds:
             sweeps[name] = {c: {rng: threshold_sweep(preds, gts, ci, sorted(args.thresholds), rng_bin=rng)

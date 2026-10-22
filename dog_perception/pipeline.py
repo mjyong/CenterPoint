@@ -99,5 +99,5 @@ class PerceptionPipeline:
         for s in out.tracks:
             tracks.append(dict(id=s.track_id, label=s.name, position=R @ s.position + T_dw[:3, 3],
                                velocity=R[:2, :2] @ s.velocity, yaw=float(s.yaw + dyaw),
-                               size=s.size, score=s.score, coasting=s.coasting))
+                               size=s.size, score=s.score, coasting=s.coasting, motion=s.motion))
         return tracks, [p.transform(T_dw, "det") for p in out.predictions]

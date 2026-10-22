@@ -148,7 +148,8 @@ class McapViz:
                          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1}},
                 "billboard": True, "font_size": 14, "scale_invariant": True,
                 "color": {"r": 1, "g": 1, "b": 1, "a": 1},
-                "text": "%s %d %.1fm/s" % (t.name[:3], t.track_id, float(np.hypot(*t.velocity))),
+                "text": "%s %d %.1fm/s %s" % (t.name[:3], t.track_id, float(np.hypot(*t.velocity)),
+                                              getattr(t, "motion", "")),
             })
         p = T_world_body[:3, 3]
         pose = {"timestamp": ts, "frame_id": "map", "pose": {

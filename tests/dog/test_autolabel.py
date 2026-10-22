@@ -89,3 +89,52 @@ def test_refine_track_votes_vehicle_subclass():
     for o in obs:
         o["subclass"] = -1                  # teacher without vehicle subclasses (older 3-class dog model)
     assert {o["subclass"] for o in refine_track(obs, t, AutoLabelConfig())} == {-1}
+
+
+def test_review_flag_trusts_tracks_seen_clearly_a_few_times():
+    """Mean score below 0.5 alone no longer flags a track: 5 detections at 0.6 or more make it sure.
+    Each label carries the teacher's score of its own frame (0 where interpolated)."""
+    from dog_perception.autolabel import AutoLabelConfig, refine_track
+    t = np.arange(40) * 0.1
+    xy = np.c_[np.full(40, 30.0), np.full(40, 4.0)]
+    scores = np.r_[np.full(34, 0.35), np.full(6, 0.7)]          # far most of the time, then clear
+    obs = [o for k, o in enumerate(_obs(t, xy, np.zeros(40), np.zeros((40, 2)))) if k != 10]   # one miss
+    for o, s in zip(obs, np.delete(scores, 10)):
+        o["score"] = float(s)
+    out = refine_track(obs, t, AutoLabelConfig())
+    assert np.mean(np.delete(scores, 10)) < 0.5 and not any(o["review"] for o in out)
+    assert {o["confident_frames"] for o in out} == {6}
+    assert out[10]["interpolated"] and out[10]["det_score"] == 0.0 and out[39]["det_score"] == 0.7
+    for o in obs[-2:]:
+        o["score"] = 0.4                                         # only 4 clear detections left
+    assert all(o["review"] for o in refine_track(obs, t, AutoLabelConfig()))
+
+
+def test_short_moving_bursts_are_static_and_short_stops_are_moving():
+    from dog_perception.autolabel import AutoLabelConfig, _clean_moving
+    cfg = AutoLabelConfig()
+    t = np.arange(100) * 0.1
+    burst = np.zeros(100, bool)
+    burst[96:] = True                                            # last 0.4 s of a parked truck's track
+    assert not _clean_moving(t, burst, cfg).any()
+    drive = np.zeros(100, bool)
+    drive[20:60] = True                                          # 4 s drive with a 0.3 s hiccup
+    drive[35:38] = False
+    out = _clean_moving(t, drive, cfg)
+    assert out[20:60].all() and not out[:20].any() and not out[60:].any()
+    short = np.ones(8, bool)                                     # a car crossing the edge of view
+    assert _clean_moving(t[:8], short, cfg).all()
+
+
+def test_parked_truck_with_a_late_burst_is_pinned():
+    """The burst kept the track from being pinned to one position before the clean-up."""
+    from dog_perception.autolabel import AutoLabelConfig, refine_track
+    rng = np.random.default_rng(1)
+    t = np.arange(60) * 0.1
+    xy = np.c_[np.full(60, 20.0), np.full(60, 6.0)] + rng.normal(0, 0.05, (60, 2))
+    xy[-5:, 1] += np.arange(1, 6) * 0.25                         # box slides along the truck at the end
+    vel = np.zeros((60, 2))
+    vel[-5:] = [0, 0.8]
+    out = refine_track(_obs(t, xy, np.zeros(60), vel, size=(12.0, 2.6, 3.5)), t, AutoLabelConfig())
+    b = np.array([o["box"] for o in out])
+    assert not any(o["moving"] for o in out) and np.ptp(b[:, 1]) == 0

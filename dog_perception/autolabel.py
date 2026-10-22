@@ -15,7 +15,14 @@ whole recording available, every track is refined *non-causally*:
                  velocity head (> 0.15 m/s) say so. A static object seen
                  from a moving robot drifts (its visible side changes), so
                  the trajectory alone gives parked cars a few tenths of
-                 m/s; the velocity head alone under-reads slow movers
+                 m/s; the velocity head alone under-reads slow movers.
+                 Then stops shorter than 0.5 s inside a motion count as
+                 moving, and moving stretches shorter than 1 s count as
+                 static unless they are most of the track: on 0921, 45 of
+                 the 104 vehicle tracks with any moving frame had only such
+                 bursts (a parked truck whose box drifts as the robot walks
+                 past, the last frames of a track), which kept them from
+                 being pinned to one position and gave them velocity labels
 * static track : zero velocity; fixed position (score-weighted median) when
                  the boxes stay close (per-class spread)
 * heading      : direction of motion when moving fast, else circular mean
@@ -24,7 +31,10 @@ whole recording available, every track is refined *non-causally*:
 * velocity     : trajectory difference when moving, zero when static
 * drop         : tracks that are too short or too low-scoring
 
-Humans then only fix what is left (``review`` flags low-confidence tracks).
+Humans then only fix what is left. ``review`` flags tracks the teacher is not
+sure of: mean score below 0.5 and fewer than 5 frames scored 0.6 or more (a
+far car scores 0.3-0.4 most of the time, but a real one is seen clearly at
+some point; a false one rarely is, several times).
 """
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -49,7 +59,13 @@ class AutoLabelConfig:
     # wider spread means the track drifted or switched objects, keep the smoothed path then
     max_static_spread: dict = field(default_factory=lambda: {"vehicle": 1.0, "pedestrian": 0.5, "cyclist": 1.5})
     velocity_window: float = 0.5    # [s] half-width of the trajectory difference
-    review_score: float = 0.5       # tracks below this mean score are flagged for review
+    min_moving_time: float = 1.0    # [s] shorter moving stretches are static, unless most of the track
+    min_stop_time: float = 0.5      # [s] shorter stops inside a motion are moving
+    # a track is flagged for review when its mean score is below review_score and fewer than
+    # confident_frames of its detections score confident_score or more
+    review_score: float = 0.5
+    confident_score: float = 0.6
+    confident_frames: int = 5
 
 
 def _weighted_median(x, w):
@@ -104,6 +120,7 @@ def refine_track(obs, stamps, cfg):
     v_teacher = _running_median(np.array([np.hypot(*o["vel"]) for o in obs]), 2)
     moving = (np.hypot(v_traj[:, 0], v_traj[:, 1]) > cfg.static_speed) & \
         (np.interp(span, t, v_teacher) > cfg.teacher_speed)
+    moving = _clean_moving(span, moving, cfg)
     if not moving.any():                      # static object: one position for the whole track
         c = np.array([_weighted_median(boxes[:, 0], scores), _weighted_median(boxes[:, 1], scores)])
         if np.percentile(np.hypot(*(boxes[:, :2] - c).T), 90) <= cfg.max_static_spread.get(CLASSES[label], 1.0):
@@ -123,14 +140,44 @@ def refine_track(obs, stamps, cfg):
     yaws[flip] += np.pi
     static_yaw = float(np.arctan2(np.sum(scores * np.sin(yaws)), np.sum(scores * np.cos(yaws))))
 
+    confident = int(np.sum(scores >= cfg.confident_score))
+    review = bool(scores.mean() < cfg.review_score and confident < cfg.confident_frames)
     out = []
     for k, s in enumerate(span):
         yaw = float(np.arctan2(vel[k, 1], vel[k, 0])) if fast[k] else static_yaw
+        near = int(np.argmin(np.abs(t - s)))
+        observed = abs(t[near] - s) <= 1e-6
         out.append(dict(t=float(s), label=label, subclass=subclass,
                         box=np.array([sx[k], sy[k], z, *size, wrap_angle(yaw)]),
                         velocity=vel[k].copy(), score=float(scores.mean()), moving=bool(moving[k]),
-                        review=bool(scores.mean() < cfg.review_score), interpolated=bool(np.min(np.abs(t - s)) > 1e-6)))
+                        det_score=float(scores[near]) if observed else 0.0, confident_frames=confident,
+                        review=review, interpolated=not observed))
     return out
+
+
+def _runs(mask):
+    """(start, end) index pairs of the True stretches of a bool array (end inclusive)."""
+    edges = np.diff(np.r_[0, mask.astype(np.int8), 0])
+    return list(zip(np.nonzero(edges == 1)[0], np.nonzero(edges == -1)[0] - 1))
+
+
+def _clean_moving(t, moving, cfg):
+    """Per-frame moving flags without the bursts: stops shorter than ``min_stop_time`` between two
+    moving stretches become moving, then moving stretches shorter than ``min_moving_time`` become
+    static unless they cover at least half of the track."""
+    moving = moving.copy()
+    if len(t) < 2 or not moving.any():
+        return moving
+    period = float(np.median(np.diff(t)))
+    for a, b in _runs(~moving):
+        if a > 0 and b < len(t) - 1 and t[b] - t[a] + period < cfg.min_stop_time:
+            moving[a:b + 1] = True
+    span = t[-1] - t[0] + period
+    for a, b in _runs(moving):
+        dur = t[b] - t[a] + period
+        if dur < cfg.min_moving_time and dur < 0.5 * span:
+            moving[a:b + 1] = False
+    return moving
 
 
 def _window_velocity(t, x, y, half):
