@@ -217,7 +217,7 @@ base 系（x 前、y 左、z 上）下的位置，单位 m：
 - 三个话题都是 `foxglove_msgs/CompressedVideo`，`format` = h264（Baseline profile，level 5.0），1920 × 1536，**24 Hz**。
 - 关键帧大约每 30 帧（1.25 s）一个，每条消息都带 SPS。每路每帧 7–20 KB，三路合计约 1.2 MB/s（约 4.3 GB/小时），是 XT32 数据量的 4%。
 - `timestamp` 比写入 bag 的时间早约 1 ms。
-- **三路的 `frame_id` 都是 `camera`**，建议改成 `front_camera` / `left_camera` / `right_camera` / `rear_camera`，否则以后标定后无法区分。
+- **三路的 `frame_id` 都是 `camera`**，建议改成 `front_camera` / `left_camera` / `right_camera`，否则以后标定后无法区分。
 - 机器人上共 **4 个**鱼眼（前、后、左、右），只录前、左、右三路，后视不录。
 - 安装位置见 1.2、1.3 节。从画面看：
   - 前视在机头，朝前略向下，画面下沿能看到机身前部的把手；
