@@ -46,3 +46,22 @@ def test_point_shuffle_is_a_permutation():
     out = Preprocess(cfg=Config(dict(mode="val", shuffle_points=True)))(res, {})[0]["lidar"]["points"]
     assert not np.array_equal(out, pts)
     assert np.array_equal(out[np.lexsort(out.T)], pts[np.lexsort(pts.T)])
+
+
+def test_train_local_rank_from_torchrun_or_launch(monkeypatch):
+    """Two GPUs per model: torchrun sets LOCAL_RANK, torch.distributed.launch passes --local-rank (PyTorch 2)
+    or --local_rank. Before, the argument's default 0 won over the environment and both processes took GPU 0."""
+    import importlib.util
+    import os
+    import sys
+
+    spec = importlib.util.spec_from_file_location("train_entry", os.path.join(os.path.dirname(__file__), "..", "..",
+                                                                              "tools", "train.py"))
+    train = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(train)
+    monkeypatch.setenv("LOCAL_RANK", "1")
+    monkeypatch.setattr(sys, "argv", ["train.py", "cfg.py"])
+    assert train.parse_args().local_rank == 1
+    monkeypatch.delenv("LOCAL_RANK")
+    monkeypatch.setattr(sys, "argv", ["train.py", "cfg.py", "--local-rank=1"])
+    assert train.parse_args().local_rank == 1 and os.environ["LOCAL_RANK"] == "1"

@@ -47,14 +47,17 @@ def parse_args():
         default="pytorch",
         help="job launcher",
     )
-    parser.add_argument("--local_rank", type=int, default=0)
+    # torch.distributed.launch passes --local-rank (PyTorch 2) or --local_rank; torchrun sets LOCAL_RANK
+    parser.add_argument("--local_rank", "--local-rank", dest="local_rank", type=int, default=0)
     parser.add_argument(
         "--autoscale-lr",
         action="store_true",
         help="automatically scale lr with the number of gpus",
     )
     args = parser.parse_args()
-    if "LOCAL_RANK" not in os.environ:
+    if "LOCAL_RANK" in os.environ:
+        args.local_rank = int(os.environ["LOCAL_RANK"])
+    else:
         os.environ["LOCAL_RANK"] = str(args.local_rank)
 
     return args
@@ -83,8 +86,11 @@ def main():
 
     if distributed:
         if args.launcher == "pytorch":
-            torch.cuda.set_device(args.local_rank)
-            torch.distributed.init_process_group(backend="nccl", init_method="env://")
+            if torch.cuda.is_available():
+                torch.cuda.set_device(args.local_rank)
+            # gloo without CUDA: the distributed path can be tested on a CPU
+            torch.distributed.init_process_group(backend="nccl" if torch.cuda.is_available() else "gloo",
+                                                 init_method="env://")
             cfg.local_rank = args.local_rank
         elif args.launcher == "slurm":
             proc_id = int(os.environ["SLURM_PROCID"])

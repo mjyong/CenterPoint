@@ -4,17 +4,11 @@ import re
 from collections import OrderedDict, defaultdict
 from functools import partial
 
-try:
-    import apex
-except:
-    print("No APEX!")
-
 import numpy as np
 import torch
 from det3d.builder import _create_learning_rate_scheduler
 
 # from det3d.datasets.kitti.eval_hooks import KittiDistEvalmAPHook, KittiEvalmAPHookV2
-from det3d.core import DistOptimizerHook
 from det3d.datasets import DATASETS, build_dataloader
 from det3d.solver.fastai_optim import OptimWrapper
 from det3d.torchie.trainer import DistSamplerSeedHook, Trainer, obj_from_dict
@@ -269,8 +263,10 @@ def train_detector(model, dataset, cfg, distributed=False, validate=False, logge
 
     total_steps = cfg.total_epochs * len(data_loaders[0])
     # print(f"total_steps: {total_steps}")
-    if distributed:
-        model = apex.parallel.convert_syncbn_model(model)
+    # BatchNorm across GPUs only when the config asks (sync_bn = True): by default each GPU normalizes over
+    # its own samples_per_gpu, as a one-GPU run does. (apex's SyncBN used here before is not installed.)
+    if distributed and cfg.get("sync_bn", False) and torch.cuda.is_available():
+        model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
     if cfg.lr_config.type == "one_cycle":
         # build trainer
         optimizer = build_one_cycle_optimizer(model, cfg.optimizer)
@@ -285,7 +281,7 @@ def train_detector(model, dataset, cfg, distributed=False, validate=False, logge
         cfg.lr_config = None 
 
     # put model on gpus
-    if distributed:
+    if distributed and torch.cuda.is_available():
         model = DistributedDataParallel(
             model.cuda(cfg.local_rank),
             device_ids=[cfg.local_rank],
@@ -293,6 +289,8 @@ def train_detector(model, dataset, cfg, distributed=False, validate=False, logge
             # broadcast_buffers=False,
             find_unused_parameters=True,
         )
+    elif distributed:           # gloo on the CPU: tests of the distributed path
+        model = DistributedDataParallel(model, find_unused_parameters=True)
     elif torch.cuda.is_available():
         model = model.cuda()
     else:
@@ -304,10 +302,9 @@ def train_detector(model, dataset, cfg, distributed=False, validate=False, logge
         model, batch_processor, optimizer, lr_scheduler, cfg.work_dir, cfg.log_level
     )
 
-    if distributed:
-        optimizer_config = DistOptimizerHook(**cfg.optimizer_config)
-    else:
-        optimizer_config = cfg.optimizer_config
+    # DistributedDataParallel already averages the gradients over the GPUs during backward;
+    # DistOptimizerHook would all-reduce them a second time (same result, twice the traffic)
+    optimizer_config = cfg.optimizer_config
 
     # register hooks
     trainer.register_training_hooks(

@@ -53,7 +53,8 @@
 | T1R | 按新规则重做自动标注（遮挡点数、待审核、静止毛刺），重做 T1、T2，统计 | Agent | T0 | 40 分钟 | 完成 |
 | T1S | 训练集也导出到 SUSTechPOINTS 逐框审核（和验证集分组，带分数 / 速度 / 运动，红框待审） | Agent | T1R | 20 分钟 | 完成 |
 | T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T1R | 1.5–2 小时（数据读取已加速） | 完成 |
-| T4 | 评估 v0 | Agent | T3 | 1 小时 | 待做 |
+| T3D | 每个模型 2 张卡训练 v0（数据并行），和单卡比 | Agent | T3 | 40 分钟 | 待做 |
+| T4 | 评估 v0 | Agent | T3（有 T3D 的结果就一起评） | 1 小时 | 待做 |
 | H1 | 人工审核车辆：35 个场景全在 SUSTechPOINTS 里逐框审（每 5 帧取 1 帧） | 人 | T1S | 1–2 天 | 待做 |
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 待做 |
 | T6 | 训练 v1 | Agent | T5 | 2–6 小时 | 待做 |
@@ -477,6 +478,50 @@ GPU 利用率；每个 epoch 迭代数；总耗时；显存；每 5 个 epoch �
 
 ---
 
+## T3D 每个模型用 2 张卡训练（数据并行）
+
+T3 加速后，单卡训练已经是 Voxel 1 小时 7 分、Pillar 49 分，GPU 利用率 90–100%。再快只能多张卡一起训：
+
+- **数据并行**：每张卡各拿一份完整的模型，各读 4 个不同的样本，各自算梯度；两张卡的梯度取平均后，两边做同一次更新。所以一步用了 8 个样本，每个 epoch 的步数减半（1868 → 934）。这就是"batch 翻倍"：每张卡上的 batch 没变，合起来的 batch 是 8。
+- **学习率**：20 个 epoch 看到的样本数不变，但参数只更新一半的次数，每次用的是 8 个样本的平均梯度（更平稳）。学习率不变的话，模型走的"路程"短了，可能欠训练。常用的做法是按 batch 线性放大学习率：`--autoscale-lr` 把最大学习率从 5e-4 提到 1e-3。
+- **不改学习率的另一条路**：每张卡 2 个样本，合起来还是 4，步数、学习率都和单卡一样。但每张卡上 BatchNorm 只有 2 个样本，统计量更不准，卡也吃不满，所以不用这个。
+- **结论要看评估**：T4 把双卡 v0 和单卡 v0 放在一起评。第 20 个 epoch 的车辆 AP 相差不到 0.01，T6 就用双卡；差得多，T6 仍用单卡（反正也只要 1 小时）。
+
+代码（2026-10-23）：`tools/train.py` 现在认 torchrun 设的 `LOCAL_RANK`（以前两个进程都跑到 0 号卡）；分布式时不再调用没安装的 apex（每张卡的 BatchNorm 各算各的，和单卡一样；配置里写 `sync_bn = True` 才跨卡同步）；梯度只由 DistributedDataParallel 平均一次。本地用 CPU（gloo）跑通了双进程训练。
+
+```text
+任务 T3D：Voxel、Pillar 各用 2 张卡训练 v0（20 个 epoch），和 T3 的单卡 v0 比速度，T4 再比精度。
+先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了 tools/train.py、det3d/ 的改动，要跑快速测试）。前置：T3 完成。
+
+1. 选 4 张空闲的卡（batch_label.py --dry-run），两个训练各用 2 张；只有 2 张空闲时先跑 Voxel，跑完再跑 Pillar：
+     mkdir -p data/reports/T3D
+     CUDA_VISIBLE_DEVICES=<卡1>,<卡2> NCCL_P2P_DISABLE=1 nohup torchrun --nproc_per_node=2 \
+         --master_addr 127.0.0.1 --master_port 29511 tools/train.py configs/dog/dog_centerpoint_voxel_xt32_veh.py \
+         --autoscale-lr --work_dir data/train/dog_voxel_veh_v0_2gpu > data/train/dog_voxel_veh_v0_2gpu.log 2>&1 &
+     CUDA_VISIBLE_DEVICES=<卡3>,<卡4> NCCL_P2P_DISABLE=1 nohup torchrun --nproc_per_node=2 \
+         --master_addr 127.0.0.1 --master_port 29512 tools/train.py configs/dog/dog_centerpoint_pp_xt32_veh.py \
+         --autoscale-lr --work_dir data/train/dog_pp_veh_v0_2gpu > data/train/dog_pp_veh_v0_2gpu.log 2>&1 &
+   - NCCL_P2P_DISABLE=1：4090 之间不能 P2P，有的驱动不关会卡死。
+   - 两个训练的 --master_port 必须不同。
+2. 开始 5 分钟后检查两个日志：
+   - 有 "Distributed training: True"；
+   - 每个 epoch 934 步；lr 在前 30% 的步里升到 0.001；
+   - 每次迭代耗时、data_time，按 20 个 epoch 估算总时长；
+   - nvidia-smi：4 张卡都在用、利用率。
+3. 等训练结束，期间每 20 分钟看一次日志。
+
+停止条件（停下并报告日志最后 50 行）：报错（NCCL、OOM、数据加载）；超过 10 分钟日志没有新的一行（NCCL 卡住）；loss 变成 nan / inf。
+提交：两个 .log 和 work_dir 里的 *.log.json 复制到 data/reports/T3D/，提交它们和本文档。
+报告（写进"T3D 结果"）：卡号；每次迭代耗时和 data_time；总耗时，和 T3 单卡的 1 小时 7 分 / 49 分比；GPU 利用率；
+每 5 个 epoch 最后一次的 loss / hm_loss / loc_loss（两个 head 分开写）。
+```
+
+### T3D 结果
+
+（待填）
+
+---
+
 ## T4 评估 v0
 
 **注意**：
@@ -487,8 +532,9 @@ GPU 利用率；每个 epoch 迭代数；总耗时；显存；每 5 个 epoch �
 任务 T4：评估 v0。模型级（验证集 infos_val）和流水线级（验证场景整段跑）都做，并扫描上报阈值。
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T3 完成。
 
-1. 模型级，第 10、15、20 个 epoch（另外把 data/train/dog_*_veh_v0_oldlabels 的 epoch_20 也评一次，
-   work_dir 用 data/train/dog_${m}_veh_v0_oldlabels/eval_e20，看标注规则改动的影响）：
+1. 模型级，第 10、15、20 个 epoch。另外把这两组的 epoch_20 也各评一次（work_dir 用 <权重目录>/eval_e20）：
+   - data/train/dog_*_veh_v0_oldlabels：看标注规则改动的影响；
+   - data/train/dog_*_veh_v0_2gpu（T3D 做了的话）：和单卡 v0 比，决定 T6 用不用双卡。
      mkdir -p data/reports/T4
      for e in 10 15 20; do for m in voxel pp; do
        python tools/dist_test.py configs/dog/dog_centerpoint_${m}_xt32_veh.py --work_dir data/train/dog_${m}_veh_v0/eval_e$e \
@@ -526,6 +572,7 @@ GPU 利用率；每个 epoch 迭代数；总耗时；显存；每 5 个 epoch �
 报告（写进"T4 结果"）：
 - 每个模型每个 epoch 的 merged/vehicle 一行（mAP、AP@0.5/1/2/4、分距离段 AP、ATE、ASE、AOE），以及 car、truck 各一行；
 - compare_val.md 的两张表（AP 表、耗时表），以及每个模型的阈值表最后的推荐行；
+- 单卡 v0、双卡 v0（T3D）、旧标注 v0 的 epoch_20 并排：merged/vehicle 的 mAP、AP@2.0；双卡和单卡差多少；
 - motion_teacher.txt、motion_v0_pp.txt 的表；两个 details CSV 里 on_speed 0.70、on_frames 3 的行数（missed / false moving 各多少）；
 - 一句话结论：v0 比 nuScenes Pillar 好还是差、差在哪个距离段。
 ```
@@ -628,7 +675,8 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 任务 T6：用 v1 数据集训练只检车辆的 Voxel 和 Pillar 模型 v1。
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T5 完成。
 
-和 T3 完全一样，只是名字换成 v1：
+和 T3 完全一样，只是名字换成 v1。T4 里双卡 v0 和单卡 v0 的车辆 AP@2.0 相差不到 0.01 时，改用 T3D 的双卡命令
+（work_dir 换成 data/train/dog_{voxel,pp}_veh_v1，T7 里选 epoch 时照常）：
   work_dir data/train/dog_voxel_veh_v1、data/train/dog_pp_veh_v1，日志 data/train/dog_{voxel,pp}_veh_v1.log，
   报告目录 data/reports/T6/。停止条件、提交、报告同 T3（写进"T6 结果"）。
 ```
