@@ -1,0 +1,272 @@
+V1_RUNS_START 2026-10-23 18:27:44 gpu5
+=== v1 0921_164127_s000 18:27:44 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:28:04.527000 1438803 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 18 dets 129.7 ms  voxel: 17 dets 33.4 ms
+frame 40  pillar: 21 dets 28.6 ms  voxel: 20 dets 40.8 ms
+frame 60  pillar: 19 dets 51.0 ms  voxel: 17 dets 123.0 ms
+frame 80  pillar: 14 dets 30.1 ms  voxel: 15 dets 51.9 ms
+frame 100  pillar: 18 dets 49.3 ms  voxel: 20 dets 75.1 ms
+frame 120  pillar: 16 dets 6.5 ms  voxel: 15 dets 13.2 ms
+frame 140  pillar: 19 dets 6.2 ms  voxel: 16 dets 12.8 ms
+frame 160  pillar: 18 dets 6.4 ms  voxel: 17 dets 13.6 ms
+frame 180  pillar: 19 dets 64.1 ms  voxel: 17 dets 99.8 ms
+frame 200  pillar: 12 dets 6.4 ms  voxel: 16 dets 13.2 ms
+frame 220  pillar: 17 dets 19.3 ms  voxel: 20 dets 29.6 ms
+frame 240  pillar: 18 dets 30.7 ms  voxel: 20 dets 13.6 ms
+frame 260  pillar: 16 dets 15.4 ms  voxel: 18 dets 33.2 ms
+frame 280  pillar: 14 dets 6.4 ms  voxel: 17 dets 37.4 ms
+[pillar] 288 frames, network 15.6 ms (median)
+[voxel] 288 frames, network 22.5 ms (median)
+=== v1 0921_164127_s001 18:30:02 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:30:21.245000 1449928 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 21 dets 19.9 ms  voxel: 17 dets 15.0 ms
+frame 40  pillar: 21 dets 147.7 ms  voxel: 16 dets 51.3 ms
+frame 60  pillar: 14 dets 6.4 ms  voxel: 14 dets 21.5 ms
+frame 80  pillar: 17 dets 7.5 ms  voxel: 18 dets 14.6 ms
+frame 100  pillar: 14 dets 7.7 ms  voxel: 19 dets 26.2 ms
+frame 120  pillar: 21 dets 7.2 ms  voxel: 15 dets 13.4 ms
+frame 140  pillar: 18 dets 8.0 ms  voxel: 15 dets 13.9 ms
+frame 160  pillar: 17 dets 105.6 ms  voxel: 14 dets 27.6 ms
+frame 180  pillar: 16 dets 7.4 ms  voxel: 19 dets 40.2 ms
+frame 200  pillar: 21 dets 8.6 ms  voxel: 12 dets 14.0 ms
+frame 220  pillar: 17 dets 25.2 ms  voxel: 10 dets 14.4 ms
+frame 240  pillar: 14 dets 49.4 ms  voxel: 10 dets 89.1 ms
+frame 260  pillar: 14 dets 43.5 ms  voxel: 9 dets 69.9 ms
+frame 280  pillar: 15 dets 44.4 ms  voxel: 8 dets 71.3 ms
+[pillar] 288 frames, network 11.7 ms (median)
+[voxel] 288 frames, network 22.4 ms (median)
+=== v1 0921_164127_s002 18:32:20 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:32:37.623000 1468156 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 9 dets 13.7 ms  voxel: 9 dets 48.4 ms
+frame 40  pillar: 10 dets 91.9 ms  voxel: 10 dets 32.2 ms
+frame 60  pillar: 8 dets 8.7 ms  voxel: 7 dets 14.8 ms
+frame 80  pillar: 10 dets 6.7 ms  voxel: 9 dets 12.9 ms
+frame 100  pillar: 8 dets 7.0 ms  voxel: 8 dets 13.6 ms
+frame 120  pillar: 14 dets 11.2 ms  voxel: 8 dets 17.7 ms
+frame 140  pillar: 11 dets 87.5 ms  voxel: 8 dets 94.8 ms
+frame 160  pillar: 7 dets 33.6 ms  voxel: 8 dets 90.0 ms
+frame 180  pillar: 11 dets 6.8 ms  voxel: 8 dets 22.8 ms
+frame 200  pillar: 11 dets 6.7 ms  voxel: 6 dets 12.8 ms
+frame 220  pillar: 6 dets 38.9 ms  voxel: 4 dets 88.3 ms
+frame 240  pillar: 7 dets 70.7 ms  voxel: 4 dets 100.6 ms
+frame 260  pillar: 4 dets 61.5 ms  voxel: 5 dets 73.5 ms
+frame 280  pillar: 6 dets 113.6 ms  voxel: 5 dets 131.3 ms
+[pillar] 288 frames, network 13.5 ms (median)
+[voxel] 288 frames, network 22.6 ms (median)
+=== v1 0921_164127_s003 18:34:31 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:34:46.836000 1485306 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 3 dets 6.7 ms  voxel: 2 dets 32.2 ms
+frame 40  pillar: 6 dets 6.9 ms  voxel: 5 dets 12.9 ms
+frame 60  pillar: 8 dets 52.0 ms  voxel: 4 dets 89.9 ms
+frame 80  pillar: 5 dets 50.4 ms  voxel: 3 dets 70.4 ms
+frame 100  pillar: 4 dets 7.0 ms  voxel: 4 dets 13.3 ms
+frame 120  pillar: 7 dets 6.7 ms  voxel: 6 dets 18.1 ms
+frame 140  pillar: 5 dets 35.2 ms  voxel: 2 dets 13.4 ms
+frame 160  pillar: 5 dets 6.6 ms  voxel: 3 dets 12.9 ms
+frame 180  pillar: 5 dets 28.9 ms  voxel: 3 dets 22.7 ms
+frame 200  pillar: 5 dets 15.2 ms  voxel: 3 dets 13.4 ms
+frame 220  pillar: 9 dets 7.3 ms  voxel: 7 dets 14.1 ms
+frame 240  pillar: 7 dets 6.8 ms  voxel: 9 dets 12.9 ms
+frame 260  pillar: 11 dets 6.8 ms  voxel: 7 dets 28.1 ms
+frame 280  pillar: 11 dets 6.8 ms  voxel: 6 dets 13.0 ms
+[pillar] 287 frames, network 11.9 ms (median)
+[voxel] 287 frames, network 21.9 ms (median)
+=== v1 0921_164127_s004 18:36:29 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:36:45.523000 1497911 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 9 dets 15.8 ms  voxel: 9 dets 40.6 ms
+frame 40  pillar: 6 dets 15.7 ms  voxel: 6 dets 42.1 ms
+frame 60  pillar: 8 dets 17.8 ms  voxel: 7 dets 19.4 ms
+frame 80  pillar: 5 dets 25.7 ms  voxel: 7 dets 36.1 ms
+frame 100  pillar: 5 dets 11.8 ms  voxel: 4 dets 13.5 ms
+frame 120  pillar: 2 dets 7.3 ms  voxel: 7 dets 30.0 ms
+frame 140  pillar: 2 dets 44.1 ms  voxel: 2 dets 22.3 ms
+frame 160  pillar: 1 dets 37.4 ms  voxel: 3 dets 92.3 ms
+frame 180  pillar: 5 dets 16.3 ms  voxel: 5 dets 37.6 ms
+frame 200  pillar: 2 dets 6.4 ms  voxel: 5 dets 13.0 ms
+frame 220  pillar: 3 dets 6.2 ms  voxel: 7 dets 12.8 ms
+frame 240  pillar: 3 dets 6.1 ms  voxel: 4 dets 13.2 ms
+frame 260  pillar: 2 dets 41.0 ms  voxel: 5 dets 75.0 ms
+frame 280  pillar: 1 dets 17.4 ms  voxel: 2 dets 60.6 ms
+[pillar] 288 frames, network 15.3 ms (median)
+[voxel] 288 frames, network 22.2 ms (median)
+=== v1 0921_164127_s005 18:38:39 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:38:55.789000 1509176 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 1 dets 20.1 ms  voxel: 2 dets 12.9 ms
+frame 40  pillar: 0 dets 52.6 ms  voxel: 2 dets 22.0 ms
+frame 60  pillar: 0 dets 17.6 ms  voxel: 1 dets 60.4 ms
+frame 80  pillar: 0 dets 5.8 ms  voxel: 1 dets 21.7 ms
+frame 100  pillar: 0 dets 16.0 ms  voxel: 1 dets 32.9 ms
+frame 120  pillar: 0 dets 45.9 ms  voxel: 1 dets 73.8 ms
+frame 140  pillar: 0 dets 6.2 ms  voxel: 1 dets 12.3 ms
+frame 160  pillar: 0 dets 15.2 ms  voxel: 1 dets 12.8 ms
+frame 180  pillar: 0 dets 6.2 ms  voxel: 3 dets 67.2 ms
+frame 200  pillar: 0 dets 39.4 ms  voxel: 2 dets 78.8 ms
+frame 220  pillar: 1 dets 6.6 ms  voxel: 1 dets 84.8 ms
+frame 240  pillar: 0 dets 65.3 ms  voxel: 2 dets 50.8 ms
+frame 260  pillar: 0 dets 8.2 ms  voxel: 2 dets 104.6 ms
+frame 280  pillar: 0 dets 6.1 ms  voxel: 1 dets 12.5 ms
+[pillar] 288 frames, network 16.0 ms (median)
+[voxel] 288 frames, network 26.2 ms (median)
+=== v1 0921_165659_s003 18:40:43 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:40:59.979000 1526009 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 2 dets 51.1 ms  voxel: 2 dets 14.8 ms
+frame 40  pillar: 2 dets 19.3 ms  voxel: 2 dets 77.8 ms
+frame 60  pillar: 2 dets 29.9 ms  voxel: 1 dets 18.7 ms
+frame 80  pillar: 4 dets 7.0 ms  voxel: 2 dets 13.3 ms
+frame 100  pillar: 2 dets 98.0 ms  voxel: 2 dets 92.5 ms
+frame 120  pillar: 5 dets 7.7 ms  voxel: 4 dets 13.8 ms
+frame 140  pillar: 4 dets 35.8 ms  voxel: 2 dets 72.6 ms
+frame 160  pillar: 2 dets 7.3 ms  voxel: 6 dets 18.3 ms
+frame 180  pillar: 2 dets 7.6 ms  voxel: 1 dets 12.9 ms
+frame 200  pillar: 2 dets 68.4 ms  voxel: 5 dets 33.8 ms
+frame 220  pillar: 1 dets 48.1 ms  voxel: 2 dets 18.1 ms
+frame 240  pillar: 2 dets 13.8 ms  voxel: 4 dets 13.2 ms
+frame 260  pillar: 6 dets 21.4 ms  voxel: 2 dets 22.9 ms
+[pillar] 276 frames, network 15.2 ms (median)
+[voxel] 276 frames, network 23.5 ms (median)
+=== v1 0921_165659_s004 18:42:56 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:43:13.015000 1541783 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 0 dets 9.6 ms  voxel: 0 dets 25.5 ms
+frame 40  pillar: 0 dets 17.0 ms  voxel: 0 dets 97.7 ms
+frame 60  pillar: 1 dets 43.6 ms  voxel: 1 dets 18.2 ms
+frame 80  pillar: 1 dets 7.9 ms  voxel: 0 dets 24.2 ms
+frame 100  pillar: 2 dets 10.9 ms  voxel: 0 dets 33.6 ms
+frame 120  pillar: 1 dets 8.0 ms  voxel: 0 dets 19.0 ms
+frame 140  pillar: 1 dets 18.6 ms  voxel: 0 dets 45.4 ms
+frame 160  pillar: 1 dets 8.7 ms  voxel: 0 dets 14.1 ms
+frame 180  pillar: 2 dets 95.3 ms  voxel: 1 dets 70.0 ms
+frame 200  pillar: 1 dets 7.5 ms  voxel: 0 dets 29.0 ms
+frame 220  pillar: 0 dets 54.5 ms  voxel: 0 dets 23.5 ms
+frame 240  pillar: 1 dets 67.2 ms  voxel: 0 dets 45.4 ms
+frame 260  pillar: 3 dets 39.8 ms  voxel: 0 dets 13.7 ms
+[pillar] 276 frames, network 13.3 ms (median)
+[voxel] 276 frames, network 22.1 ms (median)
+=== v1 0921_165659_s005 18:45:01 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:45:19.247000 1551710 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 1 dets 29.2 ms  voxel: 4 dets 18.4 ms
+frame 40  pillar: 2 dets 22.6 ms  voxel: 6 dets 71.2 ms
+frame 60  pillar: 3 dets 7.0 ms  voxel: 6 dets 13.5 ms
+frame 80  pillar: 3 dets 7.7 ms  voxel: 4 dets 13.6 ms
+frame 100  pillar: 3 dets 7.3 ms  voxel: 3 dets 18.1 ms
+frame 120  pillar: 1 dets 7.0 ms  voxel: 2 dets 13.4 ms
+frame 140  pillar: 3 dets 58.0 ms  voxel: 4 dets 13.7 ms
+frame 160  pillar: 4 dets 16.5 ms  voxel: 2 dets 13.2 ms
+frame 180  pillar: 3 dets 17.7 ms  voxel: 2 dets 21.8 ms
+frame 200  pillar: 4 dets 7.0 ms  voxel: 2 dets 82.1 ms
+frame 220  pillar: 3 dets 21.6 ms  voxel: 4 dets 24.6 ms
+frame 240  pillar: 2 dets 7.1 ms  voxel: 3 dets 13.1 ms
+frame 260  pillar: 4 dets 6.8 ms  voxel: 5 dets 13.9 ms
+frame 280  pillar: 5 dets 6.6 ms  voxel: 3 dets 73.0 ms
+frame 300  pillar: 3 dets 6.5 ms  voxel: 3 dets 12.8 ms
+[pillar] 303 frames, network 11.3 ms (median)
+[voxel] 303 frames, network 20.3 ms (median)
+=== v1 0921_165659_s006 18:47:20 ===
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1023 18:47:36.199000 1569543 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+frame 20  pillar: 4 dets 6.8 ms  voxel: 5 dets 26.1 ms
+frame 40  pillar: 3 dets 12.4 ms  voxel: 5 dets 13.3 ms
+frame 60  pillar: 4 dets 33.7 ms  voxel: 6 dets 73.1 ms
+frame 80  pillar: 5 dets 69.8 ms  voxel: 6 dets 100.0 ms
+frame 100  pillar: 4 dets 27.3 ms  voxel: 6 dets 137.1 ms
+frame 120  pillar: 6 dets 26.4 ms  voxel: 5 dets 31.1 ms
+frame 140  pillar: 7 dets 7.0 ms  voxel: 4 dets 17.5 ms
+frame 160  pillar: 4 dets 40.3 ms  voxel: 4 dets 17.2 ms
+frame 180  pillar: 3 dets 12.3 ms  voxel: 4 dets 26.8 ms
+frame 200  pillar: 6 dets 6.9 ms  voxel: 5 dets 67.3 ms
+frame 220  pillar: 6 dets 231.8 ms  voxel: 5 dets 41.0 ms
+frame 240  pillar: 8 dets 58.9 ms  voxel: 4 dets 14.0 ms
+frame 260  pillar: 8 dets 7.2 ms  voxel: 5 dets 13.3 ms
+frame 280  pillar: 2 dets 7.1 ms  voxel: 4 dets 13.2 ms
+frame 300  pillar: 2 dets 16.0 ms  voxel: 1 dets 30.8 ms
+[pillar] 302 frames, network 10.8 ms (median)
+[voxel] 302 frames, network 22.4 ms (median)
+V1_RUNS_DONE 2026-10-23 18:49:41

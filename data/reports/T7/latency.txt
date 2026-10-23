@@ -1,0 +1,2 @@
+[pillar] 288 frames, network 8.3 ms (median)
+[voxel] 288 frames, network 24.1 ms (median)

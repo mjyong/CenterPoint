@@ -1,0 +1,22 @@
+GPU5 2026-10-23 18:21:09
+index, memory.used [MiB], memory.free [MiB], utilization.gpu [%]
+5, 14035 MiB, 8520 MiB, 0 %
+START dog_voxel_veh_v1 e10 2026-10-23 18:21:10
+ev dog_voxel_veh_v1 e10 py_exit 0 grep_exit 0 18:22:13
+954 data/reports/T7/dist_test_dog_voxel_veh_v1_e10.txt
+START dog_voxel_veh_v1 e15 2026-10-23 18:22:13
+ev dog_voxel_veh_v1 e15 py_exit 0 grep_exit 0 18:23:11
+954 data/reports/T7/dist_test_dog_voxel_veh_v1_e15.txt
+START dog_voxel_veh_v1 e20 2026-10-23 18:23:11
+ev dog_voxel_veh_v1 e20 py_exit 0 grep_exit 0 18:24:14
+954 data/reports/T7/dist_test_dog_voxel_veh_v1_e20.txt
+START dog_pp_veh_v1 e10 2026-10-23 18:24:14
+ev dog_pp_veh_v1 e10 py_exit 0 grep_exit 0 18:25:12
+954 data/reports/T7/dist_test_dog_pp_veh_v1_e10.txt
+START dog_pp_veh_v1 e15 2026-10-23 18:25:12
+ev dog_pp_veh_v1 e15 py_exit 0 grep_exit 0 18:26:12
+954 data/reports/T7/dist_test_dog_pp_veh_v1_e15.txt
+START dog_pp_veh_v1 e20 2026-10-23 18:26:12
+ev dog_pp_veh_v1 e20 py_exit 0 grep_exit 0 18:27:09
+954 data/reports/T7/dist_test_dog_pp_veh_v1_e20.txt
+EVALS_DONE 2026-10-23 18:27:09

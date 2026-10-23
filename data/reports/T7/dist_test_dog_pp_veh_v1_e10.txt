@@ -1,0 +1,8 @@
+ Total time per frame:  0.0
+Evaluation car: AP@0.5=0.614, AP@1.0=0.678, AP@2.0=0.727, ATE=0.278, ASE=0.171, AOE=0.860, AVE=0.280, AP@4.0=0.731, mAP=0.687, AP@2.0[0-10m]=0.538, AP@2.0[10-20m]=0.909, AP@2.0[20-40m]=0.612
+Evaluation truck: AP@0.5=0.472, AP@1.0=0.601, AP@2.0=0.700, ATE=0.437, ASE=0.135, AOE=1.570, AVE=1.131, AP@4.0=0.753, mAP=0.631, AP@2.0[0-10m]=0.816, AP@2.0[10-20m]=0.865, AP@2.0[20-40m]=0.677
+Evaluation mAP: 0.6594
+Evaluation merged/vehicle: AP@0.5=0.550, AP@1.0=0.685, AP@2.0=0.788, ATE=0.387, ASE=0.179, AOE=1.282, AVE=0.663, AP@4.0=0.826, mAP=0.712, AP@2.0[0-10m]=0.812, AP@2.0[10-20m]=0.915, AP@2.0[20-40m]=0.749
+Evaluation merged/pedestrian: AP@0.5=nan, AP@1.0=nan, AP@2.0=nan, AP@4.0=nan, mAP=nan, AP@2.0[0-10m]=nan, AP@2.0[10-20m]=nan, AP@2.0[20-40m]=nan
+Evaluation merged/cyclist: AP@0.5=nan, AP@1.0=nan, AP@2.0=nan, AP@4.0=nan, mAP=nan, AP@2.0[0-10m]=nan, AP@2.0[10-20m]=nan, AP@2.0[20-40m]=nan
+Evaluation merged/mAP: 0.7123

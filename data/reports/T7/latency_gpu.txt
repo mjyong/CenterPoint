@@ -1,0 +1,17 @@
+card 7, scene 0921_164127_s001, back to back. Adopted measurement (latency.txt).
+BEFORE 2026-10-23 18:50:09
+7, 7033 MiB used, 15522 MiB free, util 59%
+during samples (other process stayed at 7010 MiB):
+18:50:15 util 0%
+18:50:35 util 0%  (our pid 1302 MiB)
+18:50:56 util 41% (our pid 3350 MiB)
+18:51:16 util 5%  (our pid 4286 MiB)
+18:51:36 util 0%  (our pid 4286 MiB)
+18:51:57 util 24% (voxel process starting, 672 MiB)
+AFTER 2026-10-23 18:53:25
+7, 7033 MiB used, 15522 MiB free, util 0%
+pillar 8.3 ms, voxel 24.1 ms
+
+A later run on GPU 4 started at util 0% but the neighbour woke up
+(mid-run util 33%, then 99% at the end). Those numbers are in
+latency_gpu4.txt (pillar 20.1 ms, voxel 33.8 ms) and are not used.
