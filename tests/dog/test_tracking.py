@@ -199,12 +199,18 @@ def test_motion_eval_counts_false_moving_and_latency():
     x = 10 + np.cumsum(v) * 0.1
     frames = []
     for k in range(100):
+        creep = -40 + 0.5 * t[k]                 # a truck creeping 0.5 m/s, 40 m away: moving, but not relevant
         dets = _vehicles([(x[k] + rng.normal(0, 0.1), 6.0, 4.5, 1.9, 0.0, 0.8),
-                          (30 + rng.normal(0, 0.1), -8.0, 4.5, 1.9, 0.0, 0.8)])
-        dets.velocities = np.array([[v[k], 0.0], [0.0, 0.0]])
-        gt = [dict(key="mover", label=0, xy=np.array([x[k], 6.0]), moving=bool(v[k] > 0)),
-              dict(key="parked", label=0, xy=np.array([30.0, -8.0]), moving=False)]
+                          (30 + rng.normal(0, 0.1), -8.0, 4.5, 1.9, 0.0, 0.8),
+                          (creep, 10.0, 12.0, 2.6, 0.0, 0.8)])
+        dets.velocities = np.array([[v[k], 0.0], [0.0, 0.0], [0.5, 0.0]])
+        gt = [dict(key="mover", label=0, xy=np.array([x[k], 6.0]), moving=bool(v[k] > 0), speed=v[k], range=12.0),
+              dict(key="parked", label=0, xy=np.array([30.0, -8.0]), moving=False, speed=0.0, range=31.0),
+              dict(key="creeper", label=0, xy=np.array([creep, 10.0]), moving=True, speed=0.5, range=40.0)]
         frames.append((t[k], dets, gt))
     m = evaluate_motion([frames])
     assert m["static_tracks"] == 1 and m["static_flagged"] == 0 and m["false_moving"] < 0.05
-    assert m["segments"] == 1 and m["missed"] == 0 and m["latency_median"] <= 0.5 and m["moving_recall"] > 0.85
+    assert m["segments"] == 2 and m["missed"] == 1 and m["latency_median"] <= 0.5
+    assert m["relevant_segments"] == 1 and m["relevant_missed"] == 0 and m["relevant_latency_p90"] <= 0.5
+    assert [(d["kind"], d["key"]) for d in m["details"]] == [("missed", "creeper")]
+    assert abs(m["recording_h"] * 3600 - 10.0) < 1e-6

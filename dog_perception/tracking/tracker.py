@@ -140,6 +140,8 @@ class TrackState:
     history: np.ndarray        # (K, 6) [t, x, y, vx, vy, observed]
     motion: str = "static"     # static / moving / stopped (module docstring)
     time_since_moving: float = float("inf")   # [s] since the track was last moving
+    speed_displacement: float = float("nan")  # [m/s] the two readings of the last motion update
+    speed_head: float = float("nan")
 
     @property
     def name(self):
@@ -237,6 +239,7 @@ class Track:
         traj_speed = 0.0 if traj is None else traj
         det_speed = traj_speed if det_vel is None else float(np.hypot(*det_vel))
         fast = traj is not None and traj_speed > on and det_speed > on
+        self.speeds = (float("nan") if traj is None else traj_speed, det_speed)
         self.fast.append(fast)
         if fast:
             self.last_fast = self.stamp
@@ -284,7 +287,8 @@ class Track:
             size=self.size.copy(), score=self.score, covariance=P[:4, :4].copy(),
             mode_probs=self.imm.mu.copy(), age=self.stamp - self.birth, hits=self.hits,
             coasting=self.time_since_update > 1e-6, history=np.asarray(self.history), motion=self.motion,
-            time_since_moving=float("inf") if self.last_moving is None else self.stamp - self.last_moving)
+            time_since_moving=float("inf") if self.last_moving is None else self.stamp - self.last_moving,
+            speed_displacement=self.speeds[0], speed_head=self.speeds[1])
 
 
 class MultiObjectTracker:

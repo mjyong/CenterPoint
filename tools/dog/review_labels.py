@@ -32,7 +32,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from dog_perception.label_review import apply_edits, read_edits, write_review_mcap, write_track_table  # noqa: E402
+from dog_perception.label_review import (apply_edits, read_edits, track_table, write_review_mcap,  # noqa: E402
+                                         write_track_table)
 
 
 def main():
@@ -109,6 +110,8 @@ def confidence(args):
         with open(path, "rb") as f:
             labels = pickle.load(f)
         scene = os.path.basename(os.path.dirname(os.path.abspath(path)))
+        # what training makes of each track now (the size rule can still ignore a sure track)
+        train_as = {r["track_id"]: r["train_as"] for r in track_table(labels, "vehicle" if args.vehicles_only else "sub")}
         by_id = defaultdict(list)
         for fr in labels["frames"]:
             for o in fr["objects"]:
@@ -119,6 +122,7 @@ def confidence(args):
                 raise SystemExit("%s has no det_score: re-run auto_label.py" % path)
             det = np.array([o["det_score"] for o in objs if not o["interpolated"]])
             tracks.append(dict(scene=scene, track_id=tid, mean_score=float(objs[0]["score"]), det=det,
+                               train_as=train_as.get(tid, ""),
                                boxes=len(objs), length_m=float(np.median([o["box"][3] for o in objs])),
                                min_range_m=float(min(np.hypot(*o["box"][:2]) for o in objs))))
     low = [t for t in tracks if t["mean_score"] < args.review_score]
@@ -138,13 +142,17 @@ def confidence(args):
         os.makedirs(os.path.dirname(os.path.abspath(args.spot_check)), exist_ok=True)
         with open(args.spot_check, "w", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["scene", "track_id", "mean_score", "confident_frames", "max_score", "boxes", "length_m",
-                        "min_range_m", "real_vehicle"])
-            for t in sorted(freed, key=lambda t: (t["scene"], t["track_id"])):
-                w.writerow([t["scene"], t["track_id"], "%.3f" % t["mean_score"], int(np.sum(t["det"] >= 0.6)),
-                            "%.3f" % (t["det"].max() if len(t["det"]) else 0), t["boxes"], "%.1f" % t["length_m"],
-                            "%.1f" % t["min_range_m"], ""])
-        print("%d tracks no longer flagged with (0.6, 5) -> %s (fill real_vehicle: y / n)" % (len(freed), args.spot_check))
+            w.writerow(["scene", "track_id", "train_as", "mean_score", "confident_frames", "max_score", "boxes",
+                        "length_m", "min_range_m", "real_vehicle"])
+            # the ones that now train as positives first, most boxes first; 'ignore' rows stay ignore boxes
+            # for another reason (a teacher 'truck' the size of a car) and are reviewed anyway
+            for t in sorted(freed, key=lambda t: (t["train_as"] == "ignore", -t["boxes"])):
+                w.writerow([t["scene"], t["track_id"], t["train_as"], "%.3f" % t["mean_score"],
+                            int(np.sum(t["det"] >= 0.6)), "%.3f" % (t["det"].max() if len(t["det"]) else 0),
+                            t["boxes"], "%.1f" % t["length_m"], "%.1f" % t["min_range_m"], ""])
+        pos = [t for t in freed if t["train_as"] not in ("ignore", "")]
+        print("%d tracks no longer flagged with (0.6, 5), %d of them now positives (%d boxes) -> %s "
+              "(fill real_vehicle: y / n)" % (len(freed), len(pos), sum(t["boxes"] for t in pos), args.spot_check))
 
 
 if __name__ == "__main__":

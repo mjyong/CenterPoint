@@ -442,16 +442,23 @@ GPU 利用率；每个 epoch 迭代数；总耗时；显存；每 5 个 epoch �
          --results $(for r in $VAL; do echo teacher=data/runs/$r/voxel/results.pkl nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl \
                      v0_voxel=data/runs_veh_v0/$r/voxel/results.pkl v0_pp=data/runs_veh_v0/$r/pillar/results.pkl; done) \
          --thresholds 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 | tee data/reports/T4/compare_val.md
-4. 在线运动状态，用 v0 Pillar 的检测（线上跑的就是 Pillar），和 T1R 里教师的基线比：
+4. 在线运动状态。工具在 T1R 之后多了"相关的运动段"（中位速度 ≥ 1 m/s、中位距离 ≤ 30 m）和明细 CSV（每个漏报段、每次误报）：
+   - 教师检测，全部 35 个场景（T1R 第 5 步的训练、验证两张表合成一张，并带上新列）：
+     ALL=$(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT)
+     python tools/dog/motion_eval.py $(for r in $ALL; do echo --scene data/labels/$r/labels.pkl data/runs/$r/voxel/results.pkl; done) \
+         --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 --details data/reports/T4/motion_teacher_details.csv \
+         | tee data/reports/T4/motion_teacher.txt
+   - v0 Pillar 的检测（线上跑的就是 Pillar），验证集 10 个场景：
      python tools/dog/motion_eval.py $(for r in $VAL; do echo --scene data/labels/$r/labels.pkl data/runs_veh_v0/$r/pillar/results.pkl; done) \
-         --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 | tee data/reports/T4/motion_v0_pp.txt
+         --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 --details data/reports/T4/motion_v0_pp_details.csv \
+         | tee data/reports/T4/motion_v0_pp.txt
 
 停止条件：任何报错。
 提交：data/reports/T4/、本文档。
 报告（写进"T4 结果"）：
 - 每个模型每个 epoch 的 merged/vehicle 一行（mAP、AP@0.5/1/2/4、分距离段 AP、ATE、ASE、AOE），以及 car、truck 各一行；
 - compare_val.md 的两张表（AP 表、耗时表），以及每个模型的阈值表最后的推荐行；
-- motion_v0_pp.txt 的表；
+- motion_teacher.txt、motion_v0_pp.txt 的表；两个 details CSV 里 on_speed 0.70、on_frames 3 的行数（missed / false moving 各多少）；
 - 一句话结论：v0 比 nuScenes Pillar 好还是差、差在哪个距离段。
 ```
 
@@ -465,21 +472,25 @@ GPU 利用率；每个 epoch 迭代数；总耗时；显存；每 5 个 epoch �
 
 只审车：不用管行人、骑行者，也不用改 car / truck / bus。规则见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节"审核只看车"，审核工具的用法见第 ④ 节和第 10 节。
 
-0. **先抽查新的待审核规则（约 15 分钟）**：
-   - `data/reports/T1R/review_spot_check.csv` 列的是平均分 < 0.5、但有 ≥ 5 帧 ≥ 0.6 分，因此不再要审的车辆轨迹；
-   - 随机抽 20 条，在对应场景的 review mcap 里看，`real_vehicle` 列填 `y` / `n`；
+0. **先抽查新的待审核规则（约 20 分钟）**：
+   - `data/reports/T1R/review_spot_check.csv` 是新规则放过的 46 条车辆轨迹：平均分 < 0.5，但有 ≥ 5 帧 ≥ 0.6 分。
+   - 其中 38 条（5,253 个框）现在直接当正样本训练，排在表的前面，按框数从多到少。
+   - 后 8 条 `train_as = ignore`：因为"教师说 truck、尺寸却是小车"仍是忽略框，第 1 步会审到，这里不用看。
+   - 看前 20 条（覆盖这 38 条的大部分框），在对应场景的 review mcap 里看，`real_vehicle` 列填 `y` / `n`；
    - 全是 `y`：规则可用，接着做第 1 步；
    - 有 `n`：把 CSV 提交上来，先别往下审。我来提高分数或帧数，Agent 重跑 T1R 第 1、3、6、7 步，轨迹表会变。
-1. **按轨迹（全部 35 个场景）**：
+1. **按轨迹，只做训练集的 25 个场景**：
+   - 验证集不用按轨迹审：T5 导出验证集、T7 评估用的都是第 2 步逐框审核的结果（`labels_sustech.pkl`）。
    - 在 Foxglove 里打开 `data/labels/<场景>/<场景>_review.mcap`，对照 `data/labels/<场景>/labels_tracks_vehicle.csv` 填 `action` 列；
-   - 只需处理 `train_as = ignore` 的行（条数见 T1R 结果；旧规则下训练集 135 条、验证集 72 条）。
-   - **按 `frames` 从多到少审，不到 20 帧的可以不审。** 旧规则下，不到 20 帧的占要审轨迹的 30%，框只占 4%；留空的仍是忽略框，不会被当成背景。
+   - 只需处理 `train_as = ignore` 的行：训练集 109 条。
+   - **按 `frames` 从多到少审，不到 20 帧的不用审**：不到 20 帧的有 44 条，只有 433 个框；留空的仍是忽略框，不会被当成背景。这样要审的是 65 条（旧规则下是全部 35 个场景的 207 条）。
    - `few_points` 列：这条轨迹有多少帧被挡住或太远。这些帧会自动作忽略框或不要，不用因为这些帧填 `ignore`。
-   - 先审训练集里**按尺寸算 truck**（`length_m` ≥ 5.5 或 `height_m` ≥ 2.5）的忽略行。
-     - 旧规则下，训练集能当正样本的 truck 只有 13 条轨迹、1,668 个框，比验证集的 18 条、3,215 个框还少；忽略着的 truck 尺寸轨迹有 56 条、4,084 个框。
-     - 其中 84% 在这 6 个场景（旧规则下的条数 / 框数）：0921_165659_s028（8 / 1,024）、s012（3 / 709）、s027（9 / 596）、s026（6 / 442）、s016（5 / 364）、s025（3 / 277）。
-     - 审完这 6 个场景、再加上验证集的逐框审核，就能先做 T5、T6。
-     - 其余场景 `action` 空着的行，导出时仍是忽略框；之后补审完，重跑 T5 就行。
+   - 先审**按尺寸算 truck**（`length_m` ≥ 5.5 或 `height_m` ≥ 2.5）的忽略行：
+     - T1R 后，训练集当正样本的 truck 有 25 条轨迹、3,652 个框（旧规则下 13 条、1,668 个）；
+     - 还忽略着 43 条、1,981 个框，其中 75% 在这 6 个场景（条数 / 框数）：0921_165659_s028（5 / 558）、s016（5 / 364）、s012（1 / 196）、s027（6 / 124）、s018（2 / 120）、s026（3 / 118）。
+   - 审完这 6 个场景、再加上验证集的逐框审核，就能先做 T5、T6。
+   - 其余 `action` 空着的行，导出时仍是忽略框；之后补审完，重跑 T5 就行。
+   - "教师说 truck、尺寸却是小车"的忽略行要特别看：长 2.5–3.1 m、高约 2.3 m、几乎不动，教师却连续 100 多帧给高分。这样的"truck"在验证集里有 4 条（0921_164127_s003 #22、s004 #4、0921_165659_s006 #2、0921_164127_s002 #10，在第 2 步逐框审核里处理），训练集里有 0921_165659_s001 #136。不是车就填 `drop`；是叉车之类的车辆就填 `ok`，按尺寸进 car head。先看清是什么，回头告诉我，同类东西以后可以定一条规则。
    - 动作怎么填：
 
      | 情况 | 填 |
