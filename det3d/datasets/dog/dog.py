@@ -17,6 +17,7 @@ Info file (pickle, list of dicts):
 
 Produced by ``tools/dog/export_dataset.py`` (from auto-labels or corrected labels).
 """
+import os
 import pickle
 
 import numpy as np
@@ -32,7 +33,12 @@ class DogDataset(PointCloudDataset):
     def __init__(self, info_path, root_path, nsweeps=5, cfg=None, pipeline=None, class_names=None,
                  test_mode=False, load_interval=1, class_balanced=True, empty_frames=0.0, **kwargs):
         """``empty_frames``: with ``class_balanced``, add frames without any (non-ignored) training
-        object, this fraction of the resampled set, so background-only scenes are seen too."""
+        object, this fraction of the resampled set, so background-only scenes are seen too.
+
+        ``root_path`` is resolved once, here: data/dog_veh is a symlink, and a dataset exported to a
+        new directory with the link moved over does not reach a training that is still running (the
+        infos and GT-database infos it holds belong to the old one)."""
+        root_path = os.path.realpath(root_path)
         self.load_interval = load_interval
         self.class_balanced = class_balanced
         self.empty_frames = empty_frames

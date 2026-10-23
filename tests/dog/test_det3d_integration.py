@@ -62,8 +62,12 @@ def test_dog_dataset_gt_sampling_and_training_step(sim_frames, tmp_path):
     pre.cfg.db_sampler.db_info_path = db
     pre.cfg.db_sampler.db_prep_steps[0].filter_by_min_num_points = dict(
         car=1, truck=1, bus=1, pedestrian=1, cyclist=1)       # no bus in the sim: sampler skips it
+    os.symlink(root, str(tmp_path / "dog_link"))                    # data/dog_veh is a symlink
+    cfg.data.train.root_path = str(tmp_path / "dog_link")
     np.random.seed(0)
     ds = build_dataset(cfg.data.train)
+    os.remove(str(tmp_path / "dog_link"))                            # a new export, the link moved over:
+    os.symlink(str(tmp_path / "new_export"), str(tmp_path / "dog_link"))   # the running training keeps its data
     batch = collate_kitti([ds[0], ds[1]])
     assert len(batch["hm"]) == 5 and batch["hm"][3].shape[1:] == (1, 102, 102)   # pedestrian task, stride 4
 

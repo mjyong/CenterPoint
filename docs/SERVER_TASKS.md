@@ -20,6 +20,9 @@
    - 先检查"前置条件"，不满足就停下报告。
    - 遇到"停止条件"就停下报告，不要自己改代码、改配置或换参数绕过去。
 3. 不要删除或覆盖 `data/seq`、`data/runs`、`data/labels` 里已有的东西，除非步骤里写了。SUSTechPOINTS 的场景目录（公共盘的 `sustech/`）里是人的审核结果，任何时候都不要删除或用 `--force` 覆盖。
+   - 数据集目录（`data/dog_veh` 链接指向的目录）：有训练、评估在读的时候，不要删，也不要往里导出。GT 库的文件按序号命名，新导出会把正在跑的训练贴进场景的车换成别的车的点云（T3D 的 Pillar 双卡就是这样坏的）。
+   - 新数据集导出到新目录，再把链接指过去（T5 第 3 步）。2026-10-23 之后启动的训练、评估在开始时就把链接解析成真实目录，链接改指不影响它们。
+   - 旧目录等用它的任务都结束了再删：删真实路径，不要删 `data/dog_veh` 链接。
 4. 做完以后：
    - 把报告写进本文档该任务的"结果"小节（替换"（待填）"）；
    - 把状态表里这一行改成"完成"（或"停在第 N 步"）；
@@ -29,11 +32,12 @@
 5. 选 GPU：`python tools/dog/batch_label.py --split $SPLIT --dry-run` 会打印每张卡的显存和占用。用空闲的卡，`CUDA_VISIBLE_DEVICES=<卡号>`。
 6. 大的输出写到 `/public/zjst/robot`（仓库盘只剩约 27 GB，T0）（和 `data/seq`、`data/runs` 同一块盘）。空闲空间用 `df -h /public/zjst/robot` 看，至少 80 GB。不要用 `df -h .`：那是仓库所在盘，后面的导出、训练权重、推理结果都不写到那里。第一次往下面这些目录写之前，先链过去（已经是这个链接就不用再做）：
    ```bash
-   for d in dog_veh train deploy runs_veh_v0 runs_nusc_pp runs_veh_v1 runs_veh_v1_view runs_r2 labels_r2 seq_lever; do
+   for d in train deploy runs_veh_v0 runs_nusc_pp runs_veh_v1 runs_veh_v1_view runs_r2 labels_r2 seq_lever; do
      mkdir -p /public/zjst/robot/centerpoint_data/$d
      ln -sfn /public/zjst/robot/centerpoint_data/$d data/$d
    done
    ```
+   `data/dog_veh` 已经链好，之后只由导出数据集的步骤切换（约定 3），不要再用这个循环改它。
 7. 测试：只在 T0、或者 `git pull` 拉到了代码改动（`dog_perception/`、`tools/`、`det3d/`、`configs/`）时跑，而且只跑快速的：
    ```bash
    pip install pytest-xdist       # 第一次
@@ -53,7 +57,7 @@
 | T1R | 按新规则重做自动标注（遮挡点数、待审核、静止毛刺），重做 T1、T2，统计 | Agent | T0 | 40 分钟 | 完成 |
 | T1S | 训练集也导出到 SUSTechPOINTS 逐框审核（和验证集分组，带分数 / 速度 / 运动，红框待审） | Agent | T1R | 20 分钟 | 完成 |
 | T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T1R | 1.5–2 小时（数据读取已加速） | 完成 |
-| T3D | 每个模型 2 张卡训练 v0（数据并行），和单卡比 | Agent | T3 | 40 分钟 | 完成 |
+| T3D | 每个模型 2 张卡训练 v0（数据并行），和单卡比 | Agent | T3 | 40 分钟 | 完成；Pillar 那次训练中途数据集被 T5 重写，作废（见复核） |
 | T4 | 评估 v0（在 H1 审过的验证集上） | Agent | T5（有 T3D 的结果就一起评） | 1 小时 | 待做 |
 | H1 | 人工审核车辆：35 个场景全在 SUSTechPOINTS 里逐框审（每 5 帧取 1 帧） | 人 | T1S | 1–2 天 | 完成（junyongmou，2026-10-23） |
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 完成 |
@@ -64,7 +68,7 @@
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
-- H1 完成后（2026-10-23）的顺序：T5 → T6（单卡就行，各约 1 小时）→ T7。有空闲卡时 T3D 和 T5、T6 同时跑；T4 在 T5 之后（要用审过的验证集），和 T6 同时跑。
+- H1 完成后（2026-10-23）的顺序：T5 → T6（单卡就行，各约 1 小时）→ T7。T4 在 T5 之后（要用审过的验证集），和 T6 同时跑。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
 - 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
 - v0 只用未审核的自动标注，主要作用是把 GPU 训练流程跑通、得到一个基线，**不上线**。要上线的是 v1。
 
@@ -529,6 +533,22 @@ T3 加速后，单卡训练已经是 Voxel 1 小时 7 分、Pillar 49 分，GPU 
   - Voxel：第 5 个 epoch 0.3926 / 0.2309 / 0.6468 和 0.3715 / 0.1814 / 0.7606；第 10 个 0.2760 / 0.1430 / 0.5322 和 0.2535 / 0.1000 / 0.6137；第 15 个 0.2554 / 0.1264 / 0.5161 和 0.2162 / 0.1039 / 0.4492；第 20 个 0.2062 / 0.1038 / 0.4096 和 0.1624 / 0.0543 / 0.4324。
   - Pillar：第 5 个 epoch 0.4624 / 0.2747 / 0.7509 和 0.5321 / 0.3046 / 0.9103；第 10 个 0.3751 / 0.1946 / 0.7219 和 0.3499 / 0.1775 / 0.6897；第 15 个 0.3243 / 0.1605 / 0.6554 和 0.3785 / 0.1774 / 0.8043；第 20 个 0.2585 / 0.0925 / 0.6640 和 0.2902 / 0.1199 / 0.6810。
 - 日志在 `data/reports/T3D/`：`dog_voxel_veh_v0_2gpu.log`、`dog_pp_veh_v0_2gpu.log`，以及同名的 `*.log.json`（work_dir 里是 `20261023_134930.log.json`、`20261023_143441.log.json`）。权重在 `data/train/dog_*_veh_v0_2gpu`（不提交）。
+- （2026-10-23 复核）
+  - **Voxel：双卡有效，精度不掉。**
+    - 速度：47 分对 1 小时 7 分，每秒 52.6 个样本对 37.7，是单卡的 1.4 倍（理想 2 倍）。
+    - 收敛：最后一个 epoch 的平均 loss 和单卡一样（总 0.383 / 0.384，hm 0.171 / 0.171，loc 0.846 / 0.851），学习率放大后没有欠训练。
+  - **双卡每步多出的约 0.045 s 花在哪**（按 log.json 的时间点拆）：
+    - 约 0.03 s 在"拷数据到 GPU"这一段。这里是同步拷贝，要等上一步的 GPU 工作做完，所以实际是两张卡的梯度平均，加上两张卡互相等（每批点数不同，快的等慢的）。4090 之间不能 P2P，梯度走主机内存：Voxel 每步 32 MB，Pillar 20 MB。
+    - 约 0.005 s 是 `find_unused_parameters` 每步多遍历一次计算图。日志里 DDP 自己也提示没有用不到的参数，已改成默认关（配置里写 `find_unused_parameters = True` 才开）。
+  - **Pillar 双卡这次作废。**
+    - 现象：14:57 左右（第 12 个 epoch）起，loc loss 突然从约 1.2 跳到 1.6，之后一直高；单卡同一阶段是平滑下降的。跳的是朝向两项（sin、cos 各 +0.15）和尺寸，位置几乎没变。最终 loss 0.588，单卡 0.473。
+    - 原因：这正是 T5 重新导出 `data/dog_veh` 的时候（H1 记录 14:34 提交，T5 15:01 提交）。训练开始时读进内存的是 v0 的 GT 库索引（框的尺寸、朝向），GT 库的点云文件却按"帧序号_类别_序号"命名，被 v1 的同名文件换掉了。贴进场景的车的点云和框对不上，朝向、尺寸的 loss 就上去了。Voxel 14:37 结束，在 T5 之前，不受影响。
+    - 另外，Pillar 用的 3、4 号卡上还有别人的进程，速度数字也偏慢。
+  - **这是任务安排的错**：状态说明里写了"T3D 和 T5 同时跑"，而 T5 要重写 T3D 正在读的数据集。已改：
+    - 通用约定 3：训练、评估在读的数据集目录，不删、不往里导出；新数据集导到新目录再切链接；
+    - 代码：`DogDataset` 开始时把 `data/dog_veh` 解析成真实目录，之后链接改指，不影响已经在跑的训练、评估（拉到这次代码后启动的才有）；
+    - T5 第 3 步改成导到新目录再切链接，以后补审再重跑 T5 时用。
+  - **结论**：双卡能用、不掉精度（Voxel 为证），快 1.4 倍。T6 用单卡没问题；空闲卡够、又赶时间时再用双卡。Pillar 双卡不用重跑（同一套代码，Voxel 已经验证），T4 里也不评它。
 
 ---
 
@@ -546,9 +566,15 @@ T3 加速后，单卡训练已经是 Voxel 1 小时 7 分、Pillar 49 分，GPU 
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T3、T5 完成（data/dog_veh 是 T5 导出的 v1 数据集，
 infos_val.pkl 约 580 帧；data/labels/<验证场景>/labels_sustech.pkl 存在）。
 
+0. 核对 T3D 复核的判断（只看时间，什么都不改）：
+     D=$(readlink -f data/dog_veh)
+     ls -l --time-style=full-iso $D/infos_train.pkl $D/dbinfos_train_5sweeps_withvelo.pkl
+     ls -l --time-style=full-iso $D/gt_database_5sweeps_withvelo/car | sed -n 2,3p
+   把这几个时间写进报告：落在 14:34–15:12（Pillar 双卡训练的时间）之间，就印证了复核的判断。
 1. 模型级，第 10、15、20 个 epoch。另外把这两组的 epoch_20 也各评一次（work_dir 用 <权重目录>/eval_e20）：
    - data/train/dog_*_veh_v0_oldlabels：看标注规则改动的影响；
-   - data/train/dog_*_veh_v0_2gpu（T3D 做了的话）：和单卡 v0 比，决定 T6 用不用双卡。
+   - data/train/dog_voxel_veh_v0_2gpu：和单卡 v0 比，看双卡训练掉不掉精度。Pillar 双卡不评：
+     那次训练中途数据集被 T5 重写（见 T3D 复核）。
      mkdir -p data/reports/T4
      for e in 10 15 20; do for m in voxel pp; do
        python tools/dist_test.py configs/dog/dog_centerpoint_${m}_xt32_veh.py --work_dir data/train/dog_${m}_veh_v0/eval_e$e \
@@ -677,10 +703,13 @@ infos_val.pkl 约 580 帧；data/labels/<验证场景>/labels_sustech.pkl 存在
      REC=$(for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); do echo --recording data/runs/$r data/labels/$r/labels_sustech.pkl; done
            for r in $(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT); do echo --recording data/runs/$r data/labels/$r/labels_full.pkl; done)
      VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
-     rm -rf data/dog_veh/*      # 清空链接指向的公共盘目录里的 v0 数据集；不要写成 rm -rf data/dog_veh（只删掉链接，
-                                # 新的数据集就会写到仓库盘上）
+     NEW=$(dirname $(readlink -f data/dog_veh))/dog_veh_$(date +%m%d_%H%M)   # 新目录，和旧的在同一块公共盘
      python tools/dog/export_dataset.py $REC --val-recordings $VAL --classes vehicle \
-         --out data/dog_veh --gt-db --jobs 8 2>&1 | tee data/reports/T5/export.txt
+         --out $NEW --gt-db --jobs 8 2>&1 | tee data/reports/T5/export.txt
+     OLD=$(readlink -f data/dog_veh); ln -sfn $NEW data/dog_veh; echo "data/dog_veh: $OLD -> $NEW"
+   - 不要先 rm -rf 旧的数据集，也不要导到 data/dog_veh 里：可能有训练、评估正在读它（通用约定 3）。
+   - 旧目录 $OLD 写进报告。用它的训练、评估都结束了再删（rm -rf $OLD，是真实路径，不是链接）。
+   - 2026-10-23 之前启动的训练还没有"开始时解析链接"，它们跑完之前不要做这一步。
 
 验证集只有逐框审核过的帧（每 5 帧取 1 帧，约 580 帧），训练集是每一帧（约 7,300 帧，略少于 T1R：第一个关键帧之前、
 最后一个关键帧之后的几帧不要），这是预期的。

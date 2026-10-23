@@ -280,17 +280,19 @@ def train_detector(model, dataset, cfg, distributed=False, validate=False, logge
         # lr_scheduler = None
         cfg.lr_config = None 
 
-    # put model on gpus
+    # put model on gpus. find_unused_parameters walks the autograd graph every step (about 5 ms on the
+    # dog models, which use every parameter); a config with parameters outside the loss sets it True
+    unused = cfg.get("find_unused_parameters", False)
     if distributed and torch.cuda.is_available():
         model = DistributedDataParallel(
             model.cuda(cfg.local_rank),
             device_ids=[cfg.local_rank],
             output_device=cfg.local_rank,
             # broadcast_buffers=False,
-            find_unused_parameters=True,
+            find_unused_parameters=unused,
         )
     elif distributed:           # gloo on the CPU: tests of the distributed path
-        model = DistributedDataParallel(model, find_unused_parameters=True)
+        model = DistributedDataParallel(model, find_unused_parameters=unused)
     elif torch.cuda.is_available():
         model = model.cuda()
     else:
