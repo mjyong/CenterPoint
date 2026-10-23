@@ -1,0 +1,16 @@
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+no apex
+No Tensorflow
+train set: 7472 samples
+1. per stage, one core (ms per sample):
+   LoadPointCloudFromFile           2.9
+   LoadPointCloudAnnotations        0.0
+   SweepPoseJitter                  2.1
+   Preprocess                      25.1
+     voxel_generator.generate      16.9
+   Voxelization                    17.2
+   AssignLabel                      0.8
+   Reformat                         0.0
+   total                           48.1
+2. disk: 200 unread frames (4.9 MB each), 8 threads: 10047 MB/s = 2066 frames/s
+3. DataLoader (batch 4, 8 workers): 0.053 s per batch, 75.1 samples/s
