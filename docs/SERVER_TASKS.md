@@ -60,7 +60,7 @@
 | T3D | 每个模型 2 张卡训练 v0（数据并行），和单卡比 | Agent | T3 | 40 分钟 | 完成；Pillar 那次训练中途数据集被 T5 重写，作废（见复核） |
 | T4 | 评估 v0（在 H1 审过的验证集上） | Agent | T5（有 T3D 的结果就一起评） | 1 小时 | 待做 |
 | H1 | 人工审核车辆：35 个场景全在 SUSTechPOINTS 里逐框审（每 5 帧取 1 帧） | 人 | T1S | 1–2 天 | 完成（junyongmou，2026-10-23） |
-| T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 完成 |
+| T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 完成（2026-10-23 补审后重导） |
 | T6 | 训练 v1 | Agent | T5 | 约 1 小时（单卡）/ 40 分钟（双卡） | 待做 |
 | T7 | 评估 v1，选 epoch 和上报阈值 | Agent | T6 | 1 小时 | 待做 |
 | T8 | 导出 Pillar v1 的 ONNX 并校验 | Agent | T7 | 10 分钟 | 待做 |
@@ -721,19 +721,15 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 
 ### T5 结果
 
-- 35 个场景导回的帧数和 T1S 导出一致（验证 580、训练 1,476，合计 2,056）。类别只有 vehicle：7,071 个框。其中仍带着 `review` 的 429 个（验证 63、训练 366，和 H1 留下的红框一致），导出时作忽略框。审核挪动或新画的 38 个框都在训练集（0921_165659_s024 新画 34 个，s025 1 个，s028 3 个）。
-- propagate（25 个训练场景）：留下 7,232 / 7,479 帧（96.7%）。keyframe boxes 4,605，interpolated boxes 17,224，left out: removed by the reviewer 34,925，ignore: reviewed at one end 733，frames left out (outside the keyframes) 79。ignore: between keyframes only 为 0。
-- `0921_165659_s024` 打印是 229/303 = 75.6%，按全部帧算低于 90%。这 303 帧里 55 帧是 `pose_bad`，propagate 不写这些帧（位姿不可信，导出也不收）。去掉之后是 229/248 = 92.3%，少掉的 19 帧就是该场景的 `frames left out (outside the keyframes)`。其余训练场景按全部帧算都 ≥ 90.7%（最低是 0921_165659_s011 的 274/302）。合计和任务预期的约 7,300 帧一致，所以继续导出。
-- 导出覆盖了 `data/dog_veh`（仍是指向 `/public/zjst/robot/centerpoint_data/dog_veh` 的链接，只清了里面的 v0）。train 7,232 / val 580 帧。
-  - train：car 14,382（+2,477 ignored），truck 4,078（+1,337 ignored）。T1R 是 car 13,346（+3,663），truck 3,652（+2,003）。正样本 car +1,036、truck +426，忽略 car −1,186、truck −666。
-  - val 只有关键帧：car 950（+272 ignored），truck 1,132（+102 ignored）。T1R 的验证集是每一帧（2,874 帧，car 3,295 / truck 4,631），帧数不同，不直接比。
-  - note：`few points in the current sweep (ignored)` 875；`no points in the input (left out)` 298；`teacher subclass disagrees with size (ignored)` 121（T1R 这一条是 4,237，人确认掉了大部分）。
-  - GT 库：car 14,382、truck 4,078。`du -shL data/dog_veh` 47G。
-- （2026-10-23 复核）
-  - 结果对，能进 T6、T4。帧数和 T1S 一致；s024 低于 90% 是 55 帧 `pose_bad`，解释成立。训练集正样本变多、忽略框变少，主要来自人确认掉的红框（`teacher subclass disagrees` 4,237 → 121）。
-  - `left out: removed by the reviewer` 34,925 不是审核删了这么多车。`labels.pkl` 里还有行人、骑行者，SUSTechPOINTS 只导出了车，propagate 把关键帧上看不到的行人、骑行者轨迹都算成了"被审核删掉"。真正被删的车只有 144 个框。
-  - 车辆训练不受影响（导出时 `--classes vehicle` 本来就不要行人、骑行者），但 `labels_full.pkl` 丢了行人、骑行者，以后做三类模型时要用。已修：propagate 只处理审核覆盖的类别，其它类别原样照抄（计数 `other classes, copied as they are`）。
-  - 本地用仓库里的 `labels.pkl` / `labels_sustech.pkl` 重跑核对过：25 个场景的车辆标签逐框一致；`removed by the reviewer` 144，`other classes, copied as they are` 43,640，其余计数和上面一样。`data/dog_veh` 不用重新导出；T6 第 0 步在服务器上重跑 propagate。
+- 2026-10-23 补审后重导。35 个场景导回的帧数和 T1S 一致（验证 580、训练关键帧 1,476，合计 2,056）。类别只有 vehicle：7,068 个框。仍带着 `review` 的 310 个（验证 63、训练 247），导出时作忽略框。挪动或新画的 38 个框都在训练集，和上一版一样。
+- 相对上一版，红框少了 119 个，都在训练集：0921_165659_s007 36→0（框 130→129），s008 11→0（168→166），s023 61→0（468 不变），s024 16→7，s025 35→33。验证集没变。
+- propagate（25 个训练场景，行人、骑行者原样照抄）：留下 7,232 / 7,479 帧（96.7%）。keyframe boxes 4,602，interpolated boxes 17,220，other classes, copied as they are 43,640，left out: removed by the reviewer 157，ignore: reviewed at one end 724，frames left out (outside the keyframes) 79。ignore: between keyframes only 为 0。157 是删掉的车（上一版复核时是 144，这次 s007 删 5 个框、s008 删 8 个）。
+- `0921_165659_s024` 打印是 229/303 = 75.6%。这 303 帧里 55 帧是 `pose_bad`，propagate 不写这些帧。去掉之后是 229/248 = 92.3%，少掉的 19 帧就是该场景的 `frames left out (outside the keyframes)`。其余训练场景按全部帧算都 ≥ 90.7%（最低是 0921_165659_s011 的 274/302）。合计和任务预期的约 7,300 帧一致，所以继续导出。
+- 导出到新目录，没有删旧的。`data/dog_veh`：`/public/zjst/robot/centerpoint_data/dog_veh` → `/public/zjst/robot/centerpoint_data/dog_veh_1023_1529`。旧目录等用它的训练、评估结束后再删。train 7,232 / val 580 帧。新目录 `du -sh` 37G。
+  - train：car 14,524（+2,335 ignored），truck 4,078（+1,321 ignored）。T1R 是 car 13,346（+3,663），truck 3,652（+2,003）。上一版 v1 是 car 14,382（+2,477），truck 4,078（+1,337）：补审把 142 个 car 忽略框收成正样本，truck 忽略少 16，truck 正样本不变。
+  - val 只有关键帧：car 950（+272 ignored），truck 1,132（+102 ignored），和上一版一样。T1R 的验证集是每一帧，不直接比。
+  - note：`few points in the current sweep (ignored)` 875；`no points in the input (left out)` 298；`teacher subclass disagrees with size (ignored)` 121（T1R 这一条是 4,237）。
+  - GT 库：car 14,524、truck 4,078。
 
 ---
 
@@ -744,9 +740,9 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T5 完成。
 
 0. 先重跑 T5 第 2 步的 propagate（25 个场景共几秒，覆盖 labels_full.pkl），输出写到 data/reports/T5/propagate_fix.txt。
-   修好后行人、骑行者原样照抄进来，车辆标签不变，data/dog_veh 不用重新导出。合计应为：
-   left out: removed by the reviewer 144，other classes, copied as they are 43,640，其余计数和"T5 结果"一样。
-   不一样就停下报告。提交 labels_full.pkl 和 propagate_fix.txt。
+   行人、骑行者原样照抄。合计应为：left out: removed by the reviewer 157，other classes, copied as they are 43,640，
+   其余计数和"T5 结果"一样。不一样就停下报告。2026-10-23 补审后的 T5 已经按这个数字导出到
+   dog_veh_1023_1529 并切了链接，对得上就不要再导数据集。提交 labels_full.pkl 和 propagate_fix.txt。
 
 然后和 T3 完全一样，只是名字换成 v1。T5 完成就可以开始，不用等 T4。T4 已经做完、并且双卡 v0 和单卡 v0 的车辆 AP@2.0
 相差不到 0.01 时，改用 T3D 的双卡命令

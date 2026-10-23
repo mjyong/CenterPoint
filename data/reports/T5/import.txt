@@ -25,9 +25,9 @@
 == 0921_165659_s006
 61 frames, 9 tracks, boxes {'still marked review': 10, 'vehicle': 185, 'moved or new': 0} -> data/labels/0921_165659_s006/labels_sustech.pkl
 == 0921_165659_s007
-61 frames, 7 tracks, boxes {'still marked review': 36, 'vehicle': 130, 'moved or new': 0} -> data/labels/0921_165659_s007/labels_sustech.pkl
+61 frames, 6 tracks, boxes {'still marked review': 0, 'vehicle': 129, 'moved or new': 0} -> data/labels/0921_165659_s007/labels_sustech.pkl
 == 0921_165659_s008
-61 frames, 5 tracks, boxes {'still marked review': 11, 'vehicle': 168, 'moved or new': 0} -> data/labels/0921_165659_s008/labels_sustech.pkl
+61 frames, 4 tracks, boxes {'still marked review': 0, 'vehicle': 166, 'moved or new': 0} -> data/labels/0921_165659_s008/labels_sustech.pkl
 == 0921_165659_s009
 61 frames, 4 tracks, boxes {'still marked review': 2, 'vehicle': 126, 'moved or new': 0} -> data/labels/0921_165659_s009/labels_sustech.pkl
 == 0921_165659_s010
@@ -57,11 +57,11 @@
 == 0921_165659_s022
 61 frames, 5 tracks, boxes {'still marked review': 4, 'vehicle': 31, 'moved or new': 0} -> data/labels/0921_165659_s022/labels_sustech.pkl
 == 0921_165659_s023
-61 frames, 11 tracks, boxes {'still marked review': 61, 'vehicle': 468, 'moved or new': 0} -> data/labels/0921_165659_s023/labels_sustech.pkl
+61 frames, 11 tracks, boxes {'still marked review': 0, 'vehicle': 468, 'moved or new': 0} -> data/labels/0921_165659_s023/labels_sustech.pkl
 == 0921_165659_s024
-51 frames, 25 tracks, boxes {'still marked review': 16, 'vehicle': 379, 'moved or new': 34} -> data/labels/0921_165659_s024/labels_sustech.pkl
+51 frames, 25 tracks, boxes {'still marked review': 7, 'vehicle': 379, 'moved or new': 34} -> data/labels/0921_165659_s024/labels_sustech.pkl
 == 0921_165659_s025
-58 frames, 34 tracks, boxes {'still marked review': 35, 'vehicle': 364, 'moved or new': 1} -> data/labels/0921_165659_s025/labels_sustech.pkl
+58 frames, 34 tracks, boxes {'still marked review': 33, 'vehicle': 364, 'moved or new': 1} -> data/labels/0921_165659_s025/labels_sustech.pkl
 == 0921_165659_s026
 58 frames, 28 tracks, boxes {'still marked review': 6, 'vehicle': 320, 'moved or new': 0} -> data/labels/0921_165659_s026/labels_sustech.pkl
 == 0921_165659_s027
