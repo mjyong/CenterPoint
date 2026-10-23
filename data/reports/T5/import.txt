@@ -1,0 +1,70 @@
+== 0921_164127_s000
+58 frames, 21 tracks, boxes {'still marked review': 0, 'vehicle': 630, 'moved or new': 0} -> data/labels/0921_164127_s000/labels_sustech.pkl
+== 0921_164127_s001
+57 frames, 20 tracks, boxes {'still marked review': 31, 'vehicle': 663, 'moved or new': 0} -> data/labels/0921_164127_s001/labels_sustech.pkl
+== 0921_164127_s002
+58 frames, 18 tracks, boxes {'still marked review': 0, 'vehicle': 389, 'moved or new': 0} -> data/labels/0921_164127_s002/labels_sustech.pkl
+== 0921_164127_s003
+57 frames, 15 tracks, boxes {'still marked review': 8, 'vehicle': 231, 'moved or new': 0} -> data/labels/0921_164127_s003/labels_sustech.pkl
+== 0921_164127_s004
+58 frames, 11 tracks, boxes {'still marked review': 0, 'vehicle': 177, 'moved or new': 0} -> data/labels/0921_164127_s004/labels_sustech.pkl
+== 0921_164127_s005
+58 frames, 0 tracks, boxes {} -> data/labels/0921_164127_s005/labels_sustech.pkl
+== 0921_165659_s000
+56 frames, 2 tracks, boxes {'still marked review': 5, 'vehicle': 52, 'moved or new': 0} -> data/labels/0921_165659_s000/labels_sustech.pkl
+== 0921_165659_s001
+53 frames, 7 tracks, boxes {'still marked review': 4, 'vehicle': 47, 'moved or new': 0} -> data/labels/0921_165659_s001/labels_sustech.pkl
+== 0921_165659_s002
+55 frames, 3 tracks, boxes {'still marked review': 0, 'vehicle': 54, 'moved or new': 0} -> data/labels/0921_165659_s002/labels_sustech.pkl
+== 0921_165659_s003
+56 frames, 4 tracks, boxes {'still marked review': 4, 'vehicle': 80, 'moved or new': 0} -> data/labels/0921_165659_s003/labels_sustech.pkl
+== 0921_165659_s004
+56 frames, 0 tracks, boxes {} -> data/labels/0921_165659_s004/labels_sustech.pkl
+== 0921_165659_s005
+61 frames, 5 tracks, boxes {'still marked review': 10, 'vehicle': 111, 'moved or new': 0} -> data/labels/0921_165659_s005/labels_sustech.pkl
+== 0921_165659_s006
+61 frames, 9 tracks, boxes {'still marked review': 10, 'vehicle': 185, 'moved or new': 0} -> data/labels/0921_165659_s006/labels_sustech.pkl
+== 0921_165659_s007
+61 frames, 7 tracks, boxes {'still marked review': 36, 'vehicle': 130, 'moved or new': 0} -> data/labels/0921_165659_s007/labels_sustech.pkl
+== 0921_165659_s008
+61 frames, 5 tracks, boxes {'still marked review': 11, 'vehicle': 168, 'moved or new': 0} -> data/labels/0921_165659_s008/labels_sustech.pkl
+== 0921_165659_s009
+61 frames, 4 tracks, boxes {'still marked review': 2, 'vehicle': 126, 'moved or new': 0} -> data/labels/0921_165659_s009/labels_sustech.pkl
+== 0921_165659_s010
+59 frames, 4 tracks, boxes {'still marked review': 0, 'vehicle': 72, 'moved or new': 0} -> data/labels/0921_165659_s010/labels_sustech.pkl
+== 0921_165659_s011
+56 frames, 2 tracks, boxes {'still marked review': 0, 'vehicle': 29, 'moved or new': 0} -> data/labels/0921_165659_s011/labels_sustech.pkl
+== 0921_165659_s012
+61 frames, 4 tracks, boxes {'still marked review': 2, 'vehicle': 144, 'moved or new': 0} -> data/labels/0921_165659_s012/labels_sustech.pkl
+== 0921_165659_s013
+61 frames, 0 tracks, boxes {} -> data/labels/0921_165659_s013/labels_sustech.pkl
+== 0921_165659_s014
+61 frames, 14 tracks, boxes {'still marked review': 33, 'vehicle': 286, 'moved or new': 0} -> data/labels/0921_165659_s014/labels_sustech.pkl
+== 0921_165659_s015
+61 frames, 19 tracks, boxes {'still marked review': 0, 'vehicle': 601, 'moved or new': 0} -> data/labels/0921_165659_s015/labels_sustech.pkl
+== 0921_165659_s016
+59 frames, 22 tracks, boxes {'still marked review': 26, 'vehicle': 433, 'moved or new': 0} -> data/labels/0921_165659_s016/labels_sustech.pkl
+== 0921_165659_s017
+60 frames, 17 tracks, boxes {'still marked review': 19, 'vehicle': 191, 'moved or new': 0} -> data/labels/0921_165659_s017/labels_sustech.pkl
+== 0921_165659_s018
+59 frames, 8 tracks, boxes {'still marked review': 54, 'vehicle': 112, 'moved or new': 0} -> data/labels/0921_165659_s018/labels_sustech.pkl
+== 0921_165659_s019
+60 frames, 7 tracks, boxes {'still marked review': 21, 'vehicle': 63, 'moved or new': 0} -> data/labels/0921_165659_s019/labels_sustech.pkl
+== 0921_165659_s020
+60 frames, 5 tracks, boxes {'still marked review': 4, 'vehicle': 82, 'moved or new': 0} -> data/labels/0921_165659_s020/labels_sustech.pkl
+== 0921_165659_s021
+61 frames, 4 tracks, boxes {'still marked review': 14, 'vehicle': 29, 'moved or new': 0} -> data/labels/0921_165659_s021/labels_sustech.pkl
+== 0921_165659_s022
+61 frames, 5 tracks, boxes {'still marked review': 4, 'vehicle': 31, 'moved or new': 0} -> data/labels/0921_165659_s022/labels_sustech.pkl
+== 0921_165659_s023
+61 frames, 11 tracks, boxes {'still marked review': 61, 'vehicle': 468, 'moved or new': 0} -> data/labels/0921_165659_s023/labels_sustech.pkl
+== 0921_165659_s024
+51 frames, 25 tracks, boxes {'still marked review': 16, 'vehicle': 379, 'moved or new': 34} -> data/labels/0921_165659_s024/labels_sustech.pkl
+== 0921_165659_s025
+58 frames, 34 tracks, boxes {'still marked review': 35, 'vehicle': 364, 'moved or new': 1} -> data/labels/0921_165659_s025/labels_sustech.pkl
+== 0921_165659_s026
+58 frames, 28 tracks, boxes {'still marked review': 6, 'vehicle': 320, 'moved or new': 0} -> data/labels/0921_165659_s026/labels_sustech.pkl
+== 0921_165659_s027
+61 frames, 18 tracks, boxes {'still marked review': 5, 'vehicle': 194, 'moved or new': 0} -> data/labels/0921_165659_s027/labels_sustech.pkl
+== 0921_165659_s028
+61 frames, 10 tracks, boxes {'still marked review': 8, 'vehicle': 230, 'moved or new': 3} -> data/labels/0921_165659_s028/labels_sustech.pkl
