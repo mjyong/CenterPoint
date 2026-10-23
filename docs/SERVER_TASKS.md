@@ -809,6 +809,20 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 
 日志在 `data/reports/T6/`：`dog_voxel_veh_v1.log`、`dog_pp_veh_v1.log`，以及同名的 `*.log.json`（work_dir 里是 `20261023_155232.log.json`、`20261023_155231.log.json`）。权重在 `data/train/dog_*_veh_v1`（不提交）。
 
+（2026-10-23 复核）
+- **能进 T7。** 训练没有跑坏：每个 epoch 的平均 loss 平滑下降，没有 T3D 那种突跳。v1 每步多出的时间来自共用的卡（5 号上还有别人，利用率 53%），不是数据读取（data_time 0.007 s）。
+- **v1 的训练 loss 比 v0 高一成**（最后一个 epoch：Voxel 0.430 对 0.384，Pillar 0.524 对 0.473），这不说明 v1 差：
+  - 审核把 v0 里作忽略框的难例收成了正样本，每帧 truck 正样本 10.1 个（v0 9.5 个）；
+  - 训练 loss 只说明模型记住了训练集，好坏看 T7 的验证集。
+- **T3D 的判断坐实了。** 旧目录的 GT 库文件 14:53:50、`dbinfos` 14:55:56 写成，Pillar 双卡那次的 loc loss 14:57 起突跳，时间正好接上。
+- **v0 的模型级结果**（审过的验证集，580 个关键帧）：
+  - **双卡不掉精度**：Voxel 第 20 个 epoch，双卡 AP@2.0 0.728、单卡 0.734，差 0.006（mAP 0.663 对 0.662），在 T3D 定的 0.01 以内。0–10 m 差得多一些（0.615 对 0.682），但近处的框少，不当真。
+  - **新标注规则（T1R）比旧规则好**：AP@2.0 Voxel 0.734 对 0.645，Pillar 0.771 对 0.704。注意旧规则那一版是在数据读取修好之前训的，`SweepPoseJitter` 的 8 个 worker 当时抽到同样的抖动，所以这个差里不全是标注的功劳。
+  - **Voxel v0 第 10 个 epoch 最好，之后反而下降**（0.762 → 0.735 → 0.734）；Pillar v0 一直在升（第 20 个最好）。没审核的标签有错，Voxel 容量大，后半程把错标学了进去，这是一种可能的解释。T7 看 v1 是否还这样：审过的标签如果让 Voxel 不再后程下降，就是审核的作用。
+  - **选 epoch 和最后比较用的是同一个验证集**，三个 epoch 里挑最好的，数字会略偏乐观（估计 0.01 左右）。v0、v1 用同一条规则，比较仍然公平；写结论时记着这一点。
+- **延迟数字不能直接比**：基线是在 7 号卡上跑的，同时 5 号、3 号在训练，卡上还有别人的进程，nuScenes Pillar 每帧网络耗时 12–110 ms 来回跳。T7 第 2 步之后加了一步，在同一张卡上把 v1 的 Pillar 和 Voxel 背靠背各测一次。
+- 没有记每个训练进程占的显存：T6 开始时 GPU 规则还没改（通用约定 5）。以后的任务照新规则记。
+
 ---
 
 ## T7 比较所有模型，选部署的模型和上报阈值
@@ -835,6 +849,14 @@ GPU：下面的步骤一次一个进程，每个约 3 GB，CUDA_VISIBLE_DEVICES 
            --ckpt-pillar data/train/dog_pp_veh_v1/epoch_<E_v1_pp>.pth --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth \
            --device cuda:0 --out data/runs_veh_v1/$r
      done 2>&1 | tee data/reports/T7/runs_v1.txt
+2b. 延迟（T6 的基线跑在和训练共用的卡上，耗时不能比）：找一张利用率 < 20% 的卡，v1 的两个模型在同一个场景上背靠背各跑一次：
+     S=data/seq/0921_164127_s001
+     { python tools/dog/run_sequence.py --seq $S --detectors pillar --no-mcap --device cuda:0 \
+           --ckpt-pillar data/train/dog_pp_veh_v1/epoch_<E_v1_pp>.pth --out data/runs_latency/pillar 2>&1 | grep network
+       python tools/dog/run_sequence.py --seq $S --detectors voxel --no-mcap --device cuda:0 \
+           --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth --out data/runs_latency/voxel 2>&1 | grep network
+     } | tee data/reports/T7/latency.txt
+   记两个模型的网络耗时中位数，并记下当时 nvidia-smi 里这张卡的利用率。这是 4090 上的数，Orin 上要另测（H2），只看两个模型的比例。
 3. 对比、阈值扫描、按场景重抽：
      python tools/dog/compare_detectors.py --classes vehicle \
          --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech.pkl; done) \
@@ -871,7 +893,7 @@ GPU：下面的步骤一次一个进程，每个约 3 GB，CUDA_VISIBLE_DEVICES 
 提交：data/reports/T7/、上面的 mcap、本文档。
 报告（写进"T7 结果"）：
 - E_v1_voxel、E_v1_pp，以及模型级每个 epoch 的 merged/vehicle 一行；
-- compare_val.md 的 AP 表、耗时表、重抽的两张表（整段贴）；
+- compare_val.md 的 AP 表、耗时表、重抽的两张表（整段贴）；latency.txt 两行和当时的卡利用率；
 - 三个问题各一句话，每句带差值和 90% 区间：
   (1) 部署哪个，按第 5 步的哪一条；
   (2) 审核的作用：v1_pp − v0_pp、v1_voxel − v0_voxel；
