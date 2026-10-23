@@ -54,16 +54,17 @@
 | T1S | 训练集也导出到 SUSTechPOINTS 逐框审核（和验证集分组，带分数 / 速度 / 运动，红框待审） | Agent | T1R | 20 分钟 | 完成 |
 | T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T1R | 1.5–2 小时（数据读取已加速） | 完成 |
 | T3D | 每个模型 2 张卡训练 v0（数据并行），和单卡比 | Agent | T3 | 40 分钟 | 待做 |
-| T4 | 评估 v0 | Agent | T3（有 T3D 的结果就一起评） | 1 小时 | 待做 |
+| T4 | 评估 v0（在 H1 审过的验证集上） | Agent | T5（有 T3D 的结果就一起评） | 1 小时 | 待做 |
 | H1 | 人工审核车辆：35 个场景全在 SUSTechPOINTS 里逐框审（每 5 帧取 1 帧） | 人 | T1S | 1–2 天 | 完成（junyongmou，2026-10-23） |
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 待做 |
-| T6 | 训练 v1 | Agent | T5 | 2–6 小时 | 待做 |
+| T6 | 训练 v1 | Agent | T5 | 约 1 小时（单卡）/ 40 分钟（双卡） | 待做 |
 | T7 | 评估 v1，选 epoch 和上报阈值 | Agent | T6 | 1 小时 | 待做 |
 | T8 | 导出 Pillar v1 的 ONNX 并校验 | Agent | T7 | 10 分钟 | 待做 |
 | T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
 
-- T1R 之后，T1S 和 T3–T4 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练、评估。
+- T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
+- H1 完成后（2026-10-23）的顺序：T5 → T6（单卡就行，各约 1 小时）→ T7。有空闲卡时 T3D 和 T5、T6 同时跑；T4 在 T5 之后（要用审过的验证集），和 T6 同时跑。
 - 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
 - v0 只用未审核的自动标注，主要作用是把 GPU 训练流程跑通、得到一个基线，**不上线**。要上线的是 v1。
 
@@ -525,12 +526,16 @@ T3 加速后，单卡训练已经是 Voxel 1 小时 7 分、Pillar 49 分，GPU 
 ## T4 评估 v0
 
 **注意**：
-- 验证集现在是没审核的自动标注，由教师自己生成，对教师有利。这一步只能说明训练没跑坏、和教师差多少；真正的比较在 T7。
-- v0 的 truck head 只见过 13 条 truck 轨迹（T2：1,668 个框，另有 4,084 个忽略），truck AP 低是预期的，要等 H1 审完、v1 再看。
+- 2026-10-23 起 T4 放到 T5 之后做：H1 审完了验证集，T5 把审过的验证集导进 `data/dog_veh/infos_val.pkl`（每 5 帧 1 帧），流水线级用 `labels_sustech.pkl`。在人审过的标签上评，才不偏向教师。
+- v0 用的是没审核的训练标注，这一步主要回答三个问题：
+  - 训练有没有跑坏、和教师差多少；
+  - 双卡和单卡训出来的一样不一样（T3D）；
+  - 新标注规则比旧规则好不好（`_oldlabels`）。
 
 ```text
-任务 T4：评估 v0。模型级（验证集 infos_val）和流水线级（验证场景整段跑）都做，并扫描上报阈值。
-先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T3 完成。
+任务 T4：在人工审核过的验证集上评估 v0。模型级（验证集 infos_val）和流水线级（验证场景整段跑）都做，并扫描上报阈值。
+先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T3、T5 完成（data/dog_veh 是 T5 导出的 v1 数据集，
+infos_val.pkl 约 580 帧；data/labels/<验证场景>/labels_sustech.pkl 存在）。
 
 1. 模型级，第 10、15、20 个 epoch。另外把这两组的 epoch_20 也各评一次（work_dir 用 <权重目录>/eval_e20）：
    - data/train/dog_*_veh_v0_oldlabels：看标注规则改动的影响；
@@ -551,19 +556,21 @@ T3 加速后，单卡训练已经是 Voxel 1 小时 7 分、Pillar 49 分，GPU 
            --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --device cuda:0 --out data/runs_nusc_pp/$r
      done
    （CUDA_VISIBLE_DEVICES 设成一张空闲卡。）
-3. 对比和阈值扫描（教师 = 5.11 的 nuScenes Voxel + TTA）：
-     python tools/dog/compare_detectors.py --classes vehicle --labels $(for r in $VAL; do echo data/labels/$r/labels.pkl; done) \
+3. 对比和阈值扫描（教师 = 5.11 的 nuScenes Voxel + TTA），标签用审核过的验证标签：
+     python tools/dog/compare_detectors.py --classes vehicle --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech.pkl; done) \
          --results $(for r in $VAL; do echo teacher=data/runs/$r/voxel/results.pkl nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl \
                      v0_voxel=data/runs_veh_v0/$r/voxel/results.pkl v0_pp=data/runs_veh_v0/$r/pillar/results.pkl; done) \
          --thresholds 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 | tee data/reports/T4/compare_val.md
-4. 在线运动状态。工具在 T1R 之后多了"相关的运动段"（中位速度 ≥ 1 m/s、中位距离 ≤ 30 m）和明细 CSV（每个漏报段、每次误报）：
-   - 教师检测，全部 35 个场景（T1R 第 5 步的训练、验证两张表合成一张，并带上新列）：
-     ALL=$(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT)
-     python tools/dog/motion_eval.py $(for r in $ALL; do echo --scene data/labels/$r/labels.pkl data/runs/$r/voxel/results.pkl; done) \
+4. 在线运动状态。工具在 T1R 之后多了"相关的运动段"（中位速度 ≥ 1 m/s、中位距离 ≤ 30 m）和明细 CSV（每个漏报段、每次误报）。
+   标签用审核过的：训练场景 labels_full.pkl（每一帧），验证场景 labels_sustech.pkl（只有关键帧，跟踪器照样每帧都跑，只在关键帧上计分）：
+   - 教师检测，全部 35 个场景：
+     python tools/dog/motion_eval.py \
+         $(for r in $(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT); do echo --scene data/labels/$r/labels_full.pkl data/runs/$r/voxel/results.pkl; done) \
+         $(for r in $VAL; do echo --scene data/labels/$r/labels_sustech.pkl data/runs/$r/voxel/results.pkl; done) \
          --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 --details data/reports/T4/motion_teacher_details.csv \
          | tee data/reports/T4/motion_teacher.txt
    - v0 Pillar 的检测（线上跑的就是 Pillar），验证集 10 个场景：
-     python tools/dog/motion_eval.py $(for r in $VAL; do echo --scene data/labels/$r/labels.pkl data/runs_veh_v0/$r/pillar/results.pkl; done) \
+     python tools/dog/motion_eval.py $(for r in $VAL; do echo --scene data/labels/$r/labels_sustech.pkl data/runs_veh_v0/$r/pillar/results.pkl; done) \
          --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 --details data/reports/T4/motion_v0_pp_details.csv \
          | tee data/reports/T4/motion_v0_pp.txt
 
@@ -625,6 +632,10 @@ T3 加速后，单卡训练已经是 Voxel 1 小时 7 分、Pillar 49 分，GPU 
 - 红框：验证集 837 → 还剩 63 个框（14 条轨迹），训练集 1,023 → 还剩 366 个框。还带着 `review` 的，T5 导回后作忽略框。明确标了忽略的有 463 个框，标了静止的 134 个（都在验证集），标了运动的 16 个（0921_164127_s003）。删掉 40 个框，新画 35 个（主要在 0921_165659_s024：删 7、新画 34）。框挪动超过 5 cm 的只有 0921_165659_s028 的 3 个。类型改动 1 处：0921_164127_s001 的 #18 从 Truck 改成 Car。
 - 没有改动的 8 个场景：0921_164127_s005、0921_165659_s004、s013 本来就没有车框；s011（29 框）、s015（601 框）没有红框。s007（5 条、36 框）、s008（2 条、11 框）、s023（#4，61 框）红框原样留着，等于没确认，导回后整段忽略。
 - 文档里点名的 5 条“小尺寸高分 truck”：0921_164127_s002 #10、0921_165659_s001 #136 标成忽略；0921_164127_s003 #22、0921_165659_s006 #2 确认为 Truck（去掉 review）；0921_164127_s004 #4 标成静止，类型仍是 Truck。没有另写这是什么物体。
+- （2026-10-23 复核）
+  - 能进 T5。确认为 Truck 的 3 条长不到 3.1 m、高约 2.3 m，导出时按尺寸进 car head。
+  - 框的位置基本没动（挪动超过 5 cm 的只有 3 个）：这一轮审核主要是整条轨迹的决定，框的几何仍是自动标注的。
+  - s007、s008、s023 剩下的红框（8 条轨迹、108 个框）导回后整段作忽略框，少了这些车的正样本，但不会出错；花几分钟补审，再重跑 T5 即可。
 
 
 ---
@@ -681,7 +692,8 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 任务 T6：用 v1 数据集训练只检车辆的 Voxel 和 Pillar 模型 v1。
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T5 完成。
 
-和 T3 完全一样，只是名字换成 v1。T4 里双卡 v0 和单卡 v0 的车辆 AP@2.0 相差不到 0.01 时，改用 T3D 的双卡命令
+和 T3 完全一样，只是名字换成 v1。T5 完成就可以开始，不用等 T4。T4 已经做完、并且双卡 v0 和单卡 v0 的车辆 AP@2.0
+相差不到 0.01 时，改用 T3D 的双卡命令
 （work_dir 换成 data/train/dog_{voxel,pp}_veh_v1，T7 里选 epoch 时照常）：
   work_dir data/train/dog_voxel_veh_v1、data/train/dog_pp_veh_v1，日志 data/train/dog_{voxel,pp}_veh_v1.log，
   报告目录 data/reports/T6/。停止条件、提交、报告同 T3（写进"T6 结果"）。

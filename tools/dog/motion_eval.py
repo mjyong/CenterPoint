@@ -39,14 +39,16 @@ def load_scene(labels_path, results_path, classes):
     t0 = labels["frames"][0]["stamp"] if labels["frames"] else 0.0
     frames = []
     for r in results:
+        # labels may cover every frame (labels.pkl, labels_full.pkl) or only the reviewed keyframes
+        # (labels_sustech.pkl): the tracker still gets every frame, it is scored where there are labels
         fr = gt_by_stamp.get(round(r["stamp"], 6))
-        bad = bool(r.get("pose_bad")) or fr is None or fr.get("pose_bad")
+        bad = bool(r.get("pose_bad")) or (fr is not None and fr.get("pose_bad"))
         dets = Detections(frame="world", stamp=r["stamp"]) if bad else r["detections"].transform(r["T_world_det"], "world")
         gt = []
-        if not bad:
+        if not bad and fr is not None:
             T = fr["T_world_det"]
             for o in fr["objects"]:
-                if o["label"] in classes:
+                if o["label"] in classes and not o.get("ignore"):     # ignore boxes: nobody knows what they are
                     gt.append(dict(key=(scene, o["track_id"], t0), label=CLASSES.index(o["label"]),
                                    xy=(T[:3, :3] @ np.asarray(o["box"][:3]) + T[:3, 3])[:2],
                                    moving=bool(o.get("moving", False)), speed=float(np.hypot(*o["velocity"])),

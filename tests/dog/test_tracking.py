@@ -214,3 +214,30 @@ def test_motion_eval_counts_false_moving_and_latency():
     assert m["relevant_segments"] == 1 and m["relevant_missed"] == 0 and m["relevant_latency_p90"] <= 0.5
     assert [(d["kind"], d["key"]) for d in m["details"]] == [("missed", "creeper")]
     assert abs(m["recording_h"] * 3600 - 10.0) < 1e-6
+
+
+def test_motion_eval_scene_with_keyframe_labels(tmp_path):
+    """Reviewed validation labels exist on every 5th frame only: the tracker must still get every frame's
+    detections (before, frames without labels were fed empty), scored on the labelled ones."""
+    import os
+    import pickle
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools", "dog"))
+    from motion_eval import load_scene
+
+    results, frames = [], []
+    for k in range(20):
+        dets = _vehicles([(10.0, 6.0, 4.5, 1.9, 0.0, 0.8)])
+        results.append(dict(stamp=100.0 + 0.1 * k, T_world_det=np.eye(4), detections=dets))
+        if k % 5 == 0:
+            frames.append(dict(stamp=100.0 + 0.1 * k, T_world_det=np.eye(4), objects=[
+                dict(track_id=1, label="vehicle", box=np.array([10.0, 6.0, 0.8, 4.5, 1.9, 1.6, 0.0]),
+                     velocity=np.zeros(2), moving=False),
+                dict(track_id=2, label="vehicle", box=np.array([20.0, 6.0, 0.8, 4.5, 1.9, 1.6, 0.0]),
+                     velocity=np.zeros(2), moving=False, ignore=True)]))
+    (tmp_path / "scene").mkdir()
+    pickle.dump(dict(frames=frames), open(tmp_path / "scene" / "labels_sustech.pkl", "wb"))
+    pickle.dump(results, open(tmp_path / "results.pkl", "wb"))
+    scene = load_scene(str(tmp_path / "scene" / "labels_sustech.pkl"), str(tmp_path / "results.pkl"), ["vehicle"])
+    assert all(len(d) == 1 for _, d, _ in scene)                      # detections on every frame
+    assert [len(g) for _, _, g in scene] == [1 if k % 5 == 0 else 0 for k in range(20)]   # ignore box left out
