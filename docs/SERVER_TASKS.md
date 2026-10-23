@@ -51,7 +51,7 @@
 | T1 | 车辆审核材料 | Agent | T0 | 30 分钟 | 完成；标注规则变了，T1R 里重做 |
 | T2 | 导出 v0 数据集（未审核的自动标注） | Agent | T0 | 30 分钟 | 完成；T1R 里重做 |
 | T1R | 按新规则重做自动标注（遮挡点数、待审核、静止毛刺），重做 T1、T2，统计 | Agent | T0 | 40 分钟 | 待做 |
-| T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T1R | 2–6 小时 | 完成一版（未做 T1R）；T1R 导出后重跑 |
+| T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T1R | 1.5–2 小时（数据读取已加速） | 完成一版（未做 T1R，Voxel 5.4 小时）；T1R 导出后重跑 |
 | T4 | 评估 v0 | Agent | T3 | 1 小时 | 待做 |
 | H1 | 人工审核车辆：先抽查新规则，再按轨迹（全部场景）+ 逐框（10 个验证场景） | 人 | T1R | 几个小时 | 待做 |
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 待做 |
@@ -240,7 +240,7 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 先按 docs/SERVER_TASKS.md 的"通用约定"做（这次拉到了代码改动，要跑快速测试）。
 前置：
   - data/labels/0921_*/labels_tracks*.csv 的 action 列全是空的（H1 还没开始；不是就停下报告）；
-  - 如果 T3 已经在跑：停掉（它用的是旧标注），删掉 data/train/dog_voxel_veh_v0、data/train/dog_pp_veh_v0。
+  - 如果 T3 正在跑：停掉（它用的是旧标注）。已经跑完的权重不要删，T3 第 0 步会改名留着做对比。
 
 1. 重做自动标注。覆盖 data/labels/<场景>/labels.pkl 和 labels_tracks.csv；只用 CPU，8 个同时跑：
      mkdir -p data/reports/T1R
@@ -290,10 +290,39 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 
 ## T3 训练 v0
 
+**数据读取加速（2026-10-23）。** 第一次 T3 每步约 3/4 的时间在等数据：Voxel 每步 0.66 s，其中读数据 0.48 s；GPU 自己只要 0.18 s。原因都在 CPU 上，不在磁盘上：
+
+| 原因 | 改法 |
+|---|---|
+| 体素化每个样本都新建并填满一个 40 × 1088 × 1088 的查找表（189 MB），实际最多用 12 万格 | 每个 worker 只建一次，用完只把用过的格子复原（`point_cloud_ops.points_to_voxel`，结果逐字节相同） |
+| `np.random.shuffle` 打乱 20 万个点，逐行交换 | 一次随机下标索引 |
+| 每个 worker 里 numpy（OpenBLAS）和 torch 都开出和核数一样多的线程，两个训练 16 个 worker 互相抢 | worker 里限制为单线程 |
+| 每个 epoch 重新起 worker，每个 worker 重新编译 numba 体素化 | worker 常驻（`persistent_workers`） |
+| 每批约 80 MB 的体素从普通内存拷到 GPU | 锁页内存（`pin_memory`） |
+
+另外修了一个增强的问题：`SweepPoseJitter` 的随机数生成器原来在主进程里建好，再复制给 8 个 worker，状态都一样，8 个 worker 抽到的位姿抖动完全相同，每个 epoch 还重复一遍。现在每个 worker 用 PyTorch 给它单独设种子的 numpy 生成器。
+
+本地单核、文件已在缓存里，每个样本：
+
+| | Voxel | Pillar |
+|---|---|---|
+| 以前 | 288 ms（打乱 129、体素化 116） | 148 ms（打乱 122） |
+| 现在 | 38 ms | 42 ms |
+
+本地 3 个 worker 的 DataLoader：每批（4 个样本）从 0.392 s 降到 0.072 s。服务器上 8 个 worker 应该远快于 GPU 每步的 0.18 s，预计 Voxel 20 个 epoch 约 1.5–2 小时（原来 5.4 小时），Pillar 约 1.2–1.5 小时（原来 4.6 小时）。
+
 ```text
 任务 T3：在两张空闲 GPU 上同时训练只检车辆的 Voxel 和 Pillar 模型 v0（20 个 epoch）。
-先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T1R 完成（data/dog_veh/infos_train.pkl 是 T1R 第 7 步导出的）。
+先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了 det3d/ 的改动，要跑快速测试）。前置：T1R 完成（data/dog_veh/infos_train.pkl 是 T1R 第 7 步导出的）。
 
+0. 保留第一次（T1R 之前的标注）训练的权重，T4 拿来对比；再测一下数据读取：
+     [ -d data/train/dog_voxel_veh_v0 ] && mv data/train/dog_voxel_veh_v0 data/train/dog_voxel_veh_v0_oldlabels
+     [ -d data/train/dog_pp_veh_v0 ] && mv data/train/dog_pp_veh_v0 data/train/dog_pp_veh_v0_oldlabels
+     mkdir -p data/train data/reports/T3
+     python tools/dog/bench_dataloader.py configs/dog/dog_centerpoint_voxel_xt32_veh.py | tee data/reports/T3/bench_voxel.txt
+     python tools/dog/bench_dataloader.py configs/dog/dog_centerpoint_pp_xt32_veh.py | tee data/reports/T3/bench_pp.txt
+   看第 3 行的 "s per batch"：应明显小于 0.18 s（Voxel）/ 0.15 s（Pillar）。
+   第 2 行的磁盘速度：两个训练一起跑大约要 200 MB/s；低于这个数，读盘会成为下一个瓶颈，报告里写出来。
 1. 选两张空闲的卡（batch_label.py --dry-run），各起一个训练：
      mkdir -p data/train data/reports/T3
      CUDA_VISIBLE_DEVICES=<卡1> nohup python tools/train.py configs/dog/dog_centerpoint_voxel_xt32_veh.py \
@@ -303,16 +332,18 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
    只有一张空闲卡时，先跑 Voxel，跑完再跑 Pillar。
 2. 开始 10 分钟后检查两个日志（tail -30）：
    - loss 是有限值，hm_loss 在下降；
-   - 每次迭代耗时、每个 epoch 多少次迭代，按 20 个 epoch 估算总时长；
-   - nvidia-smi 看显存和利用率。数据集在公共盘上，利用率长时间低于 50% 说明读数据跟不上，记下来报告（先不用改）。
+   - 每次迭代耗时（time）和其中读数据的时间（data_time）、每个 epoch 多少次迭代，按 20 个 epoch 估算总时长；
+     第一次 T3 是 time 0.66 / data_time 0.48（Voxel）、0.56 / 0.41（Pillar），这次 data_time 应在 0.05 s 以下；
+   - nvidia-smi 看显存和利用率，这次应该大部分时间在 80% 以上。data_time 仍超过 0.1 s 就记下来报告（先不用改）。
 3. 等训练结束（每个 epoch 存一个 data/train/<名字>/epoch_N.pth），期间每小时看一次日志。
 
 停止条件（停下并报告日志最后 50 行，不要改配置重跑）：
   报错（OOM、spconv、数据加载）；loss 变成 nan / inf；估算总时长超过 10 小时；
   训练进程意外退出（这时可以用 --resume_from data/train/<名字>/latest.pth 续一次，再退出就停下）。
-提交：把两个 .log 和 work_dir 里的 *.log.json 复制到 data/reports/T3/，提交它们和本文档。
-报告（写进"T3 结果"）：卡号和型号；每次迭代耗时；每个 epoch 迭代数；总耗时；显存；
-每 5 个 epoch 最后一次的 loss（总的、hm_loss、loc_loss，两个 head 分开写）。
+提交：把两个 .log 和 work_dir 里的 *.log.json 复制到 data/reports/T3/（第一次的日志改名加 _oldlabels 留着），
+提交它们、bench_*.txt 和本文档。
+报告（写进"T3 结果"，第一次的结果留着，新的写在后面）：bench 的三行；卡号和型号；每次迭代耗时和 data_time；
+GPU 利用率；每个 epoch 迭代数；总耗时；显存；每 5 个 epoch 最后一次的 loss（总的、hm_loss、loc_loss，两个 head 分开写）。
 ```
 
 ### T3 结果
@@ -341,7 +372,8 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 任务 T4：评估 v0。模型级（验证集 infos_val）和流水线级（验证场景整段跑）都做，并扫描上报阈值。
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T3 完成。
 
-1. 模型级，第 10、15、20 个 epoch：
+1. 模型级，第 10、15、20 个 epoch（另外把 data/train/dog_*_veh_v0_oldlabels 的 epoch_20 也评一次，
+   work_dir 用 data/train/dog_${m}_veh_v0_oldlabels/eval_e20，看标注规则改动的影响）：
      mkdir -p data/reports/T4
      for e in 10 15 20; do for m in voxel pp; do
        python tools/dist_test.py configs/dog/dog_centerpoint_${m}_xt32_veh.py --work_dir data/train/dog_${m}_veh_v0/eval_e$e \

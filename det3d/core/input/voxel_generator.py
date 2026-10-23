@@ -15,10 +15,13 @@ class VoxelGenerator:
         self._max_num_points = max_num_points
         self._max_voxels = max_voxels
         self._grid_size = grid_size
+        self._coor_to_voxelidx = None     # grid-sized lookup, made on first use in each process
 
     def generate(self, points, max_voxels=-1):
         if max_voxels == -1:
             max_voxels=self._max_voxels
+        if self._coor_to_voxelidx is None:
+            self._coor_to_voxelidx = np.full(tuple(self._grid_size[::-1]), -1, dtype=np.int32)
 
         return points_to_voxel(
             points,
@@ -27,6 +30,7 @@ class VoxelGenerator:
             self._max_num_points,
             True,
             max_voxels,
+            coor_to_voxelidx=self._coor_to_voxelidx,
         )
 
     @property

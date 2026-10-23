@@ -3,6 +3,7 @@ from functools import partial
 
 from det3d.torchie.parallel import collate, collate_kitti
 from det3d.torchie.trainer import get_dist_info
+import torch
 from torch.utils.data import DataLoader
 
 from .sampler import (
@@ -18,6 +19,19 @@ if platform.system() != "Windows":
 
     rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
     resource.setrlimit(resource.RLIMIT_NOFILE, (4096, rlimit[1]))
+
+
+def _single_thread_worker(worker_id):
+    """Each DataLoader worker computes on one core. Otherwise every worker's numpy (OpenBLAS, e.g. the
+    points @ rotation in the augmentation) and torch start as many threads as the machine has cores,
+    and 8 workers per training, several trainings per server, fight over them."""
+    torch.set_num_threads(1)
+    try:
+        from threadpoolctl import threadpool_limits
+
+        threadpool_limits(1)
+    except ImportError:
+        pass
 
 
 def build_dataloader(
@@ -42,7 +56,11 @@ def build_dataloader(
         batch_size = num_gpus * batch_size
         num_workers = num_gpus * workers_per_gpu
 
-    # TODO change pin_memory
+    extra = {}
+    if num_workers > 0:
+        # persistent: workers (their numba-compiled voxelization, their voxel lookup buffer) are kept
+        # across epochs instead of being started again
+        extra = dict(worker_init_fn=_single_thread_worker, persistent_workers=True)
     data_loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -50,8 +68,9 @@ def build_dataloader(
         shuffle=(sampler is None),
         num_workers=num_workers,
         collate_fn=collate_kitti,
-        # pin_memory=True,
-        pin_memory=False,
+        # a voxel batch is ~80 MB; from pinned memory it reaches the GPU without a staging copy
+        pin_memory=torch.cuda.is_available(),
+        **extra
     )
 
     return data_loader

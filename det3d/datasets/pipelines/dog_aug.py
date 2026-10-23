@@ -19,7 +19,10 @@ class SweepPoseJitter(object):
     def __init__(self, prob=0.3, sigma_v=0.5, max_v=1.5, sigma_w_deg=3.0, max_w_deg=10.0, seed=None, **kwargs):
         self.prob, self.sigma_v, self.max_v = prob, sigma_v, max_v
         self.sigma_w, self.max_w = np.radians(sigma_w_deg), np.radians(max_w_deg)
-        self.rng = np.random.default_rng(seed)
+        # without a seed, numpy's global generator: PyTorch seeds it differently in every DataLoader
+        # worker, while a Generator made here would be copied into every worker with the same state
+        # (all workers drawing the same jitter, epoch after epoch)
+        self.rng = np.random.default_rng(seed) if seed is not None else np.random
 
     def __call__(self, res, info):
         if res.get("mode", "train") != "train" or self.rng.random() >= self.prob:

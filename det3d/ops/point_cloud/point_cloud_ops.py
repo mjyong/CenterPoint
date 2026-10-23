@@ -110,7 +110,8 @@ def _points_to_voxel_kernel(
 
 
 def points_to_voxel(
-    points, voxel_size, coors_range, max_points=35, reverse_index=True, max_voxels=20000
+    points, voxel_size, coors_range, max_points=35, reverse_index=True, max_voxels=20000,
+    coor_to_voxelidx=None,
 ):
     """convert kitti points(N, >=3) to voxels. This version calculate
     everything in one loop. now it takes only 4.2ms(complete point cloud)
@@ -131,6 +132,10 @@ def points_to_voxel(
         max_voxels: int. indicate maximum voxels this function create.
             for second, 20000 is a good choice. you should shuffle points
             before call this function because max_voxels may drop some points.
+        coor_to_voxelidx: optional int32 buffer of the grid shape (zyx with reverse_index) filled
+            with -1, reused between calls and left filled with -1 again. Without it a buffer of the
+            whole grid is made and filled on every call: 189 MB for the dog voxel config's
+            40 x 1088 x 1088 grid, most of the time voxelization took.
 
     Returns:
         voxels: [M, max_points, ndim] float tensor. only contain points.
@@ -147,7 +152,9 @@ def points_to_voxel(
         voxelmap_shape = voxelmap_shape[::-1]
     # don't create large array in jit(nopython=True) code.
     num_points_per_voxel = np.zeros(shape=(max_voxels,), dtype=np.int32)
-    coor_to_voxelidx = -np.ones(shape=voxelmap_shape, dtype=np.int32)
+    reuse = coor_to_voxelidx is not None
+    if not reuse:
+        coor_to_voxelidx = np.full(voxelmap_shape, -1, dtype=np.int32)
     voxels = np.zeros(
         shape=(max_voxels, max_points, points.shape[-1]), dtype=points.dtype
     )
@@ -181,6 +188,11 @@ def points_to_voxel(
     coors = coors[:voxel_num]
     voxels = voxels[:voxel_num]
     num_points_per_voxel = num_points_per_voxel[:voxel_num]
+    if reuse:       # only the cells this call set
+        if reverse_index:
+            coor_to_voxelidx[coors[:, 0], coors[:, 1], coors[:, 2]] = -1
+        else:
+            coor_to_voxelidx[tuple(coors.T)] = -1
     return voxels, coors, num_points_per_voxel
 
 
