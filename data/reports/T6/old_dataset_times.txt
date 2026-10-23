@@ -1,0 +1,4 @@
+-rw-r--r-- 1 junyongmou engineers 3976393 2026-10-23 14:55:56.000000000 +0800 /public/zjst/robot/centerpoint_data/dog_veh/dbinfos_train_5sweeps_withvelo.pkl
+-rw-r--r-- 1 junyongmou engineers 4161671 2026-10-23 14:53:33.000000000 +0800 /public/zjst/robot/centerpoint_data/dog_veh/infos_train.pkl
+-rw-r--r-- 1 junyongmou engineers    9900 2026-10-23 14:53:50.000000000 +0800 1000_car_0.bin
+-rw-r--r-- 1 junyongmou engineers    3700 2026-10-23 14:53:50.000000000 +0800 1000_car_1.bin
