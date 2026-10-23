@@ -24,6 +24,7 @@ bag ─① rosbag_to_sequence ─► 序列 ─② run_sequence --save-frames �
 
 ## 0. 采集
 
+- 厂区下一批的采集计划（场景、数量、挑哪些来标）见 [DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md)。
 - 场景多比帧数多重要：至少 30 段不同场景，总共 5k–10k 帧（10 Hz 下 1 万帧只有约 17 分钟）。相邻帧高度相关。
 - 专门录 4 m 以内的近距离交互（人从狗身边走过、绕行、停下）。
 - 留出整段录制做验证集，训练集和验证集按录制段划分，不按帧。

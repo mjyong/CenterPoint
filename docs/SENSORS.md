@@ -351,7 +351,7 @@ base 系（x 前、y 左、z 上）下的位置，单位 m：
 
 ## 7. 录制清单
 
-下一批厂区数据请录：
+下一批厂区数据请录（录哪些场景、录多少见 [DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md)）：
 
 | 话题 | 必须 | 说明 |
 |---|---|---|

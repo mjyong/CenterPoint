@@ -30,6 +30,7 @@
 | [DOG_FINETUNE.md](docs/DOG_FINETUNE.md) | 从 bag 到微调权重每一步的参考说明；车辆分 head、只检车辆、遮挡 / 待审核 / 运动判断、SUSTechPOINTS 逐框审核 |
 | [LABELING_TUTORIAL.md](docs/LABELING_TUTORIAL.md) | 用两段样例 bag 实际走一遍标注，带命令输出和 SUSTechPOINTS 截图 |
 | [SERVER_TASKS.md](docs/SERVER_TASKS.md) | 服务器上用 0921 数据训练车辆模型的任务清单、结果和复核（当前进度看这里） |
+| [DATA_COLLECTION_PLAN.md](docs/DATA_COLLECTION_PLAN.md) | 厂区下一轮：教师用哪个模型、采什么数据（运动的货车、可控场景、挑哪些来标） |
 | [BAG_SPLIT.md](docs/BAG_SPLIT.md) | 长 bag 体检、切场景、位姿融合、训练 / 验证划分；0921 数据准备的记录 |
 | [DATA_LINEAGE.md](docs/DATA_LINEAGE.md) | 从 rosbag 话题字段到训练集：每个脚本读写什么、审核改了哪些字段（附 [思维导图](docs/data_lineage_mindmap.html)） |
 | [SENSORS.md](docs/SENSORS.md) | XT32、组合导航和天线、鱼眼相机的参数和外参 |
