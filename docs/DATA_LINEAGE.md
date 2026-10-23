@@ -35,12 +35,16 @@ data/runs/<场景>/    frames/<时间戳>.npy（检测系点云）  voxel/result
   │ ⑤ auto_label.py            跟踪 + 整条轨迹回溯修正
   ▼
 data/labels/<场景>/  labels.pkl  labels_tracks.csv
-  │ ⑥ 人工审核：review_labels.py（轨迹级） / sustechpoints_convert.py（框级）
+  │ ⑥ 人工审核：sustechpoints_convert.py + SUSTechPOINTS（框级，每 5 帧 1 帧）/ review_labels.py（轨迹级）
   ▼
-data/labels/<场景>/  labels_reviewed.pkl  /  labels_sustech.pkl
-  │ ⑦ export_dataset.py        转到网络坐标系、det3d 框格式，按录制分训练 / 验证
+data/labels/<场景>/  labels_sustech.pkl（审过的关键帧）/ labels_reviewed.pkl
+  │   训练场景：sustechpoints_convert.py propagate，关键帧的审核结果传播到每一帧
   ▼
-data/dog/            infos_train.pkl  infos_val.pkl  lidar/  gt_database_5sweeps_withvelo/  dbinfos_train_*.pkl
+data/labels/<场景>/  labels_full.pkl
+  │ ⑦ export_dataset.py        数框里的点、转到网络坐标系、det3d 框格式，按录制分训练 / 验证
+  ▼
+data/dog_vNNN/（data/dog 软链接指向它；只检车辆的是 data/dog_veh）
+                     infos_train.pkl  infos_val.pkl  lidar/  gt_database_5sweeps_withvelo/  dbinfos_train_*.pkl
   │ ⑧ convert_nusc_ckpt.py + tools/train.py configs/dog/*.py
   ▼
 微调后的权重 → 下一轮当教师（回到 ④），或部署到 Orin（ros2_node.py -p robot:=kygi）
@@ -82,10 +86,12 @@ mindmap
       labels.pkl
       labels_tracks.csv
     人工审核
-      轨迹级 review_labels
-        labels_reviewed.pkl
       框级 SUSTechPOINTS
         labels_sustech.pkl
+        propagate 到每一帧
+          labels_full.pkl
+      轨迹级 review_labels
+        labels_reviewed.pkl
     导出 export_dataset
       infos_train val
       lidar npy
@@ -350,7 +356,7 @@ mindmap
 | `labels` | (N,) | 0 车辆、1 行人、2 骑行者 |
 | `subclasses` | (N,) | 0 car、1 truck、2 bus、3 pedestrian、4 cyclist；−1 表示未知 |
 
-5 个检测头（car / truck / bus / pedestrian / cyclist）的输出合并成 3 类，子类保留在 `subclasses` 里。
+检测头的输出合并成 3 类，子类保留在 `subclasses` 里。nuScenes 教师的 bus、trailer head 记为 truck（教师常把大货车判成公交，2026-10-22 起），所以教师结果里没有 bus；狗的 5 个 head 模型的 bus head 仍记为 bus。
 
 ---
 
@@ -365,11 +371,12 @@ mindmap
 | 类别、子类 | 整条轨迹按分数加权投票，消除类别跳变；车辆的 car / truck / bus 也这样投票 |
 | 尺寸、z | 分数加权中位数（刚体尺寸不变） |
 | 中心 | RTS 平滑；0.5 s 以内的漏检做插值补帧（`interpolated = True`） |
-| 静止 / 运动 | 平滑后的轨迹速度 > 0.4 m/s **且**教师速度头 > 0.15 m/s，才算运动 |
+| 静止 / 运动 | 平滑后的轨迹速度 > 0.4 m/s **且**教师速度头 > 0.15 m/s，才算运动；再去掉毛刺：运动中短于 0.5 s 的停顿算运动，短于 1 s 的运动段算静止（除非占了轨迹的一半以上） |
 | 静止轨迹 | 速度置零；框的分布够集中时，位置固定为加权中位数 |
 | 朝向 | 运动快（> 1 m/s）时取运动方向，否则取框朝向的环形均值，180° 歧义用运动方向消解 |
 | 删除 | 观测少于 5 次或平均分 < 0.3 的轨迹 |
-| 待审核 | 平均分 < 0.5 的轨迹，标 `review = True` |
+| 待审核 | 平均分 < 0.5、并且教师给 ≥ 0.6 分的帧不到 5 帧的轨迹，标 `review = True` |
+| 点数 | 读 `frames/`（默认 `<run>/frames`），数每个框里的点：当前帧 `points`、5 帧 `points_all`（框长宽各放宽 0.25 m，框底 0.2 m 以内算地面） |
 
 **输出**：`data/labels/<场景>/`
 
@@ -382,21 +389,24 @@ mindmap
              "pose_bad": 这帧在 pose_refine.bad_intervals 里（位姿不可信：不进跟踪、没有框，导出时跳过）,
              "objects": [{"track_id", "label"（vehicle/pedestrian/cyclist）,
                           "subclass"（car/truck/bus，非车辆与 label 相同，没有时为 None）,
-                          "box"（7，D 系）, "velocity"（2，D 系）, "score",
+                          "box"（7，D 系）, "velocity"（2，D 系）,
+                          "score"（轨迹平均分）, "det_score"（这一帧教师的分数，插值的帧为 0）,
+                          "confident_frames"（这条轨迹 ≥ 0.6 分的帧数）,
+                          "points", "points_all"（框里的点数：当前帧、5 帧）,
                           "review", "interpolated", "moving"}]}]}
 ```
 
 `labels_tracks.csv`：一条轨迹一行，给人工审核用。待审核的和低分的排在前面。
 
-列：`track_id, label, subclass, review, mean_score, frames, interpolated, t_first, t_last, min_range_m, moving_share, max_speed, action, from, to, note`。
+列：`track_id, label, subclass, review, train_as, mean_score, confident_frames, frames, interpolated, few_points, t_first, t_last, min_range_m, length_m, height_m, moving_share, max_speed, action, from, to, note`。`train_as` 是不审的话导出时的去向（训练类别名或 `ignore`），`few_points` 是点数不够（作忽略框）的帧数。
 
-样例 bag 的结果：静止 bag 28 帧、463 个框、19 条轨迹（7 条待审核）；运动 bag 27 帧、327 个框、17 条轨迹（13 条待审核）。
+样例 bag 的结果：静止 bag 28 帧、463 个框、19 条轨迹（7 条待审核）；运动 bag 27 帧、334 个框、18 条轨迹（14 条待审核）。
 
 ---
 
 ## 7. ⑥ 人工审核
 
-两种方式可以单独用，也可以接着用：先在轨迹级把明显的错改掉，再到框级精修。约定是训练场景至少做轨迹级审核，验证场景用 SUSTechPOINTS 逐框看。
+两种方式可以单独用，也可以接着用：先在轨迹级把明显的错改掉，再到框级精修。验证场景必须用 SUSTechPOINTS 逐框看；训练场景最好也逐框看（每 5 帧 1 帧，再传播到每一帧，7.3），时间不够至少做轨迹级。0921 的 35 个场景都是逐框审的。
 
 ### 7.1 轨迹级：`tools/dog/review_labels.py`
 
@@ -427,34 +437,48 @@ mindmap
 ### 7.2 框级：`tools/dog/sustechpoints_convert.py` + SUSTechPOINTS
 
 **`export`**：把标签和点云写成 SUSTechPOINTS 的场景 `third_party/SUSTechPOINTS/data/<场景>/`，`--every 5` 表示 10 Hz 里只取 2 Hz。
-- `lidar/<帧名>.pcd`：D 系点云，整体下移 1.8 m（这个工具假定雷达离地 1.8 m），强度缩放到 0–1；帧名是微秒时间戳。
-- `label/<帧名>.json`：每个框写成 `{obj_id（= track_id）, obj_type（Car/Truck/Bus/Pedestrian/BicycleRider）, obj_attr（待审核的写 "review"，忽略的写 "ignore"）, psr: {position, scale（l,w,h）, rotation.z（yaw）}}`。`--vehicles-only` 只导出车。
-- `dog_meta.json`：记下 SUSTechPOINTS 不保存的信息：每帧的 `stamp`、`T_world_det`、分数、z 偏移。
+- `lidar/<帧名>.pcd`：D 系点云（5 帧叠加，模型的输入），整体下移 1.8 m（这个工具假定雷达离地 1.8 m），强度缩放到 0–1；字段 `t` 是这个点所在扫描比当前帧早多少秒，工具把旧扫描画暗。帧名是微秒时间戳。
+- `label/<帧名>.json`：每个框写成 `{obj_id（= track_id）, obj_type（Car/Truck/Bus/Pedestrian/BicycleRider）, obj_attr（要人定的写 "review"，工具里显示成红框；忽略的写 "ignore"）, psr: {position, scale（l,w,h）, rotation.z（yaw）}}`。`--vehicles-only` 只导出车。
+- `dog_info/<帧名>.json`：只用来显示，每个框的轨迹平均分、这一帧教师的分数、是否插值、运动 / 静止和速度、框里的点数、不审的话训练当作什么。SUSTechPOINTS 读标注时附上（`scene_reader.add_dog_info`），保存的标注里没有。
+- `desc.json`：`--split train / val`，场景列表按它分组。
+- `dog_meta.json`：记下 SUSTechPOINTS 不保存的信息：每帧的 `stamp`、`T_world_det`、自动标注的中心和速度、导出时标注内容的摘要 `label_sha1`；轨迹平均分、z 偏移、导出了哪些类别（`label_classes`）。
+- 再导出同一个场景时，只要有一帧的标注内容和 `label_sha1` 对不上（在工具里改过），就拒绝覆盖；`--force` 才覆盖。
 
 **在 SUSTechPOINTS 里**：可以挪框、改尺寸、改朝向、改类型、删框，**也可以新增漏标的物体**。
 
 **`import`**：生成 `labels_sustech.pkl`，格式和 `labels.pkl` 一样。
 - z 移回原位；
-- 类型映射回类别和子类：Car / Van → car；Truck 和各种工程车 → truck；Bus / Tram / LongVehicle → bus；
+- 类型映射回类别和子类：Car / Van → car；Truck 和各种工程车 → truck；Bus / Tram / LongVehicle → bus；三轮车、代步车 → cyclist；
 - 中心没被挪动的框，保留导出时的速度；挪过的框和新加的框，按同一 `obj_id` 在 W 系的标注中心重新算速度（±0.5 s 差分，低于静止阈值的置零）；
-- 所有框都是 `review = False`、`reviewed = True`；`obj_attr` 里有 `ignore` 的框加 `ignore = True`；
+- `obj_attr`：`ignore` → `ignore = True`；`static` → 速度 0；`moving` → 按审核后的框算速度；仍带 `review` 的（红框没点确认）→ `review = True`，导出时作忽略框；其余 `review = False`、`reviewed = True`；工具里新画的框加 `added = True`；
+- `--frames` 给出时，重新数框里的点（审核挪过的框按新位置数）；
 - 只包含导出的那些帧（`--every 5` 就是 2 Hz）。
+
+### 7.3 训练场景传播到每一帧：`sustechpoints_convert.py propagate`
+
+训练场景审的是每 5 帧中的 1 帧（关键帧），`propagate --full labels.pkl --keyframes labels_sustech.pkl` 输出每一帧的 `labels_full.pkl`（`sustechpoints.propagate_keyframes`）：
+- 关键帧：审过的框原样；
+- 两个关键帧（间隔 ≤ 1 s）之间：两端都审过的物体在 W 系里插值（中心、尺寸、朝向、速度；`interpolated = True`）；审核时在各关键帧分别新画的同一辆车按 2 m 内、同类别连起来；一端是忽略框或仍是 review 的作忽略框；
+- 关键帧上被审核删掉的轨迹：中间的帧也不要；只在一端审过、或只活在两个关键帧之间的：忽略框；
+- 第一个关键帧之前、最后一个之后、间隔超过 1 s 的帧：不要；
+- 只处理审核覆盖的类别（`dog_meta.json` 的 `label_classes`），其它类别（只审车时的行人、骑行者）原样照抄 `labels.pkl`。
 
 ---
 
 ## 8. ⑦ 导出数据集：`tools/dog/export_dataset.py`
 
-**输入**：每个场景给一对 `--recording <run 目录> <labels 文件>`。labels 文件用 `labels_sustech.pkl`；没有就用 `labels_reviewed.pkl`。`--val-recordings` 列出验证场景，用了 3.4 节的划分时就是 `split.csv` 里的 `val`。
+**输入**：每个场景给一对 `--recording <run 目录> <labels 文件>`。labels 文件：验证场景用 `labels_sustech.pkl`（只有审过的关键帧）；逐框审过的训练场景用 `labels_full.pkl`（每一帧）；只按轨迹审的用 `labels_reviewed.pkl`。`--val-recordings` 列出验证场景，用了 3.4 节的划分时就是 `split.csv` 里的 `val`。
 
 **处理**（逐帧，只处理 labels 里有、`frames/` 里也有的帧）：
 - 点云：`frames/<stamp>.npy` 从 D 系转到 M 系（`ModelFrame.points_to_model`：绕 z 转 +90°，z 减 1.84 m），存成 float32；
 - 框：从 D 系转到 M 系，再写成 det3d 格式 `[x, y, z, w, l, h, vx, vy, r]`（`r = −yaw − π/2`），float32；
 - 类名：默认是检测头的 5 类，车辆用 `subclass`。旧标签没有子类时按尺寸猜（长 ≥ 10 m 为 bus，长 ≥ 6.5 m 或高 ≥ 2.8 m 为 truck，否则 car），并打印数量提醒。`--classes coarse` 输出 3 类，给旧的 `*_3cls` 配置用。`--classes vehicle` 只导出车，按尺寸分 car / truck（长 ≥ 5.5 m 或高 ≥ 2.5 m 为 truck），给只检车辆的 `*_veh` 配置用；
-- 忽略框（`gt_ignore`）：审核时标了 `ignore` 的框；仍标着 `review` 的框（`--review-policy ignore`，默认；`drop` 或 `--skip-review` 丢掉，`keep` 当正样本）；`--classes vehicle` 时，还有没审核过、教师子类和尺寸对不上的车；
+- 点数：对着这一帧的 `frames/<stamp>.npy` 数每个框里的点（审核挪过的框按新位置）。5 帧里一个点都没有的框不要；当前帧不到 5 个点（车；行人、骑行者 3 个）的作忽略框；
+- 忽略框（`gt_ignore`）：审核时标了 `ignore` 的框；仍标着 `review` 的框（`--review-policy ignore`，默认；`drop` 或 `--skip-review` 丢掉，`keep` 当正样本）；`--classes vehicle` 时，还有没审核过、教师子类和尺寸对不上的车；点数不够的框；
 - 位姿不可靠的帧（`pose_bad`）跳过；`--jobs` 个场景同时导出；
 - 按录制分训练 / 验证，不按帧随机分。
 
-**输出**：`--out` 目录。训练配置默认读 `data/dog`；导到别的目录时，改配置里的 `data_root` 等路径，或者建软链接。
+**输出**：`--out` 目录。训练配置读 `data/dog`（只检车辆的读 `data/dog_veh`）。每一版导到新目录，再把软链接指过去；不要往正在被训练读的目录里重新导：GT 库的文件按序号命名，新文件会让还在跑的训练把别的车的点云贴进框里。`DogDataset` 开始时把软链接解析成真实目录，所以切链接不影响已经在跑的训练。
 
 | 文件 | 内容 |
 |---|---|
@@ -463,7 +487,7 @@ mindmap
 | `gt_database_5sweeps_withvelo/<类>/<token>_<类>_<i>.bin` | （`--gt-db`）每个训练框（忽略框除外）内的点，float32 (K,5)，坐标减去框中心 |
 | `dbinfos_train_5sweeps_withvelo.pkl` | 按类分组的列表：`name, path, image_idx, gt_idx, box3d_lidar, num_points_in_gt, difficulty, group_id`，给 GT 采样增强用 |
 
-样例结果：训练 28 帧、验证 27 帧；框数 bus 111、car 127、cyclist 51、pedestrian 83、truck 106。
+样例结果（LABELING_TUTORIAL 第 7 步）：训练 28 帧、验证 27 帧；训练 car 93（+27 忽略）、truck 139（+84）、pedestrian 36、cyclist 28（+32）；验证只有 truck 53 个能计分，其余是没确认的红框，作忽略框。
 
 ---
 
@@ -476,16 +500,17 @@ mindmap
    - pedestrian 头继承 pedestrian 头；
    - cyclist 头继承 motorcycle / bicycle 头里 bicycle 的通道。
 
-   输出 `work_dirs/dog_voxel_init.pth`（Pillar 是 `dog_pp_init.pth`），也就是配置里的 `load_from`。
-2. **训练**：`python tools/train.py configs/dog/dog_centerpoint_voxel_xt32.py --work_dir <目录>`。
-   - `DogDataset`（`det3d/datasets/dog/dog.py`）读 `infos_*.pkl`，加载 `lidar/*.npy`；
+   输出 `work_dirs/dog_voxel_init.pth`（Pillar 是 `dog_pp_init.pth`），也就是配置里的 `load_from`。只检车辆的 `*_veh.py`（car、truck 两个 head）加 `--config`，输出 `dog_voxel_veh_init.pth`。
+2. **训练**：`python tools/train.py configs/dog/dog_centerpoint_voxel_xt32.py --work_dir <目录>`（多卡用 `torchrun`，见 DOG_FINETUNE.md 第 ⑥ 步）。
+   - `DogDataset`（`det3d/datasets/dog/dog.py`）开始时读 `infos_*.pkl`（类平衡重采样；`*_veh.py` 再补回四分之一的无车帧），之后每个样本加载 `lidar/*.npy`；
    - 输入有 5 个特征（x, y, z, intensity, dt），已经是拼好 5 帧的点云，不再另外拼接。
 3. **训练时的数据增强**：
-   - GT 采样：从 `dbinfos` 里每帧额外贴入 car 2、truck 2、bus 2、pedestrian 4、cyclist 4 个物体，点数太少的不用（车辆 < 10 点、行人和骑行者 < 5 点）；
+   - 30% 的帧把历史 4 帧按随机的位姿误差挪动（速度误差 σ 0.5 m/s、角速度误差 σ 3°/s，`SweepPoseJitter`），模拟线上 INS 位姿拼帧时的错位；当前帧和标注框不动；
+   - GT 采样：从 `dbinfos` 里每帧额外贴入 car 2、truck 2、bus 2、pedestrian 4、cyclist 4 个物体（`*_veh.py` 是 car 2、truck 3），点数太少的不用（车辆 < 10 点、行人和骑行者 < 5 点）；
    - 全局旋转 ±45°、缩放 0.95–1.05、平移标准差 0.1 m、俯仰和横滚 ±2°（模拟残余的找平误差和坡道）。
 4. **结果**：`<work_dir>/latest.pth`。之后：
    - 当下一轮的教师（回到第 5 节）；
-   - 或者用 `export_pillar_onnx.py` 导出，在 Orin 上部署。线上节点用 `-p robot:=kygi`，检测系的构造和训练数据完全一致。
+   - 或者部署到 Orin：Pillar 用 `export_pillar_onnx.py` 导出 ONNX 建 TensorRT 引擎；Voxel 先用 PyTorch + spconv 直接跑。线上节点用 `-p robot:=kygi`，检测系的构造和训练数据完全一致。
 
 ---
 
@@ -499,9 +524,10 @@ mindmap
 | `data/preview/<录制>/`、`data/preview/time_offset/` | ③ | 人 | 是 |
 | `data/survey/split/` | `split_check.py` | ④⑦ 的批处理循环 | 是 |
 | `data/runs/<场景>/` | ④ | ⑤⑥⑦ | 否 |
-| `data/labels/<场景>/` | ⑤⑥ | ⑥⑦ | 否（审核过的标签建议另外备份） |
-| `third_party/SUSTechPOINTS/data/<场景>/` | ⑥ export / 标注工具 | ⑥ import | 否 |
-| `data/dog/`（或 `data/dog_v001/`） | ⑦ | ⑧ | 否 |
+| `data/labels/<场景>/` | ⑤⑥ | ⑥⑦ | 0921 的 `labels*.pkl`、`labels_tracks*.csv` 提交（每个几十到几百 KB，审核成果不能丢）；review mcap 不提交 |
+| `third_party/SUSTechPOINTS/data/<场景>/` | ⑥ export / 标注工具 | ⑥ import | 否（服务器上链到公共盘，里面是人的审核结果，不要删） |
+| `data/dog_vNNN/`（`data/dog`、`data/dog_veh` 是指向它的软链接） | ⑦ | ⑧ | 否 |
+| `data/reports/<任务>/` | 服务器任务（SERVER_TASKS.md） | 人 | 是 |
 | `work_dirs/`、`data/train/` | ⑧ | 部署、下一轮教师 | 否 |
 
 ---
@@ -522,6 +548,6 @@ mindmap
 **一个框**：
 1. 教师在 M 系输出，转回 D 系后存进 `results.pkl` 的 `detections.boxes[i] = [x, y, z, l, w, h, yaw]`。
 2. `auto_label.py` 用 `T_world_det` 把它转到 W 系做跟踪、平滑、投票，再转回各帧自己的 D 系，存进 `labels.pkl` 的 `objects[j].box`。
-3. 审核可能改它的类别、子类、朝向（`flip`）、速度和位置（`static`）、尺寸和位置（SUSTechPOINTS），或者删掉它。
+3. 审核可能改它的类别、子类、朝向（`flip`）、速度和位置（`static`）、尺寸和位置（SUSTechPOINTS），或者删掉它。训练场景只在关键帧上审，中间帧的框由 `propagate` 用前后两个关键帧插值得到。
 4. `export_dataset.py` 把它转到 M 系，写成 `gt_boxes[k] = [x, y, z, w, l, h, vx, vy, r]`，`gt_names[k] = 'car'` 等。
 5. 训练时，GT 采样可能把它的点贴到别的帧里。

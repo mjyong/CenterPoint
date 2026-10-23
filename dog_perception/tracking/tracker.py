@@ -96,7 +96,7 @@ class TrackerConfig:
     motion_window: int = 5               # detections looked at
     motion_traj_window: float = 1.0      # [s] detected centers the displacement speed is fitted to
     motion_on_frames: int = 3            # of those, fast ones needed to switch to moving
-    motion_off_time: float = 1.0         # [s] no fast detection this long (and a slow IMM): moving -> stopped
+    motion_off_time: float = 1.0         # [s] no fast detection this long (and slow displacement): moving -> stopped
     stop_memory: float = 10.0            # [s] stopped this long: stopped -> static
 
 

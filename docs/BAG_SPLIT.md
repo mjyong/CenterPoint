@@ -484,8 +484,8 @@ done
 ```
 
 然后是人工审核（④）：
-- 训练集场景至少按轨迹审核；
-- 验证集场景（`segments.csv` 里 `split = val`）用 SUSTechPOINTS 逐框看，导出时加 `--every 5`。
+- 验证集场景（`segments.csv` 或 `split.csv` 里 `split = val`）用 SUSTechPOINTS 逐框看，导出时加 `--every 5 --split val`；
+- 训练集场景最好也逐框看（`--every 5 --split train`），导回后用 `sustechpoints_convert.py propagate` 传播到每一帧（`labels_full.pkl`）；时间不够至少按轨迹审核。0921 的做法见 [SERVER_TASKS.md](SERVER_TASKS.md) 的 T1S、H1、T5。
 
 **多卡批量（推荐）**：`tools/dog/batch_label.py` 先用 nvidia-smi 看每张卡的显存和利用率，只用空闲的卡（默认至少剩 8 GB、占用不超过 16 GB、利用率不超过 20%；别的进程占着但卡在空转、还剩够显存的也算空闲。`--gpus 0,2` 可以直接指定，不再做这个检查）。每张卡一个进程，从队列里取场景跑教师推理（最长的场景先跑，各卡差不多同时结束）；自动标注在 CPU 上另开线程跑，卡不用等它。已经跑过的场景会跳过，中断后重跑同一条命令即可接着跑；某个场景失败不影响其他场景，最后列出来。每个场景的日志在 `data/runs/<场景>/run_sequence.log` 和 `data/labels/<场景>/auto_label.log`，汇总在 `data/labels/batch_summary.csv`。
 
@@ -507,11 +507,12 @@ for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do
 done
 ```
 
-审核完导出数据集，验证集就是 `split = val` 的那些场景。没审核、仍标着待审核的轨迹默认作忽略框（不当物体也不当背景，[DOG_FINETUNE.md](DOG_FINETUNE.md) ⑤）。**只训练车辆**（现在的要求）时加 `--classes vehicle`、输出到 `data/dog_veh`，用 `configs/dog/*_veh.py`，见 DOG_FINETUNE.md 第 13 节；服务器上的步骤见 [SERVER_TASKS.md](SERVER_TASKS.md)。
+审核完导出数据集，验证集就是 `split = val` 的那些场景。训练场景用传播到每一帧的 `labels_full.pkl`，验证场景用 `labels_sustech.pkl`（只有审过的关键帧）。每一版导到新目录（这里是 `data/dog_v001`），再把 `data/dog` 软链接指过去，不要往正在被训练读的目录里重新导（[DOG_FINETUNE.md](DOG_FINETUNE.md) ⑤）。没审核、仍标着待审核的轨迹默认作忽略框（不当物体也不当背景，[DOG_FINETUNE.md](DOG_FINETUNE.md) ⑤）。**只训练车辆**（现在的要求）时加 `--classes vehicle`、输出到 `data/dog_veh`，用 `configs/dog/*_veh.py`，见 DOG_FINETUNE.md 第 13 节；服务器上的步骤见 [SERVER_TASKS.md](SERVER_TASKS.md)。
 
 ```bash
 REC=$(for d in data/runs/${NAME}_s*; do r=$(basename $d); \
-      f=data/labels/$r/labels_sustech.pkl; [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
+      f=data/labels/$r/labels_full.pkl; [ -f $f ] || f=data/labels/$r/labels_sustech.pkl; \
+      [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
       echo --recording $d $f; done)
 VAL=$(awk -F, 'NR>1 && $11==1 && $10=="val" {print $1}' data/survey/$NAME/segments.csv)
 python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v001 --gt-db
@@ -521,7 +522,8 @@ python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v00
 
 ```bash
 REC=$(for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do \
-      f=data/labels/$r/labels_sustech.pkl; [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
+      f=data/labels/$r/labels_full.pkl; [ -f $f ] || f=data/labels/$r/labels_sustech.pkl; \
+      [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
       echo --recording data/runs/$r $f; done)
 VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
 python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v001 --gt-db

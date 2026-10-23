@@ -197,7 +197,7 @@ head 的参数量两者相同（1.374 M），计算量与特征图面积成正�
 
 ### 5.3 机器狗配置
 
-`configs/dog/dog_centerpoint_voxel_xt32.py` 有 5 个 task（car、truck、bus、pedestrian、cyclist，各 1 类），共 30 个分支，输出时 car / truck / bus 合并为 vehicle（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 12 节）。实测 tasks 部分 1.14 M 参数、21.0 GMAC；整个网络 **8.71 M 参数、75.9 GMAC**。Pillar 的狗配置是 5.76 M、38.9 GMAC。旧的单 vehicle head 布局（`*_3cls.py`，3 个 task）分别是 8.25 M、67.5 GMAC 和 5.30 M、34.1 GMAC。
+`configs/dog/dog_centerpoint_voxel_xt32.py` 有 5 个 task（car、truck、bus、pedestrian、cyclist，各 1 类），共 30 个分支，输出时 car / truck / bus 合并为 vehicle（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 12 节）。实测 tasks 部分 1.14 M 参数、21.0 GMAC；整个网络 **8.71 M 参数、75.9 GMAC**。Pillar 的狗配置是 5.76 M、38.9 GMAC。旧的单 vehicle head 布局（`*_3cls.py`，3 个 task）分别是 8.25 M、67.5 GMAC 和 5.30 M、34.1 GMAC。只检车辆的 `*_veh.py`（car、truck 2 个 task）：Voxel 8.02 M 参数，按每个 task 约 4.2 GMAC 估算约 63.3 GMAC；Pillar 5.07 M、约 31.7 GMAC。
 
 ### 5.4 训练目标
 

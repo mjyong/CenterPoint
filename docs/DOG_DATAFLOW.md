@@ -57,8 +57,8 @@
 
 | 入口 | 适用场景 | 位姿来源 | 调用链 |
 |---|---|---|---|
-| `tools/dog/ros2_node.py` | 在线运行 | `nav_msgs/Odometry`（LIO）；`robot:=kygi` 时为 `kygi665_msgs/INSPVAX`（`on_inspvax`，与转换器同样只取航向） | `on_imu:90` → `pipe.on_imu`；`on_odom:99` / `on_inspvax:110` → `pipe.on_odometry`；`on_cloud:128` → `scan_from_msg` → `pipe.on_scan` → `publish:140` |
-| `tools/dog/run_bag_mcap.py` | 离线回放带 INSPVAX 的 bag | `pose_from_inspvax`（ENU，`yaw = 180° − azimuth`，roll/pitch 置 0） | 按消息记录时间顺序读 `AnyReader`，其余与在线相同（`:96`、`:117`），最后 `McapViz.add`（`:124`） |
+| `tools/dog/ros2_node.py` | 在线运行 | `nav_msgs/Odometry`（LIO）；`robot:=kygi` 时为 `kygi665_msgs/INSPVAX`（`on_inspvax`，与转换器同样只取航向） | `on_imu:97` → `pipe.on_imu`；`on_odom:106` / `on_inspvax:117` → `pipe.on_odometry`；`on_cloud:140` → `scan_from_msg` → `pipe.on_scan` → `publish:153` |
+| `tools/dog/run_bag_mcap.py` | 离线回放带 INSPVAX 的 bag | `pose_from_inspvax`（ENU，`yaw = 180° − azimuth`，roll/pitch 置 0） | 按消息记录时间顺序读 `AnyReader`，其余与在线相同（`:104`、`:131`），最后 `McapViz.add`（`:143`） |
 | `rosbag_to_sequence.py` → `run_sequence.py` | 批量评测、保存帧数据和跟踪日志 | 先把 bag 转成序列目录，再用 `SequenceReader.events()` 回放 | 与在线相同，另外保存 `results.pkl`、`track_log.npz` 和 `frames/*.npy` |
 
 ---
@@ -66,11 +66,11 @@
 ## 3. 位姿通路（高频，与点云异步）
 
 ```
-Imu.angular_velocity          ─► ImuPropagator.on_imu(t, gyro(3,))             pose_buffer.py:156
+Imu.angular_velocity          ─► ImuPropagator.on_imu(t, gyro(3,))             pose_buffer.py:184
   （kygi RTK IMU 先经 gyro_from_kygi_imu：deg/s → rad/s，轴已是 body 轴）     inspvax.py
-                                   └─ _propagate: R ← R·Exp((ω−b)·dt),  p ← p0 + v0·(t−t0)   :166
+                                   └─ _propagate: R ← R·Exp((ω−b)·dt),  p ← p0 + v0·(t−t0)   :194
                                       └─ PoseBuffer.add(t, R(3,3), p(3,))
-Odometry / INSPVAX            ─► ImuPropagator.on_odometry(t, R(3,3), p(3,), v(3,)|None)   :132
+Odometry / INSPVAX            ─► ImuPropagator.on_odometry(t, R(3,3), p(3,), v(3,)|None)   :160
                                    ├─ 比当前锚点旧的消息直接丢弃
                                    ├─ PoseBuffer.truncate_from(t)，写入新锚点
                                    └─ 用 1 s 内缓存的 IMU 从新锚点重新传播
@@ -99,20 +99,20 @@ scan_from_msg(msg, "timestamp", "absolute")                       ros_utils.py:3
 | `cloud_to_array` | `(128000,)` 结构化数组：`x,y,z,intensity <f4`、`ring <u2`、`timestamp <f8` |
 | 去掉 NaN 和全零点后得到 `LidarScan` | `xyz (108220,3) f32`、`intensity (108220,) f32`、`point_times (108220,) f64`，`stamp = max(point_times)`（扫描结束时刻） |
 
-### 4.2 预处理 `Preprocessor.process`（`preprocess/pipeline.py:115`）
+### 4.2 预处理 `Preprocessor.process`（`preprocess/pipeline.py:124`）
 
 ```
 Preprocessor.process(scan)
-├─ sweep_to_body(scan)                                              :97
-│   ├─ dedup_returns(scan)             双回波去重，1 mm 网格           :43
+├─ sweep_to_body(scan)                                              :106
+│   ├─ dedup_returns(scan)             双回波去重，1 mm 网格           :51
 │   ├─ SelfFilter.__call__(xyz_L)      最小距离 + 机体盒 + 近场离群     self_filter.py:82
 │   └─ deskew_points(xyz_L, t_i, PoseBuffer, t_ref=stamp, T_BL)      deskew.py:14
 │        按 0.1 ms 分桶 → PoseBuffer.interpolate → T_B(t_ref)⁻¹ · T_WB(t_i) · T_BL
-├─ T_WB = PoseBuffer.pose_at(stamp)                                  pose_buffer.py:107
+├─ T_WB = PoseBuffer.pose_at(stamp)                                  pose_buffer.py:135
 ├─ SweepAccumulator.push(stamp, T_WB·xyz_B, intensity)               accumulator.py:29
-├─ T_WD = det_frame_from_body(T_WB, base_height, ground_offset)      frames.py:29
+├─ T_WD = det_frame_from_body(T_WB, base_height, ground_offset)      frames.py:35
 ├─ points = SweepAccumulator.build(T_WD, stamp)                      accumulator.py:34
-└─ GroundHeightEstimator.update(当前帧点)   (auto_ground 开启时)      frames.py:43
+└─ GroundHeightEstimator.update(当前帧点)   (auto_ground 开启时)      frames.py:55
 ```
 
 | 步骤 | 输入 | 输出（实测） | 说明 |
@@ -125,15 +125,15 @@ Preprocessor.process(scan)
 | `build` | 5 帧 | **`points (198690,5) f32`**，列为 `[x, y, z, intensity, dt]`（检测系） | 最新帧在前；dt ∈ {0, 0.1, …, 0.4} |
 | 输出 `PreprocessedFrame` | | `points (198690,5)`、`T_world_det (4,4)`、`T_world_body (4,4)`、`stamp`、`timings` | |
 
-### 4.3 检测 `CenterPointDetector.__call__`（`detection/centerpoint.py:189`）
+### 4.3 检测 `CenterPointDetector.__call__`（`detection/centerpoint.py:260`）
 
 网络内部逐层的结构、参数量、计算量和解码细节见 [CENTERPOINT_NETWORK.md](CENTERPOINT_NETWORK.md)（Voxel 见 [CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)）；从 61 224 个候选到最终检测的每一步（含真实数据的例子）见 [DETECTION_POSTPROCESS.md](DETECTION_POSTPROCESS.md)。
 
 ```
 CenterPointDetector.__call__(points_det, stamp)
-├─ _crop               检测系 z ∈ [−1, 3] m                               :149
+├─ _crop               检测系 z ∈ [−1, 3] m                               :191
 ├─ ModelFrame.points_to_model   D → M                                     frame_adapter.py:35
-├─ build_example(points_M)                                                :164
+├─ build_example(points_M)                                                :206
 │   └─ VoxelGenerator.generate(points)      det3d/core/input/voxel_generator.py
 ├─ net(example, return_loss=False)          PointPillars.forward          det3d/.../point_pillars.py:32
 │   ├─ extract_feat                                                       :21
@@ -142,12 +142,12 @@ CenterPointDetector.__call__(points_det, stamp)
 │   │   └─ neck      RPN                    3 级下采样 + 上采样拼接          necks/rpn.py:150
 │   ├─ bbox_head.forward   shared_conv + 6 个 SepHead                      bbox_heads/center_head.py:236
 │   └─ bbox_head.predict   sigmoid、解码、中心点 circle NMS                  :294 / :451
-├─ postprocess(box9, scores, labels)                                      :211
-│   ├─ label_map：nuScenes 10 类 → 3 类（barrier、cone 映射为 −1，丢弃）
-│   ├─ det3d_to_standard   [x,y,z,w,l,h,vx,vy,r] → [x,y,z,l,w,h,yaw] + v   boxes.py:87
+├─ postprocess(box9, scores, labels)                                      :282
+│   ├─ label_map：nuScenes 10 类 → 3 类（barrier、cone 映射为 −1，丢弃）；车的子类记在 subclasses（狗的模型按 head 名）
+│   ├─ det3d_to_standard   [x,y,z,w,l,h,vx,vy,r] → [x,y,z,l,w,h,yaw] + v   boxes.py:151
 │   ├─ ModelFrame.boxes_from_model   M → D                                frame_adapter.py:48
-│   └─ classwise_circle_nms   合并类别后的去重（car 和 truck 头重复出框；行人身上的第二个峰）  boxes.py:128
-└─ filter_detections   点数 / 贴地 / 跨类去重                              filters.py:77
+│   └─ classwise_circle_nms   合并类别后的去重（car 和 truck 头重复出框；行人身上的第二个峰）  boxes.py:192
+└─ filter_detections   点数 / 贴地 / 跨类去重                              filters.py:130
 ```
 
 | 步骤 | shape / dtype（实测） | 说明 |
@@ -169,36 +169,37 @@ CenterPointDetector.__call__(points_det, stamp)
 
 `predict` 之后的几行是当前代码在样例 bag 第 10 帧上的实测（`tools/dog/trace_postprocess.py --frame 10`）；上面几行是早先在另一帧上测的，量级相同。
 
-### 4.4 跟踪 `MultiObjectTracker.step`（`tracking/tracker.py:212`）
+### 4.4 跟踪 `MultiObjectTracker.step`（`tracking/tracker.py:320`）
 
 跟踪和预测逐函数的说明，以及 IMM、CV/CT 模型的原理，见 [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md)。
 
 ```
-dets_w = Detections.transform(T_world_det, "world")      boxes.py:59   (55,7)，速度一并旋转
+dets_w = Detections.transform(T_world_det, "world")      boxes.py:122  (55,7)，速度一并旋转
 MultiObjectTracker.step(dets_w, stamp)
-├─ Track.predict(stamp)  → IMM.predict(dt)：模态混合 + CV/CT 各自预测    tracker.py:115 / imm.py:149
+├─ Track.predict(stamp)  → IMM.predict(dt)：模态混合 + CV/CT 各自预测    tracker.py:183 / imm.py:149
 ├─ 按类别阈值拆分：high = score ≥ 阈值；low = 0.1 ≤ score < 阈值
-├─ _associate(high, 所有轨迹)       代价矩阵 (N_high, M) 为中心距离，同类且在门限内   :200
+├─ _associate(high, 所有轨迹)       代价矩阵 (N_high, M) 为中心距离，同类且在门限内   :308
 ├─ _associate(low, 未匹配的已确认轨迹)
-├─ Track.update(box, vel, score) → IMM.update(z=[x,y,vx,vy], H(4,5), R(4,4))    :126 / imm.py:164
-├─ 未匹配的 high 检测 → 新建 Track（tentative）；未匹配的轨迹 → mark_missed
+├─ Track.update(box, vel, score) → IMM.update(z=[x,y,vx,vy], H(4,5), R(4,4))    :194 / imm.py:164
+│   └─ _update_motion：位移速度和速度头 → motion（static / moving / stopped）      :233
+├─ 未匹配的 high 检测 → 新建 Track（tentative，落在已有同类轨迹框里的不建）；未匹配的轨迹 → mark_missed
 ├─ 删除：tentative 连续漏检超过 0.15 s，或已确认轨迹 coasting 超过 max_age
-└─ outputs() = [t.to_state() for t in reported_tracks()]                 :255
+└─ outputs() = [t.to_state() for t in reported_tracks()]                 :381
 ```
 
 | 数据 | shape / dtype | 说明 |
 |---|---|---|
 | 每个 `Track.imm` | `x (M,5)`、`P (M,5,5)`、`mu (M,)`，M=2 | 状态为 `[px, py, vx, vy, ω]`（世界系）；车和骑行者用 CV+CT，行人用两个噪声不同的 CV |
-| 输出 `TrackState`（实测 16 条） | `position (3,)`、`velocity (2,)`、`yaw` float、`size (3,)`（l,w,h）、`score`、`covariance (4,4)`、`mode_probs (2,)`、`age`、`hits`、`coasting` bool、`history (K,6)` | `history` 每行为 `[t, x, y, vx, vy, observed]`，最多保留 3 s（实测 K=6） |
+| 输出 `TrackState`（实测 16 条） | `position (3,)`、`velocity (2,)`、`yaw` float、`size (3,)`（l,w,h）、`score`、`covariance (4,4)`、`mode_probs (2,)`、`age`、`hits`、`coasting` bool、`history (K,6)`、`motion` str | `history` 每行为 `[t, x, y, vx, vy, observed]`，最多保留 3 s（实测 K=6） |
 
 ### 4.5 预测
 
-第一档 `IMMPredictor.__call__`（`prediction/kinematic.py:71`）：
+第一档 `IMMPredictor.__call__`（`prediction/kinematic.py:74`）：
 
 ```
 for t in tracker.reported_tracks():
     IMM.rollout(3.0, 0.5, mixed=False)  → mode_means (M,6,5)、mode_covs (M,6,5,5)、mode_probs (M,)   imm.py:192
-    merge_modes(...)                     3 s 内始终相距 <0.25 m 的模态按矩匹配合并              kinematic.py:37
+    merge_modes(...)                     3 s 内始终相距 <0.25 m 的模态按矩匹配合并              kinematic.py:40
     → Prediction
 ```
 
@@ -224,12 +225,12 @@ for t in tracker.reported_tracks():
 
 | 输出 | 函数 | 坐标系 | 内容 / shape |
 |---|---|---|---|
-| **给规划** | `PerceptionPipeline.to_local(out)`（`pipeline.py:91`） | D（重力对齐，航向跟随机身，原点在地面） | 轨迹：`[{id, label, position(3,), velocity(2,), yaw, size(3,), score, coasting}] × T`；预测：`Prediction × T`，其中 `modes (K,6,2)` |
-| ROS 2 可视化 | `DogPerceptionNode.publish`（`ros2_node.py:140`） | W（`world_frame` 参数） | `~/tracks`：每条轨迹一个 CUBE 加一个 TEXT；`~/predictions`：每个模态一条 6 点的 LINE_STRIP；`~/cloud`（可选）：`(N,5) f32`，20 字节/点 |
-| Foxglove MCAP | `McapViz.add`（`mcap_viz.py:76`） | map = W | `/lidar`：当前帧，最多 20 000 点，16 字节/点；`/detections`：`above()` 之后的框；`/tracks`；`/pose` |
+| **给规划** | `PerceptionPipeline.to_local(out)`（`pipeline.py:91`） | D（重力对齐，航向跟随机身，原点在地面） | 轨迹：`[{id, label, position(3,), velocity(2,), yaw, size(3,), score, coasting, motion}] × T`（`motion` 为 static / moving / stopped，狗按它决定停不停）；预测：`Prediction × T`，其中 `modes (K,6,2)` |
+| ROS 2 可视化 | `DogPerceptionNode.publish`（`ros2_node.py:153`） | W（`world_frame` 参数） | `~/tracks`：每条轨迹一个 CUBE 加一个 TEXT（文字带运动状态）；`~/predictions`：每个模态一条 6 点的 LINE_STRIP；`~/cloud`（可选）：`(N,5) f32`，20 字节/点 |
+| Foxglove MCAP | `McapViz.add`（`mcap_viz.py:88`） | map = W | `/lidar`：当前帧，最多 20 000 点，16 字节/点；`/detections`：`above()` 之后的框；`/tracks`；`/pose` |
 | 离线文件 | `run_sequence.py` | D / W | `results.pkl`（逐帧的 Detections / TrackState / Prediction）、`track_log.npz`（`rows (R,9)`、`ego (F,4)`、线上 IMM 预测）、`frames/*.npy`（`(N,5)`） |
 
-**缺口**：ROS 2 节点目前只发可视化用的 MarkerArray，**还没有给规划的正式消息**。`to_local()` 已经给出了数据，但需要定义一个 ObjectArray 消息，包含 id、类别、位姿、尺寸、速度、协方差和多模态轨迹。
+**缺口**：ROS 2 节点目前只发可视化用的 MarkerArray，**还没有给规划的正式消息**。`to_local()` 已经给出了数据，但需要定义一个 ObjectArray 消息，包含 id、类别、位姿、尺寸、速度、运动状态、协方差和多模态轨迹。
 
 ---
 

@@ -104,8 +104,8 @@ Tracks matched to a GT object with 3 s of annotated future; 6 steps of 0.5 s. IM
 
 Bird's-eye view at the middle keyframe of each scene (ego at the center, heading up). Green / red outlines: GT tracked / missed; filled boxes: reported tracks (by class) with their id; colored lines: the two most likely predicted modes (opacity = probability); black dashes: GT 3 s future.
 
-![scene-0103_bev.png](scene-0103_bev.png)
-![scene-0916_bev.png](scene-0916_bev.png)
+![scene-0103_bev.png](nusc_scene-0103_bev.png)
+![scene-0916_bev.png](nusc_scene-0916_bev.png)
 
 ## Timing (median ms per frame, this machine)
 

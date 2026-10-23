@@ -4,7 +4,7 @@
 
 传感器（XT32、组合导航与天线、鱼眼相机）的参数、外参和录制清单见 [SENSORS.md](SENSORS.md)。服务器上训练的任务清单和进度见 [SERVER_TASKS.md](SERVER_TASKS.md)。
 
-代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（120 个测试，其中 Voxel 前向在无 CUDA 时跳过）。
+代码位于 `dog_perception/`（四段流水线库）、`tools/dog/`（离线/在线工具）、`configs/dog/`（微调配置）、`det3d/datasets/dog/`（det3d 数据集）、`tests/dog/`（142 个测试，其中 11 个慢测试；Voxel 前向在无 CUDA 时跳过）。
 
 **部署前提：NVIDIA Jetson Orin（TensorRT）。** 本文早期版本按 BPU 部署来写。凡是受部署平台影响的结论，都已按 Orin 改写；改了哪些、为什么改、上板怎么做，见[第 8 节](#8-orin-部署)。
 
@@ -88,10 +88,12 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 
 由于 car、truck、bus 属于不同的 task head，映射后同一物体可能出现两个框，所以之后要再做一次类内 NMS。另外，nuScenes 的 bicycle 类包含停放的无人自行车；这对狗来说是静态障碍物，可以通过速度来区分。
 
+车的子类（`subclasses`）记下是哪个 head 出的框（`NUSC_TO_SUBCLASS`）。nuScenes 的 bus、trailer head 记为 truck：0921 上教师常把 12 m 的大货车判成公交，同一辆车一会儿 truck 一会儿 bus。
+
 **微调**（`configs/dog/dog_centerpoint_{pp,voxel}_xt32.py`）：
 - 每个类别一个 task，车分成 car / truck / bus 三个 task（和 nuScenes 按尺寸分组一致），输出时合并为 vehicle。
 - 用 `tools/dog/convert_nusc_ckpt.py` 从 nuScenes 权重迁移 head（car、truck、bus、pedestrian、bicycle 各对各）。旧的单 vehicle head 配置保留为 `*_3cls.py`。
-- **只检车辆**（当前要求）：`*_veh.py` 只有 car、truck 两个 head，按框的尺寸分，公交归 truck；拿不准的标签作忽略框。输出类别不变，只是没有行人、骑行者。见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节。
+- **只检车辆**（当前要求）：`*_veh.py` 只有 car、truck 两个 head，按框的尺寸分，公交归 truck；拿不准的标签作忽略框。输出类别不变，只是没有行人、骑行者。见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节。0921 的训练、对比和部署选择在 [SERVER_TASKS.md](SERVER_TASKS.md)（v0：未审核的自动标注；v1：人工逐框审核后）。
 - GT-sampling 开启。在重力对齐、原点在地面的检测系下，采样粘贴的目标才会贴地。
 - 增加 ±2° 的俯仰/横滚增强（`global_pitch_roll_noise`，新加到 det3d 的 `Preprocess` 中）。
 - 训练数据直接保存**预处理后的多帧点云**，与线上使用同一份预处理代码，从源头保证训练和部署一致。
@@ -99,7 +101,7 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 **Pillar 与 Voxel 的对比方法。** 把同一份预处理输出同时喂给两个模型（`run_sequence.py --detectors pillar,voxel`），然后在人工校正过的标注上，按 0–10 / 10–20 / 20–40 m 分段比较 AP、ATE、AVE 和延迟（`compare_detectors.py`）。**不要用 Voxel 教师自己生成的标签去评估 Voxel。** 建议的定位（Orin 前提）：
 
 - **线上默认用 Pillar。** 两个稠密 TensorRT 引擎，工具链简单；同一块 GPU 还要跑预处理（见 8.3），可能还有其他任务。官方在 TITAN RTX 上的测速：Pillar 31 FPS，Voxel 0.1 m 16 FPS，我们用的 0.075 m 更慢。
-- **Voxel 在 Orin 上能部署，只是更贵。** 如果在自己的标注上，Voxel 在 0–20 m 的行人上明显更好，并且 Orin 上实测的端到端延迟放得下，就可以换成线上模型，路线见 8.2。
+- **Voxel 在 Orin 上能部署，只是更贵。** 如果在自己的标注上，Voxel 在 0–20 m 明显更好（只检车辆时看车），并且 Orin 上实测的端到端延迟放得下，就可以换成线上模型，路线见 8.2。"明显"要用 `compare_detectors.py --bootstrap` 按录制重抽来判断，验证录制少时几个点的差别可能只是运气；0921 的判定规则见 SERVER_TASKS.md 的 T7。
 - 不管线上用哪个，Voxel 都继续做离线教师，并提供精度上限作为参照。
 
 ### 1.3 标注
@@ -109,10 +111,11 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
 - 类别：按分数加权投票；
 - 尺寸和 z：取加权中位数；
 - 中心点：RTS 平滑，并插值补上 0.5 s 以内的漏检；
-- 静止 / 运动：轨迹速度（±0.5 s 差分）> 0.4 m/s 并且教师速度头 > 0.15 m/s 的帧才算运动，否则速度为 0；整条轨迹都静止且框聚得紧时，位置取加权中位数。只看轨迹不行：狗走动时，静止的车被看到的那一面在变，框中心跟着漂，会被当成在动；只看速度头又会漏掉慢速运动。nuScenes 上的对比见 [DOG_FINETUNE.md](DOG_FINETUNE.md)；
+- 静止 / 运动：轨迹速度（±0.5 s 差分）> 0.4 m/s 并且教师速度头 > 0.15 m/s 的帧才算运动，否则速度为 0；再去掉毛刺（运动中短于 0.5 s 的停顿算运动，短于 1 s 的运动段算静止）；整条轨迹都静止且框聚得紧时，位置取加权中位数。只看轨迹不行：狗走动时，静止的车被看到的那一面在变，框中心跟着漂，会被当成在动；只看速度头又会漏掉慢速运动。nuScenes 上的对比见 [DOG_FINETUNE.md](DOG_FINETUNE.md)；
 - 朝向：运动快（> 1 m/s）时取运动方向，否则取框朝向的环形均值，180° 歧义用运动方向（从没动过就用分数最高的框）消解；
-- 过滤：丢弃太短或平均分太低的轨迹；
-- 所有轨迹导出到 `*_tracks.csv`，低置信的标为待审核，人工在 Foxglove 里看过后按轨迹修正（`tools/dog/review_labels.py`），见 [DOG_FINETUNE.md](DOG_FINETUNE.md)。
+- 过滤：丢弃太短或平均分太低的轨迹；平均分 < 0.5、并且 ≥ 0.6 分的帧不到 5 帧的标为待审核；
+- 遮挡和远处：按框里的点数决定训练目标（`visibility.py`）。5 帧里一个点都没有的框不要，当前帧点数不够的作忽略框；线上跟踪照样在遮挡时延续轨迹；
+- 人工审核：在 SUSTechPOINTS 里逐框审（每 5 帧 1 帧，要人定的显示为红框，训练场景再传播到每一帧），或在 Foxglove 里看、按轨迹表修正（`tools/dog/review_labels.py`），见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14、15 节。
 
 在仿真中，对同一个带噪声的教师（每帧 0.5 个虚警、10% 朝向翻转），行人指标变化如下：
 
@@ -136,6 +139,8 @@ GPU/主机   解码 + circle NMS                     detection/decode.py
   - 保活时间：行人 1.5 s，车辆和骑行者 1.0 s。狗的视角低，遮挡时间长，原方案的 5–10 帧（0.5–1 s）对行人来说偏短；
   - 保活期间输出 `coasting` 标志和随时间膨胀的协方差，由规划侧决定是否使用。
 - **框属性平滑**：z 和尺寸用 EMA；车辆朝向做 180° 消歧，速度超过 1 m/s 时与运动方向对齐；行人朝向在行走时取速度方向。
+- **一辆长货车一条轨迹**：没匹配上的高分框，如果和已有的同类轨迹"一个的中心落在另一个框里"，就不开新轨迹（长货车常被检成前后两个框）。
+- **运动状态** `TrackState.motion`：`moving`（最近 5 次检测里 3 次位移速度和速度头都 > 0.7 m/s，行人 0.5）、`stopped`（运动后 1 s 没有一次快、位移速度 < 0.3 m/s）、`static`（一开始就是，或 `stopped` 持续 10 s）。狗遇到运动的车要停，遇到停着的车不停，所以单独给出这个状态；ROS 的轨迹文字和 mcap 里也显示。依据和 0921 上的评估见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节，`tools/dog/motion_eval.py` 调阈值。
 
 ### 1.5 预测
 
@@ -185,7 +190,9 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `dog_perception/tracking/` | IMM、贪心/匈牙利匹配、多目标跟踪器 |
 | `dog_perception/prediction/` | 第一档 IMM 外推、特征构造、自监督数据、模型、训练/评估 |
 | `dog_perception/autolabel.py` | 离线轨迹级精修 |
-| `dog_perception/label_review.py` | 按轨迹审核：轨迹表、修正动作、审核用 Foxglove MCAP |
+| `dog_perception/label_review.py` | 按轨迹审核：轨迹表、修正动作、审核用 Foxglove MCAP；`train_label`：一个标签框导出时的去向（训练类别、忽略框或不要） |
+| `dog_perception/visibility.py` | 数框里的点（当前帧 / 5 帧），决定遮挡和远处的框是正样本、忽略框还是不要 |
+| `dog_perception/tracking/motion_eval.py` | 在线运动状态对照标注评估：漏报的运动段、延迟、停着的车被报运动的次数 |
 | `dog_perception/pipeline.py` | 四段串联 `PerceptionPipeline` |
 | `dog_perception/sim.py` | XT32 + 足式步态仿真器（测试和演示用） |
 | `det3d/datasets/dog/` + pipeline 改动 | `DogDataset`、GT-sampling、俯仰/横滚增强 |
@@ -201,10 +208,12 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/run_sequence.py` | 录制数据回放，Pillar/Voxel 并行跑，输出结果、跟踪日志和帧数据 |
 | `tools/dog/auto_label.py`, `export_dataset.py` | 教师自动标注，导出为 DogDataset 并建 GT 库 |
 | `tools/dog/review_labels.py` | 自动标注的人工审核：生成 MCAP、按轨迹表修正标签 |
-| `tools/dog/sustechpoints_convert.py`（`dog_perception/sustechpoints.py`） | 与 SUSTechPOINTS 互转标签（逐框修正、补漏标），并启动该工具 |
+| `tools/dog/sustechpoints_convert.py`（`dog_perception/sustechpoints.py`） | 与 SUSTechPOINTS 互转标签（逐框修正、补漏标），关键帧的审核结果传播到每一帧（`propagate`），统计红框（`stats`），并启动该工具 |
 | `third_party/SUSTechPOINTS/` | 3D 点云标注工具 SUSTechPOINTS 的源码（GPL-3.0，版本和本地修改见 `VENDORED.md`） |
 | `tools/dog/nusc_autolabel_eval.py` | 在 nuScenes 上用真值检查自动标注质量 |
-| `tools/dog/compare_detectors.py` | Pillar 与 Voxel 对比（AP、分段 AP、延迟、轨迹碎片化） |
+| `tools/dog/compare_detectors.py` | 多个检测器对比（AP、分段 AP、延迟、轨迹碎片化）；`--thresholds` 扫上报阈值，`--bootstrap` 按录制重抽给出差值的区间 |
+| `tools/dog/motion_eval.py` | 在验证场景上重跑跟踪，扫运动状态的阈值（`--on-speed`、`--on-frames`），`--details` 列出每个漏报和误报 |
+| `tools/dog/bench_dataloader.py` | 训练数据读取够不够快：每个变换的耗时、读盘速度、DataLoader 每批耗时 |
 | `tools/dog/convert_nusc_ckpt.py` | nuScenes 10 类 head 到狗的 5 个 head（或旧的 3 个）的权重迁移 |
 | `tools/dog/export_pillar_onnx.py` | 导出给 TensorRT 用的两段 ONNX，逐段校验，并打印上板建引擎的 `trtexec` 命令 |
 | `tools/dog/profile_detector.py` | 在一帧上测网络逐层的 shape、参数量、计算量（稀疏卷积按实际邻接对计）和各段耗时 |
@@ -272,8 +281,8 @@ python3 tools/dog/ros2_node.py --ros-args -p robot:=kygi -p config:=dog_pillar -
 
 # 仿真演示和测试
 python tools/dog/run_sim_demo.py --frames 80 --plot 3 --out work_dirs/sim_demo
-python -m pytest tests/dog -m "not slow" -n 4 -q    # 快速：约 1 分钟（pytest-xdist 并行，跳过 11 个慢测试）
-python -m pytest tests/dog -q                       # 完整：4 核约 3 分钟
+python -m pytest tests/dog -m "not slow" -n 8 -q    # 快速：约 1 分钟（pytest-xdist 并行，跳过 11 个慢测试）
+python -m pytest tests/dog -n 4 -q                  # 完整：4 核约 3 分钟
 ```
 
 ---
@@ -349,7 +358,7 @@ python -m pytest tests/dog -q                       # 完整：4 核约 3 分钟
 
 ## 6. 已知局限（没有在本环境中验证的部分）
 
-- **没有真实 XT32 数据和 nuScenes 预训练权重**（官方权重托管在 OneDrive，本环境无法下载）。所有检测相关的数字只验证了管线和一致性，Pillar 与 Voxel 的精度和延迟对比需要在你的机器上用步骤 1–2 实测。
+- **本环境没有 GPU。** nuScenes 预训练权重和样例 bag 都在仓库里，Pillar 在 CPU 上跑过；Voxel 的推理、训练和 0921 数据上的精度、延迟都在服务器（RTX 4090）上，记录见 [SERVER_TASKS.md](SERVER_TASKS.md)。
 - 检测封装里的 Voxel 前向需要 CUDA 版 spconv（CPU 版 spconv 不支持带 bias 的卷积）。本环境只用 `profile_detector.py` 的 CPU 绕行办法跑通过前向，实测了逐层 shape 和计算量（[CENTERPOINT_VOXEL_NETWORK.md](CENTERPOINT_VOXEL_NETWORK.md)），没有 GPU 上的耗时拆分。
 - 本环境没有 ROS，`ros2_node.py` 没有在真实 ROS 下运行过。`tests/dog/test_ros2_node.py` 用替身代替 rclpy 和消息包，把运动样例 bag 按到达顺序回放进 `robot:=kygi` 的节点，结果与训练序列的检测系点云逐帧一致。27 帧里有 20 帧中位差 < 5 mm；其余几帧差几厘米，因为 INS 位置正好在那时跳变：节点在线做插值，回放序列时只能外推。bag 转换器已用合成的 ROS2 bag 测试。
 - kygi 数据里狗沿检测系 +y 前进（INSPVAX 机身系的约定），进入网络系后相对 nuScenes 的习惯朝向转了 90°。在 nuScenes mini_val 上同样转 90°，预训练 Pillar 的 mAP 只从 0.663 降到 0.650，所以没有改；详见 [DATA_LINEAGE.md](DATA_LINEAGE.md) 的坐标系一节。
@@ -428,8 +437,8 @@ python -m pytest tests/dog -q                       # 完整：4 核约 3 分钟
 - **Pillar**：`export_pillar_onnx.py` 导出两段 ONNX，在 Orin 上构建两个 FP16 引擎（8.4）。前后处理先沿用现在的 numpy 实现，再按 8.3 搬到 GPU。
 - **Voxel** 有两条路：
   1. PyTorch + spconv 2.x（CUDA）直接跑 det3d 模型。改动最小，适合上板先测精度和延迟。spconv 要装与 JetPack 的 CUDA 版本对应的包，有的版本需要源码编译。
-  2. NVIDIA [Lidar_AI_Solution](https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution) 里的 CUDA-CenterPoint：用 libspconv 加 TensorRT 的 C++ 实现，针对的正是 nuScenes 的 CenterPoint-Voxel 0.075 m 模型。我们的网格是 1088×1088（官方 1440×1440），并且是 3 类、3 个 task，需要用它的工具重新导出并修改解码，可行性待验证。
-- **决策顺序**：先用 `compare_detectors.py` 在人工校正的标注上比精度。只有 Voxel 明显更好时，才在 Orin 上测路线 1 的延迟，再决定是否投入路线 2。
+  2. NVIDIA [Lidar_AI_Solution](https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution) 里的 CUDA-CenterPoint：用 libspconv 加 TensorRT 的 C++ 实现，针对的正是 nuScenes 的 CenterPoint-Voxel 0.075 m 模型。我们的网格是 1088×1088（官方 1440×1440），head 也不同（只检车辆的是 car、truck 两个 task），需要用它的工具重新导出并修改解码，可行性待验证。
+- **决策顺序**：先用 `compare_detectors.py --bootstrap` 在人工逐框审过的验证集上比精度（0921：SERVER_TASKS.md 的 T7）。只有 Voxel 明显更好时，才在 Orin 上测路线 1 的延迟（T8 / H2），再决定是否投入路线 2。不管选哪个，Pillar 的 ONNX 都先导出来作退路。
 
 ### 8.3 延迟预算：瓶颈在 ARM 核
 

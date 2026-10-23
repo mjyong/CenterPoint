@@ -7,7 +7,7 @@
 - **跟踪**：同一个跟踪器，世界系取 nuScenes 的 global 系。
 - **预测**：同一个 IMM 预测器（第一档），也可以加载第二档模型。
 
-真值和检测都合并成 vehicle / pedestrian / cyclist 三类，与狗的输出一致。
+真值和检测都合并成 vehicle / pedestrian / cyclist 三类，与狗的输出一致。微调后的狗模型（`--ckpt` 给狗的权重，配置按权重自动识别）也能这样评，用来查微调后在 nuScenes 上掉了多少；只检车辆的模型（`*_veh`）只看 vehicle 一行，行人、骑行者那两行不适用。
 
 ---
 
@@ -84,7 +84,7 @@ python tools/dog/nusc_clip_eval.py --dataroot data/nuscenes_mini --version v1.0-
 
 ## 5. mini_val 结果
 
-数据为 `scene-0103`、`scene-0916`：393 帧（10 Hz），81 个关键帧参与评估。检测器是 nuScenes 预训练 Pillar（`nusc_pp.pth`），流水线全部用默认参数。完整报告见 [nusc_mini_val_report.md](nusc_mini_val_report.md)。
+数据为 `scene-0103`、`scene-0916`：393 帧（10 Hz），81 个关键帧参与评估。检测器是 nuScenes 预训练 Pillar（`nusc_pp.pth`），流水线全部用默认参数（2026-10-12；之后跟踪器加了运动状态和长货车只开一条轨迹，检测和跟踪的数字可能有小的变化）。完整报告见 [nusc_mini_val_report.md](nusc_mini_val_report.md)。
 
 ![scene-0103](nusc_scene-0103_bev.png)
 

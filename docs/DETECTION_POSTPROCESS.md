@@ -155,6 +155,8 @@ NMS 后 6 个 task 共 115 个框，没有一个 task 碰到 83 的上限，整�
 
 剩 96 个。
 
+车同时记下子类（`subclasses`，`NUSC_TO_SUBCLASS`）：car 头为 car；truck、construction_vehicle、bus、trailer 头都记为 truck（狗的数据里大货车常被 bus 头判成公交，2026-10-22 起）。子类只给自动标注和训练用，不影响这里的合并。狗自己的模型（5 个 head 或只检车辆的 car / truck 两个 head）没有 barrier、cone，也不用这张 10 类映射表：head 名就是子类，按 `SUBCLASS_TO_CLASS` 归成 vehicle / pedestrian / cyclist，后面的步骤相同。
+
 **⑥ 框格式和坐标系**：
 - `det3d_to_standard`：`[x, y, z, w, l, h, vx, vy, r]` → `[x, y, z, l, w, h, yaw]`，其中 `yaw = −r − π/2`，并交换 w 和 l。那辆车：yaw_M = −1.550 − 1.571 = −3.121。
 - `ModelFrame.boxes_from_model`：M → D。M 是 D 绕 z 转 +90° 再下移 1.84 m 得到的，所以：

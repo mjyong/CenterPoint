@@ -9,6 +9,7 @@ easydict
 addict
 terminaltables
 pycocotools
+threadpoolctl     # training DataLoader workers run single-threaded (det3d/datasets/loader/build_loader.py)
 protobuf
 tqdm
 nuscenes-devkit

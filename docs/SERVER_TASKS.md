@@ -64,6 +64,7 @@
 | T6 | 训练 v1（单卡，和 v0 同配方）；同时跑基线：nuScenes 原始模型、v0 | Agent | T5 | 约 1.2 小时 | 待做 |
 | T7 | 比较 7 个模型，选部署 Voxel 还是 Pillar、上报阈值 | Agent | T6 | 1 小时 | 待做 |
 | T8 | 部署：导出 Pillar v1 的 ONNX；选了 Voxel 时再打包 Voxel，人在 Orin 上测（H2） | Agent | T7 | 10 分钟 | 待做 |
+| H2 | （T7 选了 Voxel 时）在 Orin 上测 Voxel v1 的延迟，放得下就部署 Voxel，否则部署 Pillar | 人 | T8 | 半天 | 待做 |
 | T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
 
@@ -80,7 +81,9 @@
 | 激光里程计 + RTK 融合后的位姿（第六版，含倾斜） | 各序列的 `odom.npy` | 5.10 |
 | 划分：训练 25 个、验证 10 个，不丢场景 | `data/survey/split/split.csv` | 5.10 |
 | 教师推理（nuScenes Voxel + TTA）、模型输入帧 | `data/runs/<场景>/voxel/results.pkl`、`frames/` | 5.11 |
-| 自动标注 | `data/labels/<场景>/labels.pkl`（已提交） | 5.11 |
+| 自动标注 | `data/labels/<场景>/labels.pkl`（已提交；T1R 按新规则重做过） | 5.11、T1R |
+| 人工审核（2026-10-23） | SUSTechPOINTS 场景（公共盘的 `sustech/`）；导回的 `labels_sustech.pkl`、训练场景传播到每一帧的 `labels_full.pkl`（已提交） | H1、T5 |
+| v1 数据集（只有车） | `data/dog_veh` → `dog_veh_1023_1529` | T5 |
 
 验证集是这 10 个场景：0921_164127_s000–s005、0921_165659_s003–s006。
 

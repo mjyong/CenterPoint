@@ -12,11 +12,11 @@
 PerceptionPipeline.on_scan(scan)                              pipeline.py:55
 ├─ Preprocessor.process → frame（D 系点云，T_world_det）
 ├─ detector(frame.points) → Detections（D 系）
-├─ dets.transform(T_world_det, "world")                       boxes.py:59     中心、朝向、速度转到 W 系
-├─ MultiObjectTracker.step(dets_w, stamp) → [TrackState]      tracker.py:212  跟踪
+├─ dets.transform(T_world_det, "world")                       boxes.py:122    中心、朝向、速度转到 W 系
+├─ MultiObjectTracker.step(dets_w, stamp) → [TrackState]      tracker.py:320  跟踪（含运动状态）
 ├─ _ego.append([t, x, y, vx, vy, 1])                          pipeline.py:75  机器狗自身的历史，给第二档用
 └─ predictor(...) → [Prediction]                                               预测
-     ├─ IMMPredictor(tracker)                                 kinematic.py:74 第一档
+     ├─ IMMPredictor(tracker)                                 kinematic.py:63 第一档
      └─ LearnedPredictor(tracker, ego_hist)                   learned.py:37   第二档；历史不足的轨迹回退第一档
 PerceptionPipeline.to_local(out)                              pipeline.py:91  W 系 → D 系，给规划
 ```
@@ -25,9 +25,10 @@ PerceptionPipeline.to_local(out)                              pipeline.py:91  W 
 
 | 文件 | 行数 | 内容 |
 |---|---|---|
-| `tracking/imm.py` | 223 | CV、CT 两个运动模型和 IMM 滤波器 |
+| `tracking/imm.py` | 222 | CV、CT 两个运动模型和 IMM 滤波器 |
 | `tracking/association.py` | 39 | 贪心匹配、匈牙利匹配 |
-| `tracking/tracker.py` | 270 | 单条轨迹 `Track`、两阶段关联、生命周期、`MultiObjectTracker` |
+| `tracking/tracker.py` | 382 | 单条轨迹 `Track`、两阶段关联、生命周期、运动状态、`MultiObjectTracker` |
+| `tracking/motion_eval.py` | 157 | 运动状态对照标注的评估（`tools/dog/motion_eval.py`） |
 | `prediction/kinematic.py` | 80 | 输出格式 `Prediction`；第一档 `IMMPredictor` 和模态合并 |
 | `prediction/features.py` | 152 | 第二档的输入构造，训练和线上共用 |
 | `prediction/model.py` | 133 | 第二档网络 `TrajectoryPredictor` 和损失 |
@@ -205,7 +206,7 @@ P = Σ_j μ_j·( P_j + (x_j−x)(x_j−x)ᵀ )          第二项：模态之间
 
 ### 2.1 输入：检测转到世界系
 
-`Detections.transform(T_world_det, "world")`（`boxes.py:59`）。检测系 D 和世界系 W 都是重力对齐的，两者之间只差一个绕 z 轴的旋转加平移：
+`Detections.transform(T_world_det, "world")`（`boxes.py:122`）。检测系 D 和世界系 W 都是重力对齐的，两者之间只差一个绕 z 轴的旋转加平移：
 
 ```
 中心   p_w = R·p_d + t
@@ -218,29 +219,30 @@ P = Σ_j μ_j·( P_j + (x_j−x)(x_j−x)ᵀ )          第二项：模态之间
 ### 2.2 `MultiObjectTracker.step` 逐步
 
 ```
-step(dets_w, stamp)                                                      tracker.py:212
-1  所有轨迹 IMM 预测到当前时刻                       Track.predict         :216
-2  按类别阈值把检测分成两组                                               :219-222
+step(dets_w, stamp)                                                      tracker.py:320
+1  所有轨迹 IMM 预测到当前时刻                       Track.predict         :324
+2  按类别阈值把检测分成两组                                               :327-330
      high = score ≥ high_score[类别]      车辆 0.35 / 行人 0.30 / 骑行者 0.40
      low  = 0.1 ≤ score < high_score
-3  第一阶段：high 与全部轨迹关联                    _associate            :225
-4  第二阶段：low 只与第一阶段没匹配上的"已确认"轨迹关联                     :227-228
-5  匹配上的轨迹：用检测更新                          Track.update          :233-235
+3  第一阶段：high 与全部轨迹关联                    _associate            :332
+4  第二阶段：low 只与第一阶段没匹配上的"已确认"轨迹关联                     :334-336
+5  匹配上的轨迹：用检测更新（含运动状态）            Track.update          :340-343
      同时记录 last_matches[轨迹 id] = 检测下标（离线自动标注用）
-6  没匹配上的轨迹：记一次漏检                        Track.mark_missed     :237-239
-7  没匹配上的 high 检测：新建轨迹（tentative）        Track(...)            :241-248
-8  删除过期轨迹                                                           :250-252
-9  返回 reported_tracks() 的 TrackState                                   :253
+6  没匹配上的轨迹：记一次漏检                        Track.mark_missed     :344-347
+7  没匹配上的 high 检测，按分数从高到低：新建轨迹（tentative）            :349-359
+     例外：和已有同类轨迹"一个的中心落在另一个框里"的不新建  _second_box_on_track
+8  删除过期轨迹                                                           :361-363
+9  返回 reported_tracks() 的 TrackState                                   :364
 ```
 
-### 2.3 关联：`_associate`（`tracker.py:200`）
+### 2.3 关联：`_associate`（`tracker.py:308`）
 
 **代价**：检测中心与轨迹预测中心（IMM 合成状态）的 xy 欧氏距离。以下情况代价置为无穷，即不允许匹配：
 
 - 类别不同；
 - 距离超过该轨迹的门限。
 
-**门限** `Track.gate()`（`:121`）随不确定性自适应：
+**门限** `Track.gate()`（`:189`）随不确定性自适应：
 
 ```
 σ    = sqrt( trace(P_xy) / 2 )               预测位置的平均标准差
@@ -266,15 +268,17 @@ gate = clip(3σ, 类别门限, 3 × 类别门限)
 
 单测：`test_low_score_detections_do_not_spawn_tracks_and_tentative_die`、`test_lifecycle_coasting_and_low_score_recovery`。
 
-### 2.5 单条轨迹 `Track`（`tracker.py:92`）
+**长货车不开第二条轨迹。** 长货车常被检成前后两个框：一个和轨迹匹配上，另一个没匹配上、分数又高，以前就会新开一条轨迹。现在没匹配上的高分框，如果和已有的同类轨迹"一个的中心落在另一个框里"，就不新建（`_second_box_on_track`）。对小车和行人基本没有影响：中心落进对方框里时，距离已经小于关联门限，本来就会匹配上；只对长于约 6 m 的车起作用。
 
-**新建**（`:93`）：
+### 2.5 单条轨迹 `Track`（`tracker.py:155`）
+
+**新建**（`:156`）：
 
 - 按类别参数构造 IMM，初始状态 `[x, y, vx_det, vy_det, 0]`，即新轨迹第一帧就有速度；
 - 初始协方差 `diag(pos_std², pos_std², vel_std², vel_std², 0.3²)`；关闭速度量测时，速度方差取 4.0（2 m/s 标准差）；
 - 高度 z、尺寸和朝向直接取自检测，`hits = 1`，状态为 tentative。
 
-**更新**（`:126`）：
+**更新**（`:194`）：
 
 ```
 z = [x, y, vx, vy]                            检测中心 + CenterPoint 速度，世界系
@@ -294,7 +298,7 @@ IMM.update(z, H, R)
 | 分数 | `score = 0.7·score + 0.3·score_det` |
 | 朝向 | 见下 |
 
-**朝向**（`_update_yaw`，`:149`）：
+**朝向**（`_update_yaw`，`:255`）：
 
 - **行人**：框接近正方形，检测出的朝向基本没有意义。只在速度超过 0.4 m/s 时把朝向设为速度方向，否则保持不变。
 - **车辆、骑行者**：
@@ -302,9 +306,22 @@ IMM.update(z, H, R)
   2. 速度超过 1 m/s 时，再保证朝向与运动方向一致，相反就再翻一次；
   3. 最后按 0.4 的系数做角度 EMA。
 
-**漏检**（`mark_missed`，`:166`）：分数乘以 0.9，并把预测状态记入历史，标记为未观测。
+**运动状态**（`_update_motion`，`:233`）：狗遇到运动的车要停，遇到停着的车不停，所以每条轨迹单独给出 `motion`：
 
-**历史**（`_record`，`:170`）：每帧追加一行 `[t, x, y, vx, vy, observed]`，取 IMM 的合成状态，保留最近 3 s。第二档预测器用的就是它。
+| 状态 | 什么时候进入 |
+|---|---|
+| `moving` | 最近 5 次检测里有 3 次"快"：位移速度和速度头都 > 0.7 m/s（行人 0.5） |
+| `stopped` | 运动之后，1 s 内没有一次"快"，并且位移速度 < 0.3 m/s（行人 0.2）；刚停下的车可能马上再走 |
+| `static` | 一开始就是；或者 `stopped` 持续 10 s |
+
+- 位移速度（`displacement_speed`，`:224`）：这条轨迹最近 1 s 检测框中心的直线拟合斜率，不足 0.3 s 时不算。速度头是这一帧检测器给的速度。
+- 两个都要过阈值：停着的车框会随视角漂（位移速度有零点几 m/s），速度头只看一帧、位姿一抖就跳。
+- 不用 IMM 速度：它是用第一帧的速度头初始化的，开头几帧和速度头是同一个信号。
+- 依据、仿真延迟和 0921 上的评估见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节；阈值用 `tools/dog/motion_eval.py` 调。
+
+**漏检**（`mark_missed`，`:272`）：分数乘以 0.9，并把预测状态记入历史，标记为未观测。
+
+**历史**（`_record`，`:276`）：每帧追加一行 `[t, x, y, vx, vy, observed]`，取 IMM 的合成状态，保留最近 3 s。第二档预测器用的就是它。
 
 ### 2.6 生命周期
 
@@ -326,7 +343,7 @@ IMM.update(z, H, R)
 - tentative 轨迹只能被高分检测延续（第二阶段只看已确认轨迹）。
 - coasting 不是单独存储的状态，而是"距上次匹配的时间 > 0"。期间位置完全靠 IMM 预测，协方差随时间增大。
 
-### 2.7 哪些轨迹会上报：`reported_tracks`（`tracker.py:255`）
+### 2.7 哪些轨迹会上报：`reported_tracks`（`tracker.py:367`）
 
 同时满足以下条件才上报（预测也只对这些轨迹做）：
 
@@ -347,7 +364,7 @@ IMM.update(z, H, R)
 
 **只靠低分检测维持的轨迹会存活，但不上报。** 第二阶段的低分检测会让分数的 EMA 逐渐收敛到检测分数。比如一直被 0.15 分的检测延续，分数最终会降到 0.15 附近，低于上报门限。这类轨迹不输出，但仍在参与关联；一旦高分检测回来，它会保持原来的 ID。这正是第 7 节"检测框过多"修复中加上的机制（[DOG_PIPELINE.md](DOG_PIPELINE.md) 第 7 节）。
 
-### 2.8 输出 `TrackState`（`tracker.py:71`）
+### 2.8 输出 `TrackState`（`tracker.py:126`）
 
 | 字段 | shape | 含义 |
 |---|---|---|
@@ -364,8 +381,11 @@ IMM.update(z, H, R)
 | `age` / `hits` | float / int | 存活时间、累计命中次数 |
 | `coasting` | bool | 这一帧没匹配上检测 |
 | `history` | (K, 6) | `[t, x, y, vx, vy, observed]`，最近 3 s |
+| `motion` | str | `static` / `moving` / `stopped`（2.5 节）；`moving` 属性等于 `motion == "moving"` |
+| `time_since_moving` | float | 距上次处于 `moving` 的秒数 |
+| `speed_displacement` / `speed_head` | float | 最近一次运动判断用的位移速度、速度头读数（m/s） |
 
-### 2.9 参数一览：`TrackerConfig`（`tracker.py:50`）
+### 2.9 参数一览：`TrackerConfig`（`tracker.py:75`）
 
 | 参数 | 默认值 | 作用 |
 |---|---|---|
@@ -380,6 +400,10 @@ IMM.update(z, H, R)
 | `history` | 3.0 s | 历史保留长度 |
 | `size_alpha` / `z_alpha` / `yaw_alpha` | 0.2 / 0.3 / 0.4 | EMA 系数 |
 | `heading_from_velocity` | 1.0 m/s | 车辆和骑行者速度超过它，朝向对齐运动方向 |
+| `motion_on_speed` / `motion_off_speed` | 车辆 0.7 / 0.3，行人 0.5 / 0.2，骑行者 0.7 / 0.3 m/s | 运动状态的"快"、"慢"阈值 |
+| `motion_window` / `motion_on_frames` | 5 / 3 | 最近几次检测里几次"快"进入 `moving` |
+| `motion_traj_window` | 1.0 s | 位移速度拟合用的时间窗 |
+| `motion_off_time` / `stop_memory` | 1.0 s / 10 s | `moving` → `stopped`、`stopped` → `static` 的时间 |
 
 ### 2.10 调参：现象 → 先调什么
 
@@ -391,6 +415,7 @@ IMM.update(z, H, R)
 | 速度抖动 | 增大 `vel_std`（少信检测速度），或减小 `q_acc` |
 | 转弯时位置滞后 | 增大 CT 的 `q_omega` 或 `q_acc` |
 | 遮挡时轨迹还活着却不上报 | 降低 `output_min_score`（注意 2.7 节的分数衰减） |
+| 停着的车被报成运动 / 运动的车报得太晚 | 提高 / 降低 `motion_on_speed`、`motion_on_frames`，先用 `motion_eval.py` 在验证场景上扫 |
 
 ---
 
@@ -580,4 +605,5 @@ python tools/dog/train_predictor.py --sim 10 --encoder transformer      # 没有
 | 行人两个模态大多不合并（3.2 节） | 行人通常输出 2 条很接近的轨迹 | 合并判据改为马氏距离 |
 | coasting 轨迹的预测从纯预测状态出发 | 遮挡越久，预测越不可靠 | 规划侧结合 `coasting` 标志和协方差使用 |
 | 第二档只在仿真上验证过，障碍物栅格未接入线上 | 真实交互效果未知 | 用实车日志训练和评估，过门槛再切换（DOG_PIPELINE 1.5 节） |
+| 运动状态只看最近 1 s 的位移和速度头 | 位姿跳变时，几个静止物体会一起被报成运动（运动样例 bag 1.8–2.3 s）；线上用 INS 位姿，跳变比离线修正的多 | 线上位姿质量差时（INS 跳变）暂停进入 `moving`；用线上位姿在验证场景上再评一次 |
 | 全部为 Python 实现 | x86 上跟踪约 6 ms；第一档预测在本次修改后每条轨迹约 0.85 ms | 部署到 Orin 时移植 C++（DOG_PIPELINE 8.3 节） |

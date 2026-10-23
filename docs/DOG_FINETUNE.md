@@ -10,13 +10,14 @@
 
 **第一次做，先照着 [LABELING_TUTORIAL.md](LABELING_TUTORIAL.md) 用仓库里的两段样例 bag 走一遍**：每一步的命令、应有的输出、SUSTechPOINTS 的界面截图和操作都在里面。
 
-中间产物都放在 `data/` 下（`data/seq`、`data/runs`、`data/labels`、`data/dog`），这个目录被 .gitignore 忽略，点云不会被误提交。
+中间产物都放在 `data/` 下（`data/seq`、`data/runs`、`data/labels`、`data/dog`；只检车辆的版本是 `data/dog_veh`），这个目录被 .gitignore 忽略，点云不会被误提交。服务器上按任务一步步做的记录（0921 数据）见 [SERVER_TASKS.md](SERVER_TASKS.md)。
 
 ```
 bag ─① rosbag_to_sequence ─► 序列 ─② run_sequence --save-frames ─► frames/*.npy（模型输入）+ 教师结果
    ─③ auto_label ─► labels.pkl + labels_tracks.csv
-   ─④a review_labels（Foxglove 里看，按轨迹改）─► labels_reviewed.pkl
-   ─④b SUSTechPOINTS（逐框改、补漏标，验证集必须做）─► labels_sustech.pkl
+   ─④ SUSTechPOINTS 逐框审（每 5 帧取 1 帧）─► labels_sustech.pkl
+        训练集再 propagate 到每一帧 ─► labels_full.pkl
+     （轻量的做法：④a review_labels，Foxglove 里看、按轨迹改 ─► labels_reviewed.pkl）
    ─⑤ export_dataset ─► data/dog（DogDataset + GT 库）─⑥ convert_nusc_ckpt + train ─► 微调权重
    ─⑦ 评估 ─⑧ 部署（ONNX → TensorRT）─⑨ 用微调后的模型当教师，下一轮
 ```
@@ -114,8 +115,8 @@ python tools/dog/nusc_autolabel_eval.py --dataroot data/nuscenes_mini --scenes m
 
 自动标注不能直接拿来训练：漏标的物体会被当成背景，错标的类别和朝向会被模型学进去。分两级：
 
-- **④a 按轨迹**（下面）：训练集至少做这一级，处理待审核的轨迹；
-- **④b 逐框**（SUSTechPOINTS，见第 10 节）：验证集必须做，补漏标、改框。没被标为待审核的轨迹也会错：样例 bag 里一个分数 0.50 的"骑行者"其实是三脚架（[LABELING_TUTORIAL.md](LABELING_TUTORIAL.md) 第 5 节）。
+- **④b 逐框**（SUSTechPOINTS，第 10、15 节）：验证集必须做；有时间的话训练集也做（0921 的 35 个场景都是这样审的，每 5 帧取 1 帧，约 2,000 帧，一个人 1–2 天）。补漏标、改框，要人定的框标成红色。没被标为待审核的轨迹也会错：样例 bag 里一个分数 0.50 的"骑行者"其实是三脚架（[LABELING_TUTORIAL.md](LABELING_TUTORIAL.md) 第 5 节）。训练集审的是关键帧，导回后用 `propagate` 传播到每一帧（第 15 节）。
+- **④a 按轨迹**（下面）：时间不够时训练集至少做这一级，处理待审核的轨迹；补不了漏标，也不能逐帧调框。
 
 ### ④a 按轨迹
 
@@ -167,10 +168,15 @@ python tools/dog/review_labels.py apply --labels data/labels/rec_001/labels.pkl 
 
 ```bash
 python tools/dog/export_dataset.py \
-    --recording data/runs/rec_001 data/labels/rec_001/labels_reviewed.pkl \
+    --recording data/runs/rec_001 data/labels/rec_001/labels_full.pkl \
     --recording data/runs/rec_002 data/labels/rec_002/labels_sustech.pkl \
-    --val-recordings rec_002 --out data/dog --gt-db
+    --val-recordings rec_002 --out data/dog_v002 --gt-db
+ln -sfn dog_v002 data/dog       # 配置里写的是 data/dog；只检车辆的版本是 data/dog_veh
 ```
+
+- 每个录制用哪份标签：逐框审过的训练场景用 `labels_full.pkl`（每一帧），验证场景用 `labels_sustech.pkl`（只有审过的关键帧）；只按轨迹审的用 `labels_reviewed.pkl`。
+- **每一版数据集导出到新目录，再切软链接**，不要往正在用的目录里导、也不要先删它：训练只在开始时读一次 infos 和 GT 库索引，之后按文件名读点云；GT 库的文件按序号命名，新导出的同名文件会让还在跑的训练把别的车的点云贴到框里（服务器上的 T3D 就这样坏了一次）。`DogDataset` 在开始时把软链接解析成真实目录，切链接不影响已经在跑的训练和评估。旧目录等用它的任务都结束了再删。
+- 框里的点数在这里对着导出的那一帧数：一个点都没有的框不要，当前帧点数不够的作忽略框（第 14 节）。
 
 **忽略框**（`gt_ignore`）：没审核过的待审核轨迹（`--review-policy ignore`，默认；`drop` 丢掉，`keep` 当正样本）和审核时标了 `ignore` 的轨迹。训练时热图上照样画出它的高斯（于是周围不算负样本），但不给中心点和回归目标，所以网络在这里出不出框都不奖不罚；GT 采样库不收；评估时它既不算漏检，落在它上面的检测也不算误检（类似 KITTI 的 DontCare）。实现：`det3d/datasets/pipelines/preprocess.py`（`AssignLabel`）、`dog_perception/detection/evaluate.py`。
 
@@ -187,7 +193,19 @@ python tools/train.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir data/tra
 
 - 迁移：car ← car，truck ← truck（nuScenes task 1 的 truck 通道），bus ← bus（task 2 的 bus 通道），pedestrian ← pedestrian，cyclist ← bicycle；其余层原样。task 从 `--config` 读（默认 `configs/dog/dog_centerpoint_pp_xt32.py`，Voxel 的 head 布局相同），旧的 3 类配置传 `--config configs/dog/dog_centerpoint_pp_xt32_3cls.py`（vehicle ← car）。配置里 `load_from` 指向迁移后的权重。
 - 配置：5 个 task（car、truck、bus、行人、骑行者各一个），输出时 car / truck / bus 合并为 vehicle，见第 12 节；20 个 epoch，one-cycle 最大学习率 5e-4，GT 采样（car 2、truck 2、bus 2、人 4、骑行 4；GT 库里没有的类别跳过），±45° 旋转、±5% 缩放、±2° 俯仰/横滚增强；另有 30% 的帧把历史 4 帧按随机的速度误差（σ 0.5 m/s，最多 1.5 m/s）和角速度误差（σ 3°/s，最多 10°/s）挪动（`SweepPoseJitter`，`det3d/datasets/pipelines/dog_aug.py`）：线上用 INS 位姿拼帧，急刹、急转时历史帧会错开 0.2–0.6 m、几度，训练帧用的是修正后的位姿，这样网络见过这种重影。当前帧和标注框不动，所以标注仍然对。
-- 单卡（RTX 4090）直接运行；中断后用 `--resume_from <work_dir>/epoch_N.pth` 续训。多卡命令（`torch.distributed.launch`）在 torch 2.x 上没有验证过。没有 GPU 时同一条命令会在 CPU 上跑，只适合检查流程。
+- 单卡（RTX 4090）直接运行；中断后用 `--resume_from <work_dir>/epoch_N.pth` 续训。没有 GPU 时同一条命令会在 CPU 上跑，只适合检查流程。
+- **耗时**（0921，7,311 帧，20 个 epoch，单张 4090）：Voxel 约 1 小时 7 分，Pillar 约 49 分。数据读取已经加速（体素查找表复用、点的打乱用一次随机下标、worker 单线程且常驻、锁页内存），每步读数据的时间接近 0，GPU 利用率 90% 以上。换了机器或数据，先用 `python tools/dog/bench_dataloader.py <配置>` 看数据读取跟不跟得上（每批的时间要小于训练每步的时间）。
+- **多卡**（数据并行，每个模型 2 张卡）：
+
+  ```bash
+  CUDA_VISIBLE_DEVICES=0,1 NCCL_P2P_DISABLE=1 torchrun --nproc_per_node=2 --master_addr 127.0.0.1 --master_port 29511 \
+      tools/train.py configs/dog/dog_centerpoint_voxel_xt32_veh.py --autoscale-lr --work_dir data/train/<名字>
+  ```
+
+  - 每张卡 batch 4，合起来 8，每个 epoch 的步数减半；`--autoscale-lr` 按 batch 把最大学习率从 5e-4 放大到 1e-3。
+  - `NCCL_P2P_DISABLE=1`：4090 之间不能 P2P，有的驱动不关会卡住。同时跑两个多卡训练时，`--master_port` 要不同。
+  - 实测（T3D）：Voxel 47 分（单卡 1 小时 7 分），最后的 loss 和单卡一样。只快 1.4 倍：4090 之间的梯度同步走主机内存。
+  - 要和以前的单卡模型比较时用单卡：训练配方一样，差别才只来自数据。
 - 配置要点、日志怎么看、怎么选 epoch，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) 第 4 节。
 
 ## ⑦ 评估
@@ -207,6 +225,8 @@ python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir data
 ## ⑧ 部署到 Orin
 
 `tools/dog/export_pillar_onnx.py --checkpoint <权重> --out deploy/<名字> --check <一帧 .npy>` 导出两段 ONNX 并与 PyTorch 逐段校验，再在 Orin 上用 `trtexec --fp16` 建引擎，见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) 第 6 节和 DOG_PIPELINE.md 第 8 节。
+
+Voxel 模型没有 TensorRT 的现成导出：在 Orin 上先用 PyTorch + spconv 直接跑，实测延迟放得下再用（DOG_PIPELINE.md 8.2 路线 1）。Voxel 还是 Pillar，按验证集上的对比决定（SERVER_TASKS.md 的 T7）。
 
 ## ⑨ 迭代
 
@@ -236,16 +256,25 @@ SUSTechPOINTS 的源码放在仓库里（`third_party/SUSTechPOINTS`，上游 20
 ```bash
 pip install cherrypy jinja2     # 只有它自带的自动标注按钮需要 TensorFlow
 
-# 导出：标签 + 点云 -> third_party/SUSTechPOINTS/data/rec_001。--every 5 = 10 Hz 里取 2 Hz
-python tools/dog/sustechpoints_convert.py export --labels data/labels/rec_001/labels_reviewed.pkl \
-    --frames data/runs/rec_001/frames --scene rec_001 --every 5
+# 导出：标签 + 点云 -> third_party/SUSTechPOINTS/data/rec_001。--every 5 = 10 Hz 里取 2 Hz；
+# --split train / val 让场景列表分组；只审车加 --vehicles-only
+python tools/dog/sustechpoints_convert.py export --labels data/labels/rec_001/labels.pkl \
+    --frames data/runs/rec_001/frames --scene rec_001 --every 5 --split train
 
 # 启动标注工具，浏览器打开 http://127.0.0.1:8081
 python tools/dog/sustechpoints_convert.py serve
 #   等价于上游的 cd third_party/SUSTechPOINTS && python main.py（监听所有网卡）；serve 可用 --host / --port
 
-# 标完导回来，得到和 labels.pkl 一样格式的文件，直接给 export_dataset.py
-python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labels/rec_001/labels_sustech.pkl
+# 标完导回来，得到和 labels.pkl 一样格式的文件（--frames 给框数点）
+python tools/dog/sustechpoints_convert.py import --scene rec_001 --frames data/runs/rec_001/frames \
+    --out data/labels/rec_001/labels_sustech.pkl
+
+# 训练场景：关键帧的审核结果传播到每一帧（第 15 节），再给 export_dataset.py
+python tools/dog/sustechpoints_convert.py propagate --full data/labels/rec_001/labels.pkl \
+    --keyframes data/labels/rec_001/labels_sustech.pkl --out data/labels/rec_001/labels_full.pkl
+
+# 每个场景还剩多少帧、框、红框
+python tools/dog/sustechpoints_convert.py stats
 ```
 
 导出的场景在 `third_party/SUSTechPOINTS/data/` 下，被 .gitignore 忽略，不会提交到仓库（点云很大）。标好的结果以导回后的 `labels_sustech.pkl` 为准，另行保存。
@@ -256,13 +285,14 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
 - **点云**：默认导出 5 帧拼接（模型的输入），远处稀疏的物体更容易看清；运动物体会拖影，框要放在拖影最前端（当前帧）。`--current-sweep` 只导当前帧。强度除以 255。
 - **帧名**：时间戳的微秒数（16 位数字，按名字排序就是时间顺序）。`dog_meta.json` 保存每帧的时间戳、`T_world_det` 和自动标注的速度、分数，导入时要用，不要删。
 - **框**：position 为框中心，scale 为（长、宽、高），rotation.z 为航向；导入时忽略 rotation.x / y。
-- **类别**：车按子类导出为 Car / Truck / Bus（没有子类的车导出为 Car），行人为 Pedestrian，骑行者为 BicycleRider；待审核的轨迹 `obj_attr` 为 `review`，在工具里会显示出来。导入时按 `TYPE_TO_SUBCLASS` 映射：Car、Van、PoliceCar、TourCar 为 car；Truck、ConcreteTruck 和工程机械（Excavator、ForkLift、Crane、RoadRoller、Bulldozer）为 truck（皮卡没有单独的类型，选 Truck，和 nuScenes 一致）；Bus、Tram、LongVehicle 为 bus（和 nuScenes 一样，工程车归 truck，挂车这类长车归 bus）；三者都是 vehicle。Pedestrian、RoadWorker、Child 为 pedestrian；BicycleRider、MotorcyleRider、ScooterRider 以及停着的 Bicycle、Motorcycle、Scooter 为 cyclist（和 nuScenes 的映射一致），三轮车 Trimotorcycle、FreightTricycle 也是 cyclist（小三轮车、代步车不算车辆，2026-10-21）。其他类型（Cone、TrafficBarrier 等）跳过并计数；`--type-map` 可以补充或改写。**标车的时候把类型选对**（Car / Truck / Bus），它决定训练哪个 head。
+- **类别**：车按子类导出为 Car / Truck / Bus（没有子类的车导出为 Car），行人为 Pedestrian，骑行者为 BicycleRider；待审核的轨迹 `obj_attr` 为 `review`，在工具里是红框（第 15 节）。导入时按 `TYPE_TO_SUBCLASS` 映射：Car、Van、PoliceCar、TourCar 为 car；Truck、ConcreteTruck 和工程机械（Excavator、ForkLift、Crane、RoadRoller、Bulldozer）为 truck（皮卡没有单独的类型，选 Truck，和 nuScenes 一致）；Bus、Tram、LongVehicle 为 bus（和 nuScenes 一样，工程车归 truck，挂车这类长车归 bus）；三者都是 vehicle。Pedestrian、RoadWorker、Child 为 pedestrian；BicycleRider、MotorcyleRider、ScooterRider 以及停着的 Bicycle、Motorcycle、Scooter 为 cyclist（和 nuScenes 的映射一致），三轮车 Trimotorcycle、FreightTricycle 也是 cyclist（小三轮车、代步车不算车辆，2026-10-21）。其他类型（Cone、TrafficBarrier 等）跳过并计数；`--type-map` 可以补充或改写。**标车的时候把类型选对**（Car / Truck / Bus），它决定训练哪个 head。
 - **轨迹号**：数字 `obj_id`（自动标注的轨迹）原样保留；工具里新建、不是数字的 ID 分配新号。
 - **速度**：框没被挪动（中心偏移 ≤ 5 cm）就保留自动标注的速度，静止物体的处理不受影响；挪动过或新加的框，用同一 `obj_id` 在世界系的中心差分（±0.5 s）重算，低于 0.2 m/s 置 0。所以要改一条轨迹的位置时，用批量模式把整条轨迹一起挪；只挪其中一帧，那几帧的速度会算出一个跳变。
 
 工具本身要注意的几点（详细操作见 [LABELING_TUTORIAL.md](LABELING_TUTORIAL.md) 第 5 节）：
 
-- **自动保存**：这一版默认打开自动保存（`config.js` 里 `autoSave = true`），每次修改约 0.5 s 后写回 `label/*.json`，Ctrl+S 也能手动存。它的中文 README 说"暂不支持自动保存"，已经过时。想放弃全部修改，重新 export 覆盖这个场景即可。
+- **自动保存**：这一版默认打开自动保存（`config.js` 里 `autoSave = true`），每次修改约 0.5 s 后写回 `label/*.json`，Ctrl+S 也能手动存。它的中文 README 说"暂不支持自动保存"，已经过时。
+- **重新导出不会冲掉审核**：导出时 `dog_meta.json` 记下每帧标注内容的摘要（`label_sha1`）。再导出同一个场景时，只要有一帧的标注内容变了，就拒绝覆盖（只按 Ctrl+S 重存、内容没变的不算）。先 import 存好审核结果；真要放弃全部修改，加 `--force`。
 - **新建框**（右键 → New → 类别，或 Ctrl + 拖框）：会从鼠标下的点自动生长、贴合，朝向由服务端 `/predict_rotation` 给出。没装 TensorFlow 时，仓库里的版本用点的主方向（PCA）代替，朝向可能差 180°，按 `g` 翻转；贴合时可能把旁边的东西也包进来（试验中一个骑行者的框高到了 3.1 m），要在侧视图里调。
 - 批量窗口里的 Auto / Auto (no rotation) 需要 TensorFlow 和它的模型文件（上游没有提供），没有时返回 503；Interpolate、Finalize 等不受影响。
 - 右键菜单打开时按 Esc 会触发它自己的一个脚本错误（不影响结果），点空白处关闭菜单即可。
@@ -397,12 +427,12 @@ python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labe
       --frames data/runs/$r/frames --results data/runs/$r/voxel/results.pkl
   ```
   表里只有车，要定的排在前面，带 `length_m`、`height_m`。每行：是车填 `ok`，不是车填 `drop`，看不清填 `ignore`（留空效果一样）。朝向反了加 `+flip`，停着的车加 `+static`。不用改 car / truck / bus，导出按尺寸分。
-- **逐框**（只做验证集）：`sustechpoints_convert.py export --vehicles-only ... --every 5`，补漏标的车、调框。导回的 `labels_sustech.pkl` 只有车；以后做行人、骑行者时，验证集要从 `labels.pkl` 重新导出逐框审核。
+- **逐框**：`sustechpoints_convert.py export --vehicles-only ... --every 5 --split train|val`，补漏标的车、调框。0921 最后是 35 个场景都逐框审了（第 15 节），按轨迹的表和 Foxglove 只在开始时用过。导回的 `labels_sustech.pkl` 只有车；以后做行人、骑行者时，要从 `labels.pkl` 重新导出逐框审核。
 - **规则（2026-10-21 定）**：小三轮车、老年代步车不算车辆，算骑行者，动作填 `cyclist`；单独停着的挂车厢算车辆（`ok`，按尺寸进 truck）。SUSTechPOINTS 里三轮车选 Trimotorcycle / FreightTricycle（导回为 cyclist），挂车厢选 Truck 或 LongVehicle。
 
 ### 训练和评估
 
-服务器上的步骤见 [SERVER_TASKS.md](SERVER_TASKS.md)：T2–T4 先用未审核的自动标注跑通一版（v0），H1 人工审核后 T5–T7 正式训练（v1），T8 导出 ONNX。要点：
+服务器上的步骤见 [SERVER_TASKS.md](SERVER_TASKS.md)：T1R–T3 先用未审核的自动标注跑通一版（v0）；H1 人工审核后，T5 导回并导出数据集，T6 训练 v1（同时跑 nuScenes 原始模型和 v0 的基线），T7 在审过的验证集上比较、决定部署 Voxel 还是 Pillar，T8 部署。要点：
 
 ```bash
 python tools/dog/convert_nusc_ckpt.py --src work_dirs/pretrained/nusc_voxel.pth --dst work_dirs/dog_voxel_veh_init.pth \
@@ -465,7 +495,7 @@ python tools/dog/review_labels.py confidence --vehicles-only --labels data/label
 | 0.6 | 131 / 5,115 | **142 / 6,534** | 158 / 7,774 |
 | 0.7 | 167 / 9,622 | 173 / 10,347 | 182 / 11,942 |
 
-放得更松（0.5 分、3 帧）还能再少一半，但要等抽查确认 (0.6, 5) 放过的都是真车再说。
+放得更松（0.5 分、3 帧）还能再少一半，但要等抽查确认 (0.6, 5) 放过的都是真车再说。0921 后来改成在 SUSTechPOINTS 里逐框审全部场景（H1），不是红框的也要扫一眼，(0.6, 5) 放过的轨迹也就都有人看过。
 
 另外两点，用来减少审核量：
 
@@ -527,7 +557,7 @@ python tools/dog/review_labels.py confidence --vehicles-only --labels data/label
   | 验证（10 个场景，2,884 帧） | 0.82 | 1.5% | 1 / 77 | 7 / 26 | 0.5 / 1.1 s |
   | 训练（25 个场景，7,479 帧） | 0.89 | 1.5% | 7 / 234 | 1 / 26 | 0.5 / 0.8 s |
 
-  - 验证集 27 个运动段（≥ 1 s）里 9 个中位速度不到 1 m/s，漏报的 7 段估计多在其中；T4 起工具会单独统计"相关的"运动段，并列出每个漏报段和每次误报，到时再定阈值。
+  - 验证集 27 个运动段（≥ 1 s）里 9 个中位速度不到 1 m/s，漏报的 7 段估计多在其中。`motion_eval.py` 现在单独统计"相关的"运动段，并用 `--details` 列出每个漏报段和每次误报；T7 在审核过的验证集上用部署的模型再评一次，再定阈值。
   - 放松到 0.5 m/s、2 帧：验证集漏报降到 1 段，但停着的车被报运动的轨迹从 1 条变成 10 条；收紧到 1.0 m/s、5 帧，误报几乎为 0，但漏报 14 段。0.7 / 3 是表里比较平衡的一档。
 
 
