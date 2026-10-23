@@ -255,3 +255,32 @@ def test_import_motion_attributes(tmp_path):
     ped = [o for f in out["frames"] for o in f["objects"] if o["label"] == "pedestrian"]
     assert all(not o["moving"] for o in car)               # recomputed from its boxes: they do not move
     assert all(np.all(o["velocity"] == 0) and not o["moving"] for o in ped) and counts["still marked review"] == 10
+
+
+def test_export_refuses_to_overwrite_a_reviewed_scene(tmp_path):
+    """A second export over a scene someone changed in SUSTechPOINTS would throw the review away: refused.
+    A save without changes (Ctrl+S re-writes every loaded frame, re-indented, 0.0 as 0) is not a change."""
+    import pytest
+    labels = _labels()
+    frames = _frames_dir(tmp_path, labels)
+    data = str(tmp_path / "data")
+    export_scene(labels, frames, data, "rec", every=2)
+    root = tmp_path / "data" / "rec"
+    names = sorted(os.listdir(root / "label"))
+
+    def js_save(nm, edit=None):
+        ann = json.load(open(root / "label" / nm))
+        for a in ann:
+            a["psr"]["rotation"]["x"] = 0                     # JavaScript prints 0.0 as 0
+        if edit:
+            edit(ann)
+        ann.sort(key=lambda a: -int(a["obj_id"]))
+        json.dump(ann, open(root / "label" / nm, "w"), indent=2, sort_keys=True)
+    for nm in names:
+        js_save(nm)
+    export_scene(labels, frames, data, "rec", every=2)          # nothing changed: exported again
+    js_save(names[1], lambda ann: ann[0]["psr"]["position"].update(x=ann[0]["psr"]["position"]["x"] + 0.4))
+    with pytest.raises(RuntimeError, match="1 frames"):
+        export_scene(labels, frames, data, "rec", every=2)
+    assert export_scene(labels, frames, data, "rec", every=5, overwrite=True) == 2
+    assert len(os.listdir(root / "label")) == 2 and len(os.listdir(root / "lidar")) == 2   # stale frames removed

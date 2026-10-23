@@ -35,6 +35,7 @@ dog_perception/autolabel.py); moved or new boxes get a velocity from their
 zero below ``static_speed``). The result has the ``labels.pkl`` layout of
 tools/dog/auto_label.py and goes straight into export_dataset.py.
 """
+import hashlib
 import json
 import os
 from collections import defaultdict
@@ -145,15 +146,60 @@ def needs_review(o, classes="coarse"):
     return train_label(track, classes)[1]
 
 
+def label_digest(anns):
+    """Content of one SUSTechPOINTS label file, independent of how it was written: SUSTechPOINTS saves
+    every loaded frame on Ctrl+S, re-indented, numbers as JavaScript prints them, objects sorted by id."""
+    def norm(v):
+        if isinstance(v, dict):
+            return {k: norm(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [norm(x) for x in v]
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return round(float(v), 5)
+        return v
+    items = sorted((norm(a) for a in anns or []), key=lambda a: str(a.get("obj_id")))
+    return hashlib.sha1(json.dumps(items, sort_keys=True).encode()).hexdigest()
+
+
+def edited_frames(root):
+    """Frames of an exported scene whose labels someone changed in SUSTechPOINTS since the export (content,
+    not file times: a save without changes does not count). Exports made before the digests were kept
+    count a label file written after dog_meta.json as changed."""
+    meta_path = os.path.join(root, META_FILE)
+    if not os.path.exists(meta_path):
+        return []
+    with open(meta_path) as fh:
+        meta = json.load(fh)
+    out = []
+    for fm in meta.get("frames", []):
+        path = os.path.join(root, "label", fm["name"] + ".json")
+        if not os.path.exists(path):
+            out.append(fm["name"])
+        elif "label_sha1" in fm:
+            with open(path) as fh:
+                if label_digest(json.load(fh)) != fm["label_sha1"]:
+                    out.append(fm["name"])
+        elif os.path.getmtime(path) > os.path.getmtime(meta_path):
+            out.append(fm["name"])
+    return out
+
+
 def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_end=None, current_sweep_only=False,
-                 split=None, classes="coarse"):
+                 split=None, classes="coarse", overwrite=False):
     """labels.pkl + run_sequence.py frames -> ``out_root/scene`` (point ``out_root`` at SUSTechPOINTS' data/).
 
     ``t_start`` / ``t_end``: seconds since the recording start. ``split`` (train / val / test) goes into
     the scene's desc.json, which the vendored SUSTechPOINTS uses to group its scene list. ``classes``: the
     training classes (``label_review.train_label``) that decide which boxes are marked ``review`` and
-    the ``train_as`` shown in the tool. Returns the number of frames written."""
+    the ``train_as`` shown in the tool. A scene whose labels were changed in SUSTechPOINTS since its
+    last export (``edited_frames``) is not written over unless ``overwrite``: that would throw the
+    review away. Returns the number of frames written."""
     root = os.path.join(out_root, scene)
+    edited = edited_frames(root)
+    if edited and not overwrite:
+        raise RuntimeError("%s: labels of %d frames were changed in SUSTechPOINTS since the export (%s ...); "
+                           "import them first, or overwrite=True / --force to throw them away"
+                           % (scene, len(edited), ", ".join(edited[:3])))
     os.makedirs(os.path.join(root, "lidar"), exist_ok=True)
     os.makedirs(os.path.join(root, "label"), exist_ok=True)
     os.makedirs(os.path.join(root, "dog_info"), exist_ok=True)
@@ -196,8 +242,14 @@ def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_e
             json.dump(objs, fh)
         with open(os.path.join(root, "dog_info", name + ".json"), "w") as fh:
             json.dump(info, fh)
-        meta_frames.append(dict(name=name, stamp=float(f["stamp"]),
+        meta_frames.append(dict(name=name, stamp=float(f["stamp"]), label_sha1=label_digest(objs),
                                 T_world_det=np.asarray(f["T_world_det"], float).tolist(), objects=exported))
+    # files of frames this export does not write (an earlier export with other frames) would still be listed
+    names = {fm["name"] for fm in meta_frames}
+    for sub, ext in (("lidar", ".pcd"), ("label", ".json"), ("dog_info", ".json")):
+        for fn in os.listdir(os.path.join(root, sub)):
+            if fn.endswith(ext) and fn[:-len(ext)] not in names:
+                os.remove(os.path.join(root, sub, fn))
     meta = dict(sequence=labels.get("sequence"), frames=meta_frames, class_to_type=CLASS_TO_TYPE,
                 current_sweep_only=bool(current_sweep_only), z_offset=-LIDAR_HEIGHT,
                 track_scores={str(k): float(np.mean(v)) for k, v in scores.items()})

@@ -78,6 +78,8 @@ def main():
     e.add_argument("--current-sweep", action="store_true",
                    help="only the current sweep (default: the accumulated sweeps the model sees; older sweeps are "
                         "drawn dimmer in the vendored tool)")
+    e.add_argument("--force", action="store_true",
+                   help="write over a scene whose labels were changed in SUSTechPOINTS (the review is lost)")
     e.add_argument("--split", choices=("train", "val", "test"), default=None,
                    help="written to the scene's desc.json: the tool lists validation and training scenes apart")
     i = sub.add_parser("import", help="SUSTechPOINTS scene -> labels.pkl")
@@ -139,7 +141,8 @@ def main():
             labels = dict(labels, frames=[dict(f, objects=[o for o in f["objects"] if o["label"] == "vehicle"])
                                           for f in labels["frames"]])
         n = export_scene(labels, args.frames, args.out, args.scene, args.every, args.start, args.end,
-                         args.current_sweep, split=args.split, classes="vehicle" if args.vehicles_only else "coarse")
+                         args.current_sweep, split=args.split, classes="vehicle" if args.vehicles_only else "coarse",
+                         overwrite=args.force)
         print("%d frames -> %s" % (n, os.path.join(args.out, args.scene)))
     else:
         tmap = dict(kv.split("=", 1) for kv in args.type_map)

@@ -19,7 +19,7 @@
 2. 只做交给你的那一个任务，按步骤顺序做。
    - 先检查"前置条件"，不满足就停下报告。
    - 遇到"停止条件"就停下报告，不要自己改代码、改配置或换参数绕过去。
-3. 不要删除或覆盖 `data/seq`、`data/runs`、`data/labels` 里已有的东西，除非步骤里写了。
+3. 不要删除或覆盖 `data/seq`、`data/runs`、`data/labels` 里已有的东西，除非步骤里写了。SUSTechPOINTS 的场景目录（公共盘的 `sustech/`）里是人的审核结果，任何时候都不要删除或用 `--force` 覆盖。
 4. 做完以后：
    - 把报告写进本文档该任务的"结果"小节（替换"（待填）"）；
    - 把状态表里这一行改成"完成"（或"停在第 N 步"）；
@@ -351,14 +351,14 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 ```text
 任务 T1S：把 35 个场景（训练 25 + 验证 10）都导出到 SUSTechPOINTS 给人逐框审核，覆盖 T1R 导出的验证场景。
 先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了 dog_perception/、tools/、third_party/SUSTechPOINTS/ 的改动，要跑快速测试）。
-前置：没有人在 SUSTechPOINTS 里改过标注（H1 还没开始）。下面的命令有输出就停下报告，不能覆盖：
-     for d in /public/zjst/robot/centerpoint_data/sustech/*/; do find $d/label -name "*.json" -newer $d/dog_meta.json; done | head
+前置：没有人在 SUSTechPOINTS 里改过标注（H1 还没开始）。导出自己会检查：某个场景的标注在 SUSTechPOINTS 里
+改过内容（只按 Ctrl+S 存过、内容没变的不算），就报错 "labels of N frames were changed in SUSTechPOINTS"。
+报这个错就停下报告，不要加 --force、不要删目录绕过去：那会把人审过的结果扔掉。
 
 1. 如果 SUSTechPOINTS（sustechpoints_convert.py serve）正在跑，停掉：代码改了，审核前要重新起。
 2. 导出，每 5 帧取 1 帧，只有车，带上训练 / 验证：
      mkdir -p data/reports/T1S
      awk -F, 'NR>1 && $2!="drop" {print $1, $2}' $SPLIT | while read r s; do
-       rm -rf /public/zjst/robot/centerpoint_data/sustech/$r
        python tools/dog/sustechpoints_convert.py export --vehicles-only --labels data/labels/$r/labels.pkl \
            --frames data/runs/$r/frames --scene $r --every 5 --split $s \
            --out /public/zjst/robot/centerpoint_data/sustech
@@ -380,6 +380,7 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 - 红框最多的 5 个训练场景：0921_165659_s028（171）、s016（92）、s027（78）、s026（76）、s018（64）。
 - `/public/zjst/robot/centerpoint_data/sustech` 是 9.0G，就是这 35 个场景。每个场景链回 `third_party/SUSTechPOINTS/data/<场景>`。
 - 导出前 `0921_164127_s000` 的 58 帧、`0921_164127_s003` 的 16 帧 json 比 `dog_meta.json` 新。按本次要求覆盖重导，网页上那些修改没有保留。
+- （2026-10-23 复核）按前置条件这里应该停下。SUSTechPOINTS 按一次 Ctrl+S 会把已加载的所有帧重写一遍，所以文件变新不一定是改过内容；但覆盖后已无法确认。之后的导出会按内容检查（`edited_frames`），改过内容的场景拒绝覆盖，并去掉了导出前的 `rm -rf`。
 - 三个场景有帧、没有车框：验证集 0921_164127_s005、0921_165659_s004，训练集 0921_165659_s013。
 - 快速测试：`pytest tests/dog -m "not slow" -n 8`，127 passed。旧的 `serve` 已停掉，导出后重新开在 `http://10.36.136.7:8081`。
 
