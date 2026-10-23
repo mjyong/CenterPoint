@@ -185,15 +185,18 @@ def edited_frames(root):
 
 
 def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_end=None, current_sweep_only=False,
-                 split=None, classes="coarse", overwrite=False):
+                 split=None, classes="coarse", overwrite=False, label_classes=None):
     """labels.pkl + run_sequence.py frames -> ``out_root/scene`` (point ``out_root`` at SUSTechPOINTS' data/).
 
     ``t_start`` / ``t_end``: seconds since the recording start. ``split`` (train / val / test) goes into
     the scene's desc.json, which the vendored SUSTechPOINTS uses to group its scene list. ``classes``: the
     training classes (``label_review.train_label``) that decide which boxes are marked ``review`` and
-    the ``train_as`` shown in the tool. A scene whose labels were changed in SUSTechPOINTS since its
-    last export (``edited_frames``) is not written over unless ``overwrite``: that would throw the
-    review away. Returns the number of frames written."""
+    the ``train_as`` shown in the tool. ``label_classes``: export only objects of these label classes
+    (default all); the meta records them, so the import and ``propagate_keyframes`` know the review
+    covered nothing else. A scene whose labels were changed in SUSTechPOINTS since its last export
+    (``edited_frames``) is not written over unless ``overwrite``: that would throw the review away.
+    Returns the number of frames written."""
+    label_classes = list(label_classes or CLASSES)
     root = os.path.join(out_root, scene)
     edited = edited_frames(root)
     if edited and not overwrite:
@@ -227,7 +230,7 @@ def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_e
                   pts[:, 4] if pts.shape[1] > 4 else None)
         objs, exported, info = [], {}, {}
         # points counted on the detector's input, as export_dataset.py does (all sweeps, also with current_sweep_only)
-        for o in annotate_points(f["objects"], cloud):
+        for o in annotate_points([o for o in f["objects"] if o["label"] in label_classes], cloud):
             box = np.asarray(o["box"], float).copy()
             box[2] -= LIDAR_HEIGHT
             otype = SUBCLASS_TO_TYPE.get(o.get("subclass")) or CLASS_TO_TYPE[o["label"]]
@@ -251,7 +254,7 @@ def export_scene(labels, frames_dir, out_root, scene, every=1, t_start=None, t_e
             if fn.endswith(ext) and fn[:-len(ext)] not in names:
                 os.remove(os.path.join(root, sub, fn))
     meta = dict(sequence=labels.get("sequence"), frames=meta_frames, class_to_type=CLASS_TO_TYPE,
-                current_sweep_only=bool(current_sweep_only), z_offset=-LIDAR_HEIGHT,
+                label_classes=label_classes, current_sweep_only=bool(current_sweep_only), z_offset=-LIDAR_HEIGHT,
                 track_scores={str(k): float(np.mean(v)) for k, v in scores.items()})
     with open(os.path.join(root, META_FILE), "w") as fh:
         json.dump(meta, fh, indent=1)
@@ -339,7 +342,8 @@ def import_scene(scene_dir, type_map=None, static_speed=0.2, velocity_window=0.5
                      reviewed=True,
                      interpolated=False, moving=bool(np.hypot(*o["velocity"]) > 0))
             del o["obj_id"]
-    labels = dict(sequence=meta.get("sequence"), frames=frames, source="sustechpoints:" + os.path.abspath(scene_dir))
+    labels = dict(sequence=meta.get("sequence"), frames=frames, source="sustechpoints:" + os.path.abspath(scene_dir),
+                  label_classes=meta.get("label_classes"))
     return labels, dict(counts)
 
 
@@ -370,11 +374,14 @@ def _link(a, b, link_dist):
     return pairs
 
 
-def propagate_keyframes(full, keyed, max_gap=1.0, link_dist=2.0):
+def propagate_keyframes(full, keyed, max_gap=1.0, link_dist=2.0, classes=None):
     """Labels at every frame from keyframes reviewed box by box (SUSTechPOINTS shows every n-th frame).
 
     ``full``: the scene's labels at every frame (labels.pkl, or labels_reviewed.pkl after the track review),
-    ``keyed``: ``import_scene`` of its reviewed keyframes. Returns (labels, counts):
+    ``keyed``: ``import_scene`` of its reviewed keyframes. ``classes``: the label classes the review
+    covered; default the export's ``label_classes``, or for an export older than that, the classes in the
+    keyframes. ``full`` objects of other classes nobody reviewed (a vehicles-only export) are copied as
+    they are. Returns (labels, counts), for the reviewed classes:
 
     * keyframes: the reviewed objects as they are;
     * a frame between two keyframes at most ``max_gap`` seconds apart:
@@ -393,6 +400,12 @@ def propagate_keyframes(full, keyed, max_gap=1.0, link_dist=2.0):
     if not keys:
         return dict(full, frames=[]), dict(counts)
     key_t = np.array([f["stamp"] for f in keys])
+    classes = set(classes or keyed.get("label_classes") or {o["label"] for f in keys for o in f["objects"]})
+
+    def others(f):
+        objs = [dict(o) for o in f["objects"] if o["label"] not in classes]
+        counts["other classes, copied as they are"] += len(objs)
+        return objs
     # boxes the reviewer added get ids above every track id of the full labels
     next_id = 1 + max([o["track_id"] for f in full["frames"] for o in f["objects"]] +
                       [o["track_id"] for f in keys for o in f["objects"]], default=0)
@@ -413,7 +426,7 @@ def propagate_keyframes(full, keyed, max_gap=1.0, link_dist=2.0):
         t = f["stamp"]
         k = int(np.searchsorted(key_t, t - 1e-4))
         if k < len(keys) and abs(key_t[k] - t) < 1e-4:
-            out.append(dict(f, objects=[dict(o) for o in keys[k]["objects"]]))
+            out.append(dict(f, objects=[dict(o) for o in keys[k]["objects"]] + others(f)))
             counts["keyframe boxes"] += len(keys[k]["objects"])
             continue
         if k == 0 or k == len(keys) or key_t[k] - key_t[k - 1] > max_gap + 1e-6:
@@ -440,7 +453,7 @@ def propagate_keyframes(full, keyed, max_gap=1.0, link_dist=2.0):
         auto_at_keys = full_at.get(round(k0["stamp"], 4), set()) | full_at.get(round(k1["stamp"], 4), set())
         for o in f["objects"]:
             tid = o["track_id"]
-            if tid in done:
+            if tid in done or o["label"] not in classes:
                 continue
             if tid in reviewed:
                 counts["ignore: reviewed at one end"] += 1
@@ -450,5 +463,5 @@ def propagate_keyframes(full, keyed, max_gap=1.0, link_dist=2.0):
             else:
                 counts["ignore: between keyframes only"] += 1
             objs.append(dict(o, ignore=True))
-        out.append(dict(f, objects=objs))
+        out.append(dict(f, objects=objs + others(f)))
     return dict(full, frames=out, source="propagated from keyframes: " + str(keyed.get("source"))), dict(counts)

@@ -583,3 +583,5 @@ python tools/dog/review_labels.py confidence --vehicles-only --labels data/label
 
 第一个关键帧之前、最后一个之后的几帧不要；相邻关键帧隔超过 1 s（中间有位姿不可靠的帧）时，中间的帧也不要。
 
+上面只管审核覆盖的类别。`export --vehicles-only` 只导出车，导出时把类别记进 `dog_meta.json`（`label_classes`）；propagate 只对车按上表处理，行人、骑行者原样照抄 `--full`（计数 `other classes, copied as they are`），不会算成"被审核删掉"。更早的导出没有这一项时，按关键帧里出现的类别算；也可以用 `--classes` 指定。
+

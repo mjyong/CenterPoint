@@ -202,11 +202,13 @@ def test_propagate_keyframe_review_to_every_frame(tmp_path):
                 dict(track_id=3, label="vehicle", box=det(20.0, 10.0, 1.0), velocity=np.zeros(2))]    # false
         if k in (2, 3):
             objs.append(dict(track_id=4, label="vehicle", box=det(30.0, -8.0, 0.0), velocity=np.zeros(2)))
+        objs.append(dict(track_id=5, label="pedestrian", box=det(8.0, 6.0, 0.0, (0.6, 0.6, 1.7)),  # not in the
+                         velocity=np.zeros(2)))                                                   # vehicle review
         for o in objs:
             o.update(score=0.6, review=False, interpolated=False, moving=o["track_id"] == 2)
         frames.append(dict(stamp=1000.0 + t, T_world_det=T, objects=objs))
     full = dict(sequence="test", frames=frames)
-    export_scene(full, _frames_dir(tmp_path, full), str(tmp_path / "data"), "rec", every=5)
+    export_scene(full, _frames_dir(tmp_path, full), str(tmp_path / "data"), "rec", every=5, label_classes=["vehicle"])
     root = tmp_path / "data" / "rec"
     T = {fm["name"]: np.array(fm["T_world_det"]) for fm in json.load(open(root / "dog_meta.json"))["frames"]}
     for n, nm in enumerate(sorted(os.listdir(root / "label"))):           # keyframes 0, 5, 10
@@ -233,11 +235,17 @@ def test_propagate_keyframe_review_to_every_frame(tmp_path):
     assert np.allclose(p2[:2], [6.0, -4.0], atol=1e-6) and np.isclose(np.hypot(*o2["velocity"]), 5.0, atol=0.2)
     assert all(world(f, 3)[0] is None for f in out["frames"])            # removed in review, removed everywhere
     assert world(f2, 4)[1]["ignore"] and world(out["frames"][3], 4)[1]["ignore"]   # nobody saw it
-    added = [o for o in f2["objects"] if o["track_id"] > 4]
+    added = [o for o in f2["objects"] if o["track_id"] > 5]
     assert len(added) == 1 and not added[0]["ignore"]
     pa = (f2["T_world_det"] @ np.r_[added[0]["box"][:3], 1])[:3]
     assert np.allclose(pa[:2], [0.0, 15.2], atol=1e-6)                     # linked by distance, interpolated
     assert counts["ignore: between keyframes only"] == 2 and counts["left out: removed by the reviewer"] == 8
+    # the pedestrian nobody reviewed: as it was on every frame, not removed by the reviewer
+    assert all([o for o in f["objects"] if o["label"] == "pedestrian"] == [frames[k]["objects"][-1]]
+               for k, f in enumerate(out["frames"]))
+    assert counts["other classes, copied as they are"] == 11
+    del keyed["label_classes"]                                            # an export older than label_classes:
+    assert propagate_keyframes(full, keyed)[1] == counts                  # the classes in the keyframes
 
 
 def test_import_motion_attributes(tmp_path):

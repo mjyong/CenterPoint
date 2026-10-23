@@ -35,6 +35,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+from dog_perception.detection.boxes import CLASSES  # noqa: E402
 from dog_perception.sustechpoints import export_scene, import_scene, propagate_keyframes  # noqa: E402
 from dog_perception.visibility import annotate_points  # noqa: E402
 
@@ -99,6 +100,9 @@ def main():
     g.add_argument("--keyframes", required=True, help="import of the reviewed keyframes (labels_sustech.pkl)")
     g.add_argument("--out", required=True)
     g.add_argument("--max-gap", type=float, default=1.0, help="[s] frames between keyframes further apart are left out")
+    g.add_argument("--classes", nargs="+", choices=CLASSES, default=None,
+                   help="label classes the review covered (default: the export's, e.g. vehicle for --vehicles-only); "
+                        "--full objects of other classes are copied as they are")
     st = sub.add_parser("stats", help="frames, boxes and boxes still marked review per scene")
     st.add_argument("--root", default=os.path.join(VENDORED, "data"), help="SUSTechPOINTS data/ directory")
     v = sub.add_parser("serve", help="start SUSTechPOINTS (works without TensorFlow)")
@@ -130,19 +134,16 @@ def main():
             full = pickle.load(f)
         with open(args.keyframes, "rb") as f:
             keyed = pickle.load(f)
-        labels, counts = propagate_keyframes(full, keyed, max_gap=args.max_gap)
+        labels, counts = propagate_keyframes(full, keyed, max_gap=args.max_gap, classes=args.classes)
         with open(args.out, "wb") as f:
             pickle.dump(labels, f)
         print("%d of %d frames, %s -> %s" % (len(labels["frames"]), len(full["frames"]), counts, args.out))
     elif args.cmd == "export":
         with open(args.labels, "rb") as f:
             labels = pickle.load(f)
-        if args.vehicles_only:
-            labels = dict(labels, frames=[dict(f, objects=[o for o in f["objects"] if o["label"] == "vehicle"])
-                                          for f in labels["frames"]])
         n = export_scene(labels, args.frames, args.out, args.scene, args.every, args.start, args.end,
                          args.current_sweep, split=args.split, classes="vehicle" if args.vehicles_only else "coarse",
-                         overwrite=args.force)
+                         overwrite=args.force, label_classes=["vehicle"] if args.vehicles_only else None)
         print("%d frames -> %s" % (n, os.path.join(args.out, args.scene)))
     else:
         tmap = dict(kv.split("=", 1) for kv in args.type_map)

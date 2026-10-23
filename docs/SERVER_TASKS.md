@@ -662,7 +662,8 @@ infos_val.pkl 约 580 帧；data/labels/<验证场景>/labels_sustech.pkl 存在
            --keyframes data/labels/$r/labels_sustech.pkl --out data/labels/$r/labels_full.pkl
      done 2>&1 | tee data/reports/T5/propagate.txt
    计数：keyframe boxes / interpolated boxes（两端都审过，插值）/ left out: removed by the reviewer（审核删掉的轨迹）/
-   ignore: reviewed at one end、ignore: between keyframes only（没人看过的，作忽略框）。
+   ignore: reviewed at one end、ignore: between keyframes only（没人看过的，作忽略框）/
+   other classes, copied as they are（行人、骑行者：只导出了车，没人审，原样照抄）。
 3. 导出：验证场景用 labels_sustech.pkl（只有关键帧），训练场景用 labels_full.pkl（每一帧）：
      REC=$(for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); do echo --recording data/runs/$r data/labels/$r/labels_sustech.pkl; done
            for r in $(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT); do echo --recording data/runs/$r data/labels/$r/labels_full.pkl; done)
@@ -690,6 +691,11 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
   - val 只有关键帧：car 950（+272 ignored），truck 1,132（+102 ignored）。T1R 的验证集是每一帧（2,874 帧，car 3,295 / truck 4,631），帧数不同，不直接比。
   - note：`few points in the current sweep (ignored)` 875；`no points in the input (left out)` 298；`teacher subclass disagrees with size (ignored)` 121（T1R 这一条是 4,237，人确认掉了大部分）。
   - GT 库：car 14,382、truck 4,078。`du -shL data/dog_veh` 47G。
+- （2026-10-23 复核）
+  - 结果对，能进 T6、T4。帧数和 T1S 一致；s024 低于 90% 是 55 帧 `pose_bad`，解释成立。训练集正样本变多、忽略框变少，主要来自人确认掉的红框（`teacher subclass disagrees` 4,237 → 121）。
+  - `left out: removed by the reviewer` 34,925 不是审核删了这么多车。`labels.pkl` 里还有行人、骑行者，SUSTechPOINTS 只导出了车，propagate 把关键帧上看不到的行人、骑行者轨迹都算成了"被审核删掉"。真正被删的车只有 144 个框。
+  - 车辆训练不受影响（导出时 `--classes vehicle` 本来就不要行人、骑行者），但 `labels_full.pkl` 丢了行人、骑行者，以后做三类模型时要用。已修：propagate 只处理审核覆盖的类别，其它类别原样照抄（计数 `other classes, copied as they are`）。
+  - 本地用仓库里的 `labels.pkl` / `labels_sustech.pkl` 重跑核对过：25 个场景的车辆标签逐框一致；`removed by the reviewer` 144，`other classes, copied as they are` 43,640，其余计数和上面一样。`data/dog_veh` 不用重新导出；T6 第 0 步在服务器上重跑 propagate。
 
 ---
 
@@ -699,7 +705,12 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 任务 T6：用 v1 数据集训练只检车辆的 Voxel 和 Pillar 模型 v1。
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T5 完成。
 
-和 T3 完全一样，只是名字换成 v1。T5 完成就可以开始，不用等 T4。T4 已经做完、并且双卡 v0 和单卡 v0 的车辆 AP@2.0
+0. 先重跑 T5 第 2 步的 propagate（25 个场景共几秒，覆盖 labels_full.pkl），输出写到 data/reports/T5/propagate_fix.txt。
+   修好后行人、骑行者原样照抄进来，车辆标签不变，data/dog_veh 不用重新导出。合计应为：
+   left out: removed by the reviewer 144，other classes, copied as they are 43,640，其余计数和"T5 结果"一样。
+   不一样就停下报告。提交 labels_full.pkl 和 propagate_fix.txt。
+
+然后和 T3 完全一样，只是名字换成 v1。T5 完成就可以开始，不用等 T4。T4 已经做完、并且双卡 v0 和单卡 v0 的车辆 AP@2.0
 相差不到 0.01 时，改用 T3D 的双卡命令
 （work_dir 换成 data/train/dog_{voxel,pp}_veh_v1，T7 里选 epoch 时照常）：
   work_dir data/train/dog_voxel_veh_v1、data/train/dog_pp_veh_v1，日志 data/train/dog_{voxel,pp}_veh_v1.log，
