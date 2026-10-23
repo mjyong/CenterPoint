@@ -831,6 +831,42 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
             break;
 
 
+        // CenterPoint dog pipeline (2026-10-23): a decision for the selected object in every loaded frame of the
+        // scene (all keyframes of an exported scene): drop "review" (no longer red), and add ignore / static /
+        // moving (tools/dog/sustechpoints_convert.py import reads them). Deleting it everywhere is cm-delete-obj.
+        case "cm-confirm-obj":
+        case "cm-ignore-obj":
+        case "cm-static-obj":
+        case "cm-moving-obj":
+            {
+                let op = event.currentTarget.id;
+                let decide = (attr)=>{
+                    let a = String(attr || "").split(",").map(x=>x.trim()).filter(x=>x && x != "review");
+                    if (op == "cm-ignore-obj") a.push("ignore");
+                    if (op == "cm-static-obj") a = a.filter(x=>x != "moving").concat(["static"]);
+                    if (op == "cm-moving-obj") a = a.filter(x=>x != "static").concat(["moving"]);
+                    return [...new Set(a)].join(",");
+                };
+                let trackId = this.selected_box.obj_track_id;
+                let scene = this.data.world.frameInfo.scene;
+                let n = 0;
+                this.data.worldList.forEach(w=>{
+                    if (w.frameInfo.scene != scene || !w.annotation.boxes)
+                        return;
+                    w.annotation.boxes.filter(b=>b.obj_track_id === trackId).forEach(b=>{
+                        b.obj_attr = decide(b.obj_attr);
+                        w.annotation.color_box(b);
+                        w.annotation.setModified();
+                        n++;
+                    });
+                });
+                this.floatLabelManager.set_object_attr(this.selected_box.obj_local_id, this.selected_box.obj_attr);
+                logger.log(`${op} ${trackId}: ${n} boxes`);
+                this.header.updateModifiedStatus();
+                this.render();
+            }
+            break;
+
         case "cm-delete-obj":
             {
                 //let saveList=[];
@@ -1270,6 +1306,9 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         if (this.selected_box){
             this.selected_box.obj_attr = value;
             this.floatLabelManager.set_object_attr(this.selected_box.obj_local_id, value);
+            // CenterPoint dog pipeline (2026-10-23): "review" boxes are red until the attribute is cleared
+            this.selected_box.world.annotation.color_box(this.selected_box);
+            this.render();
             this.data.world.annotation.setModified();
             this.header.updateModifiedStatus();
         }
@@ -1685,7 +1724,8 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
                     }
                 }
 
-                this.selected_box.material.color = new THREE.Color(parseInt("0x"+globalObjectCategory.get_obj_cfg_by_type(this.selected_box.obj_type).color.slice(1)));
+                // CenterPoint dog pipeline (2026-10-23): color_box keeps "review" boxes red
+                this.selected_box.world.annotation.color_box(this.selected_box);
                 this.selected_box.material.opacity = this.data.cfg.box_opacity;                
                 //this.floatLabelManager.unselect_box(this.selected_box.obj_local_id);
                 this.fastToolBox.hide();
@@ -2193,7 +2233,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
 
 
-    this.previous_frame= function(){
+    this.previous_frame= async function(){
 
 
 
@@ -2205,6 +2245,9 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         var frame_index = this.data.world.frameInfo.frame_index-1;
 
         if (frame_index < 0){
+            // CenterPoint dog pipeline (2026-10-23): go on to the previous scene's last frame
+            if (await this.load_neighbour_scene(-1))
+                return;
             console.log("first frame");
             this.infoBox.show("Notice", "This is the first frame");
             return;
@@ -2227,7 +2270,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         this.load_world(scene_meta.scene, scene_meta.frames[0]);
     };
 
-    this.next_frame= function(){    
+    this.next_frame= async function(){    
 
 
 
@@ -2241,12 +2284,35 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         var frame_index = (this.data.world.frameInfo.frame_index +1);
 
         if (frame_index >= num_frames){
+            // CenterPoint dog pipeline (2026-10-23): go on to the next scene's first frame
+            if (await this.load_neighbour_scene(1))
+                return;
             console.log("last frame");
             this.infoBox.show("Notice", "This is the last frame");
             return;
         }
 
         this.load_world(scene_meta.scene, scene_meta.frames[frame_index]);
+    };
+
+    // CenterPoint dog pipeline (2026-10-23): the scene after (step 1) or before (step -1) the current one in
+    // the scene selector's order (validation scenes, then training scenes, header.js), opened at its first
+    // (or, going back, last) frame. Returns false at the end of the list. Labels are saved as usual
+    // (autoSave), and the previous scene's frames are released when the new scene preloads (data.js).
+    this.load_neighbour_scene = async function(step){
+        if (!this.header || !this.data.world)
+            return false;
+        let order = this.header.sceneOrder();
+        let k = order.indexOf(this.data.world.frameInfo.scene);
+        for (k += step; k >= 0 && k < order.length; k += step){
+            let meta = this.data.getMetaBySceneName(order[k]) || await this.data.readSceneMetaData(order[k]);
+            if (meta && meta.frames && meta.frames.length > 0){
+                logger.log(`scene ${order[k]}`);
+                this.load_world(order[k], meta.frames[step > 0 ? 0 : meta.frames.length - 1]);
+                return true;
+            }
+        }
+        return false;
     };
 
     this.select_next_object= function(){

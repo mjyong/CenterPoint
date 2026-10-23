@@ -266,6 +266,7 @@ PCDLoader.prototype = {
 		var color = [];
 		var velocity = [];
 		var intensity = [];
+		var age = [];
 
 		// ascii
 
@@ -515,6 +516,12 @@ PCDLoader.prototype = {
 						intensity.push( dataview.getFloat32(row + offset.intensity, this.littleEndian));
 					}
 				}
+
+				// CenterPoint dog pipeline (2026-10-23): float field "t", the age of the point's sweep [s]
+				// (0 = current sweep), so the stacked older sweeps can be drawn dimmer (lidar.js)
+				if (offset.t !== undefined) {
+					age.push( dataview.getFloat32(row + offset.t, this.littleEndian));
+				}
 			}
 
 		}
@@ -525,6 +532,7 @@ PCDLoader.prototype = {
 			normal: normal,
 			velocity: velocity,
 			intensity: intensity,
+			age: age,
 		};
 		
 	}

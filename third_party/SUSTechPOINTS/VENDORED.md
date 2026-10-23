@@ -25,6 +25,12 @@ be changed together with the converter (`tools/dog/sustechpoints_convert.py`).
 | 2026-10-13 | `.gitignore` | `data/*` instead of `data`, so `data/README.md` is kept; exported scenes stay ignored |
 | 2026-10-13 | `data/README.md` | new: what goes into `data/` |
 | 2026-10-13 | `scene_reader.py` | only directories in `data/` are scenes (otherwise `data/README.md` shows up as one) |
+| 2026-10-23 | `scene_reader.py` | `read_annotations` attaches `data/<scene>/dog_info/<frame>.json` (auto-label score, speed, motion, points; written by our export) to each annotation as `dog`; it is shown, never saved back |
+| 2026-10-23 | `public/js/header.js` | scene list grouped by `desc.json` `split` (验证集 / 训练集 / 其它); box info bar shows the auto-label numbers |
+| 2026-10-23 | `public/js/annotation.js`, `public/js/editor.js` | boxes whose attribute contains `review` are red until it is cleared; boxes keep their `dog` info |
+| 2026-10-23 | `public/js/floatlabel.js`, `public/css/main.css` | labels show track score / frame score, 运动 (moving, speed) or 静止, 点少 (few points); `review` labels red; attribute choices review / ignore / static / moving |
+| 2026-10-23 | `public/js/editor.js` | next frame on a scene's last frame opens the next scene's first frame (previous frame: the previous scene's last), in the scene list's order |
+| 2026-10-23 | `public/js/lib/PCDLoader.js`, `public/js/lidar.js` | PCD field `t` (sweep age) is read; points of older sweeps are drawn at 30 % brightness |
 
 Mark further changes in this table and in the changed file (GPL-3.0 section 5a asks for a notice with
 the date).

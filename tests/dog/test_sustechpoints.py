@@ -53,7 +53,7 @@ def test_export_import_round_trip(tmp_path):
     labels = _labels()
     n = export_scene(labels, _frames_dir(tmp_path, labels), str(tmp_path / "data"), "rec")
     root = tmp_path / "data" / "rec"
-    assert n == 10 and sorted(os.listdir(root)) == ["dog_meta.json", "label", "lidar"]
+    assert n == 10 and sorted(os.listdir(root)) == ["dog_info", "dog_meta.json", "label", "lidar"]
     name = frame_name(labels["frames"][0]["stamp"])
     ann = json.load(open(root / "label" / (name + ".json")))
     assert [(a["obj_id"], a["obj_type"], a["obj_attr"]) for a in ann] == [("1", "Car", "review"),
@@ -65,11 +65,12 @@ def test_export_import_round_trip(tmp_path):
     assert np.allclose(pcd[:, 2], src[:, 2] - 1.8, atol=1e-5)
     assert np.isclose(ann[0]["psr"]["position"]["z"], labels["frames"][0]["objects"][0]["box"][2] - 1.8)
     out, counts = import_scene(str(root))
-    assert counts == {"vehicle": 10, "pedestrian": 10, "moved or new": 0}
+    assert counts == {"vehicle": 10, "pedestrian": 10, "moved or new": 0, "still marked review": 10}
     for fa, fb in zip(labels["frames"], out["frames"]):
         assert np.isclose(fa["stamp"], fb["stamp"]) and np.allclose(fa["T_world_det"], fb["T_world_det"])
         for a, b in zip(fa["objects"], fb["objects"]):
-            assert (a["track_id"], a["label"]) == (b["track_id"], b["label"]) and not b["review"]
+            assert (a["track_id"], a["label"]) == (b["track_id"], b["label"])
+            assert b["review"] == a["review"]           # the flagged car was never confirmed: still flagged
             assert b["subclass"] == ("car" if a["label"] == "vehicle" else a["label"])   # no subclass -> Car
             assert np.allclose(a["box"], b["box"]) and np.allclose(a["velocity"], b["velocity"])
             assert np.isclose(b["score"], a["score"])
@@ -141,3 +142,116 @@ def test_ignore_attribute_round_trip(tmp_path):
     flags = [(o["label"], o["ignore"]) for o in out["frames"][0]["objects"]]
     assert flags == [("vehicle", True), ("pedestrian", True)]
     assert not any(o["ignore"] for f in out["frames"][1:] for o in f["objects"] if o["label"] == "pedestrian")
+
+
+def test_export_for_review_display(tmp_path):
+    """What the vendored SUSTechPOINTS shows: the split (desc.json), per box the auto-label's score, speed,
+    motion and points (dog_info/, merged into the annotations by its scene_reader.py), boxes to check in
+    red (obj_attr review: a flagged track, or a teacher 'truck' the size of a car in the vehicle layout),
+    and the sweep age per point (PCD field t, older sweeps drawn dimmer)."""
+    import importlib.util
+    labels = _labels()
+    for k, f in enumerate(labels["frames"]):
+        f["objects"][0].update(review=False, subclass="truck", det_score=0.0 if k == 3 else 0.5, interpolated=k == 3)
+        f["objects"][1]["det_score"] = 0.8
+    frames = _frames_dir(tmp_path, labels)
+    export_scene(labels, frames, str(tmp_path / "data"), "rec", split="train", classes="vehicle")
+    root = tmp_path / "data" / "rec"
+    assert json.load(open(root / "desc.json")) == {"scene": "训练集", "split": "train"}
+    name = frame_name(labels["frames"][3]["stamp"])
+    ann = json.load(open(root / "label" / (name + ".json")))
+    assert [a["obj_attr"] for a in ann] == ["review", ""]               # a "truck" 4.5 m long: to check
+    info = json.load(open(root / "dog_info" / (name + ".json")))
+    # no point of the random cloud falls in the car's box: left out of training whatever the review says
+    assert info["1"]["train_as"] == "" and info["1"]["points_all"] == 0 and info["1"]["few_points"]
+    assert info["1"]["interpolated"] and info["1"]["det_score"] == 0.0
+    assert info["2"]["moving"] and abs(info["2"]["speed"] - 1.2) < 0.01 and info["2"]["det_score"] == 0.8
+    pcd = read_pcd(str(root / "lidar" / (name + ".pcd")), with_age=True)
+    assert pcd.shape == (100, 5) and np.allclose(np.unique(pcd[:, 4]), [0.0, 0.1])
+
+    spec = importlib.util.spec_from_file_location(
+        "scene_reader", os.path.join(os.path.dirname(__file__), "..", "..", "third_party", "SUSTechPOINTS",
+                                     "scene_reader.py"))
+    reader = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(reader)
+    reader.root_dir = str(tmp_path / "data")
+    served = reader.read_annotations("rec", name)
+    assert [a["dog"]["points_all"] for a in served] == [0, info["2"]["points_all"]]
+    assert reader.get_scene_desc("rec")["split"] == "train"
+    out, _ = import_scene(str(root))                                    # the extra files do not change the import
+    assert len(out["frames"]) == 10 and all("dog" not in o for f in out["frames"] for o in f["objects"])
+
+
+def test_propagate_keyframe_review_to_every_frame(tmp_path):
+    """Training scenes are reviewed box by box on every 5th frame; the frames between get the reviewed
+    boxes interpolated in the world frame, tracks the reviewer removed stay removed, and what nobody looked
+    at becomes an ignore box."""
+    from dog_perception.sustechpoints import propagate_keyframes
+
+    frames = []
+    for k in range(11):
+        t = 0.1 * k
+        T = make_T(rot_z(0.05 * k), [1.0 * t, 0.3 * t, 0])      # the robot walks and turns
+        Ti = np.linalg.inv(T)
+
+        def det(xw, yw, yaw_w, size=(4.5, 1.9, 1.6)):
+            return np.r_[(Ti @ [xw, yw, 0.8, 1])[:3], size, yaw_w - 0.05 * k]
+        objs = [dict(track_id=1, label="vehicle", box=det(12.0, 3.0, 0.3), velocity=np.zeros(2)),     # parked
+                dict(track_id=2, label="vehicle", box=det(5.0 + 5.0 * t, -4.0, 0.0),                  # 5 m/s
+                     velocity=(Ti[:3, :3] @ [5.0, 0, 0])[:2]),
+                dict(track_id=3, label="vehicle", box=det(20.0, 10.0, 1.0), velocity=np.zeros(2))]    # false
+        if k in (2, 3):
+            objs.append(dict(track_id=4, label="vehicle", box=det(30.0, -8.0, 0.0), velocity=np.zeros(2)))
+        for o in objs:
+            o.update(score=0.6, review=False, interpolated=False, moving=o["track_id"] == 2)
+        frames.append(dict(stamp=1000.0 + t, T_world_det=T, objects=objs))
+    full = dict(sequence="test", frames=frames)
+    export_scene(full, _frames_dir(tmp_path, full), str(tmp_path / "data"), "rec", every=5)
+    root = tmp_path / "data" / "rec"
+    T = {fm["name"]: np.array(fm["T_world_det"]) for fm in json.load(open(root / "dog_meta.json"))["frames"]}
+    for n, nm in enumerate(sorted(os.listdir(root / "label"))):           # keyframes 0, 5, 10
+        Ti = np.linalg.inv(T[nm[:-5]])
+        ann = [a for a in json.load(open(root / "label" / nm)) if a["obj_id"] != "3"]   # not a vehicle
+        shift = Ti[:3, :3] @ [0.0, 0.5, 0.0]                                 # parked car moved 0.5 m (world +y)
+        ann[0]["psr"]["position"]["x"] += shift[0]
+        ann[0]["psr"]["position"]["y"] += shift[1]
+        new = (Ti @ [0.0, 15.0 + 1.0 * 0.5 * n, -1.0, 1.0])[:3]             # a missed car, 2 m/s along +y,
+        ann.append({"obj_id": "new%d" % n, "obj_type": "Car",              # drawn anew in each keyframe
+                    "psr": box_to_psr([*new, 4.5, 1.9, 1.6, 1.57 - 0.25 * n])})
+        json.dump(ann, open(root / "label" / nm, "w"))
+    keyed, _ = import_scene(str(root))
+    out, counts = propagate_keyframes(full, keyed)
+
+    assert len(out["frames"]) == 11
+    def world(f, tid):
+        o = [o for o in f["objects"] if o["track_id"] == tid]
+        return (f["T_world_det"] @ np.r_[o[0]["box"][:3], 1])[:3] if o else None, (o[0] if o else None)
+    f2 = out["frames"][2]
+    p1, o1 = world(f2, 1)
+    assert np.allclose(p1[:2], [12.0, 3.5], atol=1e-6) and not o1["ignore"] and o1["interpolated"]
+    p2, o2 = world(f2, 2)
+    assert np.allclose(p2[:2], [6.0, -4.0], atol=1e-6) and np.isclose(np.hypot(*o2["velocity"]), 5.0, atol=0.2)
+    assert all(world(f, 3)[0] is None for f in out["frames"])            # removed in review, removed everywhere
+    assert world(f2, 4)[1]["ignore"] and world(out["frames"][3], 4)[1]["ignore"]   # nobody saw it
+    added = [o for o in f2["objects"] if o["track_id"] > 4]
+    assert len(added) == 1 and not added[0]["ignore"]
+    pa = (f2["T_world_det"] @ np.r_[added[0]["box"][:3], 1])[:3]
+    assert np.allclose(pa[:2], [0.0, 15.2], atol=1e-6)                     # linked by distance, interpolated
+    assert counts["ignore: between keyframes only"] == 2 and counts["left out: removed by the reviewer"] == 8
+
+
+def test_import_motion_attributes(tmp_path):
+    """static / moving set by the reviewer override the auto-label's motion of an unmoved box."""
+    labels = _labels()
+    export_scene(labels, _frames_dir(tmp_path, labels), str(tmp_path / "data"), "rec")
+    root = tmp_path / "data" / "rec"
+    for nm in os.listdir(root / "label"):
+        ann = json.load(open(root / "label" / nm))
+        ann[0]["obj_attr"] = "moving"                      # speed from its reviewed boxes, which stand still
+        ann[1]["obj_attr"] = "review,static"               # the walking pedestrian is said to stand
+        json.dump(ann, open(root / "label" / nm, "w"))
+    out, counts = import_scene(str(root))
+    car = [o for f in out["frames"] for o in f["objects"] if o["label"] == "vehicle"]
+    ped = [o for f in out["frames"] for o in f["objects"] if o["label"] == "pedestrian"]
+    assert all(not o["moving"] for o in car)               # recomputed from its boxes: they do not move
+    assert all(np.all(o["velocity"] == 0) and not o["moving"] for o in ped) and counts["still marked review"] == 10

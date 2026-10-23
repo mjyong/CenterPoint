@@ -51,9 +51,10 @@
 | T1 | 车辆审核材料 | Agent | T0 | 30 分钟 | 完成；标注规则变了，T1R 里重做 |
 | T2 | 导出 v0 数据集（未审核的自动标注） | Agent | T0 | 30 分钟 | 完成；T1R 里重做 |
 | T1R | 按新规则重做自动标注（遮挡点数、待审核、静止毛刺），重做 T1、T2，统计 | Agent | T0 | 40 分钟 | 完成 |
+| T1S | 训练集也导出到 SUSTechPOINTS 逐框审核（和验证集分组，带分数 / 速度 / 运动，红框待审） | Agent | T1R | 20 分钟 | 待做 |
 | T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T1R | 1.5–2 小时（数据读取已加速） | 完成一版（未做 T1R，Voxel 5.4 小时）；T1R 导出后重跑 |
 | T4 | 评估 v0 | Agent | T3 | 1 小时 | 待做 |
-| H1 | 人工审核车辆：先抽查新规则，再按轨迹（全部场景）+ 逐框（10 个验证场景） | 人 | T1R | 几个小时 | 待做 |
+| H1 | 人工审核车辆：35 个场景全在 SUSTechPOINTS 里逐框审（每 5 帧取 1 帧） | 人 | T1S | 1–2 天 | 待做 |
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 待做 |
 | T6 | 训练 v1 | Agent | T5 | 2–6 小时 | 待做 |
 | T7 | 评估 v1，选 epoch 和上报阈值 | Agent | T6 | 1 小时 | 待做 |
@@ -61,7 +62,7 @@
 | T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
 
-- T1R 之后，H1 和 T3–T4 可以同时进行：人审核（H1），v0 同时在训练。
+- T1R 之后，T1S 和 T3–T4 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练、评估。
 - 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
 - v0 只用未审核的自动标注，主要作用是把 GPU 训练流程跑通、得到一个基线，**不上线**。要上线的是 v1。
 
@@ -335,6 +336,50 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 
 ---
 
+## T1S 训练集也导出到 SUSTechPOINTS
+
+2026-10-23 起，训练集也逐框审核（每 5 帧取 1 帧），不再用 Foxglove 按轨迹审。SUSTechPOINTS 改了这些（`third_party/SUSTechPOINTS/VENDORED.md`）：
+- 场景列表分"验证集"、"训练集"两组；
+- 待审核的框是红框，标签是红字；
+- 每个框的标签下显示"轨迹平均分 / 这一帧的分数"（插值的帧显示"插值"）、运动（带速度）或静止、点少；
+- 点云仍是 5 帧叠加（0.4 s，和模型看到的一样），但旧的 4 帧画得暗，框按亮的当前帧点对齐；
+- 一个场景的最后一帧再按"下一帧"，直接进下一个场景的第一帧；
+- 右键菜单可以对整条轨迹（所有帧）一次做决定：确认、作忽略、静止、运动、删除。
+
+审核结果导回后，T5 把训练集关键帧的审核结果传播到每一帧（`sustechpoints_convert.py propagate`）。
+
+```text
+任务 T1S：把 35 个场景（训练 25 + 验证 10）都导出到 SUSTechPOINTS 给人逐框审核，覆盖 T1R 导出的验证场景。
+先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了 dog_perception/、tools/、third_party/SUSTechPOINTS/ 的改动，要跑快速测试）。
+前置：没有人在 SUSTechPOINTS 里改过标注（H1 还没开始）。下面的命令有输出就停下报告，不能覆盖：
+     for d in /public/zjst/robot/centerpoint_data/sustech/*/; do find $d/label -name "*.json" -newer $d/dog_meta.json; done | head
+
+1. 如果 SUSTechPOINTS（sustechpoints_convert.py serve）正在跑，停掉：代码改了，审核前要重新起。
+2. 导出，每 5 帧取 1 帧，只有车，带上训练 / 验证：
+     mkdir -p data/reports/T1S
+     awk -F, 'NR>1 && $2!="drop" {print $1, $2}' $SPLIT | while read r s; do
+       rm -rf /public/zjst/robot/centerpoint_data/sustech/$r
+       python tools/dog/sustechpoints_convert.py export --vehicles-only --labels data/labels/$r/labels.pkl \
+           --frames data/runs/$r/frames --scene $r --every 5 --split $s \
+           --out /public/zjst/robot/centerpoint_data/sustech
+       ln -sfn /public/zjst/robot/centerpoint_data/sustech/$r third_party/SUSTechPOINTS/data/$r
+     done 2>&1 | tee data/reports/T1S/export.txt
+3. 统计每个场景的帧数、框数、红框数（obj_attr 含 review）：
+     python tools/dog/sustechpoints_convert.py stats --root /public/zjst/robot/centerpoint_data/sustech \
+         | tee data/reports/T1S/stats.txt
+4. du -sh /public/zjst/robot/centerpoint_data/sustech
+
+停止条件：任何报错；某个场景导出 0 帧。
+提交：data/reports/T1S/、本文档。
+报告（写进"T1S 结果"）：训练、验证各多少场景、帧、框、红框（stats.txt 最后的 total 两行）；红框最多的 5 个训练场景；sustech 目录大小。
+```
+
+### T1S 结果
+
+（待填）
+
+---
+
 ## T3 训练 v0
 
 **数据读取加速（2026-10-23）。** 第一次 T3 每步约 3/4 的时间在等数据：Voxel 每步 0.66 s，其中读数据 0.48 s；GPU 自己只要 0.18 s。原因都在 CPU 上，不在磁盘上：
@@ -470,46 +515,37 @@ GPU 利用率；每个 epoch 迭代数；总耗时；显存；每 5 个 epoch �
 
 ## H1 人工审核车辆（人做）
 
-只审车：不用管行人、骑行者，也不用改 car / truck / bus。规则见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 13 节"审核只看车"，审核工具的用法见第 ④ 节和第 10 节。
+只审车：不用管行人、骑行者，也不用改 car / truck / bus（导出时按尺寸分）。全部在 SUSTechPOINTS 里做：35 个场景（训练 25、验证 10）每 5 帧取 1 帧，共约 2,000 帧（条数见 T1S 结果）。不再需要 Foxglove 的轨迹表。
 
-0. **先抽查新的待审核规则（约 20 分钟）**：
-   - `data/reports/T1R/review_spot_check.csv` 是新规则放过的 46 条车辆轨迹：平均分 < 0.5，但有 ≥ 5 帧 ≥ 0.6 分。
-   - 其中 38 条（5,253 个框）现在直接当正样本训练，排在表的前面，按框数从多到少。
-   - 后 8 条 `train_as = ignore`：因为"教师说 truck、尺寸却是小车"仍是忽略框，第 1 步会审到，这里不用看。
-   - 看前 20 条（覆盖这 38 条的大部分框），在对应场景的 review mcap 里看，`real_vehicle` 列填 `y` / `n`；
-   - 全是 `y`：规则可用，接着做第 1 步；
-   - 有 `n`：把 CSV 提交上来，先别往下审。我来提高分数或帧数，Agent 重跑 T1R 第 1、3、6、7 步，轨迹表会变。
-1. **按轨迹，只做训练集的 25 个场景**：
-   - 验证集不用按轨迹审：T5 导出验证集、T7 评估用的都是第 2 步逐框审核的结果（`labels_sustech.pkl`）。
-   - 在 Foxglove 里打开 `data/labels/<场景>/<场景>_review.mcap`，对照 `data/labels/<场景>/labels_tracks_vehicle.csv` 填 `action` 列；
-   - 只需处理 `train_as = ignore` 的行：训练集 109 条。
-   - **按 `frames` 从多到少审，不到 20 帧的不用审**：不到 20 帧的有 44 条，只有 433 个框；留空的仍是忽略框，不会被当成背景。这样要审的是 65 条（旧规则下是全部 35 个场景的 207 条）。
-   - `few_points` 列：这条轨迹有多少帧被挡住或太远。这些帧会自动作忽略框或不要，不用因为这些帧填 `ignore`。
-   - 先审**按尺寸算 truck**（`length_m` ≥ 5.5 或 `height_m` ≥ 2.5）的忽略行：
-     - T1R 后，训练集当正样本的 truck 有 25 条轨迹、3,652 个框（旧规则下 13 条、1,668 个）；
-     - 还忽略着 43 条、1,981 个框，其中 75% 在这 6 个场景（条数 / 框数）：0921_165659_s028（5 / 558）、s016（5 / 364）、s012（1 / 196）、s027（6 / 124）、s018（2 / 120）、s026（3 / 118）。
-   - 审完这 6 个场景、再加上验证集的逐框审核，就能先做 T5、T6。
-   - 其余 `action` 空着的行，导出时仍是忽略框；之后补审完，重跑 T5 就行。
-   - "教师说 truck、尺寸却是小车"的忽略行要特别看：长 2.5–3.1 m、高约 2.3 m、几乎不动，教师却连续 100 多帧给高分。这样的"truck"在验证集里有 4 条（0921_164127_s003 #22、s004 #4、0921_165659_s006 #2、0921_164127_s002 #10，在第 2 步逐框审核里处理），训练集里有 0921_165659_s001 #136。不是车就填 `drop`；是叉车之类的车辆就填 `ok`，按尺寸进 car head。先看清是什么，回头告诉我，同类东西以后可以定一条规则。
-   - 动作怎么填：
+**打开**：服务器上在仓库根目录运行 `python tools/dog/sustechpoints_convert.py serve`，浏览器打开 8081 端口。左上角选场景，列表分"验证集""训练集"两组；选第一帧，之后一直按 `PageDown`（或 `4`）往后翻。一个场景翻完，自动进入列表里的下一个场景；`PageUp`（或 `3`）往回翻。改动自动保存。
 
-     | 情况 | 填 |
-     |---|---|
-     | 是车 | `ok` |
-     | 不是车 | `drop` |
-     | 看不清 | `ignore` |
-     | 朝向反了 | 加 `+flip` |
-     | 停着的车，表里 `moving_share` 却不是 0 | 加 `+static`（狗遇到运动的车才停，静止判断要准） |
-     | 在动的车，表里 `moving_share` 是 0 | 写在 `note` 列（现在没有动作能把静止改成运动） |
-     | 小三轮车、老年代步车（算骑行者） | `cyclist` |
-     | 单独停着的挂车厢（算车辆） | `ok` |
+**看到的东西**：
+- 红框、红字：需要人定的目标：自动标注拿不准（平均分 < 0.5 且高分帧不到 5 帧），或者教师说是 truck、尺寸却是小车。
+- 标签第二行：`0.43/0.71` 是轨迹平均分 / 这一帧教师的分数（"插值"表示这一帧教师没检出，是补出来的）；然后是"运动 2.3m/s"（橙色）或"静止"（灰色）；"点少"表示框里当前帧不到 5 个点，训练时自动作忽略框。
+- 选中一个框，顶部信息栏还有：框里的点数（当前帧 / 5 帧）、不审核的话训练会把它当成什么（car / truck / ignore）。
+- **点云是 5 帧叠加的**（0.4 s，和模型看到的一样，远处、被挡住的车也能看出来）。旧的 4 帧画得暗，当前帧亮：运动的车会拖一条暗的尾巴，**框按亮的点对齐**，不要把尾巴框进去。
 
-   - 填好的 CSV 提交到仓库。
-2. **逐框（10 个验证场景）**：
-   - 在服务器上运行 `python tools/dog/sustechpoints_convert.py serve`，浏览器打开 8081 端口；
-   - 补漏标的车、调框。
-   - 标注结果存在服务器的 `third_party/SUSTechPOINTS/data/<场景>/`，T5 会导回。
-3. 做完把状态表的 H1 改成"完成"，注明审核人和日期。
+**红框怎么处理**（右键框，或标签上的"…"菜单，一次作用于这条轨迹的所有帧）：
+
+| 情况 | 操作 |
+|---|---|
+| 是车，框也对 | 确认：是车（所有帧，去掉 review） |
+| 不是车 | Delete this object (in all frames) |
+| 看不清 | 看不清：作忽略框（所有帧） |
+| 停着的车，标签却写"运动" | 静止的车（所有帧） |
+| 在动的车，标签却写"静止" | 运动的车（所有帧） |
+| 只是某一帧的框不对 | 在这一帧拖框调整；只删这一帧用 Delete |
+| 小三轮车、老年代步车 | 类型改成 Trimotorcycle（算骑行者，车辆模型不用） |
+| 单独停着的挂车厢 | 是车：确认，类型 Truck |
+
+- **不是红框的也扫一眼**：框歪了就调，不是车就删。
+- **漏标的车**补上：类型 Car 或 Truck；同一辆车在不同帧画的框，ID 不同也没关系，T5 会按位置把它们连起来。
+- **是车的红框一定要点"确认"**：导回时，还带 review 的框仍算拿不准，训练时作忽略框（不当车，也不当背景）。只是把框调对、不点确认，这辆车就白审了。
+- 特别注意长 2.5–3.1 m、高约 2.3 m、几乎不动、教师却连续给高分的"truck"：验证集有 4 条（0921_164127_s003 #22、s004 #4、0921_165659_s006 #2、0921_164127_s002 #10），训练集有 0921_165659_s001 #136。先看清是什么：不是车就删；是叉车之类的车辆就确认。回头告诉我是什么，同类东西以后可以定一条规则。
+
+**先审哪些**：先审验证集（T7 的结论靠它）；训练集先审 truck 尺寸的忽略轨迹最多的 6 个场景：0921_165659_s028、s016、s012、s027、s018、s026。这些审完就能先做 T5、T6，其余场景之后补审，再重跑 T5。
+
+做完把状态表的 H1 改成"完成"，注明审核人、日期、审完的场景。
 
 ### H1 结果
 
@@ -520,35 +556,41 @@ GPU 利用率；每个 epoch 迭代数；总耗时；显存；每 5 个 epoch �
 ## T5 应用审核结果，导出 v1 数据集
 
 ```text
-任务 T5：应用 H1 的车辆审核结果，重新导出只有车辆的数据集（v1），覆盖 data/dog_veh。
-先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：H1 完成（各场景的 labels_tracks_vehicle.csv 已提交 action 列；
-验证场景已在 SUSTechPOINTS 里标完）。
+任务 T5：导回 H1 在 SUSTechPOINTS 里的审核结果，训练场景把关键帧的结果传播到每一帧，重新导出只有车辆的数据集（v1），覆盖 data/dog_veh。
+先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：H1 完成（状态表里注明了审完的场景）。还没审的训练场景也照常走
+下面的步骤：没人动过的红框导回后仍作忽略框，其余的框当车，和直接用自动标注的效果一样。
 
-1. 按轨迹的审核：
+1. 35 个场景都导回（--frames 给框数点，评估时遮挡的框不计分）：
+     mkdir -p data/reports/T5
      for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do
-       python tools/dog/review_labels.py apply --labels data/labels/$r/labels.pkl \
-           --edits data/labels/$r/labels_tracks_vehicle.csv --out data/labels/$r/labels_reviewed.pkl
-     done 2>&1 | tee data/reports/T5/apply.txt
-2. 验证场景导回逐框审核的结果：
-     for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); do
+       echo "== $r"
        python tools/dog/sustechpoints_convert.py import --scene $r --frames data/runs/$r/frames \
            --out data/labels/$r/labels_sustech.pkl
      done 2>&1 | tee data/reports/T5/import.txt
-3. 导出（有 labels_sustech.pkl 用它，否则用 labels_reviewed.pkl）：
-     REC=$(for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do \
-           f=data/labels/$r/labels_sustech.pkl; [ -f $f ] || f=data/labels/$r/labels_reviewed.pkl; \
-           echo --recording data/runs/$r $f; done)
+   每行打印帧数和计数，其中 "still marked review" 是没点确认的红框（导出时作忽略框）。
+2. 训练场景：关键帧（每 5 帧 1 帧）的审核结果传播到每一帧：
+     for r in $(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT); do
+       echo "== $r"
+       python tools/dog/sustechpoints_convert.py propagate --full data/labels/$r/labels.pkl \
+           --keyframes data/labels/$r/labels_sustech.pkl --out data/labels/$r/labels_full.pkl
+     done 2>&1 | tee data/reports/T5/propagate.txt
+   计数：keyframe boxes / interpolated boxes（两端都审过，插值）/ left out: removed by the reviewer（审核删掉的轨迹）/
+   ignore: reviewed at one end、ignore: between keyframes only（没人看过的，作忽略框）。
+3. 导出：验证场景用 labels_sustech.pkl（只有关键帧），训练场景用 labels_full.pkl（每一帧）：
+     REC=$(for r in $(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); do echo --recording data/runs/$r data/labels/$r/labels_sustech.pkl; done
+           for r in $(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT); do echo --recording data/runs/$r data/labels/$r/labels_full.pkl; done)
      VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
      rm -rf data/dog_veh/*      # 清空链接指向的公共盘目录里的 v0 数据集；不要写成 rm -rf data/dog_veh（只删掉链接，
                                 # 新的数据集就会写到仓库盘上）
      python tools/dog/export_dataset.py $REC --val-recordings $VAL --classes vehicle \
          --out data/dog_veh --gt-db --jobs 8 2>&1 | tee data/reports/T5/export.txt
 
-验证集只有逐框审核过的帧（SUSTechPOINTS 每 5 帧取 1 帧，T1 导出了 580 帧），这是预期的。
-停止条件：apply 报未知动作；某个验证场景导回的帧数和 T1 导出的不一致；任何报错。
-提交：data/labels/0921_*/labels_reviewed.pkl、labels_sustech.pkl、data/reports/T5/、本文档。
-报告（写进"T5 结果"）：每个场景 apply 打印的那一行（汇总成表）；import 的类别计数；
-export 的各类正样本 / 忽略数，和 T2 对比（正样本应明显变多，忽略应明显变少）。
+验证集只有逐框审核过的帧（每 5 帧取 1 帧，约 580 帧），训练集是每一帧（约 7,300 帧，略少于 T1R：第一个关键帧之前、
+最后一个关键帧之后的几帧不要），这是预期的。
+停止条件：某个场景导回的帧数和 T1S 导出的不一致；某个训练场景 propagate 后留下的帧少于原来的 90%；任何报错。
+提交：data/labels/0921_*/labels_sustech.pkl、labels_full.pkl、data/reports/T5/、本文档。
+报告（写进"T5 结果"）：import 的类别计数和 still marked review 合计；propagate 各计数的合计；
+export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / truck 3,652，忽略 3,663 / 2,003）对比。
 ```
 
 ### T5 结果

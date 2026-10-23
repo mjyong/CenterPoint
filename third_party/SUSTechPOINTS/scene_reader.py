@@ -227,9 +227,29 @@ def read_annotations(scene, frame):
       with open(filename,"r") as f:
         ann=json.load(f)
         #print(ann)          
-        return ann
+        return add_dog_info(scene, frame, ann)
     else:
       return []
+
+
+def add_dog_info(scene, frame, ann):
+    """CenterPoint dog pipeline (2026-10-23): attach the auto-label's numbers for each object (track
+    score, this frame's teacher score, speed, moving, points in the box), written next to the labels as
+    data/<scene>/dog_info/<frame>.json by tools/dog/sustechpoints_convert.py export, as "dog" to the
+    annotations sent to the browser, for display (public/js/floatlabel.js, header.js). The browser saves
+    labels without it, so the label files stay as they were."""
+    filename = os.path.join(root_dir, scene, "dog_info", frame + ".json")
+    if not isinstance(ann, list) or not os.path.isfile(filename):
+      return ann
+    try:
+      with open(filename) as f:
+        info = json.load(f)
+    except (OSError, ValueError):
+      return ann
+    for a in ann:
+      if isinstance(a, dict) and str(a.get("obj_id")) in info:
+        a["dog"] = info[str(a.get("obj_id"))]
+    return ann
 
 def read_ego_pose(scene, frame):
     filename = os.path.join(root_dir, scene, "ego_pose", frame+".json")

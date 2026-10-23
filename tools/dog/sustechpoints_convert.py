@@ -2,9 +2,10 @@
 
 SUSTechPOINTS is vendored in third_party/SUSTechPOINTS (see its VENDORED.md); scenes go to its data/.
 
-    # export: labels + point clouds -> a SUSTechPOINTS scene (third_party/SUSTechPOINTS/data/rec_001)
+    # export: labels + point clouds -> a SUSTechPOINTS scene (third_party/SUSTechPOINTS/data/rec_001);
+    # --split train / val groups the scene list in the vendored tool
     python tools/dog/sustechpoints_convert.py export --labels data/labels/rec_001/labels_reviewed.pkl \
-        --frames work_dirs/rec_001/frames --scene rec_001 --every 5
+        --frames work_dirs/rec_001/frames --scene rec_001 --every 5 --split train
 
     # label in SUSTechPOINTS: open http://127.0.0.1:8081 (needs cherrypy + jinja2; TensorFlow only for its
     # auto-annotation button). Same as "cd third_party/SUSTechPOINTS && python main.py", with --host / --port.
@@ -13,8 +14,11 @@ SUSTechPOINTS is vendored in third_party/SUSTechPOINTS (see its VENDORED.md); sc
     # then import:
     python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labels/rec_001/labels_sustech.pkl
 
-    # the imported labels feed export_dataset.py like any labels.pkl
-    python tools/dog/export_dataset.py --recording work_dirs/rec_001 data/labels/rec_001/labels_sustech.pkl ...
+    # the imported labels feed export_dataset.py like any labels.pkl (keyframes only); for a training scene,
+    # first spread the reviewed keyframes over every frame:
+    python tools/dog/sustechpoints_convert.py propagate --full data/labels/rec_001/labels.pkl \
+        --keyframes data/labels/rec_001/labels_sustech.pkl --out data/labels/rec_001/labels_full.pkl
+    python tools/dog/export_dataset.py --recording work_dirs/rec_001 data/labels/rec_001/labels_full.pkl ...
 
 Frames and boxes are in the detection frame (gravity aligned, ground at z ~ 0). Types map back with
 dog_perception.sustechpoints.TYPE_TO_SUBCLASS (Car / Van -> car, Truck and construction machines ->
@@ -22,6 +26,7 @@ truck, Bus / Tram / LongVehicle -> bus; override with --type-map Trimotorcycle=c
 are recomputed from the annotated boxes. See docs/DOG_FINETUNE.md.
 """
 import argparse
+import json
 import os
 import pickle
 import sys
@@ -30,7 +35,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from dog_perception.sustechpoints import export_scene, import_scene  # noqa: E402
+from dog_perception.sustechpoints import export_scene, import_scene, propagate_keyframes  # noqa: E402
 from dog_perception.visibility import annotate_points  # noqa: E402
 
 VENDORED = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "third_party", "SUSTechPOINTS"))
@@ -71,7 +76,10 @@ def main():
     e.add_argument("--vehicles-only", action="store_true",
                    help="export only the vehicle labels (the imported labels then hold vehicles only)")
     e.add_argument("--current-sweep", action="store_true",
-                   help="only the current sweep (default: the accumulated sweeps the model sees)")
+                   help="only the current sweep (default: the accumulated sweeps the model sees; older sweeps are "
+                        "drawn dimmer in the vendored tool)")
+    e.add_argument("--split", choices=("train", "val", "test"), default=None,
+                   help="written to the scene's desc.json: the tool lists validation and training scenes apart")
     i = sub.add_parser("import", help="SUSTechPOINTS scene -> labels.pkl")
     src = i.add_mutually_exclusive_group(required=True)
     src.add_argument("--scene", help="scene name in third_party/SUSTechPOINTS/data")
@@ -84,6 +92,13 @@ def main():
     i.add_argument("--frames", default=None,
                    help="the scene's run_sequence.py frames: count the points in each box (occluded / far boxes "
                         "are then not scored by compare_detectors.py, as in export_dataset.py)")
+    g = sub.add_parser("propagate", help="keyframes reviewed in SUSTechPOINTS -> labels at every frame (training scenes)")
+    g.add_argument("--full", required=True, help="the scene's labels at every frame (labels.pkl or labels_reviewed.pkl)")
+    g.add_argument("--keyframes", required=True, help="import of the reviewed keyframes (labels_sustech.pkl)")
+    g.add_argument("--out", required=True)
+    g.add_argument("--max-gap", type=float, default=1.0, help="[s] frames between keyframes further apart are left out")
+    st = sub.add_parser("stats", help="frames, boxes and boxes still marked review per scene")
+    st.add_argument("--root", default=os.path.join(VENDORED, "data"), help="SUSTechPOINTS data/ directory")
     v = sub.add_parser("serve", help="start SUSTechPOINTS (works without TensorFlow)")
     v.add_argument("--app", default=VENDORED, help="SUSTechPOINTS checkout (default: the vendored copy)")
     v.add_argument("--host", default="127.0.0.1")
@@ -92,6 +107,31 @@ def main():
 
     if args.cmd == "serve":
         serve(args.app, args.host, args.port)
+    elif args.cmd == "stats":
+        totals = {}
+        print("scene split frames boxes review")
+        for name in sorted(os.listdir(args.root)):
+            d = os.path.join(args.root, name)
+            if not os.path.isdir(os.path.join(d, "label")):
+                continue
+            desc = os.path.join(d, "desc.json")
+            split = json.load(open(desc)).get("split", "") if os.path.exists(desc) else ""
+            labels = [json.load(open(os.path.join(d, "label", f))) or [] for f in sorted(os.listdir(os.path.join(d, "label")))]
+            n = [len(labels), sum(len(x) for x in labels),
+                 sum("review" in str(a.get("obj_attr") or "") for x in labels for a in x)]
+            print(name, split or "-", *n)
+            totals[split or "-"] = [a + b for a, b in zip(totals.get(split or "-", [0, 0, 0]), n)]
+        for split, n in sorted(totals.items()):
+            print("total %s: %d frames, %d boxes, %d marked review" % (split, *n))
+    elif args.cmd == "propagate":
+        with open(args.full, "rb") as f:
+            full = pickle.load(f)
+        with open(args.keyframes, "rb") as f:
+            keyed = pickle.load(f)
+        labels, counts = propagate_keyframes(full, keyed, max_gap=args.max_gap)
+        with open(args.out, "wb") as f:
+            pickle.dump(labels, f)
+        print("%d of %d frames, %s -> %s" % (len(labels["frames"]), len(full["frames"]), counts, args.out))
     elif args.cmd == "export":
         with open(args.labels, "rb") as f:
             labels = pickle.load(f)
@@ -99,7 +139,7 @@ def main():
             labels = dict(labels, frames=[dict(f, objects=[o for o in f["objects"] if o["label"] == "vehicle"])
                                           for f in labels["frames"]])
         n = export_scene(labels, args.frames, args.out, args.scene, args.every, args.start, args.end,
-                         args.current_sweep)
+                         args.current_sweep, split=args.split, classes="vehicle" if args.vehicles_only else "coarse")
         print("%d frames -> %s" % (n, os.path.join(args.out, args.scene)))
     else:
         tmap = dict(kv.split("=", 1) for kv in args.type_map)

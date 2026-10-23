@@ -573,6 +573,27 @@ dynamic set obj-type css has higher priority than this one.
 	padding-left: 5px;
 }
 
+/* CenterPoint dog pipeline (2026-10-23): auto-label score / speed / motion under a box label, and
+   red labels for boxes still to be checked (attribute "review"), see floatlabel.js */
+.label-dog-text {
+	padding-left: 5px;
+	white-space: nowrap;
+}
+.label-dog-moving {
+	color: #ff9900;
+	font-weight: bold;
+}
+.label-dog-static {
+	color: #aaaaaa;
+}
+.label-dog-few {
+	color: #66ccff;
+}
+.float-label.label-review {
+	color: #ff3333 !important;
+	font-weight: bold;
+}
+
 .label-out-view {
 	display: none;
 }

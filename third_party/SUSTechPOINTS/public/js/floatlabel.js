@@ -3,6 +3,26 @@
 import {psr_to_xyz} from "./util.js"
 import * as THREE from './lib/three.module.js';
 import { globalObjectCategory } from "./obj_cfg.js";
+// CenterPoint dog pipeline (2026-10-23): the auto-label's numbers under each box label, e.g.
+// "0.43/0.71 运动 2.3m/s": track mean score / this frame's teacher score ("插值" where the
+// track was interpolated), then 运动 (moving, orange) or 静止 (static, grey) with the speed;
+// "点少" when the box holds fewer than 5 current-sweep points (an ignore box in training).
+function dogInfoText(dog){
+    if (!dog)
+        return "";
+    let frame = dog.interpolated ? "插值" : (dog.det_score !== undefined ? Number(dog.det_score).toFixed(2) : "-");
+    let text = '<div class="label-dog-text">';
+    text += (dog.score !== undefined ? Number(dog.score).toFixed(2) : "-") + "/" + frame;
+    if (dog.moving)
+        text += ' <span class="label-dog-moving">运动 ' + Number(dog.speed || 0).toFixed(1) + 'm/s</span>';
+    else
+        text += ' <span class="label-dog-static">静止</span>';
+    if (dog.few_points)
+        text += ' <span class="label-dog-few">点少</span>';
+    text += '</div>';
+    return text;
+}
+
 class FastToolBox{
     constructor(ui, eventHandler)
     {
@@ -126,7 +146,10 @@ class FastToolBox{
     setAttrOptions(obj_type, obj_attr)
     {
        
-        let attrs = ["static"];
+        // CenterPoint dog pipeline (2026-10-23): one click toggles them (tools/dog/sustechpoints_convert.py import):
+        // review: still to check (red; click to clear), ignore: cannot tell (ignore box in training),
+        // static / moving: the vehicle stands still / moves, overriding the auto-label's motion
+        let attrs = ["review", "ignore", "static", "moving"];
 
 
         if (globalObjectCategory.obj_type_map[obj_type] && globalObjectCategory.obj_type_map[obj_type].attr)
@@ -479,6 +502,11 @@ class FloatLabelManager {
         {
             label.className = "float-label "+label.obj_type;
         }
+        // CenterPoint dog pipeline (2026-10-23): boxes to check (attribute "review") have red labels
+        if (label.obj_attr && String(label.obj_attr).includes("review"))
+        {
+            label.className += " label-review";
+        }
         
         label.orgClassName = label.className;
     }
@@ -508,10 +536,13 @@ class FloatLabelManager {
             label_text += '<div class="label-obj-id-text">';                
             label_text += this.obj_track_id;                
             label_text += '</div>';
+
+            label_text += dogInfoText(this.dog);
             
             this.innerHTML = label_text; 
         }
         
+        label.dog = box.dog;
         label.obj_type = box.obj_type;
         label.obj_local_id = box.obj_local_id;
         label.obj_track_id = box.obj_track_id;

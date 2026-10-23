@@ -477,6 +477,7 @@ function Annotation(sceneMeta, world, frameInfo){
                     old_box.rotation.set(nb.psr.rotation.x, nb.psr.rotation.y, nb.psr.rotation.z); 
                     old_box.obj_attr = nb.obj_attr;
                     old_box.annotator = nb.annotator;
+                    old_box.dog = nb.dog;
                     old_box.changed=false; // clear changed flag.
                     
                 }else{
@@ -541,6 +542,11 @@ function Annotation(sceneMeta, world, frameInfo){
 
         if (b.follows)
             mesh.follows = b.follows;
+
+        // CenterPoint dog pipeline (2026-10-23): the auto-label's score, speed and motion state, added by the
+        // server from data/<scene>/dog_info/<frame>.json (scene_reader.py); shown, never saved back
+        if (b.dog)
+            mesh.dog = b.dog;
         
         return mesh;  
     };
@@ -562,6 +568,15 @@ function Annotation(sceneMeta, world, frameInfo){
 
     this.color_box = function(box)
     {
+        // CenterPoint dog pipeline (2026-10-23): boxes still to be checked (attribute "review") are red,
+        // whatever the color scheme; clearing the attribute gives them their normal color back
+        if (box.obj_attr && String(box.obj_attr).includes("review"))
+        {
+            box.material.color.r=1.0;
+            box.material.color.g=0.1;
+            box.material.color.b=0.1;
+            return;
+        }
         if (this.data.cfg.color_obj == "category" || this.data.cfg.color_obj == "no")
         {
             let color = globalObjectCategory.get_color_by_category(box.obj_type);

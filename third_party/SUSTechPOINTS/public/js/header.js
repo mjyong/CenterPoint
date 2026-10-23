@@ -40,15 +40,35 @@ var Header=function(ui, data, cfg, onSceneChanged, onFrameChanged, onObjectSelec
 
     this.updateSceneList = function(sceneDescList){
         let scene_selector_str = "<option>--scene--</option>";
-        for (let scene in sceneDescList)
-        {
-            if (data.sceneDescList[scene])
-                scene_selector_str += "<option value="+scene +">"+scene + " - " +data.sceneDescList[scene].scene + "</option>";
-            else
-                scene_selector_str += "<option value="+scene +">"+scene+ "</option>";
-        }
+        // CenterPoint dog pipeline (2026-10-23): scenes exported with a split (desc.json "split", written by
+        // tools/dog/sustechpoints_convert.py export --split) are grouped: validation first, then training,
+        // then the rest. The order here is also the order "next frame" walks through scenes (editor.js).
+        let groups = [["val", "验证集 val"], ["train", "训练集 train"], ["", "其它"]];
+        let splitOf = (scene)=>{
+            let desc = sceneDescList[scene];
+            let split = desc && desc.split ? desc.split : "";
+            return groups.some(g=>g[0] == split) ? split : "";
+        };
+        groups.forEach(([split, title])=>{
+            let scenes = Object.keys(sceneDescList).filter(scene=>splitOf(scene) == split);
+            if (scenes.length == 0)
+                return;
+            scene_selector_str += '<optgroup label="' + title + ' (' + scenes.length + ')">';
+            scenes.forEach(scene=>{
+                let desc = sceneDescList[scene];
+                let text = scene + (desc && desc.scene ? " - " + desc.scene : "");
+                scene_selector_str += "<option value="+scene +">"+text+ "</option>";
+            });
+            scene_selector_str += "</optgroup>";
+        });
 
         this.ui.querySelector("#scene-selector").innerHTML = scene_selector_str;
+    }
+
+    // scene names in selector order (see updateSceneList)
+    this.sceneOrder = function(){
+        return Array.from(this.sceneSelectorUi.querySelectorAll("option"))
+                    .map(o=>o.value).filter(v=>v && v != "--scene--");
     }
     
     this.updateSceneList(this.data.sceneDescList);
@@ -94,6 +114,18 @@ var Header=function(ui, data, cfg, onSceneChanged, onFrameChanged, onObjectSelec
                                 (rotation.x*180/Math.PI).toFixed(2)+" "+(rotation.y*180/Math.PI).toFixed(2)+" "+(rotation.z*180/Math.PI).toFixed(2)+
                                 "</span> | <span title = 'points'>" +
                                 points_number + "</span> ";
+        // CenterPoint dog pipeline (2026-10-23): what the auto-label said about this box
+        if (box.dog){
+            let d = box.dog;
+            this.boxUi.innerHTML += "| <span title='auto-label: track mean score / this frame'>score " +
+                (d.score !== undefined ? Number(d.score).toFixed(2) : "-") + "/" +
+                (d.interpolated ? "插值" : (d.det_score !== undefined ? Number(d.det_score).toFixed(2) : "-")) +
+                "</span> | <span title='auto-label speed'>" + (d.moving ? "运动 " : "静止 ") +
+                Number(d.speed || 0).toFixed(2) + " m/s</span>" +
+                (d.points !== undefined ? " | <span title='points in the current sweep / all 5 sweeps'>pts " +
+                 d.points + "/" + d.points_all + "</span>" : "") +
+                (d.train_as ? " | <span title='what training makes of it without review'>" + d.train_as + "</span>" : "");
+        }
         if (box.follows){
             this.boxUi.innerHTML += "| F:"+box.follows.obj_track_id;
         }

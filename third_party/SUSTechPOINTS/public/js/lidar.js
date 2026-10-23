@@ -7,6 +7,28 @@ import {globalObjectCategory} from './obj_cfg.js';
 
 import {settings} from "./settings.js"
 
+// CenterPoint dog pipeline (2026-10-23): our frames stack 5 sweeps (0.4 s), what the detector sees.
+// Points of the older sweeps (PCD field "t" > 0, see PCDLoader.js) are drawn at this fraction of their
+// color, so a moving vehicle's trail stays visible but the box is fitted to the bright current sweep.
+const OLD_SWEEP_SHADE = 0.3;
+
+function shadeOldSweeps(age, color, indices){
+    if (!age || age.length == 0)
+        return;
+    let shade = (i)=>{
+        if (age[i] > 0.05){
+            color[i*3] *= OLD_SWEEP_SHADE;
+            color[i*3+1] *= OLD_SWEEP_SHADE;
+            color[i*3+2] *= OLD_SWEEP_SHADE;
+        }
+    };
+    if (indices)
+        indices.forEach(shade);
+    else
+        for (let i = 0; i < age.length; i++)
+            shade(i);
+}
+
 function Lidar(sceneMeta, world, frameInfo){
     this.world = world;
     this.data = world.data;
@@ -21,6 +43,7 @@ function Lidar(sceneMeta, world, frameInfo){
         let color = [];
         let normal = [];
         let intensity = [];
+        let age = [];
         //3, 3, 3, 1
 
         for (let i = 0; i < pcd.position.length/3; i++){
@@ -44,11 +67,16 @@ function Lidar(sceneMeta, world, frameInfo){
                 if (pcd.intensity){
                     intensity.push(pcd.intensity[i]);
                 }
+
+                if (pcd.age && pcd.age.length > 0){
+                    age.push(pcd.age[i]);
+                }
             }
         }
 
         pcd.position = position;
         pcd.intensity = intensity;
+        pcd.age = age;
         pcd.color = color;
         pcd.normal = normal;
 
@@ -141,6 +169,8 @@ function Lidar(sceneMeta, world, frameInfo){
                             color[i*3+2] = 1 - intensity; 
                         }
                     }
+
+                    shadeOldSweeps(pcd.age, color);
 
                     // save color, in case color needs to be restored.
                     pcd.color = color;
@@ -328,6 +358,7 @@ function Lidar(sceneMeta, world, frameInfo){
                 color[i] = this.data.cfg.point_brightness;
             }
         }
+        shadeOldSweeps(this.pcd.age, color);
 
         // step 2 color objects
         this.color_objects();
@@ -1193,6 +1224,7 @@ function Lidar(sceneMeta, world, frameInfo){
                 color[i*3+2] = this.data.cfg.point_brightness; 
             });
         }
+        shadeOldSweeps(this.pcd.age, color, indices);
     };
 
 
@@ -1225,6 +1257,7 @@ function Lidar(sceneMeta, world, frameInfo){
                     color.array[i*3+1] = target_color.y;
                     color.array[i*3+2] = target_color.z;
             });
+            shadeOldSweeps(this.pcd.age, color.array, indices);
         }
         
     };
