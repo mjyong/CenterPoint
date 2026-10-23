@@ -22,6 +22,10 @@
    the others go on.
 5. ``<labels>/batch_summary.csv``: per scene the card, seconds, frames, frames left out (pose not
    trusted), boxes, tracks and tracks flagged for review.
+6. A new teacher on scenes already run once (``--replay-runs data/runs``): the saved detector inputs
+   of ``<replay-runs>/<scene>`` are replayed (``run_sequence.py --replay``) instead of preprocessing
+   the scans again, nothing is saved twice, and ``auto_label.py`` counts the points in those frames.
+   ``--no-predict`` skips the trajectory prediction, which auto-labelling does not read.
 """
 import argparse
 import csv
@@ -178,6 +182,9 @@ def main():
     ap.add_argument("--ckpt-voxel", default="work_dirs/pretrained/nusc_voxel.pth")
     ap.add_argument("--config-voxel", default=None)
     ap.add_argument("--no-tta", action="store_true")
+    ap.add_argument("--replay-runs", default=None,
+                    help="earlier runs with saved frames (<dir>/<scene>/frames): replay them instead of the scans")
+    ap.add_argument("--no-predict", action="store_true", help="run_sequence.py --no-predict")
     ap.add_argument("--gpus", default="auto", help="'auto' (free cards), a list like 0,2, or 'cpu'")
     ap.add_argument("--per-gpu", type=int, default=1, help="workers per card")
     ap.add_argument("--max-mem-mb", type=float, default=16000.0, help="auto: a card using more memory than this is busy")
@@ -243,8 +250,14 @@ def main():
         os.makedirs(out, exist_ok=True)
         card = slot.split("#")[0]
         env = dict(os.environ, PYTHONPATH=ROOT + os.pathsep + os.environ.get("PYTHONPATH", ""), **thread_env)
-        cmd = [sys.executable, os.path.join(ROOT, "tools/dog/run_sequence.py"), "--seq", scene, "--detectors", "voxel",
-               "--ckpt-voxel", args.ckpt_voxel, "--save-frames", "--out", out]
+        cmd = [sys.executable, os.path.join(ROOT, "tools/dog/run_sequence.py"), "--detectors", "voxel",
+               "--ckpt-voxel", args.ckpt_voxel, "--out", out]
+        if args.replay_runs:
+            cmd += ["--replay", os.path.join(args.replay_runs, name), "--seq-root", os.path.dirname(os.path.normpath(scene))]
+        else:
+            cmd += ["--seq", scene, "--save-frames"]
+        if args.no_predict:
+            cmd += ["--no-predict"]
         if args.config_voxel:
             cmd += ["--config-voxel", args.config_voxel]
         if not args.no_tta:
@@ -269,6 +282,8 @@ def main():
         env = dict(os.environ, PYTHONPATH=ROOT + os.pathsep + os.environ.get("PYTHONPATH", ""), **thread_env)
         cmd = [sys.executable, os.path.join(ROOT, "tools/dog/auto_label.py"),
                "--results", os.path.join(args.runs, name, "voxel", "results.pkl"), "--out", dst]
+        if args.replay_runs:
+            cmd += ["--frames", os.path.join(args.replay_runs, name, "frames")]
         with open(logf, "w") as fh:
             ok = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env).returncode == 0
         return ok, parse_label_line(open(logf).read())

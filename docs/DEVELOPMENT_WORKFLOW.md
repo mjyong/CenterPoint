@@ -229,6 +229,7 @@ python tools/dog/compare_detectors.py --labels data/labels/rec_val/labels_sustec
 - 每个模型每类一行：AP@0.5/1/2/4、ATE、ASE、AOE、AVE、mAP，以及 0–10 / 10–20 / 20–40 m 三段的 AP@2m。对狗来说近距离（0–10 m）最重要。
 - 每个模型一行：参与评估的帧数、mAP、网络耗时（中位数、p95）、预处理耗时、轨迹数、平均轨迹长度。轨迹数比真实物体多很多、平均长度很短，说明跟踪碎了。
 
+- 教师推理时存过模型输入帧（`--save-frames`）的录制，评估时用 `--replay data/runs/<rec>` 代替 `--seq`：直接重放存好的帧和位姿，不再读扫描、做预处理，所有模型拿到的输入完全一样；再加 `--no-predict`（不做轨迹预测），多段录制一条命令跑完（`--out "data/eval/<模型>/{scene}"`，`--jobs 4` 同时跑 4 段）。0921 上每帧从 0.48 s 降到约 0.25 s，再乘上并行。
 - 验证集有多段录制时，每段各跑一遍，然后一次对比：`--labels` 给出每段的标签，`--results` 里同一个名字重复多次（`v1=<第 1 段>/results.pkl v1=<第 2 段>/results.pkl ...`），按时间戳对上帧。
 - 只检车辆的模型加 `--classes vehicle`（只算车，nuScenes 模型的其它类不计）。
 - `--thresholds 0.1 0.15 ... 0.6`：每个阈值下的 precision / recall / F1（0–40 m、0–20 m），并建议上报阈值。

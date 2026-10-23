@@ -54,6 +54,12 @@
    本地约 1 分钟。完整测试（多 11 个用样例 bag 和训练的慢测试）只在任务里写了时才跑：去掉 `-m "not slow"`。
    每个测试进程最多用 4 个 CPU 线程（`tests/dog/conftest.py`，`DOG_TEST_THREADS` 可改）。之前 T0 跑了 29 分钟，
    多半是每个进程都开了和核数一样多的线程，在共享服务器上互相抢。
+8. 评估怎么跑得快（2026-10-23 起）。T7 的 45 分钟里，一半在 `run_sequence.py` 上：两个模型每帧 0.48 s，其中一大半是重新读原始扫描、做预处理（去畸变、拼帧）和轨迹预测，网络只占 35 ms；10 个场景还是一个一个跑的。
+   - 验证场景的模型输入帧教师推理时已经存了（`data/runs/<场景>/frames`），评估直接重放：`--replay data/runs/<场景>`，不读扫描、不做预处理，用那次的位姿。在样例 bag 上和现做预处理逐框一致。
+   - `--no-predict`：评估不看轨迹预测，跳过。
+   - 一条命令跑完所有场景，`--jobs N` 同时跑 N 个场景，`--out` 写成 `data/runs_xxx/{scene}`。每个进程装一份模型，两个模型一起约 4.5 GB 显存，N 按空闲显存和 CPU 核数定（一般 4）。
+   - `dist_test.py` 每个约 1.5 GB、1 分钟，3 个一起跑（`&` 后 `wait`）。
+   - 测延迟不能并行，也不要和别的任务挤同一张卡（T7 第 2b 步）。
 
 ## 状态
 
@@ -740,27 +746,25 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
    nvidia-smi --query-compute-apps=pid,used_memory --format=csv：记下两个训练进程各占多少显存。
 3. 基线，流水线级（CUDA_VISIBLE_DEVICES=<有 ≥ 4 GB 空闲的卡，训练那张也行>）：
      VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
-     for r in $VAL; do
-       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar --no-mcap \
-           --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --device cuda:0 --out data/runs_nusc_pp/$r
-       python tools/dog/run_sequence.py --seq data/seq/$r --detectors voxel --no-mcap \
-           --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth --device cuda:0 --out data/runs_nusc_voxel/$r
-     done 2>&1 | tee data/reports/T6/runs_nusc.txt
+     RUNS=$(for r in $VAL; do echo data/runs/$r; done)      # 重放存好的帧（通用约定 8）
+     { python tools/dog/run_sequence.py --replay $RUNS --detectors pillar --ckpt-pillar work_dirs/pretrained/nusc_pp.pth \
+           --no-predict --no-mcap --jobs 4 --device cuda:0 --out "data/runs_nusc_pp/{scene}"
+       python tools/dog/run_sequence.py --replay $RUNS --detectors voxel --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth \
+           --no-predict --no-mcap --jobs 4 --device cuda:0 --out "data/runs_nusc_voxel/{scene}"
+     } 2>&1 | tee data/reports/T6/runs_nusc.txt
 4. v0 的模型级评估（同一张卡），在新的验证集（infos_val，审核过的 580 帧）上，用来选 v0 的 epoch：
      REP=data/reports/T6
      ev() {  # ev <voxel|pp> <权重目录名> <epoch>
        python tools/dist_test.py configs/dog/dog_centerpoint_$1_xt32_veh.py --work_dir data/train/$2/eval_e$3 \
            --checkpoint data/train/$2/epoch_$3.pth 2>&1 | grep -E "Evaluation|time per frame" > $REP/dist_test_$2_e$3.txt
      }
-     for m in voxel pp; do for e in 10 15 20; do ev $m dog_${m}_veh_v0 $e; done; ev $m dog_${m}_veh_v0_oldlabels 20; done
+     for m in voxel pp; do for e in 10 15 20; do ev $m dog_${m}_veh_v0 $e & done; wait; ev $m dog_${m}_veh_v0_oldlabels 20; done
      ev voxel dog_voxel_veh_v0_2gpu 20
    选 epoch：每个模型取 "Evaluation merged/vehicle" 那行里 AP@2.0 最高的 epoch；和更晚的 epoch 相差 < 0.005 时
    取更晚的（学习率退火完，更稳）。记为 E_v0_voxel、E_v0_pp。然后：
-     for r in $VAL; do
-       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar,voxel --no-mcap \
-           --ckpt-pillar data/train/dog_pp_veh_v0/epoch_<E_v0_pp>.pth --ckpt-voxel data/train/dog_voxel_veh_v0/epoch_<E_v0_voxel>.pth \
-           --device cuda:0 --out data/runs_veh_v0/$r
-     done 2>&1 | tee data/reports/T6/runs_v0.txt
+     python tools/dog/run_sequence.py --replay $RUNS --detectors pillar,voxel \
+         --ckpt-pillar data/train/dog_pp_veh_v0/epoch_<E_v0_pp>.pth --ckpt-voxel data/train/dog_voxel_veh_v0/epoch_<E_v0_voxel>.pth \
+         --no-predict --no-mcap --jobs 4 --device cuda:0 --out "data/runs_veh_v0/{scene}" 2>&1 | tee data/reports/T6/runs_v0.txt
    data/runs_veh_v0 已经有东西的话，先改名成 data/runs_veh_v0_old，不要混在一起。
 5. 等训练结束，期间每 20 分钟看一次日志。
 
@@ -841,19 +845,17 @@ GPU：下面的步骤一次一个进程，每个约 3 GB，CUDA_VISIBLE_DEVICES 
        python tools/dist_test.py configs/dog/dog_centerpoint_$1_xt32_veh.py --work_dir data/train/$2/eval_e$3 \
            --checkpoint data/train/$2/epoch_$3.pth 2>&1 | grep -E "Evaluation|time per frame" > $REP/dist_test_$2_e$3.txt
      }
-     for m in voxel pp; do for e in 10 15 20; do ev $m dog_${m}_veh_v1 $e; done; done
+     for m in voxel pp; do for e in 10 15 20; do ev $m dog_${m}_veh_v1 $e & done; wait; done   # 3 个一起跑
    规则同 T6 第 4 步，记为 E_v1_voxel、E_v1_pp。
-2. v1 流水线级：
-     for r in $VAL; do
-       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar,voxel --no-mcap \
-           --ckpt-pillar data/train/dog_pp_veh_v1/epoch_<E_v1_pp>.pth --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth \
-           --device cuda:0 --out data/runs_veh_v1/$r
-     done 2>&1 | tee data/reports/T7/runs_v1.txt
+2. v1 流水线级（通用约定 8：重放存好的帧，4 个场景一起跑；以前一个一个跑、现做预处理要 22 分钟）：
+     python tools/dog/run_sequence.py --replay $(for r in $VAL; do echo data/runs/$r; done) --detectors pillar,voxel \
+         --ckpt-pillar data/train/dog_pp_veh_v1/epoch_<E_v1_pp>.pth --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth \
+         --no-predict --no-mcap --jobs 4 --device cuda:0 --out "data/runs_veh_v1/{scene}" 2>&1 | tee data/reports/T7/runs_v1.txt
 2b. 延迟（T6 的基线跑在和训练共用的卡上，耗时不能比）：找一张利用率 < 20% 的卡，v1 的两个模型在同一个场景上背靠背各跑一次：
-     S=data/seq/0921_164127_s001
-     { python tools/dog/run_sequence.py --seq $S --detectors pillar --no-mcap --device cuda:0 \
+     S=data/runs/0921_164127_s001
+     { python tools/dog/run_sequence.py --replay $S --detectors pillar --no-predict --no-mcap --device cuda:0 \
            --ckpt-pillar data/train/dog_pp_veh_v1/epoch_<E_v1_pp>.pth --out data/runs_latency/pillar 2>&1 | grep network
-       python tools/dog/run_sequence.py --seq $S --detectors voxel --no-mcap --device cuda:0 \
+       python tools/dog/run_sequence.py --replay $S --detectors voxel --no-predict --no-mcap --device cuda:0 \
            --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth --out data/runs_latency/voxel 2>&1 | grep network
      } | tee data/reports/T7/latency.txt
    记两个模型的网络耗时中位数，并记下当时 nvidia-smi 里这张卡的利用率。这是 4090 上的数，Orin 上要另测（H2），只看两个模型的比例。
@@ -885,7 +887,7 @@ GPU：下面的步骤一次一个进程，每个约 3 GB，CUDA_VISIBLE_DEVICES 
 6. 上报阈值：在选中模型的阈值表里取 "highest threshold with recall >= 0.90 within 20 m"；没有就取 best F1。
    写出这个阈值和现在代码里的 0.35 下的 precision / recall（0–20 m、0–40 m）。
 7. 给选中的模型在 0921_164127_s001（验证集里运动的车最多）出一个 Foxglove 文件，人眼看一看：
-     python tools/dog/run_sequence.py --seq data/seq/0921_164127_s001 --detectors <pillar|voxel> \
+     python tools/dog/run_sequence.py --replay data/runs/0921_164127_s001 --detectors <pillar|voxel> \
          --ckpt-<pillar|voxel> <选中的权重> --device cuda:0 --out data/runs_veh_v1_view/0921_164127_s001
    把生成的 mcap 复制到 data/examples/runs/0921_164127_s001_v1/ 提交（Git LFS）。
 
@@ -1016,6 +1018,28 @@ details 里 missed / false moving：v1_pp 3 / 11，v1_voxel 4 / 4，nusc_pp 3 / 
 
 Foxglove：`data/examples/runs/0921_164127_s001_v1/0921_164127_s001_pillar.mcap`（Pillar v1 第 20 个 epoch，288 帧）。
 
+（2026-10-23 复核）
+- **部署 Pillar v1：同意。** 按第 5 步的规则 Voxel 没有明显更好（近处还差 0.018），Pillar 网络快 2.9 倍。另外 Voxel v1 的运动状态有硬伤：运动帧召回只有 0.447（Pillar 0.788）。漏报的运动段里，位移速度对（2.6 m/s），速度头却读 0.0–0.7 m/s：5 m 外一辆 2.6 m/s 的车，速度头给 0.01。选中的是第 10 个 epoch，速度头可能还没学到运动的车。
+- **对现在线上的 nuScenes Pillar，v1 Pillar 实际用起来好得多**（两者都不是教师，这个比较是公平的）：
+  - 误检少很多：上报阈值 0.35 时，40 m 内误检 114 个对 695 个；整段确认的轨迹 134 条对 896 条（标注里约 107 条）；
+  - 停着的车被报运动：每小时 137 次对 237 次；相关的运动段一个没漏（0 / 6，nuScenes Pillar 漏 1 个）；
+  - 代价是远处召回低一些：同样阈值 0.35，40 m 内召回 0.722 对 0.825，20 m 内 0.867 对 0.923；
+  - 所以 mAP 低 0.036，20 m 内 AP@2.0 高 0.049，两个区间都跨 0。
+- **"原始 nuScenes Voxel 比所有微调模型都好"不能直接当结论。** 验证标签就是教师（nuScenes Voxel + TTA）的框，人审时只做了确认、删除、作忽略：验证集没有新画的框，框也几乎没挪。所以：
+  - 框的位置就是教师给的：AP@0.5 教师 0.832、原始 Voxel 0.742，微调模型 0.55–0.60；
+  - 教师漏掉的车不在标签里：别的模型检出它们反而算误检。
+  
+  原始 Voxel 就是教师去掉 TTA，和标签同源，分数天然偏高。非教师模型之间（v1 对 v0、Voxel 对 Pillar、v1 对 nuScenes Pillar）的比较受影响小。
+- **但差距不全是偏差**：微调模型在远处召回明显低。阈值 0.1 时 40 m 内最高召回 0.86–0.87，原始 Voxel 0.96；20 m 内都在 0.96 以上。可能是训练时远处点少的车作忽略框、正样本少。要回答"微调到底有没有比原始 Voxel 好"，得有不偏向教师的验证标签：
+  - 把各模型（v1、nuScenes Pillar）在验证关键帧上 ≥ 0.3 分、却和现有标签都对不上的框，作为红框候选导进 SUSTechPOINTS，人看是不是车（是就确认，不是就删）；
+  - 再按 AP@2 m / 4 m（对框的位置不敏感）重评。
+  
+  需要的话我来加这个工具。
+- **审核的作用**：Voxel 明确（mAP +0.052，100% 领先），Pillar 看不出来（+0.014，76%）。
+- **两个模型都在第 10 个 epoch 左右就够了**：Voxel 两轮都是第 10 个 epoch 最好；Pillar v1 第 10、20 个几乎一样（0.788 / 0.789）。下一轮训练可以先试 10 个 epoch，训练时间减半，再看验证集。
+- **上报阈值**：0.25 时 v1 Pillar 在 20 m 内召回 0.911，误检比现在线上的 nuScenes Pillar 在 0.35 时少三分之二（226 对 695）。建议部署 v1 Pillar 时车辆用 0.25。注意 `DEFAULT_SCORE_THRESHOLDS` 也是跟踪器新建轨迹的门槛，自动标注（教师）也在用；直接改它会改变下一轮的自动标注，最好做成部署时按模型设的参数。
+- **T7 慢**：45 分钟里约一半是流水线级重跑（两个模型 10 个场景 22 分钟，每帧 0.48 s 里大半是重读扫描、预处理和轨迹预测）。已加速（通用约定 8）：`run_sequence.py --replay` 重放存好的帧、`--no-predict`、`--jobs` 多场景并行，`dist_test` 3 个一起跑。T6、T7、T9 的命令都改成了新写法，预计流水线级从 22 分钟降到 5 分钟以内。
+
 ---
 
 ## T8 部署选中的模型
@@ -1061,15 +1085,15 @@ v1 Voxel 专门在这批数据上训过，当教师应该比 nuScenes 模型准�
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T7 完成，已知 E_v1_voxel。
 
 1. python tools/dog/batch_label.py --split $SPLIT --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth \
-       --runs data/runs_r2 --labels data/labels_r2
+       --runs data/runs_r2 --labels data/labels_r2 --replay-runs data/runs --no-predict
+   `--replay-runs data/runs`：重放第一轮存好的模型输入帧，不重新读扫描、不再存一份帧（省 36 GB）；自动标注也在这些帧上数点。
 2. 每个场景出一张车辆表，统计待定的轨迹数：
      for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do
        python tools/dog/review_labels.py table --classes vehicle --labels data/labels_r2/$r/labels.pkl \
            --out data/labels_r2/$r/labels_tracks_vehicle.csv
      done | tee data/reports/T9/tables.txt
 
-停止条件：任何报错；磁盘不足（第 1 步会再存一份模型输入帧，约 36 GB；和 data/runs 里的完全一样，
-做完可以删掉 data/runs_r2/*/frames）。
+停止条件：任何报错；磁盘不足。
 提交：data/reports/T9/、data/labels_r2/batch_summary.csv（复制到 data/reports/T9/）、本文档。
 报告（写进"T9 结果"）：batch_summary；和第一轮相比，车辆轨迹数、train_as=ignore 的条数（训练、验证分开）；耗时。
 ```
