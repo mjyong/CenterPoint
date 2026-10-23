@@ -1,0 +1,8 @@
+370 tracks, 35215 boxes; mean score < 0.50: 188 tracks, 12952 boxes
+still flagged (tracks / boxes) when a track with N detections >= S is sure:
+| S \ N | 3 | 5 | 10 |
+|---|---|---|---|
+| 0.50 | 82 / 1712 | 100 / 2775 | 121 / 4210 |
+| 0.60 | 131 / 5115 | 142 / 6534 | 158 / 7774 |
+| 0.70 | 167 / 9622 | 173 / 10347 | 182 / 11942 |
+46 tracks no longer flagged with (0.6, 5) -> data/reports/T1R/review_spot_check.csv (fill real_vehicle: y / n)
