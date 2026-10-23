@@ -7,6 +7,11 @@
 each score threshold (2 m match, 0-40 m and 0-20 m) and two candidate reporting thresholds: the
 best F1, and the highest threshold that still reaches ``--target-recall`` within 20 m.
 
+``--bootstrap 1000`` tells whether a difference between two models is more than the luck of the
+validation set: the recordings (one per labels file) are resampled with replacement, the same
+draw for every model, and mAP and AP@2.0 within 20 m are recomputed. Prints each model's 90%
+interval and, for every pair, the interval of the difference and how often the first model is ahead.
+
 Several recordings at once: pass all their label files and repeat a name for
 each of its results files (``voxel=rec_001/... voxel=rec_002/...``); frames
 are matched by stamp.
@@ -26,7 +31,8 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.detection.boxes import CLASSES  # noqa: E402
-from dog_perception.detection.evaluate import evaluate_detections, format_table, threshold_sweep  # noqa: E402
+from dog_perception.detection.evaluate import (bootstrap_ap, evaluate_detections, format_table,  # noqa: E402
+                                                threshold_sweep)
 from dog_perception.label_review import train_label  # noqa: E402
 
 
@@ -44,6 +50,9 @@ def main():
                     help="score thresholds for the precision / recall / F1 table")
     ap.add_argument("--target-recall", type=float, default=0.9,
                     help="recall within 20 m the suggested reporting threshold must keep")
+    ap.add_argument("--bootstrap", type=int, default=0, metavar="N",
+                    help="N resamples of the recordings: 90%% intervals of mAP, AP within 20 m and of the "
+                         "differences between models")
     args = ap.parse_args()
     classes = list(args.classes)
     # which labels are uncertain: the same rule as export_dataset.py (vehicle-only: also a teacher
@@ -51,16 +60,18 @@ def main():
     rule = "vehicle" if classes == ["vehicle"] else "coarse"
     sweeps = {}
 
-    gt_by_stamp = {}
-    for path in args.labels:
+    gt_by_stamp, rec_of = {}, {}
+    for k, path in enumerate(args.labels):
         with open(path, "rb") as f:
-            gt_by_stamp.update({round(fr["stamp"], 6): fr for fr in pickle.load(f)["frames"]})
+            frames = pickle.load(f)["frames"]
+        gt_by_stamp.update({round(fr["stamp"], 6): fr for fr in frames})
+        rec_of.update({round(fr["stamp"], 6): k for fr in frames})
     runs = {}
     for spec in args.results:
         name, path = spec.split("=", 1)
         runs.setdefault(name, []).append(path)
 
-    table, extra = {}, {}
+    table, extra, scored = {}, {}, {}
     for name, paths in runs.items():
         res, timed, ids = [], [], {}
         for k, path in enumerate(paths):
@@ -71,11 +82,12 @@ def main():
             for fr in r:
                 for t in fr["tracks"]:
                     ids[(k, t.track_id)] = ids.get((k, t.track_id), 0) + 1
-        preds, gts = [], []
+        preds, gts, recs = [], [], []
         for r in res:
             fr = gt_by_stamp.get(round(r["stamp"], 6))
             if fr is None or fr.get("pose_bad"):
                 continue
+            recs.append(rec_of[round(r["stamp"], 6)])
             d = r["detections"]
             # class indices into ``classes``; other classes are not scored
             lut = np.array([classes.index(c) if c in classes else -1 for c in CLASSES], dtype=np.int64)
@@ -94,6 +106,7 @@ def main():
                             # uncertain labels are not scored (export_dataset.py: ignore boxes)
                             ignore=np.array(ign, dtype=bool)))
         table[name] = evaluate_detections(preds, gts, classes)
+        scored[name] = (preds, gts, recs)
         if args.thresholds:
             sweeps[name] = {c: {rng: threshold_sweep(preds, gts, ci, sorted(args.thresholds), rng_bin=rng)
                                 for rng in ((0, 40), (0, 20))} for ci, c in enumerate(classes)}
@@ -131,6 +144,31 @@ def main():
                   "within 20 m: %s" % (best["threshold"], best["f1"], best["recall"], args.target_recall,
                                        "%.2f (precision %.3f)" % (ok[-1]["threshold"], ok[-1]["precision"])
                                        if ok else "none"))
+
+    if args.bootstrap:
+        names = list(scored)
+        for ci, c in enumerate(classes):
+            boot, full = bootstrap_ap(scored, ci, args.bootstrap)
+            key = [k for k in boot[names[0]] if k != "mAP"][0]
+            q = lambda x: "%.3f – %.3f" % tuple(np.nanpercentile(x, [5, 95]))   # noqa: E731
+            print()
+            print("%s: bootstrap over the %d recordings (%d resamples, 90%% intervals)"
+                  % (c, len(args.labels), args.bootstrap))
+            print("| model | mAP | interval | AP@2.0 0-20 m | interval |")
+            print("|---|---|---|---|---|")
+            for name in names:
+                print("| %s | %.3f | %s | %.3f | %s |" % (name, full[name]["mAP"], q(boot[name]["mAP"]),
+                                                       full[name][key], q(boot[name][key])))
+            print()
+            print("| A − B | ΔmAP | interval | A ahead | ΔAP@2.0 0-20 m | interval | A ahead |")
+            print("|---|---|---|---|---|---|---|")
+            for i, a in enumerate(names):
+                for b in names[i + 1:]:
+                    dm = boot[a]["mAP"] - boot[b]["mAP"]
+                    dn = boot[a][key] - boot[b][key]
+                    print("| %s − %s | %+.3f | %s | %.0f%% | %+.3f | %s | %.0f%% |" % (
+                        a, b, full[a]["mAP"] - full[b]["mAP"], q(dm), 100 * np.nanmean(dm > 0),
+                        full[a][key] - full[b][key], q(dn), 100 * np.nanmean(dn > 0)))
 
 
 if __name__ == "__main__":

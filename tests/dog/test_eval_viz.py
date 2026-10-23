@@ -87,6 +87,44 @@ def test_threshold_sweep():
     assert (near["n_gt"], near["tp"], near["fp"]) == (1, 1, 1)
 
 
+def _random_frames(rng, n, miss=0.2, jitter=0.6, fp=1):
+    """Ground truth within 40 m and a detector that misses some, jitters the rest and adds false positives."""
+    preds, gts = [], []
+    for _ in range(n):
+        k = rng.integers(1, 6)
+        xy = rng.uniform(-40, 40, (k, 2))
+        gts.append(dict(boxes=np.c_[xy, np.zeros(k), np.tile([4.0, 2, 1.5, 0], (k, 1))], labels=np.zeros(k, np.int64)))
+        keep = rng.random(k) > miss
+        pxy = np.r_[xy[keep] + rng.normal(0, jitter, (keep.sum(), 2)), rng.uniform(-40, 40, (fp, 2))]
+        m = len(pxy)
+        preds.append(dict(boxes=np.c_[pxy, np.zeros(m), np.tile([4.0, 2, 1.5, 0], (m, 1))],
+                          labels=np.zeros(m, np.int64), scores=rng.random(m)))
+    return preds, gts
+
+
+def test_bootstrap_over_recordings():
+    """AP from per-frame matches equals the global matching; the same model twice differs by nothing,
+    and a clearly better detector is ahead in (nearly) every resample."""
+    from dog_perception.detection.evaluate import ap_of_frames, bootstrap_ap, frame_matches
+    rng = np.random.default_rng(0)
+    preds, gts = _random_frames(rng, 60)
+    full = evaluate_detections(preds, gts, ["vehicle"])["vehicle"]
+    for thr in (0.5, 2.0):
+        assert ap_of_frames(frame_matches(preds, gts, 0, thr), np.arange(60)) == pytest.approx(full["AP@%.1f" % thr])
+    rec = np.repeat(np.arange(10), 6)                                    # 10 recordings of 6 frames
+    boot, val = bootstrap_ap({"a": (preds, gts, rec), "a2": (preds, gts, rec)}, 0, n=200)
+    assert val["a"]["mAP"] == pytest.approx(full["mAP"])
+    assert np.all(boot["a"]["mAP"] == boot["a2"]["mAP"]) and np.std(boot["a"]["mAP"]) > 0
+    # a better detector on the same ground truth
+    better = []
+    for p, g in zip(preds, gts):
+        k = len(g["labels"])
+        better.append(dict(boxes=g["boxes"] + np.c_[rng.normal(0, 0.1, (k, 2)), np.zeros((k, 5))],
+                           labels=g["labels"], scores=rng.uniform(0.5, 1, k)))
+    boot, val = bootstrap_ap({"a": (preds, gts, rec), "b": (better, gts, rec)}, 0, n=200)
+    assert val["b"]["mAP"] > val["a"]["mAP"] + 0.2 and np.mean(boot["b"]["mAP"] > boot["a"]["mAP"]) > 0.99
+
+
 # ---------------------------------------------------------------- synthetic nuScenes
 def _q_yaw(yaw):
     return [float(np.cos(yaw / 2)), 0.0, 0.0, float(np.sin(yaw / 2))]

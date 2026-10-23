@@ -32,7 +32,7 @@
 5. 选 GPU：`python tools/dog/batch_label.py --split $SPLIT --dry-run` 会打印每张卡的显存和占用。用空闲的卡，`CUDA_VISIBLE_DEVICES=<卡号>`。
 6. 大的输出写到 `/public/zjst/robot`（仓库盘只剩约 27 GB，T0）（和 `data/seq`、`data/runs` 同一块盘）。空闲空间用 `df -h /public/zjst/robot` 看，至少 80 GB。不要用 `df -h .`：那是仓库所在盘，后面的导出、训练权重、推理结果都不写到那里。第一次往下面这些目录写之前，先链过去（已经是这个链接就不用再做）：
    ```bash
-   for d in train deploy runs_veh_v0 runs_nusc_pp runs_veh_v1 runs_veh_v1_view runs_r2 labels_r2 seq_lever; do
+   for d in train deploy runs_veh_v0 runs_nusc_pp runs_nusc_voxel runs_veh_v1 runs_veh_v1_view runs_r2 labels_r2 seq_lever; do
      mkdir -p /public/zjst/robot/centerpoint_data/$d
      ln -sfn /public/zjst/robot/centerpoint_data/$d data/$d
    done
@@ -58,17 +58,17 @@
 | T1S | 训练集也导出到 SUSTechPOINTS 逐框审核（和验证集分组，带分数 / 速度 / 运动，红框待审） | Agent | T1R | 20 分钟 | 完成 |
 | T3 | 训练 v0：Voxel、Pillar 两张卡同时跑 | Agent | T1R | 1.5–2 小时（数据读取已加速） | 完成 |
 | T3D | 每个模型 2 张卡训练 v0（数据并行），和单卡比 | Agent | T3 | 40 分钟 | 完成；Pillar 那次训练中途数据集被 T5 重写，作废（见复核） |
-| T4 | 评估 v0（在 H1 审过的验证集上） | Agent | T5（有 T3D 的结果就一起评） | 1 小时 | 待做 |
+| T4 | 评估 v0 | — | — | — | 并入 T6（训练期间跑基线）和 T7（对比） |
 | H1 | 人工审核车辆：35 个场景全在 SUSTechPOINTS 里逐框审（每 5 帧取 1 帧） | 人 | T1S | 1–2 天 | 完成（junyongmou，2026-10-23） |
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 完成（2026-10-23 补审后重导） |
-| T6 | 训练 v1 | Agent | T5 | 约 1 小时（单卡）/ 40 分钟（双卡） | 待做 |
-| T7 | 评估 v1，选 epoch 和上报阈值 | Agent | T6 | 1 小时 | 待做 |
-| T8 | 导出 Pillar v1 的 ONNX 并校验 | Agent | T7 | 10 分钟 | 待做 |
+| T6 | 训练 v1（单卡，和 v0 同配方）；同时跑基线：nuScenes 原始模型、v0 | Agent | T5 | 约 1.2 小时 | 待做 |
+| T7 | 比较 7 个模型，选部署 Voxel 还是 Pillar、上报阈值 | Agent | T6 | 1 小时 | 待做 |
+| T8 | 部署：导出 Pillar v1 的 ONNX；选了 Voxel 时再打包 Voxel，人在 Orin 上测（H2） | Agent | T7 | 10 分钟 | 待做 |
 | T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
-- H1 完成后（2026-10-23）的顺序：T5 → T6（单卡就行，各约 1 小时）→ T7。T4 在 T5 之后（要用审过的验证集），和 T6 同时跑。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
+- H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
 - 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
 - v0 只用未审核的自动标注，主要作用是把 GPU 训练流程跑通、得到一个基线，**不上线**。要上线的是 v1。
 
@@ -420,7 +420,7 @@ GT 库各类条数）；data/dog_veh 大小；耗时。
 任务 T3：在两张空闲 GPU 上同时训练只检车辆的 Voxel 和 Pillar 模型 v0（20 个 epoch）。
 先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了 det3d/ 的改动，要跑快速测试）。前置：T1R 完成（data/dog_veh/infos_train.pkl 是 T1R 第 7 步导出的）。
 
-0. 保留第一次（T1R 之前的标注）训练的权重，T4 拿来对比；再测一下数据读取：
+0. 保留第一次（T1R 之前的标注）训练的权重，以后拿来对比；再测一下数据读取：
      [ -d data/train/dog_voxel_veh_v0 ] && mv data/train/dog_voxel_veh_v0 data/train/dog_voxel_veh_v0_oldlabels
      [ -d data/train/dog_pp_veh_v0 ] && mv data/train/dog_pp_veh_v0 data/train/dog_pp_veh_v0_oldlabels
      mkdir -p data/train data/reports/T3
@@ -490,12 +490,12 @@ T3 加速后，单卡训练已经是 Voxel 1 小时 7 分、Pillar 49 分，GPU 
 - **数据并行**：每张卡各拿一份完整的模型，各读 4 个不同的样本，各自算梯度；两张卡的梯度取平均后，两边做同一次更新。所以一步用了 8 个样本，每个 epoch 的步数减半（1868 → 934）。这就是"batch 翻倍"：每张卡上的 batch 没变，合起来的 batch 是 8。
 - **学习率**：20 个 epoch 看到的样本数不变，但参数只更新一半的次数，每次用的是 8 个样本的平均梯度（更平稳）。学习率不变的话，模型走的"路程"短了，可能欠训练。常用的做法是按 batch 线性放大学习率：`--autoscale-lr` 把最大学习率从 5e-4 提到 1e-3。
 - **不改学习率的另一条路**：每张卡 2 个样本，合起来还是 4，步数、学习率都和单卡一样。但每张卡上 BatchNorm 只有 2 个样本，统计量更不准，卡也吃不满，所以不用这个。
-- **结论要看评估**：T4 把双卡 v0 和单卡 v0 放在一起评。第 20 个 epoch 的车辆 AP 相差不到 0.01，T6 就用双卡；差得多，T6 仍用单卡（反正也只要 1 小时）。
+- **结论要看评估**：T6 第 4 步把双卡 v0 和单卡 v0 放在一起评（只评 Voxel，见 T3D 复核）。
 
 代码（2026-10-23）：`tools/train.py` 现在认 torchrun 设的 `LOCAL_RANK`（以前两个进程都跑到 0 号卡）；分布式时不再调用没安装的 apex（每张卡的 BatchNorm 各算各的，和单卡一样；配置里写 `sync_bn = True` 才跨卡同步）；梯度只由 DistributedDataParallel 平均一次。本地用 CPU（gloo）跑通了双进程训练。
 
 ```text
-任务 T3D：Voxel、Pillar 各用 2 张卡训练 v0（20 个 epoch），和 T3 的单卡 v0 比速度，T4 再比精度。
+任务 T3D：Voxel、Pillar 各用 2 张卡训练 v0（20 个 epoch），和 T3 的单卡 v0 比速度，之后再比精度。
 先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了 tools/train.py、det3d/ 的改动，要跑快速测试）。前置：T3 完成。
 
 1. 选 4 张空闲的卡（batch_label.py --dry-run），两个训练各用 2 张；只有 2 张空闲时先跑 Voxel，跑完再跑 Pillar：
@@ -548,80 +548,13 @@ T3 加速后，单卡训练已经是 Voxel 1 小时 7 分、Pillar 49 分，GPU 
     - 通用约定 3：训练、评估在读的数据集目录，不删、不往里导出；新数据集导到新目录再切链接；
     - 代码：`DogDataset` 开始时把 `data/dog_veh` 解析成真实目录，之后链接改指，不影响已经在跑的训练、评估（拉到这次代码后启动的才有）；
     - T5 第 3 步改成导到新目录再切链接，以后补审再重跑 T5 时用。
-  - **结论**：双卡能用、不掉精度（Voxel 为证），快 1.4 倍。T6 用单卡没问题；空闲卡够、又赶时间时再用双卡。Pillar 双卡不用重跑（同一套代码，Voxel 已经验证），T4 里也不评它。
+  - **结论**：双卡能用、不掉精度（Voxel 为证），快 1.4 倍。T6 用单卡没问题；空闲卡够、又赶时间时再用双卡。Pillar 双卡不用重跑（同一套代码，Voxel 已经验证），也不评它。
 
 ---
 
-## T4 评估 v0
+## T4 评估 v0（并入 T6、T7）
 
-**注意**：
-- 2026-10-23 起 T4 放到 T5 之后做：H1 审完了验证集，T5 把审过的验证集导进 `data/dog_veh/infos_val.pkl`（每 5 帧 1 帧），流水线级用 `labels_sustech.pkl`。在人审过的标签上评，才不偏向教师。
-- v0 用的是没审核的训练标注，这一步主要回答三个问题：
-  - 训练有没有跑坏、和教师差多少；
-  - 双卡和单卡训出来的一样不一样（T3D）；
-  - 新标注规则比旧规则好不好（`_oldlabels`）。
-
-```text
-任务 T4：在人工审核过的验证集上评估 v0。模型级（验证集 infos_val）和流水线级（验证场景整段跑）都做，并扫描上报阈值。
-先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T3、T5 完成（data/dog_veh 是 T5 导出的 v1 数据集，
-infos_val.pkl 约 580 帧；data/labels/<验证场景>/labels_sustech.pkl 存在）。
-
-0. 核对 T3D 复核的判断（只看时间，什么都不改）：
-     D=$(readlink -f data/dog_veh)
-     ls -l --time-style=full-iso $D/infos_train.pkl $D/dbinfos_train_5sweeps_withvelo.pkl
-     ls -l --time-style=full-iso $D/gt_database_5sweeps_withvelo/car | sed -n 2,3p
-   把这几个时间写进报告：落在 14:34–15:12（Pillar 双卡训练的时间）之间，就印证了复核的判断。
-1. 模型级，第 10、15、20 个 epoch。另外把这两组的 epoch_20 也各评一次（work_dir 用 <权重目录>/eval_e20）：
-   - data/train/dog_*_veh_v0_oldlabels：看标注规则改动的影响；
-   - data/train/dog_voxel_veh_v0_2gpu：和单卡 v0 比，看双卡训练掉不掉精度。Pillar 双卡不评：
-     那次训练中途数据集被 T5 重写（见 T3D 复核）。
-     mkdir -p data/reports/T4
-     for e in 10 15 20; do for m in voxel pp; do
-       python tools/dist_test.py configs/dog/dog_centerpoint_${m}_xt32_veh.py --work_dir data/train/dog_${m}_veh_v0/eval_e$e \
-           --checkpoint data/train/dog_${m}_veh_v0/epoch_$e.pth 2>&1 | grep -E "Evaluation|time per frame" \
-           > data/reports/T4/dist_test_${m}_e$e.txt
-     done; done
-2. 流水线级：v0（第 20 个 epoch，不加 TTA）和 nuScenes Pillar（现在线上能用的基线）在 10 个验证场景上各跑一遍：
-     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
-     for r in $VAL; do
-       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar,voxel --no-mcap \
-           --ckpt-pillar data/train/dog_pp_veh_v0/epoch_20.pth --ckpt-voxel data/train/dog_voxel_veh_v0/epoch_20.pth \
-           --device cuda:0 --out data/runs_veh_v0/$r
-       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar --no-mcap \
-           --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --device cuda:0 --out data/runs_nusc_pp/$r
-     done
-   （CUDA_VISIBLE_DEVICES 设成一张空闲卡。）
-3. 对比和阈值扫描（教师 = 5.11 的 nuScenes Voxel + TTA），标签用审核过的验证标签：
-     python tools/dog/compare_detectors.py --classes vehicle --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech.pkl; done) \
-         --results $(for r in $VAL; do echo teacher=data/runs/$r/voxel/results.pkl nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl \
-                     v0_voxel=data/runs_veh_v0/$r/voxel/results.pkl v0_pp=data/runs_veh_v0/$r/pillar/results.pkl; done) \
-         --thresholds 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 | tee data/reports/T4/compare_val.md
-4. 在线运动状态。工具在 T1R 之后多了"相关的运动段"（中位速度 ≥ 1 m/s、中位距离 ≤ 30 m）和明细 CSV（每个漏报段、每次误报）。
-   标签用审核过的：训练场景 labels_full.pkl（每一帧），验证场景 labels_sustech.pkl（只有关键帧，跟踪器照样每帧都跑，只在关键帧上计分）：
-   - 教师检测，全部 35 个场景：
-     python tools/dog/motion_eval.py \
-         $(for r in $(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT); do echo --scene data/labels/$r/labels_full.pkl data/runs/$r/voxel/results.pkl; done) \
-         $(for r in $VAL; do echo --scene data/labels/$r/labels_sustech.pkl data/runs/$r/voxel/results.pkl; done) \
-         --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 --details data/reports/T4/motion_teacher_details.csv \
-         | tee data/reports/T4/motion_teacher.txt
-   - v0 Pillar 的检测（线上跑的就是 Pillar），验证集 10 个场景：
-     python tools/dog/motion_eval.py $(for r in $VAL; do echo --scene data/labels/$r/labels_sustech.pkl data/runs_veh_v0/$r/pillar/results.pkl; done) \
-         --on-speed 0.5 0.7 1.0 --on-frames 2 3 5 --details data/reports/T4/motion_v0_pp_details.csv \
-         | tee data/reports/T4/motion_v0_pp.txt
-
-停止条件：任何报错。
-提交：data/reports/T4/、本文档。
-报告（写进"T4 结果"）：
-- 每个模型每个 epoch 的 merged/vehicle 一行（mAP、AP@0.5/1/2/4、分距离段 AP、ATE、ASE、AOE），以及 car、truck 各一行；
-- compare_val.md 的两张表（AP 表、耗时表），以及每个模型的阈值表最后的推荐行；
-- 单卡 v0、双卡 v0（T3D）、旧标注 v0 的 epoch_20 并排：merged/vehicle 的 mAP、AP@2.0；双卡和单卡差多少；
-- motion_teacher.txt、motion_v0_pp.txt 的表；两个 details CSV 里 on_speed 0.70、on_frames 3 的行数（missed / false moving 各多少）；
-- 一句话结论：v0 比 nuScenes Pillar 好还是差、差在哪个距离段。
-```
-
-### T4 结果
-
-（待填）
+2026-10-23 起不单独做：v0 的模型级评估和 nuScenes 原始模型、v0 的流水线级结果，在 T6 训练 v1 的同时跑（T6 第 3、4 步）；所有模型的对比在 T7。
 
 ---
 
@@ -730,25 +663,99 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
   - val 只有关键帧：car 950（+272 ignored），truck 1,132（+102 ignored），和上一版一样。T1R 的验证集是每一帧，不直接比。
   - note：`few points in the current sweep (ignored)` 875；`no points in the input (left out)` 298；`teacher subclass disagrees with size (ignored)` 121（T1R 这一条是 4,237）。
   - GT 库：car 14,524、truck 4,078。
+- （2026-10-23 复核，补审后）用仓库里的标签在本地重跑 propagate，25 个训练场景的 `labels_full.pkl` 逐框一致，计数和上面相同。
+  - 补审：s007 的 36 个红框里 22 个确认、14 个作忽略、删 1 个框；s008 的 11 个全部确认、删 2 个框；s023 的 61 个全部作忽略；s024、s025 只处理了一部分。
+  - 还剩 310 个红框（验证 63、训练 247），作忽略框，不影响训练。
+  - 导到新目录再切链接，做法对。能进 T6。
 
 ---
 
-## T6 训练 v1
+## T6 训练 v1，同时跑基线
+
+**要回答的问题**（T7 给出答案）：
+1. 部署 v1 Voxel 还是 v1 Pillar：谁在验证集上更好就部署谁。差别在噪声以内时选 Pillar：在 Orin 上更省，TensorRT 的路已经通了（T8）。
+2. 人工审核值不值：v1（审核过的标注）比 v0（没审核的自动标注）好多少。
+3. 微调值不值：v1 比 nuScenes 原始模型（Pillar 是现在线上能用的）好多少。
+
+**参加比较的 7 个模型**，都只看车辆，都在 10 个验证场景上整段跑：
+
+| 名字 | 模型 | 结果目录 | 谁跑 |
+|---|---|---|---|
+| nusc_pp | nuScenes 原始 Pillar | `data/runs_nusc_pp/<场景>/pillar` | T6 |
+| nusc_voxel | nuScenes 原始 Voxel，单次前向 | `data/runs_nusc_voxel/<场景>/voxel` | T6 |
+| teacher | nuScenes Voxel + 翻转 TTA（自动标注的教师，只做参照，不能部署） | `data/runs/<场景>/voxel` | 5.11 已有 |
+| v0_pp、v0_voxel | 没审核的自动标注训练的（T3） | `data/runs_veh_v0/<场景>/{pillar,voxel}` | T6 |
+| v1_pp、v1_voxel | 审核过的标注训练的（T6） | `data/runs_veh_v1/<场景>/{pillar,voxel}` | T7 |
+
+**评分**：用审核过的验证标签（`labels_sustech.pkl`，每 5 帧 1 帧，约 580 帧）。主要看两个数：
+- 车辆 AP@2.0（中心距离 2 m 内算对）在 0–20 m 内：狗要在这个范围内对车做出反应；
+- mAP（0.5 / 1 / 2 / 4 m 平均，0–40 m）。
+
+**验证集不大**：有车的场景只有 8 个，约 2,500 个车框、107 条轨迹，同一场景里的帧高度相关。所以 `compare_detectors.py --bootstrap` 按场景有放回地重抽 1000 次，给出每个差值的 90% 区间，以及"A 比 B 好"的重抽占比。差值的区间跨过 0，就说明这个验证集分不出谁好。
+
+**v1 和 v0 的训练配方完全一样**：单卡，batch 4，学习率 5e-4，20 个 epoch。这样两者的差别只来自标注。T3D 证明双卡不掉精度，但这里不用。
 
 ```text
-任务 T6：用 v1 数据集训练只检车辆的 Voxel 和 Pillar 模型 v1。
-先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T5 完成。
+任务 T6：用补审后的 v1 数据集训练只检车辆的 Voxel 和 Pillar 模型 v1；训练期间在另一张卡上跑基线（nuScenes 原始模型、v0），给 T7 用。
+先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了 dog_perception/、tools/、det3d/ 的改动，要跑快速测试）。
+前置：T5 完成（2026-10-23 补审后重导到 dog_veh_1023_1529）。
 
-0. 先重跑 T5 第 2 步的 propagate（25 个场景共几秒，覆盖 labels_full.pkl），输出写到 data/reports/T5/propagate_fix.txt。
-   行人、骑行者原样照抄。合计应为：left out: removed by the reviewer 157，other classes, copied as they are 43,640，
-   其余计数和"T5 结果"一样。不一样就停下报告。2026-10-23 补审后的 T5 已经按这个数字导出到
-   dog_veh_1023_1529 并切了链接，对得上就不要再导数据集。提交 labels_full.pkl 和 propagate_fix.txt。
+0. 检查数据集，记下旧目录的时间，再删掉旧目录：
+     mkdir -p data/reports/T6
+     readlink -f data/dog_veh
+     python -c "import pickle; print(*(len(pickle.load(open('data/dog_veh/infos_%s.pkl' % s, 'rb'))) for s in ('train', 'val')))"
+   应为 /public/zjst/robot/centerpoint_data/dog_veh_1023_1529 和 "7232 580"，不是就停下报告。
+   旧目录 /public/zjst/robot/centerpoint_data/dog_veh 是第一次 T5 的导出，已经不用了。删之前先记时间，核对 T3D 复核的判断：
+     D=/public/zjst/robot/centerpoint_data/dog_veh
+     ls -l --time-style=full-iso $D/infos_train.pkl $D/dbinfos_train_5sweeps_withvelo.pkl | tee data/reports/T6/old_dataset_times.txt
+     ls -l --time-style=full-iso $D/gt_database_5sweeps_withvelo/car | sed -n 2,3p | tee -a data/reports/T6/old_dataset_times.txt
+   确认本仓库没有训练、评估在跑：ps aux | grep -E "dog_(voxel|pp)_veh|run_sequence|dist_test" | grep -v grep 没有输出。
+   然后 du -sh $D，再 rm -rf $D（真实路径，不是 data/dog_veh 链接）。
+1. 选卡：训练要两张空闲卡，基线（第 3、4 步）再要一张。只有两张时，先训练，训练完再做第 3、4 步。
+     mkdir -p data/train
+     ls -d data/train/dog_*_veh_v1 2>/dev/null     # 应该没有输出；有的话停下报告，不要覆盖
+     CUDA_VISIBLE_DEVICES=<卡1> nohup python tools/train.py configs/dog/dog_centerpoint_voxel_xt32_veh.py \
+         --work_dir data/train/dog_voxel_veh_v1 > data/train/dog_voxel_veh_v1.log 2>&1 &
+     CUDA_VISIBLE_DEVICES=<卡2> nohup python tools/train.py configs/dog/dog_centerpoint_pp_xt32_veh.py \
+         --work_dir data/train/dog_pp_veh_v1 > data/train/dog_pp_veh_v1.log 2>&1 &
+   单卡，不加 --autoscale-lr，和 v0 一样。
+2. 开始 10 分钟后检查两个日志（tail -30）：loss 是有限值、hm_loss 在下降；time 和 data_time 应和 T3 差不多
+   （Voxel 0.107 / 0.004 s，Pillar 0.079 / 0.002 s）；每个 epoch 的迭代数；按 20 个 epoch 估算总时长。
+3. 基线，流水线级（第三张卡，CUDA_VISIBLE_DEVICES=<卡3>）：
+     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
+     for r in $VAL; do
+       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar --no-mcap \
+           --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --device cuda:0 --out data/runs_nusc_pp/$r
+       python tools/dog/run_sequence.py --seq data/seq/$r --detectors voxel --no-mcap \
+           --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth --device cuda:0 --out data/runs_nusc_voxel/$r
+     done 2>&1 | tee data/reports/T6/runs_nusc.txt
+4. v0 的模型级评估（同一张卡），在新的验证集（infos_val，审核过的 580 帧）上，用来选 v0 的 epoch：
+     REP=data/reports/T6
+     ev() {  # ev <voxel|pp> <权重目录名> <epoch>
+       python tools/dist_test.py configs/dog/dog_centerpoint_$1_xt32_veh.py --work_dir data/train/$2/eval_e$3 \
+           --checkpoint data/train/$2/epoch_$3.pth 2>&1 | grep -E "Evaluation|time per frame" > $REP/dist_test_$2_e$3.txt
+     }
+     for m in voxel pp; do for e in 10 15 20; do ev $m dog_${m}_veh_v0 $e; done; ev $m dog_${m}_veh_v0_oldlabels 20; done
+     ev voxel dog_voxel_veh_v0_2gpu 20
+   选 epoch：每个模型取 "Evaluation merged/vehicle" 那行里 AP@2.0 最高的 epoch；和更晚的 epoch 相差 < 0.005 时
+   取更晚的（学习率退火完，更稳）。记为 E_v0_voxel、E_v0_pp。然后：
+     for r in $VAL; do
+       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar,voxel --no-mcap \
+           --ckpt-pillar data/train/dog_pp_veh_v0/epoch_<E_v0_pp>.pth --ckpt-voxel data/train/dog_voxel_veh_v0/epoch_<E_v0_voxel>.pth \
+           --device cuda:0 --out data/runs_veh_v0/$r
+     done 2>&1 | tee data/reports/T6/runs_v0.txt
+   data/runs_veh_v0 已经有东西的话，先改名成 data/runs_veh_v0_old，不要混在一起。
+5. 等训练结束，期间每 20 分钟看一次日志。
 
-然后和 T3 完全一样，只是名字换成 v1。T5 完成就可以开始，不用等 T4。T4 已经做完、并且双卡 v0 和单卡 v0 的车辆 AP@2.0
-相差不到 0.01 时，改用 T3D 的双卡命令
-（work_dir 换成 data/train/dog_{voxel,pp}_veh_v1，T7 里选 epoch 时照常）：
-  work_dir data/train/dog_voxel_veh_v1、data/train/dog_pp_veh_v1，日志 data/train/dog_{voxel,pp}_veh_v1.log，
-  报告目录 data/reports/T6/。停止条件、提交、报告同 T3（写进"T6 结果"）。
+停止条件（停下并报告日志最后 50 行，不要改配置重跑）：报错（OOM、spconv、数据加载）；loss 变成 nan / inf；
+估算总时长超过 4 小时；训练进程意外退出（可以用 --resume_from data/train/<名字>/latest.pth 续一次，再退出就停下）。
+提交：两个训练的 .log 和 work_dir 里的 *.log.json 复制到 data/reports/T6/；data/reports/T6/ 的其余文件；本文档。
+报告（写进"T6 结果"）：
+- 第 0 步的三个时间、删掉的旧目录大小；
+- 训练：卡号；time、data_time；每个 epoch 迭代数；总耗时；每 5 个 epoch 最后一次的 loss / hm_loss / loc_loss（两个 head 分开），
+  和 T3 的 v0 并排；
+- 第 4 步每个权重的 merged/vehicle 一行（mAP、AP@0.5/1/2/4、三个距离段的 AP@2.0），以及 E_v0_voxel、E_v0_pp；
+- 第 3、4 步的流水线有没有报错，每个场景的帧数。
 ```
 
 ### T6 结果
@@ -757,36 +764,72 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 
 ---
 
-## T7 评估 v1，选 epoch 和上报阈值
-
-现在验证集是人审过的，这一步的数字才算数。
+## T7 比较所有模型，选部署的模型和上报阈值
 
 ```text
-任务 T7：在审核过的验证集上评估 v1（以及 v0、教师、nuScenes Pillar），选 epoch，给出上报阈值的建议。
-先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T6 完成。
+任务 T7：在审核过的验证集上比较 7 个模型（见 T6 开头的表），选出部署的模型（v1 Voxel 或 v1 Pillar）和它的上报阈值。
+先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T6 完成（v1 两个训练结束；data/runs_nusc_pp、data/runs_nusc_voxel、
+data/runs_veh_v0 下 10 个验证场景都有 results.pkl）。
 
-1. 模型级：同 T4 第 1 步，模型换成 v1（epoch 10、15、20），另外把 v0 的 epoch_20 在新验证集上也评一次；
-   输出到 data/reports/T7/。
-2. 选 epoch：Voxel、Pillar 各选 merged/vehicle 的 AP@2.0 最高的那个 epoch（相差 < 0.005 时选更早的）。记为 E_voxel、E_pp。
-3. 流水线级：同 T4 第 2 步，权重换成 v1 的 E_pp / E_voxel，输出到 data/runs_veh_v1/<场景>。
-4. 对比和阈值扫描，标签换成审核过的验证标签：
-     python tools/dog/compare_detectors.py --classes vehicle --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech.pkl; done) \
-         --results $(for r in $VAL; do echo teacher=data/runs/$r/voxel/results.pkl nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl \
-                     v0_voxel=data/runs_veh_v0/$r/voxel/results.pkl v0_pp=data/runs_veh_v0/$r/pillar/results.pkl \
-                     v1_voxel=data/runs_veh_v1/$r/voxel/results.pkl v1_pp=data/runs_veh_v1/$r/pillar/results.pkl; done) \
-         --thresholds 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 --target-recall 0.9 | tee data/reports/T7/compare_val.md
-5. 给 v1_pp 的样例场景出一个 Foxglove 文件，人眼看一看：
-     python tools/dog/run_sequence.py --seq data/seq/0921_165659_s004 --detectors pillar \
-         --ckpt-pillar data/train/dog_pp_veh_v1/epoch_<E_pp>.pth --device cuda:0 --out data/runs_veh_v1_view/0921_165659_s004
-   把生成的 mcap 复制到 data/examples/runs/0921_165659_s004_v1/ 提交（Git LFS）。
+1. v1 的模型级评估，选 epoch（ev 函数和 T6 第 4 步一样，只是结果写到 data/reports/T7/）：
+     mkdir -p data/reports/T7
+     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
+     REP=data/reports/T7
+     ev() {  # ev <voxel|pp> <权重目录名> <epoch>
+       python tools/dist_test.py configs/dog/dog_centerpoint_$1_xt32_veh.py --work_dir data/train/$2/eval_e$3 \
+           --checkpoint data/train/$2/epoch_$3.pth 2>&1 | grep -E "Evaluation|time per frame" > $REP/dist_test_$2_e$3.txt
+     }
+     for m in voxel pp; do for e in 10 15 20; do ev $m dog_${m}_veh_v1 $e; done; done
+   规则同 T6 第 4 步，记为 E_v1_voxel、E_v1_pp。
+2. v1 流水线级：
+     for r in $VAL; do
+       python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar,voxel --no-mcap \
+           --ckpt-pillar data/train/dog_pp_veh_v1/epoch_<E_v1_pp>.pth --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth \
+           --device cuda:0 --out data/runs_veh_v1/$r
+     done 2>&1 | tee data/reports/T7/runs_v1.txt
+3. 对比、阈值扫描、按场景重抽：
+     python tools/dog/compare_detectors.py --classes vehicle \
+         --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech.pkl; done) \
+         --results $(for r in $VAL; do echo v1_voxel=data/runs_veh_v1/$r/voxel/results.pkl v1_pp=data/runs_veh_v1/$r/pillar/results.pkl \
+             v0_voxel=data/runs_veh_v0/$r/voxel/results.pkl v0_pp=data/runs_veh_v0/$r/pillar/results.pkl \
+             nusc_voxel=data/runs_nusc_voxel/$r/voxel/results.pkl nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl \
+             teacher=data/runs/$r/voxel/results.pkl; done) \
+         --thresholds 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 --target-recall 0.9 --bootstrap 1000 \
+         | tee data/reports/T7/compare_val.md
+   输出依次是：AP 表；耗时表（4090 上的网络耗时，不是 Orin）；每个模型的阈值表；最后是重抽的两张表
+   （每个模型的区间；每一对模型 "A − B" 的差值、区间、A 领先的重抽占比 "A ahead"）。模型按上面的顺序给，
+   每一行都是"新的 − 旧的"，差值为正就是前者更好。
+4. 运动状态（狗为运动的车停下，为停着的车不停）。v1 两个模型和 nusc_pp 各一次：
+     motion() {  # motion <名字> <结果目录名> <pillar|voxel>
+       python tools/dog/motion_eval.py $(for r in $VAL; do echo --scene data/labels/$r/labels_sustech.pkl data/$2/$r/$3/results.pkl; done) \
+           --details data/reports/T7/motion_$1_details.csv | tee data/reports/T7/motion_$1.txt
+     }
+     motion v1_pp runs_veh_v1 pillar; motion v1_voxel runs_veh_v1 voxel; motion nusc_pp runs_nusc_pp pillar
+5. 选部署的模型，看重抽表里 "v1_voxel − v1_pp" 这一行：
+   - 部署 Voxel，满足其一：
+     a. ΔAP@2.0 0-20 m ≥ +0.02，并且这一项的 A ahead ≥ 90%；
+     b. ΔmAP ≥ +0.03、这一项的 A ahead ≥ 90%，同时 ΔAP@2.0 0-20 m ≥ −0.01（近处不比 Pillar 差）。
+   - 否则部署 Pillar（分不出来时选更省的）。
+   - 检查：选中的模型对 nusc_pp 那一行（v1_voxel − nusc_pp 或 v1_pp − nusc_pp）的 ΔAP@2.0 0-20 m 应 > 0。
+     不是的话停下报告，多半哪里出了错。
+6. 上报阈值：在选中模型的阈值表里取 "highest threshold with recall >= 0.90 within 20 m"；没有就取 best F1。
+   写出这个阈值和现在代码里的 0.35 下的 precision / recall（0–20 m、0–40 m）。
+7. 给选中的模型在 0921_164127_s001（验证集里运动的车最多）出一个 Foxglove 文件，人眼看一看：
+     python tools/dog/run_sequence.py --seq data/seq/0921_164127_s001 --detectors <pillar|voxel> \
+         --ckpt-<pillar|voxel> <选中的权重> --device cuda:0 --out data/runs_veh_v1_view/0921_164127_s001
+   把生成的 mcap 复制到 data/examples/runs/0921_164127_s001_v1/ 提交（Git LFS）。
 
-停止条件：任何报错。
+停止条件：任何报错；某个模型某个场景的 results.pkl 缺失；第 5 步的检查不通过。
 提交：data/reports/T7/、上面的 mcap、本文档。
 报告（写进"T7 结果"）：
-- E_voxel、E_pp 及理由；
-- compare_val.md 的 AP 表（所有模型），以及 v1_pp、v1_voxel 的阈值表和推荐行；
-- 结论：v1 比教师、nuScenes Pillar 好多少，主要在哪个距离段；
-- 上报阈值的建议值（现在代码里 vehicle 是 0.35），由人决定是否改 DEFAULT_SCORE_THRESHOLDS。
+- E_v1_voxel、E_v1_pp，以及模型级每个 epoch 的 merged/vehicle 一行；
+- compare_val.md 的 AP 表、耗时表、重抽的两张表（整段贴）；
+- 三个问题各一句话，每句带差值和 90% 区间：
+  (1) 部署哪个，按第 5 步的哪一条；
+  (2) 审核的作用：v1_pp − v0_pp、v1_voxel − v0_voxel；
+  (3) 微调的作用：v1_pp − nusc_pp、v1_voxel − nusc_voxel，以及 v0 对 nuScenes 原始模型；
+- 三个 motion_*.txt 的表；details CSV 里 missed、false moving 各多少行；
+- 上报阈值的建议（由人决定是否改 DEFAULT_SCORE_THRESHOLDS）。
 ```
 
 ### T7 结果
@@ -795,23 +838,33 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 
 ---
 
-## T8 导出 Pillar v1 的 ONNX
+## T8 部署选中的模型
+
+不管 T7 选了谁，都先导出 Pillar v1 的 ONNX：选了 Pillar 就直接用；选了 Voxel，它是 Voxel 在 Orin 上跑不进延迟时的退路。
 
 ```text
-任务 T8：把 T7 选出的 Pillar v1 导出成两段 ONNX，并和 PyTorch 逐段对比。
-先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T7 完成，已知 E_pp。
+任务 T8：导出 Pillar v1 的两段 ONNX 并和 PyTorch 逐段对比；T7 选了 Voxel 时，再把 Voxel v1 打包，准备上 Orin 实测。
+先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T7 完成，已知 E_v1_pp、E_v1_voxel 和选中的模型。
 
 1. f=$(ls data/runs/0921_165659_s004/frames/*.npy | sed -n 150p)
-   python tools/dog/export_pillar_onnx.py --checkpoint data/train/dog_pp_veh_v1/epoch_<E_pp>.pth \
+   python tools/dog/export_pillar_onnx.py --checkpoint data/train/dog_pp_veh_v1/epoch_<E_v1_pp>.pth \
        --out data/deploy/dog_pp_veh_v1 --check $f 2>&1 | tee data/reports/T8/export.txt
-2. ls -la data/deploy/dog_pp_veh_v1
+   ls -la data/deploy/dog_pp_veh_v1
+2. 只在 T7 选了 Voxel 时做：
+     mkdir -p data/deploy/dog_voxel_veh_v1
+     cp data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth data/deploy/dog_voxel_veh_v1/model.pth
+     cp configs/dog/dog_centerpoint_voxel_xt32_veh.py data/deploy/dog_voxel_veh_v1/
+   Orin 上的做法见 docs/DOG_PIPELINE.md 8.2 路线 1（PyTorch + spconv），由人在 Orin 上测延迟（H2）。
 
-通过标准：export.txt 里 pfn / bev / heads 的相对误差都 < 1e-3，PyTorch 和 ONNX 的检测个数相同，
+通过标准（第 1 步）：export.txt 里 pfn / bev / heads 的相对误差都 < 1e-3，PyTorch 和 ONNX 的检测个数相同，
 分数差 < 1e-3、中心差 < 1 cm（本地用迁移权重试过：分数差 2.7e-07、中心差 3e-06 m）。
 停止条件：不满足通过标准；报错。
-提交：data/reports/T8/、本文档。不提交 ONNX（在 data/deploy/ 下，被 .gitignore 忽略），报告路径。
-报告（写进"T8 结果"）：export.txt 全文；ONNX 文件大小；它打印的 trtexec 命令（在 Orin 上建 FP16 引擎用）。
+提交：data/reports/T8/、本文档。不提交 ONNX 和权重（data/deploy/ 被 .gitignore 忽略），报告路径。
+报告（写进"T8 结果"）：export.txt 全文；ONNX 文件大小；它打印的 trtexec 命令（在 Orin 上建 FP16 引擎用）；
+选了 Voxel 时 data/deploy/dog_voxel_veh_v1 的内容。
 ```
+
+**H2（选了 Voxel 时，人做）**：在 Orin 上按 DOG_PIPELINE.md 8.2 路线 1 跑 Voxel v1，最高功耗模式、锁频后测每帧网络耗时。加上预处理和跟踪，端到端放得下 100 ms（10 Hz）就部署 Voxel；放不下就部署 T8 导出的 Pillar。
 
 ### T8 结果
 
@@ -824,10 +877,10 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 v1 Voxel 专门在这批数据上训过，当教师应该比 nuScenes 模型准，待审核的轨迹会少很多。第二轮的审核和训练，等这一步的结果出来再定。
 
 ```text
-任务 T9：用 T7 选出的 v1 Voxel（加 TTA）重新跑全部 35 个场景的教师推理和自动标注，输出到新的目录，不覆盖第一轮。
-先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T7 完成，已知 E_voxel。
+任务 T9：用 v1 Voxel（T7 选的 epoch，加 TTA）重新跑全部 35 个场景的教师推理和自动标注，输出到新的目录，不覆盖第一轮。
+先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T7 完成，已知 E_v1_voxel。
 
-1. python tools/dog/batch_label.py --split $SPLIT --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_<E_voxel>.pth \
+1. python tools/dog/batch_label.py --split $SPLIT --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth \
        --runs data/runs_r2 --labels data/labels_r2
 2. 每个场景出一张车辆表，统计待定的轨迹数：
      for r in $(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT); do

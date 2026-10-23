@@ -130,6 +130,56 @@ def evaluate_detections(frames_pred, frames_gt, class_names, dist_thresholds=(0.
     return res
 
 
+def frame_matches(frames_pred, frames_gt, cls, thr, rng_bin=None):
+    """(tp, n_gt, scores) of each frame matched on its own. Matching never crosses frames, so the AP
+    of any multiset of frames (``ap_of_frames``, a bootstrap resample) follows without matching again."""
+    out = []
+    for p, g in zip(frames_pred, frames_gt):
+        tp, n_gt, _, scores = _match([p], [g], cls, thr, rng_bin)
+        out.append((tp.astype(np.float64), n_gt, scores))
+    return out
+
+
+def ap_of_frames(matches, idx):
+    """AP over the frames ``idx`` (repeats allowed) of ``frame_matches``."""
+    if len(idx) == 0:
+        return float("nan")
+    tp = np.concatenate([matches[i][0] for i in idx])
+    scores = np.concatenate([matches[i][2] for i in idx])
+    order = np.argsort(-scores, kind="stable")
+    return _ap(tp[order], sum(matches[i][1] for i in idx))
+
+
+def bootstrap_ap(models, cls, n=1000, seed=0, dist_thresholds=(0.5, 1.0, 2.0, 4.0), near=(0, 20)):
+    """How much of a difference between detectors the validation set can tell apart.
+
+    Frames of one recording are strongly correlated, so recordings are resampled (with replacement),
+    the same draw for every model (paired). ``models``: {name: (frames_pred, frames_gt, recording of
+    each frame)}. Returns {name: {"mAP": (n,), "AP@2.0[near]": (n,)}} and the values on all frames."""
+    key = "AP@2.0[%d-%dm]" % near
+    prep = {}
+    for name, (preds, gts, rec) in models.items():
+        m = [frame_matches(preds, gts, cls, t) for t in dist_thresholds] + [frame_matches(preds, gts, cls, 2.0, near)]
+        rec = np.asarray(rec)
+        prep[name] = (m, {r: np.nonzero(rec == r)[0] for r in np.unique(rec)})
+    recs = sorted({r for _, by in prep.values() for r in by})
+    rng = np.random.default_rng(seed)
+
+    def metrics(name, draw):
+        m, by = prep[name]
+        idx = np.concatenate([by.get(r, np.zeros(0, np.int64)) for r in draw])
+        aps = [ap_of_frames(x, idx) for x in m[:-1]]
+        return (float(np.nanmean(aps)) if not np.all(np.isnan(aps)) else float("nan"), ap_of_frames(m[-1], idx))
+
+    full = {name: dict(zip(("mAP", key), metrics(name, recs))) for name in prep}
+    out = {name: {"mAP": np.empty(n), key: np.empty(n)} for name in prep}
+    for k in range(n):
+        draw = rng.choice(recs, len(recs))
+        for name in prep:
+            out[name]["mAP"][k], out[name][key][k] = metrics(name, draw)
+    return out, full
+
+
 def threshold_sweep(frames_pred, frames_gt, cls, thresholds, dist=2.0, rng_bin=None):
     """Precision, recall and F1 of class ``cls`` when only detections scoring >= each threshold are
     reported (greedy matching by score within ``dist`` m, ignored ground truth not counted).

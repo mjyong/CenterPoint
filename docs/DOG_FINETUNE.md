@@ -197,7 +197,7 @@ python tools/dist_test.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir data
     --checkpoint data/train/dog_pp_v001/latest.pth
 ```
 
-- 这是模型级评估（网络本身，验证集 `data/dog/infos_val.pkl`）。决定能不能替换线上模型，要看流水线级对比：预训练模型和微调模型都用 `run_sequence.py` 在**同一批人工逐框审核过的验证录制**上跑，再用 `compare_detectors.py --labels <验证集 labels_sustech.pkl>` 逐类、按 0–10 / 10–20 / 20–40 m 分段比。
+- 这是模型级评估（网络本身，验证集 `data/dog/infos_val.pkl`）。决定能不能替换线上模型，要看流水线级对比：预训练模型和微调模型都用 `run_sequence.py` 在**同一批人工逐框审核过的验证录制**上跑，再用 `compare_detectors.py --labels <验证集 labels_sustech.pkl>` 逐类、按 0–10 / 10–20 / 20–40 m 分段比。加 `--bootstrap 1000`：按录制有放回地重抽（同一场景的帧高度相关，按帧抽会把区间算得太窄），给出 mAP、0–20 m AP@2.0 和每两个模型之差的 90% 区间。差值的区间跨过 0，就说明这批验证数据分不出谁好。
 - 另外在 nuScenes mini_val 上查回归（`nusc_clip_eval.py`），在新 bag 上人眼看（`run_bag_mcap.py`）。
 - 不要用教师自己生成的标签评估教师同架构的模型。
 - `dist_test.py` 对 5 个 head 各出一行 AP，另外以 `merged/` 开头的几行是合并成 vehicle / pedestrian / cyclist、做完跨 head 去重之后的结果，也就是检测器实际输出的类别。
