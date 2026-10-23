@@ -29,7 +29,15 @@
    - 原始输出放在 `data/reports/<任务编号>/`；
    - 按"提交"一项提交，推送到 `claude/me/v01`。
    - 权重（`.pth`）、点云帧、`.pkl`、mcap 都不提交。
-5. 选 GPU：`python tools/dog/batch_label.py --split $SPLIT --dry-run` 会打印每张卡的显存和占用。用空闲的卡，`CUDA_VISIBLE_DEVICES=<卡号>`。
+5. 选 GPU：按显存放卡，一张卡可以同时放几个任务。先看每张卡：
+   ```bash
+   nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu --format=csv
+   ```
+   - 空闲显存（total − used）够这张卡上所有任务加起来、再留 1 GB，就可以放。每个进程大约要：训练 Voxel 7 GB、训练 Pillar 6 GB（batch 4；日志里的 `memory` 只有 3.7 / 3.0 GB，另加 CUDA 上下文和缓存）；`run_sequence.py` 推理、`dist_test.py` 各约 3 GB；Voxel + TTA 教师推理约 6 GB。
+   - 利用率只影响快慢：卡上已经有别人在训练（利用率 > 80%）时，再放上去大家都会变慢，但不会出错。
+   - 训练前加 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`，显存碎片少，占用更接近日志里的 `memory`。
+   - 启动后用 `nvidia-smi --query-compute-apps=pid,used_memory --format=csv` 看各进程实际占了多少，写进报告，以后按实测值放卡。
+   - `batch_label.py --dry-run` 的 FREE / busy 是给批量教师推理定的（至少 8 GB 空闲、利用率不超过 20%），比上面严，别的任务不用照它。
 6. 大的输出写到 `/public/zjst/robot`（仓库盘只剩约 27 GB，T0）（和 `data/seq`、`data/runs` 同一块盘）。空闲空间用 `df -h /public/zjst/robot` 看，至少 80 GB。不要用 `df -h .`：那是仓库所在盘，后面的导出、训练权重、推理结果都不写到那里。第一次往下面这些目录写之前，先链过去（已经是这个链接就不用再做）：
    ```bash
    for d in train deploy runs_veh_v0 runs_nusc_pp runs_nusc_voxel runs_veh_v1 runs_veh_v1_view runs_r2 labels_r2 seq_lever; do
@@ -61,7 +69,7 @@
 | T4 | 评估 v0 | — | — | — | 并入 T6（训练期间跑基线）和 T7（对比） |
 | H1 | 人工审核车辆：35 个场景全在 SUSTechPOINTS 里逐框审（每 5 帧取 1 帧） | 人 | T1S | 1–2 天 | 完成（junyongmou，2026-10-23） |
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 完成（2026-10-23 补审后重导） |
-| T6 | 训练 v1（单卡，和 v0 同配方）；同时跑基线：nuScenes 原始模型、v0 | Agent | T5 | 约 1.2 小时 | 待做 |
+| T6 | 训练 v1（单卡，和 v0 同配方）；同时跑基线：nuScenes 原始模型、v0 | Agent | T5 | 约 1.2 小时（两个训练挤一张卡时约 2 小时） | 待做 |
 | T7 | 比较 7 个模型，选部署 Voxel 还是 Pillar、上报阈值 | Agent | T6 | 1 小时 | 待做 |
 | T8 | 部署：导出 Pillar v1 的 ONNX；选了 Voxel 时再打包 Voxel，人在 Orin 上测（H2） | Agent | T7 | 10 分钟 | 待做 |
 | H2 | （T7 选了 Voxel 时）在 Orin 上测 Voxel v1 的延迟，放得下就部署 Voxel，否则部署 Pillar | 人 | T8 | 半天 | 待做 |
@@ -714,17 +722,23 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
      ls -l --time-style=full-iso $D/gt_database_5sweeps_withvelo/car | sed -n 2,3p | tee -a data/reports/T6/old_dataset_times.txt
    确认本仓库没有训练、评估在跑：ps aux | grep -E "dog_(voxel|pp)_veh|run_sequence|dist_test" | grep -v grep 没有输出。
    然后 du -sh $D，再 rm -rf $D（真实路径，不是 data/dog_veh 链接）。
-1. 选卡：训练要两张空闲卡，基线（第 3、4 步）再要一张。只有两张时，先训练，训练完再做第 3、4 步。
+1. 放卡（通用约定 5）：Voxel 约 7 GB、Pillar 约 6 GB，两个训练同时起，不要等：
+   - 有两张卡各空出 ≥ 8 GB（Voxel）/ ≥ 7 GB（Pillar）：各放一张，约 1 小时 7 分都跑完；
+   - 只有一张卡空出 ≥ 14 GB：两个都放这张卡上。各自会慢一半左右，合计约 2 小时（和先后跑差不多），但不用等卡；
+   - 都不够：先起 Voxel，Pillar 等有卡再起（每 20 分钟看一次）。
      mkdir -p data/train
      ls -d data/train/dog_*_veh_v1 2>/dev/null     # 应该没有输出；有的话停下报告，不要覆盖
+     export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
      CUDA_VISIBLE_DEVICES=<卡1> nohup python tools/train.py configs/dog/dog_centerpoint_voxel_xt32_veh.py \
          --work_dir data/train/dog_voxel_veh_v1 > data/train/dog_voxel_veh_v1.log 2>&1 &
-     CUDA_VISIBLE_DEVICES=<卡2> nohup python tools/train.py configs/dog/dog_centerpoint_pp_xt32_veh.py \
+     CUDA_VISIBLE_DEVICES=<卡2，可以和卡1相同> nohup python tools/train.py configs/dog/dog_centerpoint_pp_xt32_veh.py \
          --work_dir data/train/dog_pp_veh_v1 > data/train/dog_pp_veh_v1.log 2>&1 &
-   单卡，不加 --autoscale-lr，和 v0 一样。
-2. 开始 10 分钟后检查两个日志（tail -30）：loss 是有限值、hm_loss 在下降；time 和 data_time 应和 T3 差不多
-   （Voxel 0.107 / 0.004 s，Pillar 0.079 / 0.002 s）；每个 epoch 的迭代数；按 20 个 epoch 估算总时长。
-3. 基线，流水线级（第三张卡，CUDA_VISIBLE_DEVICES=<卡3>）：
+   单卡，不加 --autoscale-lr，和 v0 一样（两个训练在同一张卡上也是各自单卡训练，配方不变，只是慢）。
+   第 3、4 步的基线每个进程约 3 GB，有空的显存就放（训练那张卡也行），不用等第三张卡；一次只跑一个基线进程。
+2. 开始 10 分钟后检查两个日志（tail -30）：loss 是有限值、hm_loss 在下降；time 和 data_time，各占一张卡时应和 T3 差不多
+   （Voxel 0.107 / 0.004 s，Pillar 0.079 / 0.002 s），同一张卡时各慢一半左右；每个 epoch 的迭代数；按 20 个 epoch 估算总时长。
+   nvidia-smi --query-compute-apps=pid,used_memory --format=csv：记下两个训练进程各占多少显存。
+3. 基线，流水线级（CUDA_VISIBLE_DEVICES=<有 ≥ 4 GB 空闲的卡，训练那张也行>）：
      VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
      for r in $VAL; do
        python tools/dog/run_sequence.py --seq data/seq/$r --detectors pillar --no-mcap \
@@ -750,12 +764,13 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
    data/runs_veh_v0 已经有东西的话，先改名成 data/runs_veh_v0_old，不要混在一起。
 5. 等训练结束，期间每 20 分钟看一次日志。
 
-停止条件（停下并报告日志最后 50 行，不要改配置重跑）：报错（OOM、spconv、数据加载）；loss 变成 nan / inf；
+停止条件（停下并报告日志最后 50 行，不要改配置重跑）：报错（spconv、数据加载）；loss 变成 nan / inf；
 估算总时长超过 4 小时；训练进程意外退出（可以用 --resume_from data/train/<名字>/latest.pth 续一次，再退出就停下）。
+显存不够（CUDA out of memory）：多半是同一张卡上别人的任务涨了。换一张空出够多显存的卡，用 --resume_from 续训一次；再出现就停下报告。
 提交：两个训练的 .log 和 work_dir 里的 *.log.json 复制到 data/reports/T6/；data/reports/T6/ 的其余文件；本文档。
 报告（写进"T6 结果"）：
 - 第 0 步的三个时间、删掉的旧目录大小；
-- 训练：卡号；time、data_time；每个 epoch 迭代数；总耗时；每 5 个 epoch 最后一次的 loss / hm_loss / loc_loss（两个 head 分开），
+- 训练：卡号（两个是否在同一张卡上）；每个训练进程占的显存（nvidia-smi）；time、data_time；每个 epoch 迭代数；总耗时；每 5 个 epoch 最后一次的 loss / hm_loss / loc_loss（两个 head 分开），
   和 T3 的 v0 并排；
 - 第 4 步每个权重的 merged/vehicle 一行（mAP、AP@0.5/1/2/4、三个距离段的 AP@2.0），以及 E_v0_voxel、E_v0_pp；
 - 第 3、4 步的流水线有没有报错，每个场景的帧数。
@@ -773,6 +788,7 @@ export 的各类正样本 / 忽略数，和 T1R 的导出（训练 car 13,346 / 
 任务 T7：在审核过的验证集上比较 7 个模型（见 T6 开头的表），选出部署的模型（v1 Voxel 或 v1 Pillar）和它的上报阈值。
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T6 完成（v1 两个训练结束；data/runs_nusc_pp、data/runs_nusc_voxel、
 data/runs_veh_v0 下 10 个验证场景都有 results.pkl）。
+GPU：下面的步骤一次一个进程，每个约 3 GB，CUDA_VISIBLE_DEVICES 设成一张空出 ≥ 4 GB 的卡就行（通用约定 5），不用整张空卡。
 
 1. v1 的模型级评估，选 epoch（ev 函数和 T6 第 4 步一样，只是结果写到 data/reports/T7/）：
      mkdir -p data/reports/T7

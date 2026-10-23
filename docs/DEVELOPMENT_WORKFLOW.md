@@ -144,7 +144,8 @@ python tools/train.py configs/dog/dog_centerpoint_pp_xt32.py --work_dir data/tra
 - 数据读取跟不跟得上：`python tools/dog/bench_dataloader.py <配置>`，每批的时间要小于训练每步的时间。
 - 输出：`data/train/dog_pp_v001/epoch_N.pth`、`latest.pth`（指向最新一个）、`<时间>.log`（文本日志）、`<时间>.log.json`（每行一组 loss）、`det3d/`（源码备份）。
 - 中断后接着训：`--resume_from data/train/dog_pp_v001/epoch_N.pth`（会恢复 epoch、迭代数和优化器状态）。
-- batch：默认 4，显存只用 3–4 GB。合起来 batch 8、`lr_max` 1e-3 在双卡上实测过（最后的 loss 和单卡 batch 4 一样）；单卡 batch 8 没试过。
+- 显存：一个训练进程约 6–7 GB（日志里的 `memory` 只有 3–4 GB，另加 CUDA 上下文和缓存；加 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 会少一些）。Voxel 和 Pillar 可以放在同一张 24 GB 的卡上同时训练，各自慢一半左右，配方不变。
+- batch：默认 4。合起来 batch 8、`lr_max` 1e-3 在双卡上实测过（最后的 loss 和单卡 batch 4 一样）；单卡 batch 8 没试过。
 - 没有 GPU 时同一条命令会在 CPU 上跑（日志里有 `no CUDA device: training on the CPU` 的警告），样例上约 2 分钟一个 epoch，只用来检查流程。
 
 ### 4.4 看训练日志
