@@ -31,6 +31,8 @@ be changed together with the converter (`tools/dog/sustechpoints_convert.py`).
 | 2026-10-23 | `public/js/floatlabel.js`, `public/css/main.css` | labels show track score / frame score, 运动 (moving, speed) or 静止, 点少 (few points); `review` labels red; attribute choices review / ignore / static / moving |
 | 2026-10-23 | `public/js/editor.js` | next frame on a scene's last frame opens the next scene's first frame (previous frame: the previous scene's last), in the scene list's order |
 | 2026-10-23 | `public/js/lib/PCDLoader.js`, `public/js/lidar.js` | PCD field `t` (sweep age) is read; points of older sweeps are drawn at 30 % brightness |
+| 2026-10-24 | `dog_fit.py` (new), `main.py`, `public/js/ml.js`, `public/js/editor.js` | Ctrl + drag asks the new `/dog_fit_box` for the box first: the best-scoring model box from `data/<scene>/dog_dets/<frame>.json` (written by `sustechpoints_convert.py detections`) that holds most of the selected object's points, else the smallest box around them with an L-shape yaw, bottom on the ground where the selection shows it. The object is the group of points nearest the rectangle's middle. SUSTechPOINTS' own fitting only when the answer is empty; Shift + drag unchanged |
+| 2026-10-24 | `public/js/floatlabel.js`, `public/js/header.js` | candidates (`dog_info` with `candidate`, from `sustechpoints_convert.py candidates`) show the models that found them and their scores: `候选 v1_pp 0.62 · nusc_pp 0.41` |
 
 Mark further changes in this table and in the changed file (GPL-3.0 section 5a asks for a notice with
 the date).

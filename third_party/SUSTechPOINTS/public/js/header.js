@@ -117,9 +117,13 @@ var Header=function(ui, data, cfg, onSceneChanged, onFrameChanged, onObjectSelec
         // CenterPoint dog pipeline (2026-10-23): what the auto-label said about this box
         if (box.dog){
             let d = box.dog;
-            this.boxUi.innerHTML += "| <span title='auto-label: track mean score / this frame'>score " +
+            // candidates (2026-10-24): the models that found the object and their scores instead
+            this.boxUi.innerHTML += (d.candidate ?
+                "| <span title='candidate: models that found it, with their scores'>候选 " +
+                (d.models || []).map(m=>m[0] + " " + Number(m[1]).toFixed(2)).join(" · ") :
+                "| <span title='auto-label: track mean score / this frame'>score " +
                 (d.score !== undefined ? Number(d.score).toFixed(2) : "-") + "/" +
-                (d.interpolated ? "插值" : (d.det_score !== undefined ? Number(d.det_score).toFixed(2) : "-")) +
+                (d.interpolated ? "插值" : (d.det_score !== undefined ? Number(d.det_score).toFixed(2) : "-"))) +
                 "</span> | <span title='auto-label speed'>" + (d.moving ? "运动 " : "静止 ") +
                 Number(d.speed || 0).toFixed(2) + " m/s</span>" +
                 (d.points !== undefined ? " | <span title='points in the current sweep / all 5 sweeps'>pts " +

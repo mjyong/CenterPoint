@@ -7,6 +7,9 @@
 each score threshold (2 m match, 0-40 m and 0-20 m) and two candidate reporting thresholds: the
 best F1, and the highest threshold that still reaches ``--target-recall`` within 20 m.
 
+A table of how each model's velocity head reads moving labels (``--moving-speed``) tells whether it
+can be the teacher: the auto-labeller needs the teacher's head to read a moving vehicle as moving.
+
 ``--bootstrap 1000`` tells whether a difference between two models is more than the luck of the
 validation set: the recordings (one per labels file) are resampled with replacement, the same
 draw for every model, and mAP and AP@2.0 within 20 m are recomputed. Prints each model's 90%
@@ -32,7 +35,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from dog_perception.detection.boxes import CLASSES  # noqa: E402
 from dog_perception.detection.evaluate import (bootstrap_ap, evaluate_detections, format_table,  # noqa: E402
-                                                threshold_sweep)
+                                                moving_velocity, threshold_sweep)
 from dog_perception.label_review import train_label  # noqa: E402
 
 
@@ -50,6 +53,8 @@ def main():
                     help="score thresholds for the precision / recall / F1 table")
     ap.add_argument("--target-recall", type=float, default=0.9,
                     help="recall within 20 m the suggested reporting threshold must keep")
+    ap.add_argument("--moving-speed", type=float, default=1.0,
+                    help="[m/s] labels faster than this are moving: how each velocity head reads them")
     ap.add_argument("--bootstrap", type=int, default=0, metavar="N",
                     help="N resamples of the recordings: 90%% intervals of mAP, AP within 20 m and of the "
                          "differences between models")
@@ -119,6 +124,17 @@ def main():
                            tracks=len(ids), mean_track_len=float(np.mean(list(ids.values()))) if ids else 0.0)
 
     print(format_table(table, classes))
+    print()
+    print("velocity head on moving labels (> %.1f m/s, matched within 2 m at any score; the auto-labeller calls a "
+          "frame moving when the teacher's head reads > 0.15 m/s):" % args.moving_speed)
+    print("| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |")
+    print("|---|---|---|---|---|---|---|")
+    for name, (preds, gts, _) in scored.items():
+        for ci, c in enumerate(classes):
+            mv = moving_velocity(preds, gts, ci, args.moving_speed)
+            if mv["labels"]:
+                print("| %s | %s | %d | %d | %.2f | %.0f%% | %.2f |" % (
+                    name, c, mv["labels"], mv["matched"], mv["speed_ratio"], 100 * mv["read_moving"], mv["error"]))
     print()
     print("| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |")
     print("|---|---|---|---|---|---|---|---|")

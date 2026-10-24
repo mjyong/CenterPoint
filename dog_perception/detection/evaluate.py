@@ -229,3 +229,32 @@ def match_frame(pred, gt, thr=2.0):
             gt_m[cand[j]] = i
             tp[i] = True
     return tp, gt_m
+
+
+
+def moving_velocity(frames_pred, frames_gt, cls, min_speed=1.0, thr=2.0, min_score=0.0, head_speed=0.15):
+    """How a detector's velocity head reads moving objects: labels of class ``cls`` (not ignored) faster
+    than ``min_speed``, matched per frame (``match_frame``, ``thr`` m, detections >= ``min_score``).
+    Returns dict(labels, matched, speed_ratio = median |v_det| / |v_label|, read_moving = share of the
+    matched with |v_det| > ``head_speed`` (what the auto-labeller needs to call a frame moving),
+    error = median |v_det - v_label|)."""
+    n, det_speed, gt_speed, err = 0, [], [], []
+    for p, g in zip(frames_pred, frames_gt):
+        if len(g["labels"]) == 0 or g.get("velocities") is None or p.get("velocities") is None:
+            continue
+        keep = np.asarray(p["scores"]) >= min_score
+        pk = {k: np.asarray(p[k])[keep] for k in ("boxes", "labels", "scores", "velocities")}
+        _, gt_m = match_frame(pk, g, thr)
+        v_gt = np.asarray(g["velocities"], float).reshape(-1, 2)
+        moving = (g["labels"] == cls) & ~_ignored(g) & (np.hypot(v_gt[:, 0], v_gt[:, 1]) > min_speed)
+        n += int(moving.sum())
+        for j in np.nonzero(moving & (gt_m >= 0))[0]:
+            vd = np.asarray(pk["velocities"][gt_m[j]], float)
+            det_speed.append(np.hypot(*vd))
+            gt_speed.append(np.hypot(*v_gt[j]))
+            err.append(np.hypot(*(vd - v_gt[j])))
+    det_speed, gt_speed = np.asarray(det_speed), np.asarray(gt_speed)
+    m = len(det_speed)
+    return dict(labels=n, matched=m, speed_ratio=float(np.median(det_speed / gt_speed)) if m else float("nan"),
+                read_moving=float(np.mean(det_speed > head_speed)) if m else float("nan"),
+                error=float(np.median(err)) if m else float("nan"))

@@ -38,15 +38,18 @@ tools/dog/auto_label.py and goes straight into export_dataset.py.
 import hashlib
 import json
 import os
+import re
+import shutil
+import time
 from collections import defaultdict
 
 import numpy as np
 
 from .autolabel import _window_velocity
-from .detection.boxes import CLASSES, SUBCLASS_TO_CLASS, Detections
+from .detection.boxes import CLASSES, SUBCLASS_TO_CLASS, SUBCLASSES, Detections
 from .geometry import inv_T, wrap_angle
 from .label_review import train_label
-from .visibility import annotate_points, visibility
+from .visibility import annotate_points, box_point_counts, visibility
 
 CLASS_TO_TYPE = {"vehicle": "Car", "pedestrian": "Pedestrian", "cyclist": "BicycleRider"}
 SUBCLASS_TO_TYPE = {"car": "Car", "truck": "Truck", "bus": "Bus", "pedestrian": "Pedestrian", "cyclist": "BicycleRider"}
@@ -345,6 +348,234 @@ def import_scene(scene_dir, type_map=None, static_speed=0.2, velocity_window=0.5
     labels = dict(sequence=meta.get("sequence"), frames=frames, source="sustechpoints:" + os.path.abspath(scene_dir),
                   label_classes=meta.get("label_classes"))
     return labels, dict(counts)
+
+
+CANDIDATE_ID = re.compile(r"c\d+$")       # obj_id of a candidate added by ``add_candidates``
+
+
+def _det_type(label, sub):
+    return SUBCLASS_TO_TYPE.get(SUBCLASSES[sub] if sub >= 0 else None) or CLASS_TO_TYPE[CLASSES[label]]
+
+
+def write_detections(scene_dir, results, min_score=0.15):
+    """The models' detections in each frame of an exported scene, for drawing boxes: the vendored
+    SUSTechPOINTS turns the points selected with Ctrl + drag into the best-scoring of these boxes that
+    holds most of them (third_party/SUSTechPOINTS/dog_fit.py). ``results``: {model name: run_sequence.py
+    results.pkl rows}. Writes ``dog_dets/<frame>.json`` (detections of the scene's label classes with a
+    score >= ``min_score``, in the tool's frame); returns the number of boxes written."""
+    with open(os.path.join(scene_dir, META_FILE)) as fh:
+        meta = json.load(fh)
+    z_off = float(meta.get("z_offset", 0.0))
+    want = [CLASSES.index(c) for c in (meta.get("label_classes") or CLASSES)]
+    rows_at = {m: {round(float(r["stamp"]), 6): r for r in rows} for m, rows in results.items()}
+    os.makedirs(os.path.join(scene_dir, "dog_dets"), exist_ok=True)
+    total = 0
+    for fm in meta["frames"]:
+        out = []
+        for m, at in rows_at.items():
+            r = at.get(round(float(fm["stamp"]), 6))
+            if r is None:
+                continue
+            d = r["detections"]
+            for k in np.nonzero((d.scores >= min_score) & np.isin(d.labels, want))[0]:
+                b = np.asarray(d.boxes[k], float).copy()
+                b[2] += z_off
+                psr = {key: {ax: round(v, 3) for ax, v in val.items()} for key, val in box_to_psr(b).items()}
+                out.append(dict(model=m, score=round(float(d.scores[k]), 3),
+                                obj_type=_det_type(int(d.labels[k]), int(d.subclasses[k])), psr=psr))
+        out.sort(key=lambda x: -x["score"])
+        with open(os.path.join(scene_dir, "dog_dets", fm["name"] + ".json"), "w") as fh:
+            json.dump(out, fh)
+        total += len(out)
+    return total
+
+
+def _attrs(a):
+    return {t.strip() for t in str(a.get("obj_attr") or "").lower().split(",")}
+
+
+def _bev_hit(xy, boxes, dist, margin):
+    """Whether the BEV point ``xy`` is within ``dist`` of a box center or inside a box grown by ``margin``."""
+    b = np.asarray(boxes, float).reshape(-1, 7)
+    if not len(b):
+        return False
+    d = np.asarray(xy, float)[:2] - b[:, :2]
+    c, s = np.cos(b[:, 6]), np.sin(b[:, 6])
+    inside = (np.abs(c * d[:, 0] + s * d[:, 1]) <= b[:, 3] / 2 + margin) & \
+        (np.abs(-s * d[:, 0] + c * d[:, 1]) <= b[:, 4] / 2 + margin)
+    return bool((np.hypot(d[:, 0], d[:, 1]) <= dist).any() or inside.any())
+
+
+def _same_object(box, boxes, dist, margin):
+    """``box`` and one of ``boxes`` cover the same object: centers within ``dist``, or either center inside
+    the other box grown by ``margin`` (a partial box of a long truck and a full one)."""
+    boxes = np.asarray(boxes, float).reshape(-1, 7)
+    return _bev_hit(box[:2], boxes, dist, margin) or any(_bev_hit(b[:2], box, dist, margin) for b in boxes)
+
+
+def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5, link_dist=2.5, max_gap=1.5,
+                   min_points=1, backup=True):
+    """Detections of other models as boxes to check ("candidates") in an exported scene, reviewed or not.
+
+    Labels made by reviewing the teacher's boxes favour the teacher: what it missed is not labelled, so
+    another model that finds it scores a false positive. This adds to every frame of the scene the
+    detections in ``results`` ({model name: run_sequence.py results.pkl rows}) of the scene's label
+    classes with a score >= ``min_score`` that nothing in the frame accounts for. A detection is left out
+    when it and a box in the label file cover the same object (centers within ``match_dist``, or one
+    center inside the other box grown by ``margin``: already labelled), when its center is within
+    ``match_dist`` of a box the reviewer deleted (an exported object or an earlier candidate missing
+    from the file: judged not to be one), or when the frame's cloud has fewer than ``min_points`` points
+    in it (nothing to judge). Detections of several models on one object become one candidate, the
+    best-scoring box. Candidates of frames up to ``max_gap`` seconds apart whose world centers (carried
+    forward by the detection's velocity) are within ``link_dist`` share an ``obj_id`` (``c<n>``), so one
+    confirm or delete in the tool decides the whole object.
+
+    Candidates are red (``obj_attr`` review). On import a confirmed one becomes a label, with a velocity
+    from its annotated centers like a box the reviewer drew; one still red becomes an ignore box; a
+    deleted one nothing. Running again replaces the candidates still red and keeps the confirmed ones;
+    the ones the reviewer deleted are remembered in dog_meta.json and not proposed again. The label files
+    are copied to ``label_backup/<time>/`` first. Close the scene in the browser before running and load
+    it again afterwards: a save from a page loaded before would write the old labels back.
+    Returns counts.
+    """
+    with open(os.path.join(scene_dir, META_FILE)) as fh:
+        meta = json.load(fh)
+    z_off = float(meta.get("z_offset", 0.0))
+    want = [CLASSES.index(c) for c in (meta.get("label_classes") or CLASSES)]
+    record = {k: dict(v) for k, v in meta.get("candidates", {}).get("frames", {}).items()}  # frame -> {id: xy}
+    rows_at = {m: {round(float(r["stamp"]), 6): r for r in rows} for m, rows in results.items()}
+    counts = defaultdict(int)
+    if backup and os.path.isdir(os.path.join(scene_dir, "label")):
+        dst = base = os.path.join(scene_dir, "label_backup", time.strftime("%Y%m%d-%H%M%S"))
+        k = 1
+        while os.path.exists(dst):
+            dst, k = "%s-%d" % (base, k), k + 1
+        shutil.copytree(os.path.join(scene_dir, "label"), dst)
+
+    work = []
+    for fm in sorted(meta["frames"], key=lambda f: f["stamp"]):
+        name = fm["name"]
+        path = os.path.join(scene_dir, "label", name + ".json")
+        anns = []
+        if os.path.exists(path):
+            with open(path) as fh:
+                anns = json.load(fh) or []
+        ids = {str(a.get("obj_id")) for a in anns}
+        old = {str(a.get("obj_id")) for a in anns if CANDIDATE_ID.match(str(a.get("obj_id"))) and "review" in _attrs(a)}
+        anns = [a for a in anns if str(a.get("obj_id")) not in old]
+        counts["earlier candidates replaced"] += len(old)
+        rec = record.get(name, {})
+        gone = [ex["center"][:2] for oid, ex in fm.get("objects", {}).items() if oid not in ids]
+        gone += [xy for cid, xy in rec.items() if cid not in ids]
+        record[name] = {cid: xy for cid, xy in rec.items() if cid not in old}
+        labelled = np.array([psr_to_box(a["psr"]) for a in anns]).reshape(-1, 7)
+
+        dets = []                                 # (score, model, box, velocity, label, subclass)
+        for m, at in rows_at.items():
+            r = at.get(round(float(fm["stamp"]), 6))
+            if r is None:
+                counts["frames without results: %s" % m] += 1
+                continue
+            d = r["detections"]
+            for k in np.nonzero((d.scores >= min_score) & np.isin(d.labels, want))[0]:
+                dets.append((float(d.scores[k]), m, np.asarray(d.boxes[k], float), np.asarray(d.velocities[k], float),
+                             int(d.labels[k]), int(d.subclasses[k])))
+        clusters = []                             # [best detection, {model: score}]
+        for det in sorted(dets, key=lambda x: -x[0]):
+            hit = next((c for c in clusters if _same_object(det[2], c[0][2], match_dist, margin)), None)
+            if hit is None:
+                clusters.append([det, {det[1]: det[0]}])
+            else:
+                hit[1][det[1]] = max(hit[1].get(det[1], 0.0), det[0])
+        cands = []
+        for det, models in clusters:
+            if _same_object(det[2], labelled, match_dist, margin):
+                counts["already labelled"] += 1
+            elif any(np.hypot(*(det[2][:2] - np.asarray(xy[:2]))) <= match_dist for xy in gone):
+                counts["deleted by the reviewer"] += 1
+            else:
+                cands.append(dict(det=det, models=models))
+        if cands:
+            pts = read_pcd(os.path.join(scene_dir, "lidar", name + ".pcd"), with_age=True)
+            boxes = np.stack([c["det"][2] for c in cands]) + [0, 0, z_off, 0, 0, 0, 0]
+            cur, tot = box_point_counts(pts, boxes)
+            for c, n, n_all in zip(cands, cur, tot):
+                c.update(points=int(n), points_all=int(n_all))
+            counts["no points"] += sum(c["points_all"] < min_points for c in cands)
+            cands = [c for c in cands if c["points_all"] >= min_points]
+        T = np.asarray(fm["T_world_det"], float)
+        for c in cands:
+            c["world"], c["world_vel"] = _to_world(c["det"][2], c["det"][3], T)
+        work.append((fm, anns, cands))
+
+    # ids: above every candidate number still in the files or remembered
+    taken = [str(a.get("obj_id")) for _, anns, _ in work for a in anns]
+    taken += [cid for rec in record.values() for cid in rec]
+    taken = [int(cid[1:]) for cid in taken if CANDIDATE_ID.match(cid)]
+    next_id = max(taken, default=0) + 1
+    tracks = []                                   # [id, label, stamp, world xy, world velocity]
+    for fm, anns, cands in work:
+        t = float(fm["stamp"])
+        pairs = sorted((float(np.hypot(*(c["world"][:2] - (tr[3] + tr[4] * (t - tr[2]))))), i, j)
+                       for i, c in enumerate(cands) for j, tr in enumerate(tracks)
+                       if tr[1] == c["det"][4] and 0 < t - tr[2] <= max_gap + 1e-6)
+        got, used = {}, set()
+        for d, i, j in pairs:
+            if d <= link_dist and i not in got and j not in used:
+                got[i] = j
+                used.add(j)
+        for i, c in enumerate(cands):
+            if i in got:
+                tr = tracks[got[i]]
+            else:
+                tr = ["c%d" % next_id, c["det"][4], t, None, None]
+                next_id += 1
+                tracks.append(tr)
+            tr[2:] = [t, c["world"][:2], c["world_vel"]]
+            c["id"] = tr[0]
+
+        name = fm["name"]
+        for c in cands:
+            score, _, box, vel, label, sub = c["det"]
+            b = box.copy()
+            b[2] += z_off
+            anns.append({"obj_id": c["id"], "obj_type": _det_type(label, sub), "obj_attr": "review",
+                         "psr": box_to_psr(b)})
+            record[name][c["id"]] = [float(box[0]), float(box[1])]
+            for m in c["models"]:
+                counts["found by %s" % m] += 1
+            if len(c["models"]) == 1:
+                counts["found by %s only" % next(iter(c["models"]))] += 1
+        with open(os.path.join(scene_dir, "label", name + ".json"), "w") as fh:
+            json.dump(anns, fh)
+        info_path = os.path.join(scene_dir, "dog_info", name + ".json")
+        info = {}
+        if os.path.exists(info_path):
+            with open(info_path) as fh:
+                info = json.load(fh)
+        here = {str(a.get("obj_id")) for a in anns}
+        info = {k: v for k, v in info.items() if not CANDIDATE_ID.match(k) or k in here}
+        for c in cands:
+            score, _, box, vel, label, sub = c["det"]
+            o = dict(label=CLASSES[label], points=c["points"], points_all=c["points_all"])
+            info[c["id"]] = dict(candidate=True, models=sorted(([m, round(s, 3)] for m, s in c["models"].items()),
+                                                               key=lambda x: -x[1]),
+                                 score=round(score, 3), det_score=round(score, 3), interpolated=False,
+                                 speed=round(float(np.hypot(*vel)), 2), moving=bool(np.hypot(*vel) > 1.0),
+                                 review=True, points=c["points"], points_all=c["points_all"],
+                                 few_points=visibility(o) in ("none", "few"), train_as="ignore")
+        os.makedirs(os.path.dirname(info_path), exist_ok=True)
+        with open(info_path, "w") as fh:
+            json.dump(info, fh)
+        counts["candidate boxes"] += len(cands)
+    counts["candidate objects"] = len({c["id"] for _, _, cands in work for c in cands})
+    runs = meta.get("candidates", {}).get("runs", [])
+    runs.append(dict(time=time.strftime("%Y-%m-%d %H:%M:%S"), models=sorted(results), min_score=min_score,
+                     boxes=counts["candidate boxes"], objects=counts["candidate objects"]))
+    meta["candidates"] = dict(runs=runs, frames={k: v for k, v in record.items() if v})
+    with open(os.path.join(scene_dir, META_FILE), "w") as fh:
+        json.dump(meta, fh, indent=1)
+    return dict(counts)
 
 
 def _to_world(box, vel, T):

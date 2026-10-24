@@ -2,6 +2,7 @@ import json
 import os
 
 import numpy as np
+import pytest
 
 from dog_perception.geometry import make_T, rot_z
 from dog_perception.sustechpoints import (box_to_psr, export_scene, frame_name, import_scene, psr_to_box, read_pcd,
@@ -268,7 +269,6 @@ def test_import_motion_attributes(tmp_path):
 def test_export_refuses_to_overwrite_a_reviewed_scene(tmp_path):
     """A second export over a scene someone changed in SUSTechPOINTS would throw the review away: refused.
     A save without changes (Ctrl+S re-writes every loaded frame, re-indented, 0.0 as 0) is not a change."""
-    import pytest
     labels = _labels()
     frames = _frames_dir(tmp_path, labels)
     data = str(tmp_path / "data")
@@ -292,3 +292,150 @@ def test_export_refuses_to_overwrite_a_reviewed_scene(tmp_path):
         export_scene(labels, frames, data, "rec", every=2)
     assert export_scene(labels, frames, data, "rec", every=5, overwrite=True) == 2
     assert len(os.listdir(root / "label")) == 2 and len(os.listdir(root / "lidar")) == 2   # stale frames removed
+
+
+def _box_points(rng, box, n=200):
+    """Points on the surface of a det-frame box (sides and top), as the lidar would hit a vehicle."""
+    x, y, z, l, w, h, yaw = box
+    u, v, s = rng.uniform(-0.5, 0.5, n) * l, rng.uniform(-0.5, 0.5, n) * w, rng.integers(0, 3, n)
+    u = np.where(s == 0, np.sign(u) * l / 2, u)
+    v = np.where(s == 1, np.sign(v) * w / 2, v)
+    zz = np.where(s == 2, z + h / 2, rng.uniform(z - h / 2 + 0.3, z + h / 2, n))
+    c, sn = np.cos(yaw), np.sin(yaw)
+    return np.c_[x + c * u - sn * v, y + sn * u + c * v, zz]
+
+
+def _candidate_scene(tmp_path):
+    """The robot drives along x. World: car A (track 1, labelled), car C (track 3, the reviewer deleted it),
+    car B (driving at 3 m/s along y, the teacher missed it), a ghost D where the cloud is empty.
+    Returns (scene dir, labels, {model: results rows})."""
+    from dog_perception.detection.boxes import Detections
+    rng = np.random.default_rng(3)
+    world = dict(A=[12.0, 3.0, 0.8, 4.5, 1.9, 1.6, 0.3], C=[8.0, 6.0, 0.8, 4.4, 1.8, 1.5, 1.2],
+                 B=[20.0, -8.0, 0.8, 4.6, 1.9, 1.6, np.pi / 2], D=[30.0, 10.0, 0.8, 4.5, 1.9, 1.6, 0.0])
+    frames, m1, m2 = [], [], []
+    fdir = tmp_path / "frames"
+    fdir.mkdir()
+    for k in range(10):
+        t = 1000.0 + 0.1 * k
+        T = make_T(rot_z(0.05 * k), [0.5 * k, 0.0, 0.0])
+        Ti = np.linalg.inv(T)
+        det = {}
+        for name, b in world.items():
+            b = np.array(b, float)
+            if name == "B":
+                b[1] += 3.0 * 0.1 * k
+            p = Ti @ np.r_[b[:3], 1.0]
+            det[name] = np.r_[p[:3], b[3:6], b[6] - 0.05 * k]
+        vel_b = (Ti[:3, :3] @ [0.0, 3.0, 0.0])[:2]
+        objs = [dict(track_id=1, label="vehicle", subclass="car", box=det["A"], velocity=np.zeros(2), score=0.8,
+                     review=False, interpolated=False, moving=False),
+                dict(track_id=3, label="vehicle", subclass="car", box=det["C"], velocity=np.zeros(2), score=0.4,
+                     review=True, interpolated=False, moving=False)]
+        frames.append(dict(stamp=t, T_world_det=T, objects=objs))
+        pts = np.vstack([_box_points(rng, det[n]) for n in "ACB"] + [np.c_[rng.uniform(-30, 30, (300, 2)), np.zeros(300)]])
+        np.save(fdir / ("%.6f.npy" % t), np.c_[pts, np.full(len(pts), 100.0), np.zeros(len(pts))].astype(np.float32))
+        boxes = np.stack([det["A"], det["B"], det["C"], det["D"]])
+        vel = np.stack([np.zeros(2), vel_b, np.zeros(2), np.zeros(2)])
+        m1.append(dict(stamp=t, detections=Detections(boxes, vel, np.array([0.9, 0.8, 0.7, 0.6]), np.zeros(4, np.int64),
+                                                      subclasses=np.array([0, 0, 0, 0]))))
+        jit = det["B"] + [0.3, -0.2, 0, 0, 0, 0, 0.05]           # the same car B, slightly off; and a pedestrian
+        m2.append(dict(stamp=t, detections=Detections(np.stack([jit, [5.0, 1.0, 0.9, 0.6, 0.6, 1.7, 0.0]]),
+                                                      np.stack([vel_b, np.zeros(2)]), np.array([0.6, 0.9]),
+                                                      np.array([0, 1]), subclasses=np.array([1, 3]))))
+    labels = dict(sequence="test", frames=frames)
+    export_scene(labels, str(fdir), str(tmp_path / "data"), "rec", label_classes=["vehicle"])
+    root = tmp_path / "data" / "rec"
+    for nm in os.listdir(root / "label"):                         # the reviewer deletes C everywhere
+        ann = [a for a in json.load(open(root / "label" / nm)) if a["obj_id"] != "3"]
+        json.dump(ann, open(root / "label" / nm, "w"))
+    return root, labels, dict(m1=m1, m2=m2)
+
+
+def test_candidates_from_other_models(tmp_path):
+    from dog_perception.sustechpoints import add_candidates
+    root, labels, results = _candidate_scene(tmp_path)
+    counts = add_candidates(str(root), results)
+    assert counts["candidate boxes"] == 10 and counts["candidate objects"] == 1      # B, one id in every frame
+    assert counts["already labelled"] == 10 and counts["deleted by the reviewer"] == 10
+    assert counts["no points"] == 10 and counts["found by m2"] == 10 and "found by m1 only" not in counts
+    assert len(os.listdir(root / "label_backup")) == 1
+    name = frame_name(labels["frames"][4]["stamp"])
+    ann = {a["obj_id"]: a for a in json.load(open(root / "label" / (name + ".json")))}
+    assert set(ann) == {"1", "c1"} and ann["c1"]["obj_attr"] == "review" and ann["c1"]["obj_type"] == "Car"
+    info = json.load(open(root / "dog_info" / (name + ".json")))["c1"]
+    assert info["candidate"] and info["models"] == [["m1", 0.8], ["m2", 0.6]] and info["points"] > 100
+    assert ann["c1"]["psr"]["position"]["z"] == pytest.approx(0.8 - 1.8)            # the best-scoring box, m1's
+
+    # still red: an ignore box after import; confirmed: a vehicle with the speed of its annotated centers
+    out, _ = import_scene(str(root))
+    assert [o["review"] for f in out["frames"] for o in f["objects"] if o.get("added")] == [True] * 10
+    for nm in os.listdir(root / "label"):
+        ann = json.load(open(root / "label" / nm))
+        for a in ann:
+            if a["obj_id"] == "c1" and nm != name + ".json":
+                a["obj_attr"] = ""                                 # confirmed; deleted in one frame
+        json.dump([a for a in ann if not (a["obj_id"] == "c1" and nm == name + ".json")], open(root / "label" / nm, "w"))
+    out, _ = import_scene(str(root))
+    b = [(f, o) for f in out["frames"] for o in f["objects"] if o.get("added")]
+    assert len(b) == 9 and not any(o["review"] for _, o in b)
+    f, o = b[4]
+    v_world = f["T_world_det"][:2, :2] @ o["velocity"]
+    assert np.allclose(v_world, [0.0, 3.0], atol=0.3)
+
+    # again: nothing new; the frame where the reviewer deleted it stays without
+    counts = add_candidates(str(root), results)
+    assert counts.get("candidate boxes", 0) == 0 and counts["already labelled"] == 19
+    assert counts["deleted by the reviewer"] == 11
+
+
+def _dog_fit():
+    import importlib
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "third_party", "SUSTechPOINTS"))
+    try:
+        return importlib.import_module("dog_fit")
+    finally:
+        sys.path.pop(0)
+
+
+def test_fit_box_from_selected_points(tmp_path):
+    """Ctrl + drag in SUSTechPOINTS: the L-shape fit follows the two visible sides where the principal axis does
+    not; a model's box that holds the object wins; ground and a smaller group behind are not the object."""
+    fit = _dog_fit()
+    rng = np.random.default_rng(5)
+    yaw = np.deg2rad(30.0)
+    c, s = np.cos(yaw), np.sin(yaw)
+    # a car 4.6 x 1.9 x 1.5 seen from (0, 0): its rear and right side, on the ground at z = -1.8 (SUSTechPOINTS frame)
+    u = np.r_[np.full(80, -2.3), rng.uniform(-2.3, 2.3, 200)]
+    v = np.r_[rng.uniform(-0.95, 0.95, 80), np.full(200, -0.95)]
+    car = np.c_[10 + c * u - s * v, 6 + s * u + c * v, rng.uniform(-1.5, -0.3, 280)]
+    ground = np.c_[rng.uniform(6, 14, (400, 2)) + [0, -1], rng.normal(-1.8, 0.02, 400)]
+    behind = np.c_[rng.uniform(16, 16.5, (30, 2)), rng.uniform(-1.5, 0, 30)]
+    pts = np.vstack([car, ground, behind])
+    scene = tmp_path / "rec"
+    (scene / "dog_dets").mkdir(parents=True)
+    json.dump({"z_offset": -1.8}, open(scene / "dog_meta.json", "w"))
+
+    got = fit.fit(str(scene), "f0", pts.tolist(), yaw_hint=yaw + 0.3)
+    assert got["source"] == "fit" and got["points"] == 280
+    p = got["psr"]
+    assert abs(np.rad2deg(p["rotation"]["z"] - yaw)) < 2.0                       # heading toward the hint
+    assert abs(p["scale"]["x"] - 4.6) < 0.1 and abs(p["scale"]["y"] - 1.9) < 0.1
+    assert abs(p["position"]["z"] - p["scale"]["z"] / 2 + 1.8) < 0.05            # bottom on the ground
+    assert np.hypot(p["position"]["x"] - 10, p["position"]["y"] - 6) < 0.1
+    pca = np.linalg.eigh(np.cov((car[:, :2] - car[:, :2].mean(0)).T))[1][:, -1]
+    assert abs(np.rad2deg(np.arctan2(pca[1], pca[0]) % np.pi - yaw)) > 5.0       # what SUSTechPOINTS' fallback gets
+    alone = fit.fit(str(scene), "f0", (car + [0, 0, 1.0]).tolist())["psr"]        # far away: no ground in sight
+    assert abs(alone["position"]["z"] - alone["scale"]["z"] / 2 - car[:, 2].min() - 1.0) < 1e-6
+    back = fit.fit(str(scene), "f0", pts.tolist(), yaw_hint=yaw + np.pi)["psr"]["rotation"]["z"]
+    assert abs(np.rad2deg(np.angle(np.exp(1j * (back - yaw - np.pi))))) < 2.0    # g's other heading
+
+    model = {"position": {"x": 10.2, "y": 6.1, "z": -1.0}, "scale": {"x": 4.8, "y": 2.0, "z": 1.6},
+             "rotation": {"x": 0, "y": 0, "z": yaw}}
+    json.dump([{"model": "v1_pp", "score": 0.4, "obj_type": "Car", "psr": model},
+               {"model": "nusc", "score": 0.9, "obj_type": "Truck",
+                "psr": dict(model, position={"x": 30.0, "y": 6.0, "z": -1.0})}], open(scene / "dog_dets" / "f0.json", "w"))
+    got = fit.fit(str(scene), "f0", pts.tolist())
+    assert got["source"] == "v1_pp 0.40" and got["psr"] == model and got["obj_type"] == "Car"
+    assert fit.fit(str(scene), "f0", ground.tolist()) == {}

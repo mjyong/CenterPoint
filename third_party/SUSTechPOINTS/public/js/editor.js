@@ -8,6 +8,7 @@ import {ImageContextManager} from "./image.js";
 import {globalObjectCategory} from "./obj_cfg.js";
 
 import {objIdManager} from "./obj_id_list.js";
+import {ml} from "./ml.js";
 import {Header} from "./header.js";
 import {BoxOp} from './box_op.js';
 import {AutoAdjust} from "./auto-adjust.js";
@@ -1454,7 +1455,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         
     };
     
-    this.handleSelectRect= function(x,y,w,h, ctrl, shift){
+    this.handleSelectRect= async function(x,y,w,h, ctrl, shift){
         // y = y+h;
         // x = x*2-1;
         // y = -y*2+1;
@@ -1506,7 +1507,25 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         
         let initRoationZ = this.viewManager.mainView.camera.rotation.z + Math.PI/2;
 
-        let box = this.create_box_by_points(points, initRoationZ);
+        // CenterPoint dog pipeline (2026-10-24): Ctrl + drag asks the server for the box first (main.py
+        // dog_fit_box, dog_fit.py): a model's box when one holds the selected object, else an L-shape fit
+        // standing on the ground. SUSTechPOINTS' own fitting below only when it has none.
+        let fitted = null;
+        if (!shift){
+            let world = this.data.world;
+            let hint = world.sceneRotToLidar(new THREE.Euler(0, 0, initRoationZ, "XYZ")).z;
+            fitted = await ml.dog_fit_box(world.frameInfo.scene, world.frameInfo.frame, points, hint,
+                                          [center_pos.x, center_pos.y]);
+            if (!fitted || !fitted.psr)
+                fitted = null;
+            else
+                logger.log(`new box: ${fitted.source} (${fitted.points} points)`);
+        }
+
+        let box = fitted ?
+            this.data.world.annotation.add_box(fitted.psr.position, fitted.psr.scale, fitted.psr.rotation,
+                fitted.obj_type || globalObjectCategory.guess_obj_type_by_dimension(fitted.psr.scale), "") :
+            this.create_box_by_points(points, initRoationZ);
 
         let id = objIdManager.generateNewUniqueId();
         box.obj_track_id = id;
@@ -1517,7 +1536,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         
         
         
-        if (!shift){
+        if (!shift && !fitted){
             try{
                 this.boxOp.auto_shrink_box(box);
             }
@@ -1529,7 +1548,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         
         // guess obj type here
         
-        box.obj_type = globalObjectCategory.guess_obj_type_by_dimension(box.scale);
+        box.obj_type = (fitted && fitted.obj_type) || globalObjectCategory.guess_obj_type_by_dimension(box.scale);
         
         objIdManager.addObject({
             category: box.obj_type,
@@ -1544,7 +1563,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         this.selectBox(box);
         this.on_box_changed(box);
 
-        if (!shift){
+        if (!shift && !fitted){
             this.boxOp.auto_rotate_xyz(box, ()=>{
                 box.obj_type = globalObjectCategory.guess_obj_type_by_dimension(box.scale);
                 this.floatLabelManager.set_object_type(box.obj_local_id, box.obj_type);

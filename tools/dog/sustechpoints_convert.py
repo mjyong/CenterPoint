@@ -14,6 +14,11 @@ SUSTechPOINTS is vendored in third_party/SUSTechPOINTS (see its VENDORED.md); sc
     # then import:
     python tools/dog/sustechpoints_convert.py import --scene rec_001 --out data/labels/rec_001/labels_sustech.pkl
 
+    # validation labels made from the teacher's boxes favour the teacher: add what other models detect and no
+    # box accounts for as red candidates (reviewed scenes too; {scene} stands for each scene), review, import
+    python tools/dog/sustechpoints_convert.py candidates --scenes rec_001 rec_002 --min-score 0.3 \
+        --results v1_pp=data/runs_veh_v1/{scene}/pillar/results.pkl nusc_pp=data/runs_nusc_pp/{scene}/pillar/results.pkl
+
     # the imported labels feed export_dataset.py like any labels.pkl (keyframes only); for a training scene,
     # first spread the reviewed keyframes over every frame:
     python tools/dog/sustechpoints_convert.py propagate --full data/labels/rec_001/labels.pkl \
@@ -29,14 +34,18 @@ import argparse
 import json
 import os
 import pickle
+import shutil
 import sys
+import tempfile
+from collections import Counter
 
 import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.detection.boxes import CLASSES  # noqa: E402
-from dog_perception.sustechpoints import export_scene, import_scene, propagate_keyframes  # noqa: E402
+from dog_perception.sustechpoints import (add_candidates, export_scene, import_scene,  # noqa: E402
+                                          propagate_keyframes, write_detections)
 from dog_perception.visibility import annotate_points  # noqa: E402
 
 VENDORED = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "third_party", "SUSTechPOINTS"))
@@ -61,6 +70,44 @@ def serve(app, host, port):
     cherrypy.engine.signals.subscribe()
     cherrypy.engine.start()
     cherrypy.engine.block()
+
+
+def candidates(args):
+    """``candidates`` and ``detections`` over the scenes, with each model's results.pkl of the scene."""
+    specs = [kv.split("=", 1) for kv in args.results]
+    total = Counter()
+    for scene in args.scenes:
+        results = {}
+        for name, path in specs:
+            with open(path.replace("{scene}", scene), "rb") as f:
+                results[name] = pickle.load(f)
+        scene_dir = os.path.join(args.root, scene)
+        if args.cmd == "detections" or not args.dry_run:
+            n = write_detections(scene_dir, results, args.dets_min_score)
+            print("%s: %d model boxes for Ctrl + drag -> %s" % (scene, n, os.path.join(scene_dir, "dog_dets")))
+        if args.cmd == "detections":
+            continue
+        if args.dry_run:
+            tmp = tempfile.mkdtemp()
+            work = os.path.join(tmp, scene)
+            shutil.copytree(scene_dir, work, ignore=shutil.ignore_patterns("lidar", "label_backup", "dog_dets"))
+            os.symlink(os.path.abspath(os.path.join(scene_dir, "lidar")), os.path.join(work, "lidar"))
+            counts = add_candidates(work, results, args.min_score, args.match_dist, min_points=args.min_points,
+                                    backup=False)
+            shutil.rmtree(tmp)
+        else:
+            counts = add_candidates(scene_dir, results, args.min_score, args.match_dist, min_points=args.min_points)
+        total.update(counts)
+        print("%s: %d candidate boxes (%d objects); %s" % (
+            scene, counts.get("candidate boxes", 0), counts.get("candidate objects", 0),
+            ", ".join("%s %d" % kv for kv in sorted(counts.items()) if not kv[0].startswith("candidate"))))
+    if args.cmd == "detections":
+        return
+    print("total: %d candidate boxes (%d objects); %s" % (
+        total["candidate boxes"], total["candidate objects"],
+        ", ".join("%s %d" % kv for kv in sorted(total.items()) if not kv[0].startswith("candidate"))))
+    if args.dry_run:
+        print("dry run: nothing written")
 
 
 def main():
@@ -103,6 +150,20 @@ def main():
     g.add_argument("--classes", nargs="+", choices=CLASSES, default=None,
                    help="label classes the review covered (default: the export's, e.g. vehicle for --vehicles-only); "
                         "--full objects of other classes are copied as they are")
+    c = sub.add_parser("candidates", help="other models' detections no box accounts for -> red boxes to check "
+                                          "(also writes the detections for Ctrl + drag, as 'detections')")
+    d = sub.add_parser("detections", help="the models' boxes per frame: Ctrl + drag in the tool snaps to them")
+    for p in (c, d):
+        p.add_argument("--root", default=os.path.join(VENDORED, "data"), help="SUSTechPOINTS data/ directory")
+        p.add_argument("--scenes", nargs="+", required=True, help="scene names under --root")
+        p.add_argument("--results", nargs="+", required=True, metavar="NAME=PATH",
+                       help="run_sequence.py results.pkl per model; {scene} in PATH stands for the scene name")
+        p.add_argument("--dets-min-score", type=float, default=0.15, help="lowest score of the boxes for Ctrl + drag")
+    c.add_argument("--min-score", type=float, default=0.3)
+    c.add_argument("--match-dist", type=float, default=2.0,
+                   help="[m] a detection this close to a label (or a deleted box) is not a candidate")
+    c.add_argument("--min-points", type=int, default=1, help="points (all sweeps) a candidate needs to be judged")
+    c.add_argument("--dry-run", action="store_true", help="count only; the scenes are not changed")
     st = sub.add_parser("stats", help="frames, boxes and boxes still marked review per scene")
     st.add_argument("--root", default=os.path.join(VENDORED, "data"), help="SUSTechPOINTS data/ directory")
     v = sub.add_parser("serve", help="start SUSTechPOINTS (works without TensorFlow)")
@@ -113,6 +174,8 @@ def main():
 
     if args.cmd == "serve":
         serve(args.app, args.host, args.port)
+    elif args.cmd in ("candidates", "detections"):
+        candidates(args)
     elif args.cmd == "stats":
         totals = {}
         print("scene split frames boxes review")

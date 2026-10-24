@@ -81,11 +81,15 @@
 | H2 | （T7 选了 Voxel 时）在 Orin 上测 Voxel v1 的延迟，放得下就部署 Voxel，否则部署 Pillar | 人 | T8 | 半天 | 待做 |
 | T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
+| T11 | 验证集加多模型候选框（红框"候选"）；35 个场景写上模型框，供 Ctrl + 拖框用 | Agent | T7 | 20 分钟 | 待做 |
+| H3 | 审候选框：是车确认、不是车删除；漏掉的车 Ctrl + 拖框补上 | 人 | T11 | 1–2 小时 | 待做 |
+| T12 | 导回 H3 的验证标签，重评所有模型；比较候选教师（nuScenes Voxel、v1 Voxel 加 TTA），选下一轮教师 | Agent | H3 | 1 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
 - 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
 - v0 只用未审核的自动标注，主要作用是把 GPU 训练流程跑通、得到一个基线，**不上线**。要上线的是 v1。
+- T11 → H3 → T12（2026-10-24 加）：验证标签是审教师的框得来的，教师漏掉的车不在里面，评哪个模型都偏向教师（T7 复核）。先把其他模型多检出的东西让人判一遍，再重评、选下一轮的教师（[DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md) 第 1 节）。和 T8、T9 不冲突，可以同时做；T9 用哪个教师，等 T12 的结论更好。
 
 ## 背景：已经有的东西
 
@@ -1034,7 +1038,7 @@ Foxglove：`data/examples/runs/0921_164127_s001_v1/0921_164127_s001_pillar.mcap`
   - 把各模型（v1、nuScenes Pillar）在验证关键帧上 ≥ 0.3 分、却和现有标签都对不上的框，作为红框候选导进 SUSTechPOINTS，人看是不是车（是就确认，不是就删）；
   - 再按 AP@2 m / 4 m（对框的位置不敏感）重评。
   
-  需要的话我来加这个工具。
+  这个工具已经加了（2026-10-24）：T11–T12。
 - **审核的作用**：Voxel 明确（mAP +0.052，100% 领先），Pillar 看不出来（+0.014，76%）。
 - **两个模型都在第 10 个 epoch 左右就够了**：Voxel 两轮都是第 10 个 epoch 最好；Pillar v1 第 10、20 个几乎一样（0.788 / 0.789）。下一轮训练可以先试 10 个 epoch，训练时间减半，再看验证集。
 - **上报阈值**：0.25 时 v1 Pillar 在 20 m 内召回 0.911，误检比现在线上的 nuScenes Pillar 在 0.35 时少三分之二（226 对 695）。建议部署 v1 Pillar 时车辆用 0.25。注意 `DEFAULT_SCORE_THRESHOLDS` 也是跟踪器新建轨迹的门槛，自动标注（教师）也在用；直接改它会改变下一轮的自动标注，最好做成部署时按模型设的参数。
@@ -1139,3 +1143,165 @@ v1 Voxel 专门在这批数据上训过，当教师应该比 nuScenes 模型准�
 ### T10 结果
 
 （待填）
+
+---
+
+## T11 验证集加多模型候选框
+
+工具见 [DOG_FINETUNE.md](DOG_FINETUNE.md) 第 16 节。T7 的 7 个模型在 10 个验证场景上的 results.pkl 都在，不用 GPU，也不重新推理。
+
+```text
+任务 T11：给 10 个验证场景加多模型候选框（红框，标签写"候选"和检出它的模型），给 35 个场景写上模型框（Ctrl + 拖框用）。
+先按 docs/SERVER_TASKS.md 的"通用约定"做（这次 git pull 拉到了代码改动，跑快速测试）。前置：T7 完成
+（data/runs_veh_v1、data/runs_veh_v0、data/runs_nusc_pp、data/runs_nusc_voxel、data/runs 下 10 个验证场景都有 results.pkl）。
+只读 results.pkl、改公共盘 sustech/ 里的场景，不用 GPU。不要用 --force，不要重新 export 任何场景（通用约定 3）。
+
+1. 停掉正在跑的 SUSTechPOINTS：它的代码改了，要重启才有新功能；停着的时候，浏览器里还开着的旧页面也存不回去。
+     ps aux | grep "sustechpoints_convert.py serve" | grep -v grep
+   有就记下它的启动命令和 PID，然后 kill <PID>。
+2. 备份 10 个验证场景的标注。工具自己会把 label/ 复制到场景里的 label_backup/<时间>/，这里连 dog_meta.json、dog_info 再备一份：
+     mkdir -p data/reports/T11 /public/zjst/robot/centerpoint_data/sustech_backup
+     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
+     tar -C /public/zjst/robot/centerpoint_data/sustech -cf /public/zjst/robot/centerpoint_data/sustech_backup/T11_before.tar \
+         $(for r in $VAL; do echo $r/label $r/dog_meta.json $r/dog_info; done)
+3. 先空跑，只统计（{scene} 原样写，工具按场景替换）：
+     RES="v1_pp=data/runs_veh_v1/{scene}/pillar/results.pkl v1_voxel=data/runs_veh_v1/{scene}/voxel/results.pkl
+          v0_pp=data/runs_veh_v0/{scene}/pillar/results.pkl v0_voxel=data/runs_veh_v0/{scene}/voxel/results.pkl
+          nusc_pp=data/runs_nusc_pp/{scene}/pillar/results.pkl nusc_voxel=data/runs_nusc_voxel/{scene}/voxel/results.pkl
+          teacher=data/runs/{scene}/voxel/results.pkl"
+     python tools/dog/sustechpoints_convert.py candidates --root /public/zjst/robot/centerpoint_data/sustech \
+         --scenes $VAL --results $RES --min-score 0.3 --dry-run | tee data/reports/T11/dry_run.txt
+   最后一行 total 的候选物体数（"N objects"）超过 400 就停下报告：一次审不完，要提高 --min-score。
+4. 正式跑：同一条命令去掉 --dry-run，输出 tee 到 data/reports/T11/candidates.txt。
+   每个场景先打印"model boxes for Ctrl + drag"（写 dog_dets/），再打印候选数。
+5. 训练场景也写上模型框（只有教师的），审训练集时 Ctrl + 拖框也能用：
+     TRAIN=$(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT)
+     python tools/dog/sustechpoints_convert.py detections --root /public/zjst/robot/centerpoint_data/sustech \
+         --scenes $TRAIN --results teacher=data/runs/{scene}/voxel/results.pkl | tee data/reports/T11/detections.txt
+6. 统计每个场景的帧数、框数、红框数：
+     python tools/dog/sustechpoints_convert.py stats --root /public/zjst/robot/centerpoint_data/sustech \
+         | tee data/reports/T11/stats.txt
+7. 第 1 步停掉过的话，用记下的同一条命令重新起 SUSTechPOINTS（后台运行，日志写到 data/reports/T11/serve.log）。
+
+停止条件：任何报错；第 3 步候选物体超过 400。
+提交：data/reports/T11/（不要 tar、serve.log）、本文档。
+报告（写进"T11 结果"）：
+- candidates.txt 每个场景一行（候选框数、物体数）和 total 行；
+- 每个模型 "found by X" 和 "found by X only" 的数（哪个模型多检出的东西最多）；
+- "already labelled"、"deleted by the reviewer"、"no points" 的总数；
+- stats.txt 里验证集的红框总数（含 H1 剩下的）；
+- SUSTechPOINTS 是否已重新起好，地址。
+```
+
+### T11 结果
+
+（待填）
+
+---
+
+## H3 审候选框（人做）
+
+T11 之后，在 SUSTechPOINTS 里只看验证集（列表里"验证集"一组，10 个场景，约 580 帧）。浏览器要重新打开页面（Ctrl+F5），才会用到新代码。
+
+**候选框**：红框，标签写"候选"和检出它的模型、分数，例如 `候选 v1_pp 0.62 · nusc_pp 0.41`。同一个物体在各关键帧的候选是同一个 ID（`c12`），右键菜单的操作作用于它的所有帧：
+
+| 看到的 | 操作 |
+|---|---|
+| 是车（含停着的、挂车厢、叉车） | 右键 → 确认。框明显歪了（偏出车 0.5 m 以上）就调一下 |
+| 不是车（墙角、集装箱、货堆、岗亭……） | 右键 → Delete this object (in all frames) |
+| 看不清（点太少、只看到一角） | 右键 → 看不清（作忽略框） |
+| 同一个 ID 里，有几帧是车、有几帧不是 | 按 `v` 进批量窗口逐帧看，不是车的那几帧单独删 |
+
+**漏掉的车**：翻帧时看到一辆车没有任何框（连候选也没有），按住 Ctrl 拖一个矩形把它框进去，会自动出框（有模型框就用模型的，没有就按点拟合），检查后把类别改成 Car 或 Truck。只看得到一部分的车，在侧视图里把框拉到整车长度。
+
+**H1 剩下的红框**（不带"候选"的，T5 复核里的 s007、s008、s023 等是训练集，不用管；验证集还有约 14 条）也顺手定掉。
+
+做完把状态表的 H3 改成"完成"，注明审核人、日期。大致记一下：确认了多少个候选、删了多少，补画了几辆。
+
+### H3 结果
+
+（待填）
+
+---
+
+## T12 导回新的验证标签，重评，选下一轮教师
+
+```text
+任务 T12：导回 H3 审过的验证标签，在新标签上重评 T7 的 7 个模型；再比较三个候选教师
+（nuScenes Voxel + TTA，即现在的教师；v1 Voxel 第 10、20 个 epoch 加 TTA），给出下一轮用哪个当教师。
+先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：H3 完成。
+GPU：第 3 步每个进程约 6 GB（Voxel + TTA），--jobs 2 就是 12 GB，按通用约定 5 放卡。
+
+1. 导回。旧的验证标签先另存一份，比较用（labels_sustech.pkl 在 git 里，旧版本也在历史里）：
+     mkdir -p data/reports/T12
+     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
+     for r in $VAL; do
+       cp data/labels/$r/labels_sustech.pkl data/labels/$r/labels_sustech_h1.pkl
+       python tools/dog/sustechpoints_convert.py import --scene $r --frames data/runs/$r/frames \
+           --out data/labels/$r/labels_sustech.pkl
+     done 2>&1 | tee data/reports/T12/import.txt
+2. 标签变了多少（每个场景：车辆框 旧 → 新；人加的框 added 旧 → 新，其中确认的、仍作忽略的）。
+   下面的 Python 从行首开始写（heredoc 里不能缩进），整段复制：
+python - $VAL <<'EOF' | tee data/reports/T12/label_changes.txt
+import pickle, sys
+def veh(path):
+    return [o for f in pickle.load(open(path, "rb"))["frames"] for o in f["objects"] if o["label"] == "vehicle"]
+print("scene vehicles_old vehicles_new added_old added_new added_new_confirmed added_new_still_review")
+for r in sys.argv[1:]:
+    old, new = veh("data/labels/%s/labels_sustech_h1.pkl" % r), veh("data/labels/%s/labels_sustech.pkl" % r)
+    add = [o for o in new if o.get("added")]
+    print(r, len(old), len(new), sum(bool(o.get("added")) for o in old), len(add),
+          sum(not o["review"] and not o.get("ignore") for o in add), sum(bool(o["review"]) for o in add))
+EOF
+3. 候选教师：v1 Voxel 第 10、20 个 epoch，加 TTA，重放验证场景：
+     for e in 10 20; do
+       python tools/dog/run_sequence.py --replay $(for r in $VAL; do echo data/runs/$r; done) --detectors voxel --tta \
+           --ckpt-voxel data/train/dog_voxel_veh_v1/epoch_$e.pth --no-predict --no-mcap --jobs 2 --device cuda:0 \
+           --out "data/runs_teacher_v1_e$e/{scene}"
+     done 2>&1 | tee data/reports/T12/runs.txt
+4. 在新标签上重评，T7 的 7 个模型再加两个候选教师：
+     RES=$(for r in $VAL; do echo v1_voxel=data/runs_veh_v1/$r/voxel/results.pkl v1_pp=data/runs_veh_v1/$r/pillar/results.pkl \
+         v0_voxel=data/runs_veh_v0/$r/voxel/results.pkl v0_pp=data/runs_veh_v0/$r/pillar/results.pkl \
+         nusc_voxel=data/runs_nusc_voxel/$r/voxel/results.pkl nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl \
+         teacher=data/runs/$r/voxel/results.pkl teacher_v1_e10=data/runs_teacher_v1_e10/$r/voxel/results.pkl \
+         teacher_v1_e20=data/runs_teacher_v1_e20/$r/voxel/results.pkl; done)
+     python tools/dog/compare_detectors.py --classes vehicle --results $RES \
+         --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech.pkl; done) \
+         --thresholds 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 --target-recall 0.9 --bootstrap 1000 \
+         | tee data/reports/T12/compare_val.md
+   旧标签再跑一次（不要 --thresholds），看结论变了没有：
+     python tools/dog/compare_detectors.py --classes vehicle --results $RES \
+         --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech_h1.pkl; done) --bootstrap 1000 \
+         | tee data/reports/T12/compare_val_h1.md
+   AP 表后面多了一张"velocity head on moving labels"：各模型的速度头怎么读运动的车。自动标注要教师的速度头
+   读到 > 0.15 m/s 才把这一帧算运动（"head > 0.15 m/s" 一列）。
+5. 运动状态（新标签）：
+     motion() {  # motion <名字> <结果目录名> <pillar|voxel>
+       python tools/dog/motion_eval.py $(for r in $VAL; do echo --scene data/labels/$r/labels_sustech.pkl data/$2/$r/$3/results.pkl; done) \
+           --details data/reports/T12/motion_$1_details.csv | tee data/reports/T12/motion_$1.txt
+     }
+     motion v1_pp runs_veh_v1 pillar; motion nusc_pp runs_nusc_pp pillar
+6. 选下一轮的教师，在 teacher、teacher_v1_e10、teacher_v1_e20 三个里比（新标签的 AP 表）：
+   - 只看 AP@2.0、AP@4.0 和 AP@2.0[20-40m]：框的位置还是第一轮教师给的，AP@0.5、1.0 仍然偏向 teacher。
+   - 选 v1 的某个 epoch，要同时满足：
+     a. AP@2.0 比 teacher 高 ≥ 0.02；
+     b. AP@2.0[20-40m] 不低于 teacher（教师要看得远）；
+     c. 速度表里 "head > 0.15 m/s" 不低于 teacher 的减 5 个百分点（运动的车要标成运动）。
+     两个 epoch 都满足时选 AP@2.0 高的。
+   - 都不满足就继续用 teacher（nuScenes Voxel + TTA）。
+
+停止条件：任何报错；某个模型某个场景的 results.pkl 缺失；import.txt 里各场景 "still marked review" 合计超过 100 个框（H3 没审完，问人）。
+提交：data/labels/0921_*/labels_sustech.pkl（验证场景，新的）、data/reports/T12/、本文档。不提交 labels_sustech_h1.pkl。
+报告（写进"T12 结果"）：
+- label_changes.txt 整段，以及合计：加了多少车框、多少条轨迹；
+- compare_val.md 的 AP 表、速度表、重抽的两张表（整段贴）；compare_val_h1.md 的 AP 表；
+- 新旧标签下，这几个差值各一句（带 90% 区间）：v1_pp − nusc_pp、v1_voxel − v1_pp、v1_voxel − nusc_voxel；
+- 各模型和 teacher 的 mAP 差，新旧标签下各是多少（偏向教师的问题小了多少）；
+- 两个 motion_*.txt 的表；
+- 第 6 步选了哪个教师，满足了哪几条；三个教师的 AP@2.0、AP@2.0[20-40m]、"head > 0.15 m/s" 列成一张表。
+```
+
+### T12 结果
+
+（待填）
+

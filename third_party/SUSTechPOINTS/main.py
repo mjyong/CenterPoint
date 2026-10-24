@@ -10,6 +10,7 @@ env = Environment(loader=FileSystemLoader('./'))
 import os
 import sys
 import scene_reader
+import dog_fit   # CenterPoint dog pipeline (2026-10-24): /dog_fit_box
 from tools import check_labels  as check
 
 
@@ -168,6 +169,18 @@ class Root(object):
       #return {}
 
     
+    # CenterPoint dog pipeline (2026-10-24): a box for the points selected with Ctrl + drag (dog_fit.py):
+    # a model's box from data/<scene>/dog_dets/ when one holds the object, else an L-shape fit on the ground.
+    # Body: {"scene", "frame", "points": [[x, y, z], ...] (lidar frame), "yaw_hint", "center": the rectangle's
+    # middle [x, y]}; {} when there is no object.
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def dog_fit_box(self):
+      data = json.loads(cherrypy.request.body.read().decode("UTF-8"))
+      scene, frame = os.path.basename(str(data["scene"])), os.path.basename(str(data["frame"]))
+      return dog_fit.fit(os.path.join(scene_reader.root_dir, scene), frame, data["points"], data.get("yaw_hint"),
+                         data.get("center"))
+
     @cherrypy.expose    
     @cherrypy.tools.json_out()
     def auto_annotate(self, scene, frame):

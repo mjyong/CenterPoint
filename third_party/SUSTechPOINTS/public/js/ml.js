@@ -284,6 +284,17 @@ var ml = {
     //     xhr.send(JSON.stringify({"points": data}));
     // },
 
+    // CenterPoint dog pipeline (2026-10-24): a box for the points selected with Ctrl + drag (main.py
+    // dog_fit_box, dog_fit.py): {psr, obj_type, source, points}; {} when they hold no object, null on an error
+    dog_fit_box: function(scene, frame, points, yaw_hint, center){
+        return fetch(new Request("/dog_fit_box"), {
+            method: 'POST',
+            body: JSON.stringify({scene: scene, frame: frame, points: points, yaw_hint: yaw_hint, center: center})
+        })
+        .then(response=>response.ok ? response.json() : null)
+        .catch(()=>null);
+    },
+
     predict_rotation: function(data){
         const req = new Request("/predict_rotation");
         let init = {

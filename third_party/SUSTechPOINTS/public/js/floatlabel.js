@@ -7,12 +7,21 @@ import { globalObjectCategory } from "./obj_cfg.js";
 // "0.43/0.71 运动 2.3m/s": track mean score / this frame's teacher score ("插值" where the
 // track was interpolated), then 运动 (moving, orange) or 静止 (static, grey) with the speed;
 // "点少" when the box holds fewer than 5 current-sweep points (an ignore box in training).
+// Candidates (tools/dog/sustechpoints_convert.py candidates, 2026-10-24) show the models that found them
+// instead: "候选 v1_pp 0.62 · nusc_pp 0.41".
+function dogModelsText(dog){
+    return (dog.models || []).map(m=>m[0] + " " + Number(m[1]).toFixed(2)).join(" · ");
+}
+
 function dogInfoText(dog){
     if (!dog)
         return "";
     let frame = dog.interpolated ? "插值" : (dog.det_score !== undefined ? Number(dog.det_score).toFixed(2) : "-");
     let text = '<div class="label-dog-text">';
-    text += (dog.score !== undefined ? Number(dog.score).toFixed(2) : "-") + "/" + frame;
+    if (dog.candidate)
+        text += "候选 " + dogModelsText(dog);
+    else
+        text += (dog.score !== undefined ? Number(dog.score).toFixed(2) : "-") + "/" + frame;
     if (dog.moving)
         text += ' <span class="label-dog-moving">运动 ' + Number(dog.speed || 0).toFixed(1) + 'm/s</span>';
     else

@@ -265,3 +265,21 @@ def test_clip_visualizer_writes_all_layers(tmp_path):
         topics = {ch.topic for _, ch, _ in make_reader(f).iter_messages()}
     assert {"/tf", "/lidar", "/ego", "/gt/boxes", "/gt/paths", "/det/boxes", "/track/boxes", "/track/history",
             "/pred/paths", "/events", "/metrics/frame", "/log"} <= topics
+
+
+def test_moving_velocity_reads_the_velocity_head():
+    """A head that reads a moving car at a tenth of its speed is told apart from one that reads it right;
+    parked cars and ignored labels do not count."""
+    from dog_perception.detection.evaluate import moving_velocity
+    gts, good, slow = [], [], []
+    for k in range(10):
+        boxes = np.array([[10.0 + k, 0, 0.8, 4.5, 1.9, 1.6, 0], [5, 8, 0.8, 4.5, 1.9, 1.6, 0], [-9, 3, 0.8, 4, 2, 2, 0]])
+        vel = np.array([[3.0, 0.0], [0.0, 0.0], [2.0, 0.0]])
+        gts.append(dict(boxes=boxes, labels=np.zeros(3, np.int64), velocities=vel, ignore=np.array([0, 0, 1], bool)))
+        for out, f in ((good, 1.0), (slow, 0.03)):
+            out.append(dict(boxes=boxes[:2] + [0.3, 0, 0, 0, 0, 0, 0], labels=np.zeros(2, np.int64),
+                            scores=np.array([0.8, 0.9]), velocities=vel[:2] * f))
+    g = moving_velocity(good, gts, 0)
+    s = moving_velocity(slow, gts, 0)
+    assert g["labels"] == g["matched"] == 10 and g["speed_ratio"] == pytest.approx(1.0) and g["read_moving"] == 1.0
+    assert s["speed_ratio"] == pytest.approx(0.03) and s["read_moving"] == 0.0 and s["error"] == pytest.approx(2.91)

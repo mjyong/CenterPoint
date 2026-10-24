@@ -444,13 +444,21 @@ mindmap
 - `dog_meta.json`：记下 SUSTechPOINTS 不保存的信息：每帧的 `stamp`、`T_world_det`、自动标注的中心和速度、导出时标注内容的摘要 `label_sha1`；轨迹平均分、z 偏移、导出了哪些类别（`label_classes`）。
 - 再导出同一个场景时，只要有一帧的标注内容和 `label_sha1` 对不上（在工具里改过），就拒绝覆盖；`--force` 才覆盖。
 
-**在 SUSTechPOINTS 里**：可以挪框、改尺寸、改朝向、改类型、删框，**也可以新增漏标的物体**。
+**`detections`**（`candidates` 也会写）：读各模型的 `results.pkl`，写 `dog_dets/<帧名>.json`，内容是这一帧各模型 ≥ 0.15 分的框（模型名、分数、类型、psr，同样下移 1.8 m）。工具里 Ctrl + 拖框时，服务端（`dog_fit.py`）用包住选中物体的、分最高的那个框。
+
+**`candidates`**：往导出过（可以已经审过）的场景里加其他模型的检测，作为红框候选（DOG_FINETUNE.md 第 16 节）：
+- `label/<帧名>.json` 多出 `obj_id = c<n>`、`obj_attr = "review"` 的框；同一个物体在各关键帧是同一个 `c<n>`；
+- `dog_info` 里这些框带 `candidate`，以及检出它的模型和分数；
+- `dog_meta.json` 加 `candidates`：每次运行的记录，和每帧提过的候选位置。人删掉的候选靠它记住，下次不再提；
+- 改之前，`label/` 先复制到 `label_backup/<时间>/`。
+
+**在 SUSTechPOINTS 里**：可以挪框、改尺寸、改朝向、改类型、删框，**也可以新增漏标的物体**（Ctrl + 拖框自动出框）。
 
 **`import`**：生成 `labels_sustech.pkl`，格式和 `labels.pkl` 一样。
 - z 移回原位；
 - 类型映射回类别和子类：Car / Van → car；Truck 和各种工程车 → truck；Bus / Tram / LongVehicle → bus；三轮车、代步车 → cyclist；
 - 中心没被挪动的框，保留导出时的速度；挪过的框和新加的框，按同一 `obj_id` 在 W 系的标注中心重新算速度（±0.5 s 差分，低于静止阈值的置零）；
-- `obj_attr`：`ignore` → `ignore = True`；`static` → 速度 0；`moving` → 按审核后的框算速度；仍带 `review` 的（红框没点确认）→ `review = True`，导出时作忽略框；其余 `review = False`、`reviewed = True`；工具里新画的框加 `added = True`；
+- `obj_attr`：`ignore` → `ignore = True`；`static` → 速度 0；`moving` → 按审核后的框算速度；仍带 `review` 的（红框没点确认）→ `review = True`，导出时作忽略框；其余 `review = False`、`reviewed = True`；工具里新画的框和候选框（不是导出时就有的）加 `added = True`，轨迹号接在已有的后面；
 - `--frames` 给出时，重新数框里的点（审核挪过的框按新位置数）；
 - 只包含导出的那些帧（`--every 5` 就是 2 Hz）。
 
