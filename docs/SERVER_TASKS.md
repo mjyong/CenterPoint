@@ -83,8 +83,9 @@
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
 | T11 | 验证集加多模型候选框（红框"候选"）；35 个场景写上模型框，供 Ctrl + 拖框用 | Agent | T7 | 20 分钟 | 完成（物体最高分门槛 0.5，306 个候选物体） |
 | T11b | 重做候选：只要车辆，只用 v1 Voxel、v1 Pillar 两个模型（T11 混进了行人、骑行者） | Agent | T11 | 15 分钟 | 完成（物体最高分门槛 0.3，54 个候选物体） |
-| H3 | 审候选框（只有车）：是车确认、不是车删除；漏掉的车 Ctrl + 拖框补上 | 人 | T11b | 1–2 小时 | 待做（T11b 之前先别审） |
+| H3 | 审候选框（只有车）：是车确认、不是车删除；漏掉的车 Ctrl + 拖框补上 | 人 | T11b | 约 1 小时 | 可以开始 |
 | T12 | 导回 H3 的验证标签，重评所有模型；选下一轮的两个教师（Voxel、Pillar 各一个） | Agent | H3 | 1 小时 | 待做 |
+| T13 | 雷达后方盲区：量出盲区，看各模型在盲区边上是不是误检更多 | Agent | T7 | 10 分钟 | 待做（不用等 H3） |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -1386,6 +1387,12 @@ T11 写的、还红着的 2679 个框全部换掉，已经确认的是 0。v1 Vo
 
 SUSTechPOINTS 已重新起好：`python tools/dog/sustechpoints_convert.py serve --host 10.36.136.7`，地址 http://10.36.136.7:8081 。备份在 `sustech_backup/T11b_before.tar`（4.5 MB，不提交）。
 
+（2026-10-25 复核）
+- **可以开始 H3。** 54 个物体、237 个框，都是车（Car 191、Truck 46）。T11 留下的 2679 个还红着的框全换掉了，确认过的是 0，说明 T11 之后还没人动过。
+- **两个模型多检出的东西几乎不重合**：v1 Voxel 169 个框里 155 个只有它，v1 Pillar 82 个里 68 个只有它，两个都检出的只有 14 个框。两个模型各漏各的，正好说明两个教师互补（DATA_COLLECTION_PLAN.md 第 1 节）；也说明这些候选里误检不会少，H3 时大胆删。
+- "其他帧是 #…" 的有 17 个框：多半是停着的车，自动标注的轨迹没覆盖这一帧，确认即可。
+- v1 为什么还不如 nuScenes Voxel + TTA，分析写在 DATA_COLLECTION_PLAN.md 2.1 节：一半是量法（标签就是教师的框），一半是数据少、训练标签有空档（停着的车被拆成两段、中间看得见却没标）。
+
 ---
 
 ## H3 审候选框（人做）
@@ -1506,6 +1513,51 @@ EOF
 ```
 
 ### T12 结果
+
+（待填）
+
+---
+
+## T13 雷达后方盲区：边上是不是误检更多
+
+XT32 正后方约 74–78° 没有点（[SENSORS.md](SENSORS.md) 2.2）。被盲区截断的墙、成排的车，断口像车的一端，模型可能把它当成车；
+车一半在盲区里时，框也会往看得见的一半偏。本地用 nuScenes Pillar 在 3 个场景上看过（s000、s002、s025）：
+盲区边上 20° 内的误检比例和别处差不多（10 m 内 12% 对 14%，10–40 m 21% 对 26%），但上线的是 v1 Pillar，要用它的结果再看。
+
+看完 T13 再定怎么改。可选的做法（按代价从小到大）：
+1. 盲区写进雷达配置，规划把它当"看不见"，不是"没有东西"。
+2. 跟踪：轨迹进了盲区多保留一会儿（按预测外推，不删），从另一边出来接上，不当成新车。
+3. 跟踪：在盲区边上**新出现**的目标，多确认一两帧再上报。
+4. 训练：GT 采样贴进来的车，落在盲区里的点删掉，和真雷达一样；盲区边上的杂物在审核里删掉（不要标忽略），让模型学到那是背景。
+5. 硬件：查清是什么挡住了（宽约 0.8 m、在雷达后方约 0.5 m），能挪开或把雷达抬高最好。
+
+**注意安全**：从后面开过来的车，正是先出现在盲区边上。所以不能在边上直接把检测删掉或降分。第 3 条只适用于突然出现、又不连续的目标，而且要先在数据上验证，不会推迟报出真车。
+
+```text
+任务 T13：量出雷达后方盲区，统计 v1 Pillar、v1 Voxel、教师、nuScenes Pillar 在盲区边上和别处的误检比例。
+先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T7 完成。不用 GPU，只读 results.pkl、标签和存好的帧。
+
+1. VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); mkdir -p data/reports/T13
+   python tools/dog/sector_check.py --scenes $VAL --labels "data/labels/{scene}/labels_sustech.pkl" \
+       --frames "data/runs/{scene}/frames" \
+       --results v1_pp=data/runs_veh_v1/{scene}/pillar/results.pkl v1_voxel=data/runs_veh_v1/{scene}/voxel/results.pkl \
+                 teacher=data/runs/{scene}/voxel/results.pkl nusc_pp=data/runs_nusc_pp/{scene}/pillar/results.pkl \
+       | tee data/reports/T13/sector_val.md
+   第一行是量出来的盲区（度，0 为正前方）。之后每个模型分"盲区里（blind）/ 盲区边上 20° 内（edge）/ 别处"、10 m 内外统计；
+   最后列出盲区边上和盲区里分数最高的误检（场景、时间戳）。
+2. 训练场景（机器人走动、转弯多）的盲区也量一下，只量不评（教师的结果在每个场景都有）：
+     TRAIN=$(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT)
+     python tools/dog/sector_check.py --scenes $TRAIN --labels "data/labels/{scene}/labels_full.pkl" \
+         --frames "data/runs/{scene}/frames" --results teacher=data/runs/{scene}/voxel/results.pkl --list 0 \
+         | tee data/reports/T13/sector_train_teacher.md
+
+停止条件：任何报错；第 1 步没量出盲区（"none found"）。
+提交：data/reports/T13/、本文档。
+报告（写进"T13 结果"）：两次量出的盲区；sector_val.md 的表（整段）；v1_pp 盲区边上的误检比例是不是明显高于别处
+（同一距离段，高出一半以上、并且至少 20 个误检，就算"明显"）；v1_pp 误检列表的前 10 条。
+```
+
+### T13 结果
 
 （待填）
 
