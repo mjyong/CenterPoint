@@ -1,0 +1,2 @@
+total: 168 candidate boxes (24 objects); already labelled 1703, at a place labelled in another frame 15, beyond max range 192, earlier candidates confirmed 0, earlier candidates replaced 2679, found by v1_pp 57, found by v1_pp only 45, found by v1_voxel 123, found by v1_voxel only 111, left out: best box below 0.50 69, left out: in fewer than 2 keyframes 70, no points 0
+dry run: nothing written
