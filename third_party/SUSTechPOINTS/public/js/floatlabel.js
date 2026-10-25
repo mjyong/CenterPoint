@@ -8,9 +8,11 @@ import { globalObjectCategory } from "./obj_cfg.js";
 // track was interpolated), then 运动 (moving, orange) or 静止 (static, grey) with the speed;
 // "点少" when the box holds fewer than 5 current-sweep points (an ignore box in training).
 // Candidates (tools/dog/sustechpoints_convert.py candidates, 2026-10-24) show the models that found them
-// instead: "候选 v1_pp 0.62 · nusc_pp 0.41".
+// instead: "候选 v1_pp 0.62 · nusc_pp 0.41"; 2026-10-25: "其他帧是 #12" when a label of another frame is
+// at the same place (mostly a parked vehicle the auto-label's track does not cover here).
 function dogModelsText(dog){
-    return (dog.models || []).map(m=>m[0] + " " + Number(m[1]).toFixed(2)).join(" · ");
+    return (dog.models || []).map(m=>m[0] + " " + Number(m[1]).toFixed(2)).join(" · ") +
+        (dog.labelled_as ? " · 其他帧是 #" + dog.labelled_as : "");
 }
 
 function dogInfoText(dog){

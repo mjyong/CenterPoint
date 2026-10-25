@@ -414,7 +414,8 @@ def _same_object(box, boxes, dist, margin):
 
 
 def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5, link_dist=2.5, max_gap=1.5,
-                   min_points=1, backup=True):
+                   min_points=1, backup=True, object_min_score=None, min_keyframes=1, max_range=None,
+                   same_place=1.5):
     """Detections of other models as boxes to check ("candidates") in an exported scene, reviewed or not.
 
     Labels made by reviewing the teacher's boxes favour the teacher: what it missed is not labelled, so
@@ -429,6 +430,14 @@ def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5
     best-scoring box. Candidates of frames up to ``max_gap`` seconds apart whose world centers (carried
     forward by the detection's velocity) are within ``link_dist`` share an ``obj_id`` (``c<n>``), so one
     confirm or delete in the tool decides the whole object.
+
+    Fewer to review: ``max_range`` leaves out detections farther from the robot (score the models within
+    the same range, compare_detectors.py --max-range); an object is kept only when it is a candidate in
+    at least ``min_keyframes`` keyframes (one-frame flicker is mostly clutter) and its best box scores
+    >= ``object_min_score`` (default ``min_score``; its other boxes down to ``min_score`` stay, so a
+    vehicle keeps all its frames). A candidate within ``same_place`` m (world frame) of a label in
+    another frame of the scene is marked with that label's id (``labelled_as``): mostly a parked vehicle
+    the auto-label's track does not cover at this frame.
 
     Candidates are red (``obj_attr`` review). On import a confirmed one becomes a label, with a velocity
     from its annotated centers like a box the reviewer drew; one still red becomes an ignore box; a
@@ -477,7 +486,9 @@ def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5
                 counts["frames without results: %s" % m] += 1
                 continue
             d = r["detections"]
-            for k in np.nonzero((d.scores >= min_score) & np.isin(d.labels, want))[0]:
+            near = np.hypot(d.boxes[:, 0], d.boxes[:, 1]) <= max_range if max_range else np.ones(len(d), bool)
+            counts["beyond max range"] += int(((d.scores >= min_score) & np.isin(d.labels, want) & ~near).sum())
+            for k in np.nonzero((d.scores >= min_score) & np.isin(d.labels, want) & near)[0]:
                 dets.append((float(d.scores[k]), m, np.asarray(d.boxes[k], float), np.asarray(d.velocities[k], float),
                              int(d.labels[k]), int(d.subclasses[k])))
         clusters = []                             # [best detection, {model: score}]
@@ -508,6 +519,14 @@ def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5
             c["world"], c["world_vel"] = _to_world(c["det"][2], c["det"][3], T)
         work.append((fm, anns, cands))
 
+    # labels of every frame in the world frame, for "labelled at this place in another frame"
+    placed = [(fm["name"], str(a.get("obj_id")), _to_world(psr_to_box(a["psr"]), np.zeros(2),
+                                                           np.asarray(fm["T_world_det"], float))[0][:2])
+              for fm, anns, _ in work for a in anns if not CANDIDATE_ID.match(str(a.get("obj_id")))]
+    placed_frame = np.array([p[0] for p in placed])
+    placed_id = [p[1] for p in placed]
+    placed_xy = np.array([p[2] for p in placed]).reshape(-1, 2)
+
     # ids: above every candidate number still in the files or remembered
     taken = [str(a.get("obj_id")) for _, anns, _ in work for a in anns]
     taken += [cid for rec in record.values() for cid in rec]
@@ -534,7 +553,30 @@ def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5
             tr[2:] = [t, c["world"][:2], c["world_vel"]]
             c["id"] = tr[0]
 
+    # objects seen in too few keyframes or never scoring high enough: left out
+    boxes_of, best_of = defaultdict(int), defaultdict(float)
+    for _, _, cands in work:
+        for c in cands:
+            boxes_of[c["id"]] += 1
+            best_of[c["id"]] = max(best_of[c["id"]], c["det"][0])
+    floor = min_score if object_min_score is None else object_min_score
+    for k, (fm, anns, cands) in enumerate(work):
+        few = [c for c in cands if boxes_of[c["id"]] < min_keyframes]
+        low = [c for c in cands if boxes_of[c["id"]] >= min_keyframes and best_of[c["id"]] < floor]
+        counts["left out: in fewer than %d keyframes" % min_keyframes] += len(few)
+        counts["left out: best box below %.2f" % floor] += len(low)
+        work[k] = (fm, anns, [c for c in cands if c not in few and c not in low])
+    for k in [k for k in counts if k.startswith("left out") and not counts[k]]:
+        del counts[k]
+    if not counts.get("beyond max range"):
+        counts.pop("beyond max range", None)
+
+    for fm, anns, cands in work:
         name = fm["name"]
+        for c in cands:
+            d = np.where(placed_frame != name, np.hypot(*(placed_xy - c["world"][:2]).T), np.inf)
+            c["labelled_as"] = placed_id[int(np.argmin(d))] if len(d) and d.min() <= same_place else None
+            counts["at a place labelled in another frame"] += c["labelled_as"] is not None
         for c in cands:
             score, _, box, vel, label, sub = c["det"]
             b = box.copy()
@@ -563,7 +605,8 @@ def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5
                                  score=round(score, 3), det_score=round(score, 3), interpolated=False,
                                  speed=round(float(np.hypot(*vel)), 2), moving=bool(np.hypot(*vel) > 1.0),
                                  review=True, points=c["points"], points_all=c["points_all"],
-                                 few_points=visibility(o) in ("none", "few"), train_as="ignore")
+                                 few_points=visibility(o) in ("none", "few"), train_as="ignore",
+                                 labelled_as=c["labelled_as"])
         os.makedirs(os.path.dirname(info_path), exist_ok=True)
         with open(info_path, "w") as fh:
             json.dump(info, fh)

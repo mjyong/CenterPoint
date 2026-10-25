@@ -439,3 +439,26 @@ def test_fit_box_from_selected_points(tmp_path):
     got = fit.fit(str(scene), "f0", pts.tolist())
     assert got["source"] == "v1_pp 0.40" and got["psr"] == model and got["obj_type"] == "Car"
     assert fit.fit(str(scene), "f0", ground.tolist()) == {}
+
+
+def test_candidate_filters_and_same_place(tmp_path):
+    """Fewer candidates to review: range, keyframes an object is seen in, its best score. A candidate where
+    another frame has a label is marked with that label's id."""
+    from dog_perception.sustechpoints import add_candidates
+    root, labels, results = _candidate_scene(tmp_path)
+    names = [frame_name(f["stamp"]) for f in labels["frames"]]
+    ann = json.load(open(root / "label" / (names[0] + ".json")))
+    det_b = results["m1"][0]["detections"].boxes[1]              # B, drawn by the reviewer in the first frame
+    b = dict(ann[0], obj_id="7")
+    b["psr"] = {"position": {"x": det_b[0], "y": det_b[1], "z": det_b[2] - 1.8},
+                "scale": {"x": det_b[3], "y": det_b[4], "z": det_b[5]}, "rotation": {"x": 0, "y": 0, "z": det_b[6]}}
+    json.dump(ann + [b], open(root / "label" / (names[0] + ".json"), "w"))
+    for kw, left in ((dict(max_range=15), "beyond max range"), (dict(min_keyframes=10), "in fewer than 10 keyframes"),
+                     (dict(object_min_score=0.85), "best box below 0.85")):
+        counts = add_candidates(str(root), results, backup=False, **kw)
+        assert counts.get("candidate boxes", 0) == 0 and any(left in k for k in counts if counts[k] >= 9), counts
+    counts = add_candidates(str(root), results, backup=False, max_range=40, min_keyframes=9, object_min_score=0.75)
+    assert counts["candidate boxes"] == 9 and counts["candidate objects"] == 1 and counts["already labelled"] == 11
+    info = [json.load(open(root / "dog_info" / (n + ".json")))["c1"] for n in names[1:]]
+    assert info[0]["labelled_as"] == "7" and info[-1]["labelled_as"] is None        # B drove 2.7 m away by then
+    assert counts["at a place labelled in another frame"] == sum(i["labelled_as"] == "7" for i in info) >= 3

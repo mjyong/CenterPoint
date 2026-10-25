@@ -45,6 +45,8 @@ def main():
     ap.add_argument("--results", nargs="+", required=True,
                     help="name=path/to/results.pkl; a name given several times scores all its files together")
     ap.add_argument("--min-score", type=float, default=0.0)
+    ap.add_argument("--max-range", type=float, default=None,
+                    help="[m] score only labels and detections this close to the robot (bird's-eye distance)")
     ap.add_argument("--classes", nargs="+", default=list(CLASSES), choices=CLASSES,
                     help="classes to score (--classes vehicle for the vehicle-only models)")
     ap.add_argument("--review-policy", choices=("ignore", "keep"), default="ignore",
@@ -97,11 +99,15 @@ def main():
             # class indices into ``classes``; other classes are not scored
             lut = np.array([classes.index(c) if c in classes else -1 for c in CLASSES], dtype=np.int64)
             keep = d.scores >= args.min_score
+            if args.max_range:
+                keep &= np.hypot(d.boxes[:, 0], d.boxes[:, 1]) <= args.max_range
             preds.append(dict(boxes=d.boxes[keep], labels=lut[d.labels[keep]], scores=d.scores[keep],
                               velocities=d.velocities[keep]))
             # labels the cloud does not show at all are left out, as in export_dataset.py
             tl = [train_label(o, rule, args.review_policy) for o in fr["objects"]]
-            keep_gt = [n is not None or o["label"] not in classes for o, (n, _) in zip(fr["objects"], tl)]
+            keep_gt = [(n is not None or o["label"] not in classes) and
+                       (not args.max_range or np.hypot(*np.asarray(o["box"])[:2]) <= args.max_range)
+                       for o, (n, _) in zip(fr["objects"], tl)]
             objs = [o for o, k in zip(fr["objects"], keep_gt) if k]
             ign = [t[1] for t, k in zip(tl, keep_gt) if k]
             gts.append(dict(boxes=np.array([o["box"] for o in objs]).reshape(-1, 7),

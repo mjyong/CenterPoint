@@ -81,7 +81,7 @@
 | H2 | （T7 选了 Voxel 时）在 Orin 上测 Voxel v1 的延迟，放得下就部署 Voxel，否则部署 Pillar | 人 | T8 | 半天 | 待做 |
 | T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
-| T11 | 验证集加多模型候选框（红框"候选"）；35 个场景写上模型框，供 Ctrl + 拖框用 | Agent | T7 | 20 分钟 | 停在第 3 步 |
+| T11 | 验证集加多模型候选框（红框"候选"）；35 个场景写上模型框，供 Ctrl + 拖框用 | Agent | T7 | 20 分钟 | 第一次停在第 3 步（2045 个候选物体）；工具加了过滤，按改过的第 3 步重跑 |
 | H3 | 审候选框：是车确认、不是车删除；漏掉的车 Ctrl + 拖框补上 | 人 | T11 | 1–2 小时 | 待做 |
 | T12 | 导回 H3 的验证标签，重评所有模型；比较候选教师（nuScenes Voxel、v1 Voxel 加 TTA），选下一轮教师 | Agent | H3 | 1 小时 | 待做 |
 
@@ -1164,15 +1164,19 @@ v1 Voxel 专门在这批数据上训过，当教师应该比 nuScenes 模型准�
      VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
      tar -C /public/zjst/robot/centerpoint_data/sustech -cf /public/zjst/robot/centerpoint_data/sustech_backup/T11_before.tar \
          $(for r in $VAL; do echo $r/label $r/dog_meta.json $r/dog_info; done)
-3. 先空跑，只统计（{scene} 原样写，工具按场景替换）：
+3. 先空跑，只统计（{scene} 原样写，工具按场景替换）。只要 40 m 内、至少在 2 个关键帧里出现的物体；
+   物体最高分的门槛从 0.3 试到 0.5（物体的其它框只要 ≥ 0.3 都留着）：
      RES="v1_pp=data/runs_veh_v1/{scene}/pillar/results.pkl v1_voxel=data/runs_veh_v1/{scene}/voxel/results.pkl
           v0_pp=data/runs_veh_v0/{scene}/pillar/results.pkl v0_voxel=data/runs_veh_v0/{scene}/voxel/results.pkl
           nusc_pp=data/runs_nusc_pp/{scene}/pillar/results.pkl nusc_voxel=data/runs_nusc_voxel/{scene}/voxel/results.pkl
           teacher=data/runs/{scene}/voxel/results.pkl"
-     python tools/dog/sustechpoints_convert.py candidates --root /public/zjst/robot/centerpoint_data/sustech \
-         --scenes $VAL --results $RES --min-score 0.3 --dry-run | tee data/reports/T11/dry_run.txt
-   最后一行 total 的候选物体数（"N objects"）超过 400 就停下报告：一次审不完，要提高 --min-score。
-4. 正式跑：同一条命令去掉 --dry-run，输出 tee 到 data/reports/T11/candidates.txt。
+     cand() {  # cand <物体最高分门槛> [--dry-run]
+       python tools/dog/sustechpoints_convert.py candidates --root /public/zjst/robot/centerpoint_data/sustech \
+           --scenes $VAL --results $RES --min-score 0.3 --max-range 40 --min-keyframes 2 --object-min-score $1 $2
+     }
+     for x in 0.3 0.4 0.5; do cand $x --dry-run | tail -2 | tee data/reports/T11/dry_run_$x.txt; done
+   取 total 的候选物体数（"N objects"）≤ 400 的最小门槛，记为 X。三个都超过 400 就停下报告。
+4. 正式跑：cand X 2>&1 | tee data/reports/T11/candidates.txt
    每个场景先打印"model boxes for Ctrl + drag"（写 dog_dets/），再打印候选数。
 5. 训练场景也写上模型框（只有教师的），审训练集时 Ctrl + 拖框也能用：
      TRAIN=$(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT)
@@ -1183,10 +1187,12 @@ v1 Voxel 专门在这批数据上训过，当教师应该比 nuScenes 模型准�
          | tee data/reports/T11/stats.txt
 7. 第 1 步停掉过的话，用记下的同一条命令重新起 SUSTechPOINTS（后台运行，日志写到 data/reports/T11/serve.log）。
 
-停止条件：任何报错；第 3 步候选物体超过 400。
+停止条件：任何报错；第 3 步三个门槛的候选物体都超过 400。
 提交：data/reports/T11/（不要 tar、serve.log）、本文档。
-报告（写进"T11 结果"）：
+报告（写进"T11 结果"，接在第一次的记录后面）：
+- 三个门槛空跑的 total 行，选的 X；
 - candidates.txt 每个场景一行（候选框数、物体数）和 total 行；
+- "at a place labelled in another frame"（同一位置别的帧有标注）的框数；
 - 每个模型 "found by X" 和 "found by X only" 的数（哪个模型多检出的东西最多）；
 - "already labelled"、"deleted by the reviewer"、"no points" 的总数；
 - stats.txt 里验证集的红框总数（含 H1 剩下的）；
@@ -1229,6 +1235,22 @@ already labelled 2360，deleted by the reviewer 0，no points 6。stats 没跑�
 
 SUSTechPOINTS 已用原来的命令重新起好：`python tools/dog/sustechpoints_convert.py serve --host 10.36.136.7`，地址 http://10.36.136.7:8081 。这次空跑没有改标注。
 
+（2026-10-25 复核）
+- **停得对。** 2045 个物体一次审不完；直接把门槛提到 0.5，又会把教师漏掉、其它模型分数不高的真车也筛掉。
+- **候选都是些什么**：验证集的 0921_164127_s000、s002 在本地有原始扫描，用 nuScenes Pillar（多检出最多的模型）重跑，加到审过的标签上（150 个物体），逐个看：
+  - **一大半只在一个关键帧出现**（s000 是 50 个里的 31 个），多是闪一下的杂物；
+  - **四分之一在 40 m 外**（s002 有 115 个框），点少，人也很难判断；
+  - **将近一半的框分数在 0.30–0.35**；
+  - 还有一类是真车：**别的关键帧标了，这一帧没标**。例如 s000 西南角那辆 16 m 的货车，有的帧有标注，有的帧只剩候选：自动标注的轨迹没覆盖到这一帧。这类要确认，否则每个检出它的模型都算误检。
+- **H1 没删过验证集的车框**（拿不准的都标了忽略），所以 "deleted by the reviewer 0" 是对的，不是工具的问题。
+- **工具改了**（`candidates` 新参数）：
+  - `--max-range 40`：只要 40 m 内的；T12 评估也加 `--max-range 40`，40 m 外不审也不评分，谁都不吃亏；
+  - `--min-keyframes 2`：只出现在一个关键帧的物体不提；
+  - `--object-min-score`：物体最高的那个框达到门槛才提，它的其它框只要 ≥ 0.3 都留着，车不会只剩几帧；
+  - 同一位置别的帧有标注的候选，标签上写"其他帧是 #12"，审核时一眼能认出是同一辆车。
+- **本地两个场景的效果**（只有 nuScenes Pillar）：150 个物体 → 40 m 内且 ≥ 2 个关键帧 43 个 → 再要求最高分 ≥ 0.4 是 27 个、≥ 0.5 是 15 个，分别是 29%、18%、10%。按这个比例，服务器上 2045 个大约变成 590、370、205 个，所以第 3 步改成三个门槛都空跑一次，取 ≤ 400 的最小门槛。
+- **你要做的**：把改过的 T11 整段再交给 Agent 跑一次，第 1、2 步照做（备份会覆盖成同样的内容，没关系）。跑完开始 H3。
+
 ---
 
 ## H3 审候选框（人做）
@@ -1243,6 +1265,7 @@ T11 之后，在 SUSTechPOINTS 里只看验证集（列表里"验证集"一组�
 | 不是车（墙角、集装箱、货堆、岗亭……） | 右键 → Delete this object (in all frames) |
 | 看不清（点太少、只看到一角） | 右键 → 看不清（作忽略框） |
 | 同一个 ID 里，有几帧是车、有几帧不是 | 按 `v` 进批量窗口逐帧看，不是车的那几帧单独删 |
+| 标签写"其他帧是 #12" | 同一个位置别的帧有 #12 这个标注：多半是同一辆停着的车，自动标注的轨迹没覆盖这一帧。确认即可；别的帧 #12 是忽略框的，这里也点"看不清" |
 
 **漏掉的车**：翻帧时看到一辆车没有任何框（连候选也没有），按住 Ctrl 拖一个矩形把它框进去，会自动出框（有模型框就用模型的，没有就按点拟合），检查后把类别改成 Car 或 Truck。只看得到一部分的车，在侧视图里把框拉到整车长度。
 
@@ -1297,14 +1320,16 @@ EOF
          nusc_voxel=data/runs_nusc_voxel/$r/voxel/results.pkl nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl \
          teacher=data/runs/$r/voxel/results.pkl teacher_v1_e10=data/runs_teacher_v1_e10/$r/voxel/results.pkl \
          teacher_v1_e20=data/runs_teacher_v1_e20/$r/voxel/results.pkl; done)
-     python tools/dog/compare_detectors.py --classes vehicle --results $RES \
+     python tools/dog/compare_detectors.py --classes vehicle --results $RES --max-range 40 \
          --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech.pkl; done) \
          --thresholds 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 --target-recall 0.9 --bootstrap 1000 \
          | tee data/reports/T12/compare_val.md
    旧标签再跑一次（不要 --thresholds），看结论变了没有：
-     python tools/dog/compare_detectors.py --classes vehicle --results $RES \
+     python tools/dog/compare_detectors.py --classes vehicle --results $RES --max-range 40 \
          --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech_h1.pkl; done) --bootstrap 1000 \
          | tee data/reports/T12/compare_val_h1.md
+   `--max-range 40`：候选只提了 40 m 内的，40 m 外的标签和检测都不评分（T7 的 mAP 含 40 m 外，所以数字和 T7 不能直接比，
+   新旧标签之间可以比）。
    AP 表后面多了一张"velocity head on moving labels"：各模型的速度头怎么读运动的车。自动标注要教师的速度头
    读到 > 0.15 m/s 才把这一帧算运动（"head > 0.15 m/s" 一列）。
 5. 运动状态（新标签）：

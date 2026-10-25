@@ -120,7 +120,8 @@ var Header=function(ui, data, cfg, onSceneChanged, onFrameChanged, onObjectSelec
             // candidates (2026-10-24): the models that found the object and their scores instead
             this.boxUi.innerHTML += (d.candidate ?
                 "| <span title='candidate: models that found it, with their scores'>候选 " +
-                (d.models || []).map(m=>m[0] + " " + Number(m[1]).toFixed(2)).join(" · ") :
+                (d.models || []).map(m=>m[0] + " " + Number(m[1]).toFixed(2)).join(" · ") +
+                (d.labelled_as ? " · 其他帧是 #" + d.labelled_as : "") :
                 "| <span title='auto-label: track mean score / this frame'>score " +
                 (d.score !== undefined ? Number(d.score).toFixed(2) : "-") + "/" +
                 (d.interpolated ? "插值" : (d.det_score !== undefined ? Number(d.det_score).toFixed(2) : "-"))) +

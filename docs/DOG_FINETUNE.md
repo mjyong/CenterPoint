@@ -645,6 +645,11 @@ python tools/dog/sustechpoints_convert.py candidates --scenes <场景...> --min-
 - 每次运行前，标注文件先复制到 `label_backup/<时间>/`。
 - 运行前关掉浏览器里这些场景，跑完重新打开。浏览器里旧页面一保存，会把旧标注写回去。
 - `--dry-run` 只统计、不改场景。
+- 候选太多时（0921 验证集第一次空跑有 2045 个物体，SERVER_TASKS.md T11 复核），用这几个参数减少：
+  - `--max-range 40`：只要 40 m 内的，评估时 `compare_detectors.py --max-range 40` 对应；
+  - `--min-keyframes 2`：只在一个关键帧出现的物体不提，多是闪一下的杂物；
+  - `--object-min-score 0.4`：物体最高的那个框达到门槛才提，它的其它框只要 ≥ `--min-score` 都留着。
+- 同一位置别的帧有标注的候选（自动标注的轨迹没覆盖这一帧的停着的车），标签上加"其他帧是 #12"。
 
 样例 bag 的 `rec_moving`（27 帧，三类都导出）用 3 个模型试过：提出 50 个物体、156 个框。另有 126 个检测已有标注、78 个靠近人删掉的框，都没有再提出来。分最高的候选是教程里那个三脚架：它是在轨迹表里删的，没进过 SUSTechPOINTS，工具不知道它被判过。服务器上的验证场景是直接从 `labels.pkl` 导出的，删除都在 SUSTechPOINTS 里做，不会有这个问题。
 

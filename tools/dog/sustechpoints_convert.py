@@ -75,6 +75,8 @@ def serve(app, host, port):
 def candidates(args):
     """``candidates`` and ``detections`` over the scenes, with each model's results.pkl of the scene."""
     specs = [kv.split("=", 1) for kv in args.results]
+    filters = {} if args.cmd == "detections" else dict(object_min_score=args.object_min_score,
+                                                        min_keyframes=args.min_keyframes, max_range=args.max_range)
     total = Counter()
     for scene in args.scenes:
         results = {}
@@ -93,10 +95,11 @@ def candidates(args):
             shutil.copytree(scene_dir, work, ignore=shutil.ignore_patterns("lidar", "label_backup", "dog_dets"))
             os.symlink(os.path.abspath(os.path.join(scene_dir, "lidar")), os.path.join(work, "lidar"))
             counts = add_candidates(work, results, args.min_score, args.match_dist, min_points=args.min_points,
-                                    backup=False)
+                                    backup=False, **filters)
             shutil.rmtree(tmp)
         else:
-            counts = add_candidates(scene_dir, results, args.min_score, args.match_dist, min_points=args.min_points)
+            counts = add_candidates(scene_dir, results, args.min_score, args.match_dist, min_points=args.min_points,
+                                    **filters)
         total.update(counts)
         print("%s: %d candidate boxes (%d objects); %s" % (
             scene, counts.get("candidate boxes", 0), counts.get("candidate objects", 0),
@@ -159,7 +162,14 @@ def main():
         p.add_argument("--results", nargs="+", required=True, metavar="NAME=PATH",
                        help="run_sequence.py results.pkl per model; {scene} in PATH stands for the scene name")
         p.add_argument("--dets-min-score", type=float, default=0.15, help="lowest score of the boxes for Ctrl + drag")
-    c.add_argument("--min-score", type=float, default=0.3)
+    c.add_argument("--min-score", type=float, default=0.3, help="lowest score of a candidate box")
+    c.add_argument("--object-min-score", type=float, default=None,
+                   help="an object is kept when its best box reaches this (default --min-score); its other boxes "
+                        "down to --min-score stay")
+    c.add_argument("--min-keyframes", type=int, default=1, help="an object is kept when it is a candidate in this "
+                                                                "many keyframes (2 drops one-frame flicker)")
+    c.add_argument("--max-range", type=float, default=None,
+                   help="[m] only detections this close to the robot (score with compare_detectors.py --max-range)")
     c.add_argument("--match-dist", type=float, default=2.0,
                    help="[m] a detection this close to a label (or a deleted box) is not a candidate")
     c.add_argument("--min-points", type=int, default=1, help="points (all sweeps) a candidate needs to be judged")
