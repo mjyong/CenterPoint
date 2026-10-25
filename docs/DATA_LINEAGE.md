@@ -471,6 +471,12 @@ mindmap
 - 第一个关键帧之前、最后一个之后、间隔超过 1 s 的帧：不要；
 - 只处理审核覆盖的类别（`dog_meta.json` 的 `label_classes`），其它类别（只审车时的行人、骑行者）原样照抄 `labels.pkl`。
 
+之后可以用 `tools/dog/merge_labels.py`（`dog_perception/label_merge.py`）补成 `labels_merged.pkl`，不用再审：
+- 停着的车被自动标注拆成两段、中间几帧看得见却没标：补上审过的那个框（`filled = True`），当正样本；
+- 双教师自动标注（`auto_label.py` 给两个教师的 results.pkl）看到、这里没有的：加成忽略框（`added_by = "teachers"`）。
+
+只用于训练场景（DOG_FINETUNE.md 第 17 节）。
+
 ---
 
 ## 8. ⑦ 导出数据集：`tools/dog/export_dataset.py`

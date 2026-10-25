@@ -1,4 +1,7 @@
+import os
+
 import numpy as np
+import pytest
 
 from dog_perception.autolabel import auto_label
 from dog_perception.detection import CLASSES, OracleDetector, OracleNoise
@@ -138,3 +141,37 @@ def test_parked_truck_with_a_late_burst_is_pinned():
     out = refine_track(_obs(t, xy, np.zeros(60), vel, size=(12.0, 2.6, 3.5)), t, AutoLabelConfig())
     b = np.array([o["box"] for o in out])
     assert not any(o["moving"] for o in out) and np.ptp(b[:, 1]) == 0
+
+
+def test_two_teachers_on_the_command_line(tmp_path):
+    """auto_label.py with two teachers' results: a car both see is labelled as usual; a car only one sees
+    stays when that teacher is sure of it, flagged for review; one it is unsure of is left out."""
+    import pickle
+    import subprocess
+    import sys
+    from dog_perception.detection.boxes import Detections
+    root = os.path.join(os.path.dirname(__file__), "..", "..")
+    runs = [[], []]
+    for k in range(20):
+        t = 100.0 + 0.1 * k
+        T = np.eye(4)
+        cars = {"both": [10, 0], "sure": [-15, 5], "unsure": [5, 20]}
+        teach = [{"both": 0.6, "sure": 0.8}, {"both": 0.5, "unsure": 0.4}]
+        for run, scores in zip(runs, teach):
+            names = list(scores)
+            boxes = np.array([[*cars[n], 0.8, 4.5, 1.9, 1.6, 0.0] for n in names])
+            run.append(dict(stamp=t, T_world_det=T, pose_bad=False,
+                            detections=Detections(boxes, np.zeros((len(names), 2)), np.array([scores[n] for n in names]),
+                                                  np.zeros(len(names), np.int64))))
+    paths = []
+    for i, run in enumerate(runs):
+        paths.append(str(tmp_path / ("t%d.pkl" % i)))
+        pickle.dump(run, open(paths[-1], "wb"))
+    out = tmp_path / "labels.pkl"
+    subprocess.run([sys.executable, os.path.join(root, "tools", "dog", "auto_label.py"), "--results", *paths,
+                    "--out", str(out)], check=True, capture_output=True, env=dict(os.environ, PYTHONPATH=root))
+    objs = pickle.load(open(out, "rb"))["frames"][10]["objects"]
+    by_x = {round(float(o["box"][0])): o for o in objs}
+    assert set(by_x) == {10, -15}                               # the unsure one (0.4 / 2 = 0.2) is left out
+    assert not by_x[10]["review"] and by_x[10]["score"] == pytest.approx(0.55, abs=0.01)
+    assert by_x[-15]["review"] and by_x[-15]["score"] == pytest.approx(0.4, abs=0.01)

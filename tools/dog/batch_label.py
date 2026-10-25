@@ -26,6 +26,10 @@
    of ``<replay-runs>/<scene>`` are replayed (``run_sequence.py --replay``) instead of preprocessing
    the scans again, nothing is saved twice, and ``auto_label.py`` counts the points in those frames.
    ``--no-predict`` skips the trajectory prediction, which auto-labelling does not read.
+7. Two teachers (``--ckpt-pillar``, a Pillar model next to the Voxel one): run_sequence.py runs both
+   on the same frames (both with TTA unless ``--no-tta``) and auto_label.py fuses their detections
+   (dog_perception/detection/ensemble.py): what both see is labelled as usual, what one sees only
+   when that teacher is sure, and flagged for review. About 10 GB per worker with TTA.
 """
 import argparse
 import csv
@@ -181,6 +185,8 @@ def main():
     ap.add_argument("--labels", default="data/labels", help="auto_label.py outputs: <labels>/<scene>/labels.pkl")
     ap.add_argument("--ckpt-voxel", default="work_dirs/pretrained/nusc_voxel.pth")
     ap.add_argument("--config-voxel", default=None)
+    ap.add_argument("--ckpt-pillar", default=None, help="second teacher (Pillar), fused with the Voxel one")
+    ap.add_argument("--config-pillar", default=None)
     ap.add_argument("--no-tta", action="store_true")
     ap.add_argument("--replay-runs", default=None,
                     help="earlier runs with saved frames (<dir>/<scene>/frames): replay them instead of the scans")
@@ -245,13 +251,18 @@ def main():
     def infer(scene, slot):
         name = os.path.basename(os.path.normpath(scene))
         out = os.path.join(args.runs, name)
-        if not args.force and os.path.exists(os.path.join(out, "voxel", "results.pkl")):
+        done = [os.path.join(out, d, "results.pkl") for d in ["voxel"] + (["pillar"] if args.ckpt_pillar else [])]
+        if not args.force and all(os.path.exists(p) for p in done):
             return True, dict(skipped_inference=True)
         os.makedirs(out, exist_ok=True)
         card = slot.split("#")[0]
         env = dict(os.environ, PYTHONPATH=ROOT + os.pathsep + os.environ.get("PYTHONPATH", ""), **thread_env)
-        cmd = [sys.executable, os.path.join(ROOT, "tools/dog/run_sequence.py"), "--detectors", "voxel",
-               "--ckpt-voxel", args.ckpt_voxel, "--out", out]
+        cmd = [sys.executable, os.path.join(ROOT, "tools/dog/run_sequence.py"),
+               "--detectors", "voxel,pillar" if args.ckpt_pillar else "voxel", "--ckpt-voxel", args.ckpt_voxel,
+               "--out", out]
+        if args.ckpt_pillar:
+            cmd += ["--ckpt-pillar", args.ckpt_pillar] + (["--config-pillar", args.config_pillar]
+                                                          if args.config_pillar else [])
         if args.replay_runs:
             cmd += ["--replay", os.path.join(args.replay_runs, name), "--seq-root", os.path.dirname(os.path.normpath(scene))]
         else:
@@ -281,7 +292,10 @@ def main():
         os.makedirs(out, exist_ok=True)
         env = dict(os.environ, PYTHONPATH=ROOT + os.pathsep + os.environ.get("PYTHONPATH", ""), **thread_env)
         cmd = [sys.executable, os.path.join(ROOT, "tools/dog/auto_label.py"),
-               "--results", os.path.join(args.runs, name, "voxel", "results.pkl"), "--out", dst]
+               "--results", os.path.join(args.runs, name, "voxel", "results.pkl")]
+        if args.ckpt_pillar:
+            cmd += [os.path.join(args.runs, name, "pillar", "results.pkl")]
+        cmd += ["--out", dst]
         if args.replay_runs:
             cmd += ["--frames", os.path.join(args.replay_runs, name, "frames")]
         with open(logf, "w") as fh:

@@ -2,7 +2,11 @@
 
 Teacher: CenterPoint-Voxel with double-flip TTA (nuScenes weights first, your
 fine-tuned voxel model in later rounds). Either run it here or reuse the
-output of run_sequence.py (--results). Output ``labels.pkl``:
+output of run_sequence.py (--results). Two teachers (a Voxel and a Pillar model,
+both with TTA): give both results.pkl to --results; their detections are fused
+per frame (dog_perception/detection/ensemble.py) before tracking, so a track both
+see follows the usual rules and a track one sees stays only when that teacher is
+sure (its own mean score >= 0.6) and is flagged for review. Output ``labels.pkl``:
 
     {"sequence": str, "frames": [{"stamp", "T_world_det", "pose_bad",
         "objects": [{"track_id", "label", "subclass", "box" (7, det frame), "velocity" (2, det frame),
@@ -36,17 +40,24 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from dog_perception.autolabel import AutoLabelConfig, auto_label  # noqa: E402
 from dog_perception.detection.boxes import CLASSES, SUBCLASSES, Detections  # noqa: E402
+from dog_perception.detection.ensemble import fuse  # noqa: E402
 from dog_perception.geometry import inv_T  # noqa: E402
 from dog_perception.label_review import write_track_table  # noqa: E402
 from dog_perception.visibility import annotate_points  # noqa: E402
 
 
 def teacher_frames(args):
-    """Returns list of (stamp, T_world_det, Detections in det frame, pose_bad)."""
+    """Returns list of (stamp, T_world_det, Detections in det frame, pose_bad); with several --results the
+    teachers' detections fused per stamp (frames are the first teacher's)."""
     if args.results:
-        with open(args.results, "rb") as f:
-            res = pickle.load(f)
-        return [(r["stamp"], r["T_world_det"], r["detections"], bool(r.get("pose_bad", False))) for r in res]
+        runs = []
+        for path in args.results:
+            with open(path, "rb") as f:
+                runs.append(pickle.load(f))
+        others = [{round(r["stamp"], 6): r["detections"] for r in rows} for rows in runs[1:]]
+        return [(r["stamp"], r["T_world_det"],
+                 fuse([r["detections"]] + [o.get(round(r["stamp"], 6)) for o in others])[0] if others else r["detections"],
+                 bool(r.get("pose_bad", False))) for r in runs[0]]
 
     from dog_perception.detection.centerpoint import CenterPointDetector
     from dog_perception.io import SequenceReader, pose_bad
@@ -74,7 +85,8 @@ def teacher_frames(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seq", default=None)
-    ap.add_argument("--results", default=None, help="results.pkl from run_sequence.py (skip the teacher)")
+    ap.add_argument("--results", nargs="+", default=None,
+                    help="results.pkl from run_sequence.py (skip the teacher); two teachers: both, fused per frame")
     ap.add_argument("--config-voxel", default="configs/nusc/voxelnet/nusc_centerpoint_voxelnet_0075voxel_fix_bn_z.py")
     ap.add_argument("--ckpt-voxel", default=None)
     ap.add_argument("--tta", action="store_true")
@@ -93,7 +105,7 @@ def main():
     frames = teacher_frames(args)
     frames_dir = args.frames
     if frames_dir is None and args.results:       # run_sequence.py layout: <run>/voxel/results.pkl, <run>/frames
-        frames_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(args.results))), "frames")
+        frames_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(args.results[0]))), "frames")
     if frames_dir and not os.path.isdir(frames_dir):
         frames_dir = None
     # frames whose pose cannot be trusted (pose_refine.bad_intervals) give the tracker nothing: their
@@ -123,7 +135,7 @@ def main():
         out_frames.append(dict(stamp=stamp, T_world_det=T_wd, objects=[] if bad else entries, pose_bad=bad))
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    result = dict(sequence=args.seq or args.results, frames=out_frames)
+    result = dict(sequence=args.seq or "+".join(args.results), frames=out_frames)
     with open(args.out, "wb") as f:
         pickle.dump(result, f)
     table = os.path.splitext(args.out)[0] + "_tracks.csv"

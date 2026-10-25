@@ -10,6 +10,10 @@ best F1, and the highest threshold that still reaches ``--target-recall`` within
 A table of how each model's velocity head reads moving labels (``--moving-speed``) tells whether it
 can be the teacher: the auto-labeller needs the teacher's head to read a moving vehicle as moving.
 
+Two teachers together: ``fused=a/results.pkl+b/results.pkl`` scores their detections fused per frame
+(dog_perception/detection/ensemble.py: what both see keeps the mean score, what one sees half its own),
+as the two-teacher auto-label would use them.
+
 ``--bootstrap 1000`` tells whether a difference between two models is more than the luck of the
 validation set: the recordings (one per labels file) are resampled with replacement, the same
 draw for every model, and mAP and AP@2.0 within 20 m are recomputed. Prints each model's 90%
@@ -34,16 +38,31 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.detection.boxes import CLASSES  # noqa: E402
+from dog_perception.detection.ensemble import fuse  # noqa: E402
 from dog_perception.detection.evaluate import (bootstrap_ap, evaluate_detections, format_table,  # noqa: E402
                                                 moving_velocity, threshold_sweep)
 from dog_perception.label_review import train_label  # noqa: E402
+
+
+def load_results(path):
+    """results.pkl rows; ``a.pkl+b.pkl``: the rows of a with the detections of all fused per stamp."""
+    parts = []
+    for p in path.split("+"):
+        with open(p, "rb") as f:
+            parts.append(pickle.load(f))
+    if len(parts) == 1:
+        return parts[0]
+    others = [{round(r["stamp"], 6): r["detections"] for r in rows} for rows in parts[1:]]
+    return [dict(r, detections=fuse([r["detections"]] + [o.get(round(r["stamp"], 6)) for o in others])[0])
+            for r in parts[0]]
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--labels", nargs="+", required=True, help="labels.pkl (one per recording)")
     ap.add_argument("--results", nargs="+", required=True,
-                    help="name=path/to/results.pkl; a name given several times scores all its files together")
+                    help="name=path/to/results.pkl; a name given several times scores all its files together; "
+                         "name=a.pkl+b.pkl fuses two teachers' detections")
     ap.add_argument("--min-score", type=float, default=0.0)
     ap.add_argument("--max-range", type=float, default=None,
                     help="[m] score only labels and detections this close to the robot (bird's-eye distance)")
@@ -82,8 +101,7 @@ def main():
     for name, paths in runs.items():
         res, timed, ids = [], [], {}
         for k, path in enumerate(paths):
-            with open(path, "rb") as f:
-                r = pickle.load(f)
+            r = load_results(path)
             res += r
             timed += r[1:]                       # the first frame includes warm-up
             for fr in r:
