@@ -629,7 +629,8 @@ python tools/dog/sustechpoints_convert.py candidates --scenes <场景...> --min-
     --results v1_pp=data/runs_veh_v1/{scene}/pillar/results.pkl nusc_pp=data/runs_nusc_pp/{scene}/pillar/results.pkl ...
 ```
 
-- 每个关键帧，取各模型 ≥ 0.3 分、属于导出类别（只有车）的检测。
+- 每个关键帧，取各模型 ≥ 0.3 分、属于 `--classes` 的检测（默认 `vehicle`：人工只审车辆）。不看场景记录的类别：2026-10-23 07:11 UTC 以前导出的场景没记，0921 验证集的 T11 因此混进了行人、骑行者。
+- 候选模型用最好的两个就够了，Voxel、Pillar 各一个（以后一直迭代的两个教师）；模型越多，要审的越多，主要是噪声大的模型多出来的杂物。
 - 以下三种不加：
   - 和标注里的框是同一个物体：中心相距 ≤ 2 m，或一个的中心落在另一个框里（框四周放宽 0.5 m）；
   - 靠近人删掉的框：导出时有、现在没有的框，算人判断过不是车；

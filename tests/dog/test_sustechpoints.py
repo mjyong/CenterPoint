@@ -462,3 +462,21 @@ def test_candidate_filters_and_same_place(tmp_path):
     info = [json.load(open(root / "dog_info" / (n + ".json")))["c1"] for n in names[1:]]
     assert info[0]["labelled_as"] == "7" and info[-1]["labelled_as"] is None        # B drove 2.7 m away by then
     assert counts["at a place labelled in another frame"] == sum(i["labelled_as"] == "7" for i in info) >= 3
+
+
+def test_candidates_of_an_export_without_label_classes(tmp_path):
+    """Scenes exported before dog_meta.json recorded label_classes (the 0921 validation scenes): without
+    classes every class came in, the second model's pedestrian too. classes=["vehicle"] keeps to vehicles."""
+    from dog_perception.sustechpoints import add_candidates, write_detections
+    root, labels, results = _candidate_scene(tmp_path)
+    meta = json.load(open(root / "dog_meta.json"))
+    del meta["label_classes"]
+    json.dump(meta, open(root / "dog_meta.json", "w"))
+    counts = add_candidates(str(root), results, backup=False)
+    assert counts["no points"] == 20                       # ghost D and the pedestrian (no points there) considered
+    counts = add_candidates(str(root), results, backup=False, classes=["vehicle"])
+    assert counts["no points"] == 10 and counts["candidate objects"] == 1   # the pedestrian is not even looked at
+    name = frame_name(labels["frames"][3]["stamp"])
+    assert {a["obj_type"] for a in json.load(open(root / "label" / (name + ".json")))} == {"Car"}
+    write_detections(str(root), results, classes=["vehicle"])
+    assert {d["obj_type"] for d in json.load(open(root / "dog_dets" / (name + ".json")))} == {"Car", "Truck"}

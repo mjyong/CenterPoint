@@ -357,16 +357,16 @@ def _det_type(label, sub):
     return SUBCLASS_TO_TYPE.get(SUBCLASSES[sub] if sub >= 0 else None) or CLASS_TO_TYPE[CLASSES[label]]
 
 
-def write_detections(scene_dir, results, min_score=0.15):
+def write_detections(scene_dir, results, min_score=0.15, classes=None):
     """The models' detections in each frame of an exported scene, for drawing boxes: the vendored
     SUSTechPOINTS turns the points selected with Ctrl + drag into the best-scoring of these boxes that
     holds most of them (third_party/SUSTechPOINTS/dog_fit.py). ``results``: {model name: run_sequence.py
-    results.pkl rows}. Writes ``dog_dets/<frame>.json`` (detections of the scene's label classes with a
-    score >= ``min_score``, in the tool's frame); returns the number of boxes written."""
+    results.pkl rows}. Writes ``dog_dets/<frame>.json`` (detections of ``classes``, default the scene's
+    label classes, with a score >= ``min_score``, in the tool's frame); returns the number of boxes written."""
     with open(os.path.join(scene_dir, META_FILE)) as fh:
         meta = json.load(fh)
     z_off = float(meta.get("z_offset", 0.0))
-    want = [CLASSES.index(c) for c in (meta.get("label_classes") or CLASSES)]
+    want = [CLASSES.index(c) for c in (classes or meta.get("label_classes") or CLASSES)]
     rows_at = {m: {round(float(r["stamp"]), 6): r for r in rows} for m, rows in results.items()}
     os.makedirs(os.path.join(scene_dir, "dog_dets"), exist_ok=True)
     total = 0
@@ -415,13 +415,14 @@ def _same_object(box, boxes, dist, margin):
 
 def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5, link_dist=2.5, max_gap=1.5,
                    min_points=1, backup=True, object_min_score=None, min_keyframes=1, max_range=None,
-                   same_place=1.5):
+                   same_place=1.5, classes=None):
     """Detections of other models as boxes to check ("candidates") in an exported scene, reviewed or not.
 
     Labels made by reviewing the teacher's boxes favour the teacher: what it missed is not labelled, so
     another model that finds it scores a false positive. This adds to every frame of the scene the
-    detections in ``results`` ({model name: run_sequence.py results.pkl rows}) of the scene's label
-    classes with a score >= ``min_score`` that nothing in the frame accounts for. A detection is left out
+    detections in ``results`` ({model name: run_sequence.py results.pkl rows}) of ``classes`` (default the
+    scene's label classes; an export older than 2026-10-23 07:11 UTC does not record them and then gets
+    every class) with a score >= ``min_score`` that nothing in the frame accounts for. A detection is left out
     when it and a box in the label file cover the same object (centers within ``match_dist``, or one
     center inside the other box grown by ``margin``: already labelled), when its center is within
     ``match_dist`` of a box the reviewer deleted (an exported object or an earlier candidate missing
@@ -450,7 +451,7 @@ def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5
     with open(os.path.join(scene_dir, META_FILE)) as fh:
         meta = json.load(fh)
     z_off = float(meta.get("z_offset", 0.0))
-    want = [CLASSES.index(c) for c in (meta.get("label_classes") or CLASSES)]
+    want = [CLASSES.index(c) for c in (classes or meta.get("label_classes") or CLASSES)]
     record = {k: dict(v) for k, v in meta.get("candidates", {}).get("frames", {}).items()}  # frame -> {id: xy}
     rows_at = {m: {round(float(r["stamp"]), 6): r for r in rows} for m, rows in results.items()}
     counts = defaultdict(int)
@@ -473,6 +474,7 @@ def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5
         old = {str(a.get("obj_id")) for a in anns if CANDIDATE_ID.match(str(a.get("obj_id"))) and "review" in _attrs(a)}
         anns = [a for a in anns if str(a.get("obj_id")) not in old]
         counts["earlier candidates replaced"] += len(old)
+        counts["earlier candidates confirmed"] += sum(bool(CANDIDATE_ID.match(str(a.get("obj_id")))) for a in anns)
         rec = record.get(name, {})
         gone = [ex["center"][:2] for oid, ex in fm.get("objects", {}).items() if oid not in ids]
         gone += [xy for cid, xy in rec.items() if cid not in ids]

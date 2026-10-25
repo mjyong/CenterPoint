@@ -75,7 +75,7 @@ def serve(app, host, port):
 def candidates(args):
     """``candidates`` and ``detections`` over the scenes, with each model's results.pkl of the scene."""
     specs = [kv.split("=", 1) for kv in args.results]
-    filters = {} if args.cmd == "detections" else dict(object_min_score=args.object_min_score,
+    filters = {} if args.cmd == "detections" else dict(object_min_score=args.object_min_score, classes=args.classes,
                                                         min_keyframes=args.min_keyframes, max_range=args.max_range)
     total = Counter()
     for scene in args.scenes:
@@ -85,7 +85,7 @@ def candidates(args):
                 results[name] = pickle.load(f)
         scene_dir = os.path.join(args.root, scene)
         if args.cmd == "detections" or not args.dry_run:
-            n = write_detections(scene_dir, results, args.dets_min_score)
+            n = write_detections(scene_dir, results, args.dets_min_score, args.classes)
             print("%s: %d model boxes for Ctrl + drag -> %s" % (scene, n, os.path.join(scene_dir, "dog_dets")))
         if args.cmd == "detections":
             continue
@@ -162,6 +162,8 @@ def main():
         p.add_argument("--results", nargs="+", required=True, metavar="NAME=PATH",
                        help="run_sequence.py results.pkl per model; {scene} in PATH stands for the scene name")
         p.add_argument("--dets-min-score", type=float, default=0.15, help="lowest score of the boxes for Ctrl + drag")
+        p.add_argument("--classes", nargs="+", choices=CLASSES, default=["vehicle"],
+                       help="detection classes to propose / write (default vehicle: the review covers vehicles only)")
     c.add_argument("--min-score", type=float, default=0.3, help="lowest score of a candidate box")
     c.add_argument("--object-min-score", type=float, default=None,
                    help="an object is kept when its best box reaches this (default --min-score); its other boxes "
