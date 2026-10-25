@@ -1,0 +1,4 @@
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+[W1025 12:53:44.986035441 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 253755392 bytes (free: 148635648, total: 23649648640).
+[W1025 12:53:59.473379507 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 306184192 bytes (free: 211550208, total: 23649648640).
