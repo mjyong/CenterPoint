@@ -1,0 +1,2 @@
+total: 3838 candidate boxes (685 objects); already labelled 2178, at a place labelled in another frame 191, beyond max range 1621, earlier candidates replaced 0, found by nusc_pp 2856, found by nusc_pp only 1512, found by nusc_voxel 1924, found by nusc_voxel only 248, found by teacher 1618, found by teacher only 93, found by v0_pp 61, found by v0_pp only 9, found by v0_voxel 66, found by v0_voxel only 15, found by v1_pp 101, found by v1_pp only 23, found by v1_voxel 175, found by v1_voxel only 99, left out: in fewer than 2 keyframes 1103, no points 5
+dry run: nothing written
