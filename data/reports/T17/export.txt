@@ -1,0 +1,48 @@
+0921_164127_s000: 58 frames
+0921_164127_s001: 57 frames
+0921_164127_s002: 58 frames
+0921_164127_s003: 57 frames
+0921_164127_s004: 58 frames
+0921_164127_s005: 58 frames
+0921_165659_s003: 56 frames
+0921_165659_s004: 56 frames
+0921_165659_s005: 61 frames
+0921_165659_s006: 61 frames
+0921_165659_s000: 276 frames
+0921_165659_s001: 259 frames
+0921_165659_s002: 271 frames
+0921_165659_s007: 301 frames
+0921_165659_s008: 301 frames
+0921_165659_s009: 301 frames
+0921_165659_s010: 289 frames
+0921_165659_s011: 274 frames
+0921_165659_s012: 301 frames
+0921_165659_s013: 301 frames
+0921_165659_s014: 301 frames
+0921_165659_s015: 301 frames
+0921_165659_s016: 287 frames
+0921_165659_s017: 292 frames
+0921_165659_s018: 287 frames
+0921_165659_s019: 295 frames
+0921_165659_s020: 297 frames
+0921_165659_s021: 301 frames
+0921_165659_s022: 301 frames
+0921_165659_s023: 301 frames
+0921_165659_s024: 229 frames
+0921_165659_s025: 282 frames
+0921_165659_s026: 282 frames
+0921_165659_s027: 301 frames
+0921_165659_s028: 301 frames
+train 7232 / val 580 / test 0 frames -> /public/zjst/robot/centerpoint_data/dog_veh_1026_1410
+train boxes: car 14339 (+2893 ignored), truck 5073 (+1418 ignored)
+val boxes: car 1100 (+217 ignored), truck 1091 (+155 ignored)
+note: 1025 boxes: few points in the current sweep (ignored)
+note: 358 boxes: no points in the input (left out)
+note: 34 boxes: teacher subclass disagrees with size (ignored)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+no apex
+No Tensorflow
+
+dataset length:  7232
+load 14339 car database infos
+load 5073 truck database infos

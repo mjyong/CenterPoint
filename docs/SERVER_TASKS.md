@@ -85,7 +85,7 @@
 | T11b | 重做候选：只要车辆，只用 v1 Voxel、v1 Pillar 两个模型（T11 混进了行人、骑行者） | Agent | T11 | 15 分钟 | 完成（物体最高分门槛 0.3，54 个候选物体） |
 | T16 | 双教师的自动标注导成新的 SUSTechPOINTS 场景（35 个），沿用 H1 的审核结论；训练和验证一样，只留两个教师的框 | Agent | T14 | 20 分钟 | 完成（2026-10-26，验证集的 v1 候选已去掉） |
 | H3 | 在双教师的场景里审红框（训练 + 验证 35 个场景，只审车）；漏掉的车 Ctrl + 拖框补上 | 人 | T16 | 2–3 小时 | 完成（junyongmou，2026-10-26） |
-| T17 | 导回 H3，训练场景传播到每一帧、补停着的车的空档，导出 v2 数据集 | Agent | H3 | 40 分钟 | 待做 |
+| T17 | 导回 H3，训练场景传播到每一帧、补停着的车的空档，导出 v2 数据集 | Agent | H3 | 40 分钟 | 完成（2026-10-26） |
 | T12 | 在新的验证标签上重评所有模型；选下一轮的两个教师（Voxel、Pillar 各一个） | Agent | T15 | 1 小时 | 暂缓：T15 里 v2 当教师比 nuScenes 教师好才需要，否则不做 |
 | T13 | 雷达后方盲区：量出盲区，看各模型在盲区边上是不是误检更多 | Agent | T7 | 10 分钟 | 完成（盲区 142°–218°；v1 Pillar 在 10–40 m 边上算明显） |
 | T14 | 双教师（nuScenes Voxel + TTA、nuScenes Pillar + TTA）重新自动标注 0921，补进审过的训练标签（不丢 H1） | Agent | T7 | 1 小时 | 完成（双教师标注 T16 接着用；labels_merged.pkl 不再用） |
@@ -1531,7 +1531,16 @@ export 的 car / truck 正样本、忽略数，和 T5（v1）的对比；新数�
 
 ### T17 结果
 
-（待填）
+35 个场景导回的帧数和 T16 一致（验证 580、训练关键帧 1,476，合计 2,056）。车辆框 **7,478**，still marked review **0**，moved or new **642**（其中 637 个是双教师导出里没有的，主要是从 H1 照搬过来、ID 带 h 的框）。H1 的 `labels_sustech.pkl`、`labels_full.pkl` 没动。
+
+- propagate（25 个训练场景）：留下 **7,232 / 7,479** 帧（96.7%）。keyframe boxes 4,903，interpolated boxes 18,356，other classes, copied as they are 36,292，left out: removed by the reviewer 104，ignore: reviewed at one end 536，frames left out (outside the keyframes) 79。
+- `0921_165659_s024` 打印是 229/303 = 75.6%。这 303 帧里 55 帧是 `pose_bad`，propagate 不写这些帧。去掉之后是 229/248 = 92.3%，和 T5 一样。其余训练场景按全部帧算都 ≥ 90.7%（最低是 `0921_165659_s011` 的 274/302）。所以继续导出。
+- 补停着的车的空档：parked places 136（其中 51 处被拆成好几段），gap frames filled **274**，gap frames hidden (left as they are) 1,544。
+- 导出到新目录 `/public/zjst/robot/centerpoint_data/dog_veh_1026_1410`（37G）。`data/dog_veh`：`/public/zjst/robot/centerpoint_data/dog_veh_1023_1529` → 这个新目录。旧目录是 v1，等用它的训练、评估结束后再删。train 7,232 / val 580 帧。
+  - train：car 14,339（+2,893 ignored），truck 5,073（+1,418 ignored）。v1（T5）是 car 14,524（+2,335），truck 4,078（+1,321）。
+  - val：car 1,100（+217 ignored），truck 1,091（+155 ignored）。v1 是 car 950（+272），truck 1,132（+102）。
+  - note：few points 1,025；no points 358；subclass disagrees 34。v1 是 875 / 298 / 121。
+  - GT 库：car 14,339、truck 5,073。
 
 ---
 
