@@ -33,7 +33,7 @@
    ```bash
    nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu --format=csv
    ```
-   - 空闲显存（total − used）够这张卡上所有任务加起来、再留 1 GB，就可以放。每个进程大约要：训练 Voxel 7 GB、训练 Pillar 6 GB（batch 4；日志里的 `memory` 只有 3.7 / 3.0 GB，另加 CUDA 上下文和缓存）；`run_sequence.py` 推理、`dist_test.py` 各约 3 GB；Voxel + TTA 教师推理约 6 GB。
+   - 空闲显存（total − used）够这张卡上所有任务加起来、再留 1 GB，就可以放。每个进程大约要：训练 Voxel 7 GB、训练 Pillar 6 GB（batch 4；日志里的 `memory` 只有 3.7 / 3.0 GB，另加 CUDA 上下文和缓存）；`run_sequence.py` 推理、`dist_test.py` 各约 3 GB；Voxel + TTA 教师推理约 6 GB；Pillar + TTA 推理约 13 GB（T14 实测单进程峰值 12.6 GB，比 Voxel + TTA 还多）。
    - 利用率只影响快慢：卡上已经有别人在训练（利用率 > 80%）时，再放上去大家都会变慢，但不会出错。
    - 训练前加 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`，显存碎片少，占用更接近日志里的 `memory`。
    - 启动后用 `nvidia-smi --query-compute-apps=pid,used_memory --format=csv` 看各进程实际占了多少，写进报告，以后按实测值放卡。
@@ -1462,7 +1462,7 @@ EOF
              --out "data/runs_teacher_v1_e$e/{scene}"
        done
        python tools/dog/run_sequence.py --replay $(for r in $VAL; do echo data/runs/$r; done) --detectors pillar --tta \
-           --ckpt-pillar data/train/dog_pp_veh_v1/epoch_20.pth --no-predict --no-mcap --jobs 2 --device cuda:0 \
+           --ckpt-pillar data/train/dog_pp_veh_v1/epoch_20.pth --no-predict --no-mcap --jobs 1 --device cuda:0 \
            --out "data/runs_teacher_pp_v1/{scene}"
      } 2>&1 | tee data/reports/T12/runs.txt
 4. 在新标签上重评，T7 的 7 个模型再加三个候选教师：
@@ -1591,7 +1591,7 @@ nuScenes Pillar 加 TTA 在本地两个验证场景上试过（DOG_FINETUNE.md �
 不要改 data/labels/<场景>/ 下已有的文件，只新增 labels_merged.pkl；不要动 data/runs。
 
 0. 通用约定 6 的链接循环里加上 runs_pp_tta、labels_dual 两个目录（照约定 6 先链到公共盘）。
-1. Pillar + TTA，重放 35 个场景存好的帧（每个进程约 4–5 GB，按空闲显存定 --jobs，一般 3）：
+1. Pillar + TTA，重放 35 个场景存好的帧（每个进程约 13 GB，见通用约定 5；一张卡只放 1 个）：
      mkdir -p data/reports/T14
      ALL=$(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT)
      python tools/dog/run_sequence.py --replay $(for r in $ALL; do echo data/runs/$r; done) --detectors pillar --tta \
@@ -1669,6 +1669,19 @@ merge.txt 的合计和第 4 步的比例。
 | 0921_165659_s028 | 18 / 13 | 17 / 13 |
 
 25 个训练场景补进 `labels_merged.pkl`：正样本空档补了 **294** 框（另有 1509 个空档帧点不够，没补），忽略框加了 **1617** 框、74 条轨迹。`labels_full.pkl` 里原有车辆框 22546（其中非忽略 19746）。新忽略框占全部车辆框 7.2%、占非忽略车辆框 **8.2%**，没到 30%。已有标注、没有重复加的 20631 框。
+
+（2026-10-26 复核）
+- **结果可用，T15 等 T12 就能跑。** 本地把 25 个 `labels_merged.pkl` 读了一遍：帧数和 `labels_full.pkl` 一样；新加的轨迹号不和原有的重复；同一帧里没有重复的框。
+- **停着的车中间漏标、其实看得见的帧，比我之前估的少得多**：
+  - 空档帧一共 1,803 帧，框里点够、补上的只有 294 帧（16%），其余 1,509 帧是真被挡住了；
+  - 我之前拿 s025 估算（115 帧里 51 帧看得见），s025 恰好是最严重的一个；
+  - 294 个框只占原有正样本 19,746 个的 1.5%。"训练标签有矛盾"是次要原因，DATA_COLLECTION_PLAN.md 2.1 已改正。
+  - 补得多的场景：s010（101 帧）、s027（52）、s025（51）、s015（34）、s028（29）。
+- **加的 1,617 个忽略框（74 条轨迹）大多是远处的大家伙**：距离中位数 35 m；26 条长 6 m 以上（10–16 m 长、约 4 m 高），融合后的分数中位数 0.39。两个教师都只给了不高的分，可能是挂车、集装箱，也可能是建筑，当忽略框是对的（不当车，也不当背景）。
+  - s013（H1 时没有车框）加了 1 条 142 框的：18 m 外、8.8 m 长、3.7 m 高、当前帧 532 个点，分数 0.35。
+- **双教师的轨迹比单教师少**（992 对 1,231），待审核也少（502 对 610）：只有一个教师看到、又没把握的轨迹没进来。新数据用双教师标，人要审的会少一些。
+- **Pillar + TTA 很占显存**：单进程峰值 12.6 GB，我原来写的 4–5 GB 错了，第一次因此停下。已改通用约定 5、T12 第 3 步（Pillar 那条改成 --jobs 1）。GPU 上网络耗时 21.2 → 32.9 ms（10 个验证场景的中位数），约 1.6 倍，和 Voxel 一样。
+- **对 T15 的预期要放低**：v1.1 只比 v1 多 1.5% 的正样本、8% 的忽略框，v1.1 和 v1 的差别很可能在验证集分辨不出的范围内。T15 还是值得跑（3 小时 GPU，不用人看着）：如果分不出来，就说明 v1 不如教师主要不是标签的问题，下一步该改训练配方（混 nuScenes 数据或蒸馏）和多采数据。
 
 ---
 
