@@ -90,7 +90,7 @@
 | T13 | 雷达后方盲区：量出盲区，看各模型在盲区边上是不是误检更多 | Agent | T7 | 10 分钟 | 完成（盲区 142°–218°；v1 Pillar 在 10–40 m 边上算明显） |
 | T14 | 双教师（nuScenes Voxel + TTA、nuScenes Pillar + TTA）重新自动标注 0921，补进审过的训练标签（不丢 H1） | Agent | T7 | 1 小时 | 完成（双教师标注 T16 接着用；labels_merged.pkl 不再用） |
 | T15 | 用 v2 数据集训练 v2；定上线用哪个 Pillar、教师换不换 | Agent | T17 | 3.5 小时 | 完成。上线用 nuScenes Pillar（人定：v1、v2 都不如它，见复核）；教师不换 |
-| T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 停在第 3 步（训练场景标签拼接 80 > 40，oracle_train 和汇总没跑） |
+| T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 停在第 3 步（停止条件太紧，见复核）；评估工具修正后重跑第 3、4 步（T18 续，约 5 分钟） |
 | H4 | 在 Foxglove 里看基线，按问题清单归类典型问题 | 人 | T18 | 1 小时 | 待做 |
 | T19 | 后处理扫参（上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉） | Agent | T18 | 30 分钟 | 待做 |
 | T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 待做 |
@@ -2141,7 +2141,7 @@ GPU 只在第 2 步用（Pillar 不加 TTA，每个进程约 3 GB）；其余都
      ls -la data/tune/T18_mcap; du -sh data/tune/T18_mcap data/tune/T18_mcap_v2
 
 停止条件：任何报错；第 1 步某个场景传播后留下的帧少于原来的 90%（pose_bad 的帧不算，见 T17）；
-某份报告开头"Label tracks stitched into one vehicle"超过 40（拼得太多，可能拼错）。
+某份报告开头"Label tracks stitched into one vehicle"超过场景数的 4 倍（验证 10 个场景 > 40，训练 25 个场景 > 100；拼得太多，可能拼错）。
 提交：data/reports/T18/（MCAP 不在里面）、验证场景新生成的 data/labels/0921_*/labels_full2.pkl、本文档。
 （第 2 步只重放 nusc_pp；v1_pp、v2_pp 用 T15 存好的结果，已经按默认参数过滤过。）
 报告（写进"T18 结果"）：
@@ -2190,6 +2190,61 @@ GPU 只在第 2 步用（Pillar 不加 TTA，每个进程约 3 GB）；其余都
 
 deploy 的检测、跟踪、盲区、运动、预测、预警、耗时和 issues 在 `data/reports/T18/deploy/report.md`。v2_pp 的漏报和盲区表在 `data/reports/T18/v2_pp/report.md`。七列并排的 summary.md 没有写。
 
+（2026-10-26 复核）
+- **停下是我定的停止条件太紧**：40 是按验证集 10 个场景定的，没按场景数放大。训练集的 80 处拼接在本地核过：
+  - 67 处是停着的车被拆成几段，和 T17 的"136 处停车位、51 处被拆成几段"对得上；
+  - 两段首尾相距超过 2.5 m 的，训练集 0 处，验证集 2 处（都是运动的车，按原速度推过去接得上）。
+  停止条件已改成"超过场景数的 4 倍"。
+- **评估口径的一个问题，已修**：车进了盲区或被挡住时，标签就断了。跟踪器在那里继续 coast 是对的，原来却被算成假轨迹。
+  - oracle_val 的 48 个"coasting after the vehicle was lost"全是这种，其中 25 个在盲区里，合每分钟 6.2 条假轨迹。
+  - 现在的做法：标签断开后（以及开始前）`max_age + 0.5 s` 之内，按原速度推过去的位置不计分。
+  - 本地用验证集的 10 Hz 标签重跑 oracle：假轨迹 6.2 → 0 条 / 分钟，MOTA 0.939 → 0.963，ID 切换不变。
+  - 其他几份报告的假轨迹也会少一些，所以要重跑第 3、4 步（下面的 T18 续）。
+- **ID 切换是真的**：oracle 每分钟 1.66 次，和 v1、教师完全一样，说明不是检测的问题。
+  - 例子：s000 两辆停着的货车 20–23.5 s 看不见（当前帧 0 个点），1 s 后轨迹被删，再出现时换了号。
+  - 停着的车多 coast 一会儿是安全的。T20 的 max_age 加了 3.0 s；D2 可以按运动状态分开设，静止的轨迹 coast 更久。
+- **10 m 内 v1、v2 不如 nusc_pp，主要是因为一辆小车**：
+  - 3.4 × 1.5 × 2.0 m，标成 truck，停在离狗 4–5 m 处；164127_s004、s005 里都是它，约 70 个关键帧。
+  - 两个教师给它的分数只有 0.37–0.43，nuScenes 教师单独也在 10 m 内漏了 72 个框，只有 nusc_pp 检得到。
+  - v2_pp 在 10 m 内的 96 个漏报里，s005 这一辆就占了 57 个。
+  - 所以 T15 里 nusc_pp 在 20 m 内的优势，很大一部分来自这一辆车。它是什么车，H4 里人看一下：
+    像是 DATA_COLLECTION_PLAN.md 第 4 节问过的那种 2.5–3.1 m 长、2.3 m 高的"truck"。
+- **nusc_pp 在默认阈值 0.35 下假轨迹太多**：
+  - 每分钟约 60 条，681 个假轨迹关键帧里 567 个是"附近没有标注"；
+  - 停着的车被报成在动，每小时 149 次（v2、v1 是 74 次）。
+  - 但它召回最高（30 m 内 0.867），车进到 30 m 后被跟上的延迟 p90 是 0.95 s（v2 4.95 s，v1 2.5 s）。
+  - 三个模型的分数尺度不一样，应该各自用最合适的阈值再比，所以 T19 第 1 步加了 v1、v2 的阈值扫描。
+- **预测：IMM 和匀速（CV）几乎一样**，这些车速下转弯模式不起作用，两个模式基本重合。
+  - 运动的车 3 s 的 FDE 2.8 m，MR 52%；用标签当检测（oracle）是 1.4 m、28%。
+  - 也就是说，一半误差来自跟踪估出的速度，一半来自车本身：起步、停车、转弯，129 个运动样本里 119 个慢于 3 m/s。
+  - T21 和 D2 先从速度估计入手。
+- **预警**：6 次里报出 3 次，提前 1.0 s。样本太少，先只记下。
+- **耗时**：跟踪每帧中位数 7.9 ms，p90 18.5 ms（服务器 CPU）。nusc_pp 每帧的检测多（行人、骑车的也在里面）；阈值提高后会降，Orin 上要再测。
+- **10 Hz 标签里审核人加的框被 propagate 重新编了号**。不影响训练数据：每个关键帧车框按位置都在 10 Hz 标签里。
+  评估工具画图时已按关键帧对回原来的编号，同一辆车在关键帧之间不会画成两个框。
+
+### T18 续：评估修正后重跑第 3、4 步
+
+```text
+任务 T18 续：评估工具改了两处（标签断开后一小段不计分；10 Hz 标签的编号对回关键帧），重跑 T18 第 3、4 步。
+第 0–2 步的结果都在（labels_full2、data/tune/deploy、data/tune/nusc_pp_train），不用重做。不用 GPU。
+先 git pull、跑快速测试。
+
+0. 同 T18 第 0 步设好 TASK=T18、VAL、TRAIN、PP，同 T18 第 3 步定义 ev。
+   报告和 MCAP 直接覆盖（旧的数字留在上面的表里和 git 历史里）。
+1. T18 第 3 步的七条全部重跑（包括上次没跑的 oracle_train）。
+2. T18 第 4 步汇总，写 data/reports/T18/summary.md。
+
+停止条件：任何报错；拼接数超过场景数的 4 倍；oracle_val 的 false tracks / min 大于 1（修正没生效）。
+提交：data/reports/T18/（MCAP 不在里面）、本文档。
+报告（写进下面"T18 续结果"）：summary.md 七列并排的主要指标表；deploy、v2_pp 两份报告的"Where the errors are"、运动状态、
+预测（moving）、预警几张表；和修正前（上面的表）比，各份 false tracks / min 变了多少；oracle_train 的预测表（moving）。
+```
+
+### T18 续结果
+
+（待填）
+
 ---
 
 ## H4 在 Foxglove 里看基线（人做）
@@ -2237,6 +2292,13 @@ T18 之后，把 `data/tune/T18_mcap/` 拷到本机，用 Foxglove 打开，Layo
 1. 上报阈值（也是新建轨迹的阈值）：
      A score --set tracker.high_score=0.35,0.3,0.4,0.45,0.5,0.55;  B score --set tracker.high_score=0.35,0.3,0.4,0.45,0.5,0.55
    （nuScenes Pillar 的分数偏高：T15 里阈值 0.35 时 40 m 内误检 618 个，F1 最高在 0.40–0.45，所以往高扫。）
+   1b. 三个 Pillar 各用自己最好的阈值再比一次（T18 复核：默认阈值下 nusc_pp 召回最高、假轨迹也最多，分数尺度不一样）。
+       v1、v2 用 T15 存好的结果（已按默认参数过滤），只扫阈值，只跑 A：
+     ev score_v2_A "$VAL" "data/runs_veh_v2/{scene}/pillar/results.pkl" --no-mcap --set tracker.high_score=0.35,0.2,0.25,0.3,0.4,0.45
+     ev score_v1_A "$VAL" "data/runs_veh_v1/{scene}/pillar/results.pkl" --no-mcap --set tracker.high_score=0.35,0.2,0.25,0.3,0.4,0.45
+     三份 sweep.md 里，按下面第 1 组的规则各选一行，把三行并排成一张表：det recall、det precision、det F1、IDF1、
+     false tracks / min、confirm p90、moving missed、false moving / h。
+     v1 或 v2 选出的那行，det F1 和 IDF1 都比 nusc_pp 选出的那行高 0.02 以上：停下报告（上线模型要人重新定），不做第 2–4 组。
 2. 轨迹输出分数、低分门槛：
      A output --set tracker.output_min_score=0.3,0.2,0.25,0.35 --set tracker.low_score=0.1,0.15,0.2
      B output（同上）
@@ -2275,7 +2337,7 @@ T18 之后，把 `data/tune/T18_mcap/` 拷到本机，用 Foxglove 打开，Layo
 
 0. mkdir -p data/reports/T20; TASK=T20; VAL、TRAIN、ev 同 T18；A、B 同 T19 第 0 步；BASE=T19 报告里最后的 BASE。
 1. 关联半径：             A gate --set tracker.vehicle.gate=3,2,2.5,4
-2. 最长 coast 时间：      A age --set tracker.vehicle.max_age=1.0,0.5,1.5,2.0
+2. 最长 coast 时间：      A age --set tracker.vehicle.max_age=1.0,0.5,1.5,2.0,3.0
 3. 确认帧数、试探寿命：   A hits --set tracker.vehicle.min_hits=2,1,3 --set tracker.tentative_max_age=0.15,0.25
 4. 观测噪声：             A noise --set tracker.vehicle.pos_std=0.3,0.2,0.5 --set tracker.vehicle.vel_std=0.8,0.5,1.5
 5. 速度头、匹配方法：     A assoc --set tracker.use_velocity=true,false --set tracker.matching=greedy,hungarian

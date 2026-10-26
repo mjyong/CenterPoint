@@ -125,6 +125,7 @@ def test_overrides_and_grid():
 
 def test_scene_metrics(scene):
     assert scene.merges == 1 and scene.gt_id[5] == 1
+    assert scene.dense_id[3] == 3 and 9 in scene.dense_id                  # 10 Hz ids matched at keyframes
     res = pe.run_scene(scene, pe.EvalConfig())
     m = pe.summarize([res])
     assert res.keyframes == 60
@@ -134,6 +135,11 @@ def test_scene_metrics(scene):
     assert m["MOTA"] > 0.85 and m["IDF1"] > 0.85 and res.mot["IDSW"] == 0
     assert res.fp_episodes >= 1 and any(i["kind"] == "false track" for i in res.issues)
     assert res.counts["fp_cause|nothing labelled nearby"] >= 1
+    # cars 2 and 3 vanish at the end of their labels: the tracks coasting on are not false ones (only
+    # the clutter track's coasting is)
+    strict = pe.run_scene(scene, pe.apply_overrides(pe.EvalConfig(), {"eval.unlabelled_grace": 0.0}))
+    key = "fp_cause|coasting after the vehicle was lost"
+    assert strict.counts[key] >= res.counts[key] + 2 and strict.fp_episodes > res.fp_episodes
     assert m["motion_relevant_segments"] >= 1 and m["motion_relevant_missed"] == 0
     assert m["pred_samples_moving"] > 10 and m["IMM_FDE3_moving"] < 3.0
     assert m["CV_FDE3_moving"] < 3.0

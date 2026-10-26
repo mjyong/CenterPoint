@@ -72,6 +72,9 @@ class EvalConfig:
     hazard_radius: float = 5.0       # [m]
     hazard_horizon: float = 3.0      # [s]
     bad_fde: float = 3.0             # [m] predictions listed as issues
+    # [s] after its last / before its first label a vehicle is still there, not scored (``_unlabelled``);
+    # None: the vehicle max_age + 0.5 s, so a track coasting into the blind sector is never a false one
+    unlabelled_grace: float = None
     sector: tuple = BLIND_SECTOR_DEG
     edge: float = EDGE_DEG
 
@@ -221,6 +224,7 @@ class SceneData:
     gt_id: dict = None            # label track id -> stitched id
     gt_track: dict = None         # stitched id -> dict(t, xy, zb (box bottom), moving, box (world), by stamp)
     merges: int = 0
+    dense_id: dict = field(default_factory=dict)   # 10 Hz label track id -> keyframe label track id
 
 
 def _key(stamp):
@@ -246,11 +250,23 @@ def load_scene(name, rows, labels, dense=None, **stitch):
     gt_track = {}
     for g, v in groups.items():
         v.sort(key=lambda x: x[0])
-        gt_track[g] = dict(t=np.array([x[0] for x in v]), xy=np.array([x[1] for x in v]),
-                           zb=np.array([x[2] for x in v]), moving=np.array([x[3] for x in v]),
-                           box=np.array([x[4] for x in v]))
+        t, xy = np.array([x[0] for x in v]), np.array([x[1] for x in v])
+        gt_track[g] = dict(t=t, xy=xy, zb=np.array([x[2] for x in v]), moving=np.array([x[3] for x in v]),
+                           box=np.array([x[4] for x in v]), v_start=_edge_velocity(t, xy, False),
+                           v_end=_edge_velocity(t, xy, True))
     dense_key = None if dense is None else {_key(f["stamp"]): f for f in dense["frames"] if not f.get("pose_bad")}
-    return SceneData(name, rows, key, dense_key, gt_id, gt_track, merges)
+    # propagate_keyframes renumbers the boxes the reviewer added: match the 10 Hz ids at the keyframes
+    dense_id = {}
+    for k, f in key.items():
+        d = (dense_key or {}).get(k)
+        kv = [o for o in f["objects"] if o["label"] == "vehicle"]
+        for o in (d["objects"] if d else []):
+            if o["label"] != "vehicle" or o["track_id"] in dense_id or not kv:
+                continue
+            dist = [np.hypot(*(np.asarray(o["box"][:2]) - q["box"][:2])) for q in kv]
+            if min(dist) < 0.5:
+                dense_id[o["track_id"]] = kv[int(np.argmin(dist))]["track_id"]
+    return SceneData(name, rows, key, dense_key, gt_id, gt_track, merges, dense_id)
 
 
 def _at(track, times, tol=0.06):
@@ -266,15 +282,35 @@ def _at(track, times, tol=0.06):
     return out
 
 
-def _between(track, stamp):
-    """World box of a stitched GT track at ``stamp`` when it has keyframes before and after but none
-    then (the labels left it out, mostly hidden): the nearest box moved to the interpolated center."""
+def _edge_velocity(t, xy, end, window=1.0):
+    """Mean velocity over the first / last ``window`` s of a track's labelled centers."""
+    m = t >= t[-1] - window if end else t <= t[0] + window
+    tt, pp = t[m], xy[m]
+    return (pp[-1] - pp[0]) / (tt[-1] - tt[0]) if len(tt) > 1 and tt[-1] > tt[0] else np.zeros(2)
+
+
+def _unlabelled(track, stamp, grace):
+    """World box of a stitched GT track at ``stamp`` when the labels leave it out although the vehicle
+    is there: between two of its labelled stretches (the nearest box moved to the interpolated
+    center), or up to ``grace`` s after its last / before its first label (moved on at its speed
+    there). It went into the blind sector or behind something, or the labels pick it up a little late;
+    a track coasting there, or started early, is not a false one."""
     t = track["t"]
-    if not (t[0] < stamp < t[-1]) or np.abs(t - stamp).min() <= 0.06:
+    if np.abs(t - stamp).min() <= 0.06:
         return None
-    box = track["box"][int(np.argmin(np.abs(t - stamp)))].copy()
-    box[0], box[1] = np.interp(stamp, t, track["xy"][:, 0]), np.interp(stamp, t, track["xy"][:, 1])
-    return box
+    if t[0] < stamp < t[-1]:
+        box = track["box"][int(np.argmin(np.abs(t - stamp)))].copy()
+        box[0], box[1] = np.interp(stamp, t, track["xy"][:, 0]), np.interp(stamp, t, track["xy"][:, 1])
+        return box
+    if t[-1] < stamp <= t[-1] + grace:
+        box = track["box"][-1].copy()
+        box[:2] = track["xy"][-1] + track["v_end"] * (stamp - t[-1])
+        return box
+    if t[0] - grace <= stamp < t[0]:
+        box = track["box"][0].copy()
+        box[:2] = track["xy"][0] - track["v_start"] * (t[0] - stamp)
+        return box
+    return None
 
 
 def _path(track, t0, t1, zb=0.0):
@@ -374,6 +410,8 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
         return np.c_[np.interp(ts, rob_t, rob_xy[:, 0]), np.interp(ts, rob_t, rob_xy[:, 1])]
 
     keys = [_key(r["stamp"]) for r in sd.rows if _key(r["stamp"]) in sd.keyframes and not r.get("pose_bad")]
+    grace = cfg.unlabelled_grace if cfg.unlabelled_grace is not None else \
+        cfg.tracker.class_params["vehicle"].max_age + 0.5
     snap_key = keys[len(keys) // 2] if keys else None
     kidx = -1
     seen_near, tracked_at, first_scored = {}, {}, {}
@@ -415,13 +453,14 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
                 g = None if o.get("ignore") else sd.gt_id.get(o["track_id"])
                 scored = g is not None and rng <= cfg.max_range and int(o.get("points", 1)) > 0
                 gts.append(dict(o=o, box=b, rng=rng, g=g, scored=scored, w=_to_world(b, T), zone=zone_of(b[:2], cfg.sector, cfg.edge)))
-            # a stitched vehicle between two labelled stretches is not scored either
+            # a labelled vehicle the labels leave out here (between its stretches, or just after / before
+            # them) is not scored either
             for g, trk in sd.gt_track.items():
-                w = _between(trk, stamp)
+                w = _unlabelled(trk, stamp, grace)
                 if w is not None:
                     b = Detections(w[None], np.zeros((1, 2)), np.ones(1), np.zeros(1, np.int64)).transform(
                         T_dw, "det").boxes[0]
-                    gts.append(dict(o=dict(track_id=-g, velocity=np.zeros(2), points="-", between=True), box=b,
+                    gts.append(dict(o=dict(track_id=-g, velocity=np.zeros(2), points="-", unlabelled=True), box=b,
                                     rng=float(np.hypot(*b[:2])), g=None, scored=False, w=w,
                                     zone=zone_of(b[:2], cfg.sector, cfg.edge)))
             sc = [x for x in gts if x["scored"]]
@@ -593,7 +632,7 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
                                   past=_path(trk, stamp - 2.0, stamp), future=_path(trk, stamp, stamp + 3.0),
                                   meta={"gt_id": g if g is not None else "-", "label_track": x["o"]["track_id"],
                                         "ignore": bool(x["o"].get("ignore")), "points": x["o"].get("points", "-"),
-                                        "between_labels": bool(x["o"].get("between")),
+                                        "unlabelled": bool(x["o"].get("unlabelled")),
                                         "moving": bool(x["o"].get("moving")), "range_m": "%.1f" % x["rng"],
                                         "zone": x["zone"], "scored": x["scored"],
                                         "status": status.get(g, "not scored") if x["scored"] else "not scored"}))
@@ -694,7 +733,8 @@ def _draw(viz, sd, row, T, dets, reported, det_tp, det_gt, dropped, why, tracks,
         f = sd.dense.get(_key(stamp))
         for o in (f["objects"] if f else []):
             if o["label"] == "vehicle" and not o.get("ignore"):
-                items.append(dict(box=_to_world(o["box"], T), id=sd.gt_id.get(o["track_id"], -int(o["track_id"])),
+                kid = sd.dense_id.get(o["track_id"], o["track_id"])
+                items.append(dict(box=_to_world(o["box"], T), id=sd.gt_id.get(kid, -int(kid)),
                                   label=VEHICLE, status="interp"))
     if keyframe or sd.dense is not None:
         viz.ground_truth(stamp, items, keyframe)
