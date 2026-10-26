@@ -9,7 +9,7 @@ from dog_perception.prediction.learned import (LearnedPredictor, evaluate_kinema
                                                train_predictor)
 from dog_perception.prediction.model import ModelConfig, TrajectoryPredictor, load_model, predictor_loss, save_model
 from dog_perception.detection.boxes import Detections
-from dog_perception.tracking import MultiObjectTracker
+from dog_perception.tracking import MultiObjectTracker, TrackerConfig
 
 
 @pytest.fixture(scope="module")
@@ -95,7 +95,7 @@ def test_training_converges_and_runtime_wrapper(logs, tmp_path):
     assert fc["hist_len"] == 20
 
     # runtime wrapper on a live tracker, with IMM fallback for young tracks
-    trk = MultiObjectTracker()
+    trk = MultiObjectTracker(TrackerConfig(classes=("pedestrian",)))
     for k in range(15):
         t = 0.1 * (k + 1)
         d = Detections(np.array([[k * 0.1, 0.0, 0.9, 0.6, 0.6, 1.7, 0.0], [5.0, 5.0 - k * 0.1, 0.9, 0.6, 0.6, 1.7, 0.0]]),

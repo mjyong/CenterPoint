@@ -116,6 +116,8 @@ class ClipVisualizer:
         """dets_map: Detections in the map frame; tp / matched_gt only on keyframes."""
         rep, low = [], []
         for i, (b, s, l, v) in enumerate(zip(dets_map.boxes, dets_map.scores, dets_map.labels, dets_map.velocities)):
+            if int(l) != 0:              # vehicle only
+                continue
             rgb = CLASS_RGB.get(int(l), GREY)
             meta = {"class": CLASSES[l], "score": "%.3f" % s, "speed_mps": "%.2f" % np.hypot(*v),
                     "vel": "(%.2f, %.2f)" % tuple(v), "size_lwh": "%.2f %.2f %.2f" % tuple(b[3:6])}
@@ -142,6 +144,8 @@ class ClipVisualizer:
         """Detections the geometric filters dropped (``filters.filter_reasons``), reason as the label."""
         ents = []
         for i, (b, s, l) in enumerate(zip(dets_map.boxes, dets_map.scores, dets_map.labels)):
+            if int(l) != 0:
+                continue
             ents.append(fx.entity("filt-%d" % i, t, lifetime=self.life,
                                   metadata={"class": CLASSES[l], "score": "%.3f" % s, "dropped": reasons[i]},
                                   lines=[fx.box_wire(b, GREY[:3] + (0.6,), 0.02)],
@@ -170,6 +174,8 @@ class ClipVisualizer:
         (matched GT id, distance, FP) on keyframes."""
         boxes, hist = [], []
         for s in tracks:
+            if int(s.label) != 0:
+                continue
             rgb = track_rgb(s.track_id, 0.45 if s.coasting else 1.0)
             b = np.r_[s.position, s.size, s.yaw]
             spd = float(np.hypot(*s.velocity))
@@ -328,14 +334,16 @@ def bev_figure(snap, path, extent=40.0, forward="x", ego_outline=None, sector=No
             f = P(it["future"])
             ax.plot(f[:, 0], f[:, 1], ls=(0, (3, 2)), color=INK, lw=0.9, zorder=3)
     for s in snap["tracks"]:
+        if int(s.label) != 0:
+            continue
         c = P(fx.box_corners(np.r_[s.position, s.size, s.yaw])[:4])
         if not (np.abs(c) < extent).all():
             continue
         col = CLS.get(int(s.label), MUTED)
         ax.add_patch(Polygon(c, closed=True, fc=col, ec=col, alpha=0.35 if s.coasting else 0.55, lw=0.8, zorder=5))
         ax.text(c[:, 0].max() + 0.3, c[:, 1].mean(), "T%d" % s.track_id, color=INK2, fontsize=6.5, zorder=7)
-    labels = {s.track_id: int(s.label) for s in snap["tracks"]}
-    start = {s.track_id: s.position[:2] for s in snap["tracks"]}
+    labels = {s.track_id: int(s.label) for s in snap["tracks"] if int(s.label) == 0}
+    start = {s.track_id: s.position[:2] for s in snap["tracks"] if int(s.label) == 0}
     for p in snap["preds"]:
         if p.track_id not in start or not (np.abs(P(start[p.track_id])) < extent).all():
             continue
@@ -363,7 +371,7 @@ def bev_figure(snap, path, extent=40.0, forward="x", ego_outline=None, sector=No
                Line2D([], [], color=STATUS["missed"], lw=1.6, label="GT, missed (FN)"),
                Line2D([], [], color=STATUS["ignored"], lw=0.8, label="GT, not evaluated"),
                Line2D([], [], color=INK, lw=0.9, ls=(0, (3, 2)), label="GT future 3 s")]
-    handles += [Patch(fc=CLS[c], alpha=0.55, label="track: %s" % n) for c, n in enumerate(CLASSES)]
+    handles += [Patch(fc=CLS[c], alpha=0.55, label="track: %s" % n) for c, n in enumerate(CLASSES) if n == "vehicle"]
     handles += [Line2D([], [], color=INK2, lw=1.6, label="predicted modes (opacity = prob.)")]
     if sector is not None:
         handles.append(Patch(fc=GRID, alpha=0.6, label="lidar blind sector"))

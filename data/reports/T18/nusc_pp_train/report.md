@@ -12,13 +12,13 @@
 | metric | value | interval |
 |---|---|---|
 | detections: recall within near range | **0.845** | 0.774 – 0.898 |
-| detections: precision within near range | **0.736** | 0.608 – 0.812 |
-| detections: F1 within near range | **0.787** | 0.698 – 0.840 |
-| detections: false per keyframe | **0.776** | 0.598 – 0.954 |
-| tracks: MOTA | **0.512** | 0.290 – 0.638 |
-| tracks: IDF1 | **0.727** | 0.649 – 0.785 |
+| detections: precision within near range | **0.738** | 0.610 – 0.815 |
+| detections: F1 within near range | **0.788** | 0.700 – 0.842 |
+| detections: false per keyframe | **0.762** | 0.588 – 0.934 |
+| tracks: MOTA | **0.526** | 0.304 – 0.651 |
+| tracks: IDF1 | **0.732** | 0.654 – 0.789 |
 | tracks: ID switches / min | **3.902** | 1.536 – 6.449 |
-| tracks: false tracks / min | **47.312** | 38.366 – 55.389 |
+| tracks: false tracks / min | **44.061** | 35.257 – 52.273 |
 | tracks: confirm delay p90 [s] | **0.501** | 0.350 – 2.000 |
 | motion: relevant moving stretches missed | **1** | 0.000 – 3.000 |
 | motion: parked reported moving / h | **34.143** | 9.676 – 68.327 |
@@ -31,10 +31,10 @@ Vehicle threshold 0.35 (`tracker.high_score`), 2 m match, keyframes. Near: withi
 
 | range | precision | recall | TP | FP | FN |
 |---|---|---|---|---|---|
-| 0-30 m | 0.736 | 0.845 | 2036 | 730 | 373 |
-| 30-40 m | 0.694 | 0.784 | 939 | 415 | 258 |
+| 0-30 m | 0.738 | 0.845 | 2036 | 721 | 373 |
+| 30-40 m | 0.700 | 0.784 | 939 | 403 | 258 |
 
-False detections per keyframe 0.776. AP over all scores: AP@2.0 0.824, AP@4.0 0.837, AP@2.0 0-20 m 0.871, 20-40 m 0.768.
+False detections per keyframe 0.762. AP over all scores: AP@2.0 0.825, AP@4.0 0.839, AP@2.0 0-20 m 0.872, 20-40 m 0.770.
 
 ## Tracking
 
@@ -42,9 +42,9 @@ Reported tracks (confirmed, coasting included) against the scored vehicles, keyf
 
 | MOTA | MOTP m | IDF1 | recall | precision | IDSW | IDSW / min | FRAG | MT | ML | vehicles | TP | FP | FN |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **0.512** | 0.23 | **0.727** | 0.880 | 0.713 | 48 | 3.90 | 78 | 113 | 11 | 147 | 3173 | 1277 | 433 |
+| **0.526** | 0.23 | **0.732** | 0.880 | 0.721 | 48 | 3.90 | 78 | 113 | 11 | 147 | 3173 | 1227 | 433 |
 
-- false tracks (a track false on consecutive keyframes counts once): 47.31 per minute
+- false tracks (a track false on consecutive keyframes counts once): 44.06 per minute
 - a vehicle coming into 30 m waits for its first matched track: median 0.0 s, p90 0.5 s (63 vehicles; 5 never tracked; 0.5 s resolution)
 
 ### Where the errors are
@@ -52,9 +52,9 @@ Reported tracks (confirmed, coasting included) against the scored vehicles, keyf
 | false tracks: cause | count |
 |---|---|
 | second track on a tracked vehicle | 1 |
-| beside a vehicle (2-4 m off) | 69 |
-| coasting after the vehicle was lost | 150 |
-| nothing labelled nearby | 1057 |
+| beside a vehicle (2-4 m off) | 60 |
+| coasting after the vehicle was lost | 121 |
+| nothing labelled nearby | 1045 |
 
 | missed vehicles (FN) | count |
 |---|---|
@@ -72,9 +72,9 @@ Blind sector (142-218 deg behind the robot) and the 20 deg bands beside it:
 
 | zone | scored vehicles | missed | missed share | tracks | false | false share |
 |---|---|---|---|---|---|---|
-| elsewhere | 3192 | 358 | 0.112 | 3963 | 1124 | 0.284 |
-| edge | 324 | 52 | 0.160 | 400 | 126 | 0.315 |
-| blind | 90 | 23 | 0.256 | 87 | 27 | 0.310 |
+| elsewhere | 3192 | 358 | 0.112 | 3936 | 1097 | 0.279 |
+| edge | 324 | 52 | 0.160 | 387 | 113 | 0.292 |
+| blind | 90 | 23 | 0.256 | 77 | 17 | 0.221 |
 
 ## Motion state
 
@@ -165,9 +165,9 @@ A moving vehicle that comes within 5 m of the robot within 3 s (labelled future,
 
 | stage | median | p90 |
 |---|---|---|
-| filter | 1.27 | 3.44 |
-| track | 7.35 | 16.86 |
-| predict | 3.79 | 8.56 |
+| filter | 1.23 | 3.36 |
+| track | 2.22 | 8.17 |
+| predict | 1.09 | 3.49 |
 
 ## Issues (`issues.csv`)
 
@@ -176,7 +176,7 @@ A moving vehicle that comes within 5 m of the robot within 3 s (labelled future,
 | ID switch | 48 |
 | bad prediction | 74 |
 | false moving | 7 |
-| false track | 248 |
+| false track | 240 |
 | hazard not reported | 1 |
 | lost vehicle | 39 |
 | missed moving vehicle | 1 |

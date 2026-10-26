@@ -74,6 +74,9 @@ DEFAULT_CLASS_PARAMS = {
 @dataclass
 class TrackerConfig:
     class_params: dict = field(default_factory=lambda: dict(DEFAULT_CLASS_PARAMS))
+    # only these classes are tracked, and therefore predicted. Pedestrians and cyclists stay in the
+    # detector output (the nuScenes pillar still has those heads) but are not tracked.
+    classes: tuple = ("vehicle",)
     # score needed to start a track (float or {class: score}); below it, down to
     # low_score, detections only continue existing confirmed tracks
     high_score: object = field(default_factory=lambda: dict(DEFAULT_SCORE_THRESHOLDS))
@@ -324,7 +327,8 @@ class MultiObjectTracker:
         for t in self.tracks:
             t.predict(stamp)
 
-        keep = dets.labels >= 0
+        allowed = np.array([CLASSES.index(c) for c in cfg.classes], dtype=np.int64)
+        keep = np.isin(dets.labels, allowed)
         hi_thr = score_threshold_array(dets.labels, cfg.high_score)
         high = np.nonzero(keep & (dets.scores >= hi_thr))[0]
         low = np.nonzero(keep & (dets.scores >= cfg.low_score) & (dets.scores < hi_thr))[0]

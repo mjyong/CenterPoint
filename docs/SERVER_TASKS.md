@@ -90,7 +90,7 @@
 | T13 | 雷达后方盲区：量出盲区，看各模型在盲区边上是不是误检更多 | Agent | T7 | 10 分钟 | 完成（盲区 142°–218°；v1 Pillar 在 10–40 m 边上算明显） |
 | T14 | 双教师（nuScenes Voxel + TTA、nuScenes Pillar + TTA）重新自动标注 0921，补进审过的训练标签（不丢 H1） | Agent | T7 | 1 小时 | 完成（双教师标注 T16 接着用；labels_merged.pkl 不再用） |
 | T15 | 用 v2 数据集训练 v2；定上线用哪个 Pillar、教师换不换 | Agent | T17 | 3.5 小时 | 完成。上线用 nuScenes Pillar（人定：v1、v2 都不如它，见复核）；教师不换 |
-| T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 停在第 3 步（停止条件太紧，见复核）；评估工具修正后重跑第 3、4 步（T18 续，约 5 分钟） |
+| T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 完成（修正后重跑；oracle 假轨迹 0 / 分钟；跟踪只计车辆） |
 | H4 | 在 Foxglove 里看基线，按问题清单归类典型问题 | 人 | T18 | 1 小时 | 待做 |
 | T19 | 后处理扫参（上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉） | Agent | T18 | 30 分钟 | 待做 |
 | T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 待做 |
@@ -2258,7 +2258,104 @@ deploy 的检测、跟踪、盲区、运动、预测、预警、耗时和 issues
 
 ### T18 续结果
 
-（待填）
+七份都跑完。拼接数：验证集五份都是 20（上限 40），训练两份都是 80（上限 100）。oracle_val 的 false tracks / min 是 **0**，修正生效。耗时：deploy 53 s，v2_pp 21 s，v1_pp 11 s，teacher 14 s，oracle_val 14 s，nusc_pp_train 26 s，oracle_train 22 s。MCAP：`data/tune/T18_mcap` 876 MB，`data/tune/T18_mcap_v2` 858 MB。这次跟踪、预测和可视化只处理车（人和骑行者仍由检测器输出，不建轨迹、不画）。
+
+主要指标：
+
+| metric | deploy | v2_pp | v1_pp | teacher | oracle_val | nusc_pp_train | oracle_train |
+|---|---|---|---|---|---|---|---|
+| detections: recall within near range | 0.867 | 0.765 | 0.727 | 0.857 | 1.000 | 0.845 | 1.000 |
+| detections: precision within near range | 0.782 | 0.894 | 0.952 | 0.952 | 1.000 | 0.738 | 1.000 |
+| detections: F1 within near range | 0.822 | 0.824 | 0.824 | 0.902 | 1.000 | 0.788 | 1.000 |
+| detections: false per keyframe | 1.038 | 0.309 | 0.162 | 0.217 | 0.000 | 0.762 | 0.000 |
+| tracks: MOTA | 0.526 | 0.635 | 0.667 | 0.800 | 0.963 | 0.526 | 0.943 |
+| tracks: IDF1 | 0.753 | 0.779 | 0.785 | 0.875 | 0.962 | 0.732 | 0.877 |
+| tracks: ID switches / min | 2.689 | 1.862 | 1.655 | 1.655 | 1.655 | 3.902 | 4.065 |
+| tracks: false tracks / min | 57.720 | 13.447 | 11.172 | 13.034 | 0.000 | 44.061 | 0.000 |
+| tracks: confirm delay p90 [s] | 0.950 | 4.950 | 2.500 | 0.501 | 0.501 | 0.501 | 0.501 |
+| motion: relevant moving stretches missed | 2 | 1 | 1 | 1 | 0 | 1 | 0 |
+| motion: parked reported moving / h | 148.956 | 74.478 | 74.478 | 24.826 | 0.000 | 34.143 | 0.000 |
+| prediction: FDE 3 s, moving [m] | 2.818 | 2.705 | 2.409 | 1.917 | 1.404 | 3.050 | 2.188 |
+| prediction: miss rate 3 s, moving | 0.519 | 0.473 | 0.398 | 0.377 | 0.285 | 0.649 | 0.521 |
+
+false tracks / min 相对修正前：deploy 59.789 → 57.720（−2.07），v2_pp 14.482 → 13.447（−1.04），v1_pp 13.034 → 11.172（−1.86），teacher 14.275 → 13.034（−1.24），oracle_val 6.206 → 0.000（−6.21），nusc_pp_train 47.312 → 44.061（−3.25）。oracle_val 的 MOTA 0.939 → 0.963，ID 切换仍是 1.655 次/分钟。deploy 跟踪耗时中位数 7.9 → 5.0 ms（p90 19.1 ms）。
+
+deploy，错误在哪：
+
+| false tracks: cause | count |
+|---|---|
+| second track on a tracked vehicle | 4 |
+| beside a vehicle (2-4 m off) | 51 |
+| coasting after the vehicle was lost | 45 |
+| nothing labelled nearby | 564 |
+
+| missed vehicles (FN) | count |
+|---|---|
+| detected, not tracked | 58 |
+| not detected | 224 |
+| 0-10 m | 11 |
+| 10-20 m | 27 |
+| 20-30 m | 130 |
+| 30-40 m | 114 |
+| 1-9 pts | 13 |
+| 10-49 pts | 63 |
+| >=50 pts | 206 |
+
+| zone | scored vehicles | missed | missed share | tracks | false | false share |
+|---|---|---|---|---|---|---|
+| elsewhere | 1597 | 202 | 0.126 | 1989 | 596 | 0.300 |
+| edge | 408 | 73 | 0.179 | 388 | 60 | 0.155 |
+| blind | 19 | 7 | 0.368 | 29 | 8 | 0.276 |
+
+运动状态：moving recall 0.745，停着被报成在动 7/46（149 次/小时），相关段漏报 2/9，延迟 0.50 / 0.90 s。
+
+预测，moving，129 个样本，3 s：IMM FDE 2.82 m、MR 0.519；CV FDE 2.80 m、MR 0.519。
+
+预警：6 次里报出 3 次，提前 1.0 s；没有这种车的报警 1 次（12.4 次/小时）。
+
+v2_pp，错误在哪：
+
+| false tracks: cause | count |
+|---|---|
+| second track on a tracked vehicle | 0 |
+| beside a vehicle (2-4 m off) | 48 |
+| coasting after the vehicle was lost | 6 |
+| nothing labelled nearby | 140 |
+
+| missed vehicles (FN) | count |
+|---|---|
+| detected, not tracked | 42 |
+| not detected | 493 |
+| 0-10 m | 96 |
+| 10-20 m | 60 |
+| 20-30 m | 199 |
+| 30-40 m | 180 |
+| 1-9 pts | 23 |
+| 10-49 pts | 113 |
+| >=50 pts | 399 |
+
+| zone | scored vehicles | missed | missed share | tracks | false | false share |
+|---|---|---|---|---|---|---|
+| elsewhere | 1597 | 421 | 0.264 | 1321 | 151 | 0.114 |
+| edge | 408 | 106 | 0.260 | 339 | 33 | 0.097 |
+| blind | 19 | 8 | 0.421 | 23 | 10 | 0.435 |
+
+运动状态：moving recall 0.746，停着被报成在动 3/42（74.5 次/小时），相关段漏报 1/7，延迟 1.00 / 2.00 s。
+
+预测，moving，110 个样本，3 s：IMM FDE 2.71 m、MR 0.473；CV FDE 2.71 m、MR 0.482。
+
+预警：6 次里报出 5 次，中位提前 1.5 s（最短 −0.5 s）；没有这种车的报警 2 次（24.8 次/小时）。
+
+oracle_train 预测，moving，217 个样本：
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.37 | 0.52 | 0.36 | 0.50 | 0.009 |
+| IMM | 2 s | 0.73 | 1.28 | 0.70 | 1.23 | 0.189 |
+| IMM | 3 s | 1.14 | 2.19 | 1.09 | 2.09 | 0.521 |
+| CV | 1 s | 0.38 | 0.52 | 0.38 | 0.52 | 0.009 |
+| CV | 2 s | 0.73 | 1.29 | 0.73 | 1.29 | 0.203 |
+| CV | 3 s | 1.15 | 2.22 | 1.15 | 2.22 | 0.571 |
 
 ---
 

@@ -1,7 +1,7 @@
 """Glue used by the simulation demo and the tests."""
 import numpy as np
 
-from .detection import OracleDetector, OracleNoise
+from .detection import CLASSES, OracleDetector, OracleNoise
 from .geometry import inv_T
 from .pose_buffer import ImuPropagator, PoseBuffer
 from .preprocess import det_frame_from_body
@@ -22,7 +22,7 @@ def oracle_tracking_log(seed=0, duration=60.0, num_pedestrians=12, num_cyclists=
     labels = ["pedestrian"] * num_pedestrians + ["cyclist"] * num_cyclists + ["vehicle"] * num_vehicles
     objs = [SimObject.random(i, lab, rng, duration + 1.0, (0.0, 0.0), area) for i, lab in enumerate(labels)]
     det = OracleDetector(noise or OracleNoise(), seed=seed + 1)
-    trk = MultiObjectTracker(tracker_cfg or TrackerConfig())
+    trk = MultiObjectTracker(tracker_cfg or TrackerConfig(classes=CLASSES))
     log = TrackLogger()
     predictor = IMMPredictor()
     for k in range(int(duration * rate)):

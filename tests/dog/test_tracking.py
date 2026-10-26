@@ -60,7 +60,7 @@ def _det(xy, label=1, score=0.8, vel=(0.0, 0.0)):
 
 
 def test_lifecycle_coasting_and_low_score_recovery():
-    trk = MultiObjectTracker(TrackerConfig())
+    trk = MultiObjectTracker(TrackerConfig(classes=("pedestrian",)))
     t, pos, ids = 0.0, np.array([0.0, 0.0]), []
     for k in range(40):
         t += 0.1
@@ -82,7 +82,7 @@ def test_lifecycle_coasting_and_low_score_recovery():
 
 
 def test_low_score_detections_do_not_spawn_tracks_and_tentative_die():
-    trk = MultiObjectTracker(TrackerConfig())
+    trk = MultiObjectTracker(TrackerConfig(classes=("pedestrian",)))
     for k in range(5):
         assert trk.step(_det((5.0, 5.0), score=0.2), 0.1 * (k + 1)) == []
     assert trk.tracks == []
@@ -130,7 +130,7 @@ def test_static_pedestrian_static_in_world_while_robot_turns():
     robot = RobotTrajectory(GaitModel(speed=0.0, yaw_rate=1.0))
     ped = SimObject(0, "pedestrian", (6.0, 2.0), 0.0, [(0.0, 0.0, 0.0)], 10.0)
     oracle = OracleDetector(OracleNoise(false_positive_rate=0.0, yaw_flip_prob=0.0), seed=0)
-    trk = MultiObjectTracker(TrackerConfig())
+    trk = MultiObjectTracker(TrackerConfig(classes=("pedestrian",)))
     for k in range(50):
         t = 0.1 * (k + 1)
         T_wd = det_frame_from_body(robot.T(t), 0.45)

@@ -409,7 +409,7 @@ python -m pytest tests/dog -n 4 -q                  # 完整：4 核约 3 分钟
 
 ### 7.4 可调参数
 
-- `DEFAULT_SCORE_THRESHOLDS`：上报阈值和新建轨迹阈值。召回不够就调低；误检多就调高，优先调骑行者。
+- `DEFAULT_SCORE_THRESHOLDS`：上报阈值和新建轨迹阈值。召回不够就调低；误检多就调高，优先调骑行者。在线跟踪、预测和可视化只用 vehicle（`TrackerConfig.classes`），行人和骑行者的阈值留着，打开对应类别才生效。
 - `DetectionFilterConfig`：`min_points`、`max_float`、`max_sink`、`cross_class_nms`。
 - `TrackerConfig.output_min_score`：轨迹输出所需的平滑分数下限。
 

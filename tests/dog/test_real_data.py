@@ -85,7 +85,14 @@ def test_estimate_base_height():
 
 
 def test_tracker_start_and_report_thresholds():
-    cfg = TrackerConfig()
+    ignored = MultiObjectTracker(TrackerConfig())
+    for label, x in ((1, 8.0), (2, -8.0)):
+        box = Detections(np.array([[x, 0, 0.8, 1.8, 0.6, 1.5, 0.0]]), np.zeros((1, 2)), np.array([0.95]),
+                         np.array([label]), "world")
+        for k in range(3):
+            assert ignored.step(box, 0.1 * (k + 1)) == []
+    assert ignored.tracks == []
+    cfg = TrackerConfig(classes=("cyclist",))
     trk = MultiObjectTracker(cfg)
     cyc = lambda s, x: Detections(np.array([[x, 0, 0.8, 1.8, 0.6, 1.5, 0.0]]), np.zeros((1, 2)), np.array([s]),
                                   np.array([2]), "world")
