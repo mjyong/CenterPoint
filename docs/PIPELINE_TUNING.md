@@ -12,7 +12,7 @@
 - 停着的车会不会被当成在动，让狗白停；
 - 预测的路径准不准。
 
-检测模型本身在 T15 里定（上线用哪个 Pillar），这里不再动网络。服务器上的步骤见 [SERVER_TASKS.md](SERVER_TASKS.md) T18–T22。原理见 [DETECTION_POSTPROCESS.md](DETECTION_POSTPROCESS.md)、[TRACKING_PREDICTION.md](TRACKING_PREDICTION.md)。
+检测模型本身在 T15 里定：上线用 nuScenes Pillar（人定，见 SERVER_TASKS.md 的 T15 复核），这里不再动网络。服务器上的步骤见 [SERVER_TASKS.md](SERVER_TASKS.md) T18–T22。原理见 [DETECTION_POSTPROCESS.md](DETECTION_POSTPROCESS.md)、[TRACKING_PREDICTION.md](TRACKING_PREDICTION.md)。
 
 ---
 
@@ -24,13 +24,16 @@
 | 车辆轨迹（不含忽略） | 94 条，其中运动的 28 条 | 244 条，其中运动的 41 条 |
 | 预测样本（运动、关键帧、后面还有 3 s 标注） | 174 个（30 m 内 127 个） | 245 个（30 m 内 161 个） |
 | 运动时离狗最近不到 10 m 的车 | 5 辆（不到 5 m 的 3 辆） | 3 辆（不到 5 m 的 1 辆） |
-| 上线的 Pillar 训练时见过 | 没见过 | 见过 |
+| 上线的 Pillar（nuScenes Pillar）训练时见过 | 没见过 | 没见过 |
+
+上线的 Pillar 是 nuScenes Pillar（2026-10-26 人定：nusc_pp、v1_pp、v2_pp 三个里它最好，[SERVER_TASKS.md](SERVER_TASKS.md) T15 复核）。
+它没在任何 0921 场景上训练过，所以训练场景也能拿来评。
 
 两份数据怎么用：
 - **A（主）**：验证 10 个场景，用上线 Pillar 的检测。
-- **B（防过拟合）**：训练 25 个场景，用 nuScenes Pillar 的检测（它没见过这些场景），只在关键帧上评。
-  - 上线 Pillar 在训练场景上检得太好，拿它调出来的跟踪参数会太信任检测，所以 B 不用它。
-  - B 的作用是检查：在 A 上调好的参数，换一个更差、误差不同的检测器还成不成立。
+- **B（防过拟合）**：训练 25 个场景，同一个检测器，只在关键帧上评。
+  - B 的作用是检查：在 A 上调好的参数，换一批场景还成不成立。
+  - （原计划上线的是微调过的 Pillar，它见过训练场景，所以 B 原来要换成 nuScenes Pillar；现在两组是同一个检测器。）
 - **预测的 oracle 评估**：把标签当成检测喂给跟踪器，只看预测器本身的误差。IMM 不用训练，所以 35 个场景都能用，需要 10 Hz 的标签：
   - 训练场景用 `labels_train2.pkl`；
   - 验证场景在 T18 里按 T17 第 2 步传播出 `labels_full2.pkl`。这个文件只用来画图和 oracle，不用来算检测 AP。
@@ -140,9 +143,9 @@ GT 框当前帧一个点都没有的（被挡住、在盲区里）：
 | 编号 | 内容 | 谁 | 依赖 | 耗时 | 产出 |
 |---|---|---|---|---|---|
 | D1 | 第 4 节的工具：`pipeline_eval.py`、`run_sequence.py --save-raw`、测试、文档；在 SERVER_TASKS 里写出 T18–T22 的命令 | 我 | — | 完成（2026-10-26） | 工具 |
-| T18 | 基线：<br>1. 上线 Pillar（T15 定）重放验证场景，存原始检测；<br>2. 验证场景传播出 10 Hz 标签；<br>3. 默认参数下评四组：上线 Pillar、另一个 Pillar 候选、nuScenes Voxel + TTA 教师（检测强时跟踪能到哪）、标签当检测（跟踪、预测的上限）；<br>4. 出 MCAP、报告、问题清单 | Agent | T15、D1 | 30 分钟 | 基线 |
+| T18 | 基线：<br>1. 上线的 nuScenes Pillar 重放验证、训练场景，存原始检测；<br>2. 验证场景传播出 10 Hz 标签；<br>3. 默认参数下评：上线 Pillar（A、B 两组）、v2 / v1 Pillar、nuScenes Voxel + TTA 教师（检测强时跟踪能到哪）、标签当检测（跟踪、预测的上限）；<br>4. 出 MCAP（上线 Pillar 和 v2 Pillar 各一套）、报告、问题清单 | Agent | T15、D1 | 30 分钟 | 基线 |
 | H4 | 在 Foxglove 里看基线，按问题清单逐条看，归几类典型问题：ID 切换、盲区边上、假轨迹、运动误判、预测偏 | 人 | T18 | 1 小时 | 问题归类 |
-| T19 | 后处理扫参：车辆上报阈值、低分门槛（`low_score`）、轨迹输出分数（`output_min_score`）、最少点数、离地 / 下沉上限、跨类 NMS | Agent | T18 | 30 分钟 | 后处理参数 |
+| T19 | 后处理扫参：车辆上报阈值（nuScenes Pillar 分数偏高，往 0.55 扫）、低分门槛（`low_score`）、轨迹输出分数（`output_min_score`）、最少点数、离地 / 下沉上限；检测按 30 m 内的 F1 选 | Agent | T18 | 30 分钟 | 后处理参数 |
 | T20 | 跟踪扫参：<br>- 关联半径、最长 coast 时间、确认要几帧、试探轨迹寿命；<br>- 位置 / 速度观测噪声、用不用速度头、贪心还是匈牙利；<br>- 运动状态的开 / 关速度和帧数 | Agent | T19 | 1 小时 | 跟踪参数 |
 | D2 | 按 H4、T20 看到的问题改代码，交 T20 复测。可能的改动：<br>- 轨迹进盲区后多 coast 一会儿；<br>- 盲区边上新出的轨迹多要几帧才确认；<br>- 大货车一车两框 | 我 | H4、T20 | 看问题 | 代码 |
 | T21 | 预测：<br>- IMM 对 CV；<br>- IMM 的过程噪声、转弯模型的角速度、模式合并距离；<br>- oracle（35 个场景）和端到端（验证）各一遍 | Agent | T20 | 30 分钟 | 预测参数 |

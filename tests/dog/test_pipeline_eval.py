@@ -129,6 +129,8 @@ def test_scene_metrics(scene):
     m = pe.summarize([res])
     assert res.keyframes == 60
     assert m["det_recall_near"] > 0.95 and m["det_precision_near"] < 1.0           # the clutter box
+    p, r = m["det_precision_near"], m["det_recall_near"]
+    assert m["det_f1_near"] == pytest.approx(2 * p * r / (p + r))
     assert m["MOTA"] > 0.85 and m["IDF1"] > 0.85 and res.mot["IDSW"] == 0
     assert res.fp_episodes >= 1 and any(i["kind"] == "false track" for i in res.issues)
     assert res.counts["fp_cause|nothing labelled nearby"] >= 1

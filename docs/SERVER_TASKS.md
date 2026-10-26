@@ -77,7 +77,7 @@
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 完成（2026-10-23 补审后重导） |
 | T6 | 训练 v1（单卡，和 v0 同配方）；同时跑基线：nuScenes 原始模型、v0 | Agent | T5 | 约 1.2 小时（两个训练挤一张卡时约 2 小时） | 完成 |
 | T7 | 比较 7 个模型，选部署 Voxel 还是 Pillar、上报阈值 | Agent | T6 | 1 小时 | 完成 |
-| T8 | 部署：导出 Pillar v1 的 ONNX；选了 Voxel 时再打包 Voxel，人在 Orin 上测（H2） | Agent | T7 | 10 分钟 | 待做 |
+| T8 | 部署：导出上线 Pillar 的 ONNX（2026-10-26 起是 nuScenes Pillar，见 T15 复核）；选了 Voxel 时再打包 Voxel，人在 Orin 上测（H2） | Agent | T7 | 10 分钟 | 待做 |
 | H2 | （T7 选了 Voxel 时）在 Orin 上测 Voxel v1 的延迟，放得下就部署 Voxel，否则部署 Pillar | 人 | T8 | 半天 | 待做 |
 | T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
@@ -86,10 +86,10 @@
 | T16 | 双教师的自动标注导成新的 SUSTechPOINTS 场景（35 个），沿用 H1 的审核结论；训练和验证一样，只留两个教师的框 | Agent | T14 | 20 分钟 | 完成（2026-10-26，验证集的 v1 候选已去掉） |
 | H3 | 在双教师的场景里审红框（训练 + 验证 35 个场景，只审车）；漏掉的车 Ctrl + 拖框补上 | 人 | T16 | 2–3 小时 | 完成（junyongmou，2026-10-26） |
 | T17 | 导回 H3，训练场景传播到每一帧、补停着的车的空档，导出 v2 数据集 | Agent | H3 | 40 分钟 | 完成（2026-10-26） |
-| T12 | 在新的验证标签上重评所有模型；选下一轮的两个教师（Voxel、Pillar 各一个） | Agent | T15 | 1 小时 | 暂缓：T15 里 v2 当教师比 nuScenes 教师好才需要，否则不做 |
+| T12 | 在新的验证标签上重评所有模型；选下一轮的两个教师（Voxel、Pillar 各一个） | Agent | T15 | 1 小时 | 不做：教师不换（T15 里 v2 Voxel + TTA 比 nuScenes 教师低 0.109） |
 | T13 | 雷达后方盲区：量出盲区，看各模型在盲区边上是不是误检更多 | Agent | T7 | 10 分钟 | 完成（盲区 142°–218°；v1 Pillar 在 10–40 m 边上算明显） |
 | T14 | 双教师（nuScenes Voxel + TTA、nuScenes Pillar + TTA）重新自动标注 0921，补进审过的训练标签（不丢 H1） | Agent | T7 | 1 小时 | 完成（双教师标注 T16 接着用；labels_merged.pkl 不再用） |
-| T15 | 用 v2 数据集训练 v2；定上线用哪个 Pillar、教师换不换 | Agent | T17 | 3.5 小时 | 完成（上线改用 v2 Pillar 第 10 个 epoch；教师不换，dual_v2 未测） |
+| T15 | 用 v2 数据集训练 v2；定上线用哪个 Pillar、教师换不换 | Agent | T17 | 3.5 小时 | 完成。上线用 nuScenes Pillar（人定：v1、v2 都不如它，见复核）；教师不换 |
 | T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 待做 |
 | H4 | 在 Foxglove 里看基线，按问题清单归类典型问题 | 人 | T18 | 1 小时 | 待做 |
 | T19 | 后处理扫参（上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉） | Agent | T18 | 30 分钟 | 待做 |
@@ -103,7 +103,7 @@
 - 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
 - v0 只用未审核的自动标注，主要作用是把 GPU 训练流程跑通、得到一个基线，**不上线**。要上线的是 v1。
 - 2026-10-26 加：后处理、跟踪、预测的调试 T18 → H4 → T19 → T20 → T21 → T22 → H5，计划和指标见 [PIPELINE_TUNING.md](PIPELINE_TUNING.md)。工具 `tools/dog/pipeline_eval.py` 已经做好，T18 只等 T15 定出上线的 Pillar。除了 T18、T22 各有一步 Pillar 推理，都在 CPU 上跑，不占 GPU。
-- 2026-10-26 起的顺序：T16 → H3 → T17 → T15。T12 等 T15：v2 当教师不比两个 nuScenes 教师好，教师就不换，T12 不做。H3 改成审双教师的训练、验证数据（人决定）。验证集不加 v1 候选，和训练集一样只审两个教师的框。
+- 2026-10-26 起的顺序：T16 → H3 → T17 → T15。T12 等 T15：v2 当教师不比两个 nuScenes 教师好，教师就不换，T12 不做（T15 之后：不做）。H3 改成审双教师的训练、验证数据（人决定）。验证集不加 v1 候选，和训练集一样只审两个教师的框。
 - T11 → T11b → H3 → T12（2026-10-24 加，T11b 是 10-25 加的）：验证标签是审教师的框得来的，教师漏掉的车不在里面，评哪个模型都偏向教师（T7 复核）。先把其他模型多检出的东西让人判一遍，再重评、选下一轮的教师（[DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md) 第 1 节）。和 T8、T9 不冲突，可以同时做；T9 用哪个教师，等 T12 的结论更好。
 
 ## 背景：已经有的东西
@@ -1065,14 +1065,17 @@ Foxglove：`data/examples/runs/0921_164127_s001_v1/0921_164127_s001_pillar.mcap`
 
 不管 T7 选了谁，都先导出 Pillar v1 的 ONNX：选了 Pillar 就直接用；选了 Voxel，它是 Voxel 在 Orin 上跑不进延迟时的退路。
 
+**2026-10-26 改**：上线的 Pillar 换成 nuScenes Pillar（T15 复核），第 1 步导出它：
+权重用 `work_dirs/pretrained/nusc_pp.pth`，输出目录 `data/deploy/nusc_pp`，其余照旧。上报阈值等 T19 定。
+
 ```text
-任务 T8：导出 Pillar v1 的两段 ONNX 并和 PyTorch 逐段对比；T7 选了 Voxel 时，再把 Voxel v1 打包，准备上 Orin 实测。
+任务 T8：导出上线 Pillar（nuScenes Pillar，2026-10-26 起）的两段 ONNX 并和 PyTorch 逐段对比；T7 选了 Voxel 时，再把 Voxel v1 打包，准备上 Orin 实测。
 先按 docs/SERVER_TASKS.md 的"通用约定"做。前置：T7 完成，已知 E_v1_pp、E_v1_voxel 和选中的模型。
 
 1. f=$(ls data/runs/0921_165659_s004/frames/*.npy | sed -n 150p)
-   python tools/dog/export_pillar_onnx.py --checkpoint data/train/dog_pp_veh_v1/epoch_<E_v1_pp>.pth \
-       --out data/deploy/dog_pp_veh_v1 --check $f 2>&1 | tee data/reports/T8/export.txt
-   ls -la data/deploy/dog_pp_veh_v1
+   python tools/dog/export_pillar_onnx.py --checkpoint work_dirs/pretrained/nusc_pp.pth \
+       --out data/deploy/nusc_pp --check $f 2>&1 | tee data/reports/T8/export.txt
+   ls -la data/deploy/nusc_pp
 2. 只在 T7 选了 Voxel 时做：
      mkdir -p data/deploy/dog_voxel_veh_v1
      cp data/train/dog_voxel_veh_v1/epoch_<E_v1_voxel>.pth data/deploy/dog_voxel_veh_v1/model.pth
@@ -2049,33 +2052,56 @@ AP 表（40 m 内，新验证标签，2011 个车框）：
 
 **教师不换。** v2 Voxel + TTA 对 nuScenes Voxel + TTA：AP@2.0 0.816 对 0.925（低 0.109），AP@2.0[20-40m] 0.796 对 0.903，速度头 74% 对 93%（低 19 个百分点），三条都不满足。dual_v2 没有测，所以不能说两组都不满足，T12 仍是暂缓。有一张空闲 ≥ 14 GB 的卡之后补跑 Pillar + TTA，再比 dual_v2。
 
+（2026-10-26 复核）
+- **上线用 nuScenes Pillar（人定），T18 的基线也用它。** T15 第 7 步的规则只比 v2 和 v1，所以选了 v2_pp；
+  人定的规则是从 nusc_pp、v1_pp、v2_pp 三个里选最好的，v1、v2 都不如 nusc_pp 就用 nusc_pp（`work_dirs/pretrained/nusc_pp.pth`）。
+  - 差距主要在 20 m 内：AP@2.0 0–20 m 0.932 对 v2_pp 的 0.861，重抽里 v2 领先只有 3%。
+    同样的精确率（约 0.91）下，20 m 内 nusc_pp（阈值 0.50）召回 0.838，v2_pp（阈值 0.45）是 0.732。
+  - 10 m 内差得最多（AP@2.0 0.930 对 0.545），但验证集 10 m 内只有 11 辆车、186 个关键帧框，
+    164127_s005、165659_s006 两个场景占了 108 个。v1、v2 为什么检不好这几辆车，H4 里对照 v2 的 MCAP 看（T18 已加）。
+  - 20 m 以外 v2 不差：AP@2.0[20-40m] 0.816 对 0.801，AP@4.0 0.875 对 0.864。
+  - 速度头和运动状态也是 nusc_pp 好一些：读成运动 91% 对 89%，误差中位数 1.08 对 1.40 m/s；
+    相关运动段报出延迟 p90 0.9 s 对 2.0 s（漏报 2 / 9 对 1 / 7，段数太少，分不出来）。
+- **要注意两点**：
+  - 验证标签是从两个 nuScenes 教师的框审出来的（T17 复核），对 nusc_pp 有利，尤其是 AP@0.5、AP@1.0（0.699 对 0.581）。
+    但 20 m 内召回差 0.1，不像只是这种偏向造成的。
+  - nusc_pp 的分数和 v1、v2 不在一个尺度上：阈值 0.35 时，40 m 内误检 618 个，v2_pp 是 194 个。
+    nusc_pp 的 F1 最高在阈值 0.40（40 m 内）和 0.45（20 m 内），比默认的 0.35 高。
+    所以 T19 的上报阈值改成往高扫（0.35、0.3、0.4、0.45、0.5、0.55），按 30 m 内的 F1 选。
+- **教师不换，T12 不做，dual_v2 也不用补跑。**
+  - v2 Voxel + TTA 比 nuScenes Voxel + TTA 的 AP@2.0 低 0.109，速度头低 19 个百分点；v2_pp 也不如 nusc_pp。
+    两个 v2 模型都比对应的 nuScenes 模型差，融合后超过 dual（0.941）0.02 以上的可能很小。
+  - 按 10-26 定的规则，微调的模型不如 nuScenes 原始模型，教师就不换。
+- **v2 Pillar 第 10 个 epoch 最好，之后掉得多**（AP@2.0 0.820 → 0.726 → 0.742），Voxel 则一直在涨（0.745 → 0.796）。
+  验证集小、波动大，这只能说明 Pillar 后半程不一定更好；下一轮还是 10、15、20 个 epoch 都评。
+- **T8 改为导出 nusc_pp 的 ONNX**（`export_pillar_onnx.py` 会从权重认出 nuScenes 的配置），已改 T8 第 1 步。
+
 
 ---
 
 ## T18 后处理、跟踪、预测的基线
 
-计划、指标和可视化见 [PIPELINE_TUNING.md](PIPELINE_TUNING.md)。这一步不改参数，用默认参数做出六份报告：
+计划、指标和可视化见 [PIPELINE_TUNING.md](PIPELINE_TUNING.md)。这一步不改参数，用默认参数做出七份报告。
+上线的 Pillar 是 **nuScenes Pillar**（2026-10-26 人定：nusc_pp、v1_pp、v2_pp 三个里它最好，见 T15 复核）。
 
 | 名字 | 场景 | 检测 | 用来 |
 |---|---|---|---|
-| `deploy` | 验证 10 个 | 上线的 Pillar（T15 定），过滤前的检测在这里重新过滤 | **基线**，带 Foxglove MCAP。后面调参的 A 组 |
-| `other` | 验证 | 另一个 Pillar 候选（存好的结果） | 检测模型对跟踪的影响 |
+| `deploy` | 验证 10 个 | nuScenes Pillar（上线），过滤前的检测在这里重新过滤 | **基线**，带 Foxglove MCAP。后面调参的 A 组 |
+| `v2_pp`、`v1_pp` | 验证 | 两个微调的 Pillar（T15 存好的结果） | 跟踪层面再比一次；v2_pp 也出 MCAP，对照看它 10 m 内哪里不行 |
 | `teacher` | 验证 | nuScenes Voxel + TTA 教师 | 检测强很多时，跟踪能到哪 |
 | `oracle_val` | 验证 | 10 Hz 标签当检测 | 跟踪、预测本身的上限 |
-| `nusc_pp_train` | 训练 25 个 | nuScenes Pillar（没见过这些场景），过滤前的检测 | 调参的 B 组：防止调到验证集的偶然上去 |
+| `nusc_pp_train` | 训练 25 个 | 同一个 nuScenes Pillar（它没见过任何 0921 场景），过滤前的检测 | 调参的 B 组：换一批场景，防止调到验证集的偶然上去 |
 | `oracle_train` | 训练 | 10 Hz 标签当检测 | 预测样本多一些（T21） |
 
 ```text
-任务 T18：用默认参数做后处理、跟踪、预测的基线：六份报告、验证场景的 Foxglove MCAP、问题清单。
-先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了代码改动，跑快速测试）。前置：T15 完成，结论里写了上线用哪个 Pillar。
+任务 T18：用默认参数做后处理、跟踪、预测的基线：七份报告、验证场景的 Foxglove MCAP、问题清单。上线的 Pillar 是 nuScenes Pillar。
+先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了代码改动，跑快速测试）。前置：T15 完成。
 GPU 只在第 2 步用（Pillar 不加 TTA，每个进程约 3 GB）；其余都是 CPU。
 
 0. 通用约定 6 的链接循环里加上 tune 目录（照约定 6 先链到公共盘）。
      mkdir -p data/reports/T18; TASK=T18
      VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); TRAIN=$(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT)
-   按 T15 第 7 步的结论设上线的 Pillar：
-     换成了 v2_pp：PP=data/train/dog_pp_veh_v2/epoch_<E_v2_pp>.pth; OTHER=data/runs_veh_v1
-     留 v1_pp：    PP=data/train/dog_pp_veh_v1/epoch_20.pth;        OTHER=data/runs_veh_v2
+   上线的 Pillar（T22 也用）：PP=work_dirs/pretrained/nusc_pp.pth
 1. 验证场景的 10 Hz 标签（只画图和 oracle 用，不算 AP），照 T17 第 2 步的 propagate：
      for r in $VAL; do
        echo "== $r"
@@ -2099,7 +2125,9 @@ GPU 只在第 2 步用（Pillar 不加 TTA，每个进程约 3 GB）；其余都
    然后：
      ev deploy "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections raw \
          --dense-labels "data/labels/{scene}/labels_full2.pkl" --frames "data/runs/{scene}/frames" --mcap-dir data/tune/T18_mcap
-     ev other "$VAL" "$OTHER/{scene}/pillar/results.pkl" --no-mcap
+     ev v2_pp "$VAL" "data/runs_veh_v2/{scene}/pillar/results.pkl" \
+         --dense-labels "data/labels/{scene}/labels_full2.pkl" --frames "data/runs/{scene}/frames" --mcap-dir data/tune/T18_mcap_v2
+     ev v1_pp "$VAL" "data/runs_veh_v1/{scene}/pillar/results.pkl" --no-mcap
      ev teacher "$VAL" "data/runs/{scene}/voxel/results.pkl" --no-mcap
      ev oracle_val "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections labels \
          --dense-labels "data/labels/{scene}/labels_full2.pkl" --no-mcap
@@ -2107,18 +2135,19 @@ GPU 只在第 2 步用（Pillar 不加 TTA，每个进程约 3 GB）；其余都
      ev oracle_train "$TRAIN" "data/tune/nusc_pp_train/{scene}/pillar/results.pkl" --detections labels \
          --dense-labels "data/labels/{scene}/labels_train2.pkl" --no-mcap
 4. 汇总：
-     for n in deploy other teacher oracle_val nusc_pp_train oracle_train; do
+     for n in deploy v2_pp v1_pp teacher oracle_val nusc_pp_train oracle_train; do
        echo "== $n"; sed -n '/^## Main metrics/,/^## Detections/p' data/reports/T18/$n/report.md | grep '^|'
      done | tee data/reports/T18/summary.md
-     ls -la data/tune/T18_mcap; du -sh data/tune/T18_mcap
+     ls -la data/tune/T18_mcap; du -sh data/tune/T18_mcap data/tune/T18_mcap_v2
 
 停止条件：任何报错；第 1 步某个场景传播后留下的帧少于原来的 90%（pose_bad 的帧不算，见 T17）；
 某份报告开头"Label tracks stitched into one vehicle"超过 40（拼得太多，可能拼错）。
 提交：data/reports/T18/（MCAP 不在里面）、验证场景新生成的 data/labels/0921_*/labels_full2.pkl、本文档。
+（第 2 步只重放 nusc_pp；v1_pp、v2_pp 用 T15 存好的结果，已经按默认参数过滤过。）
 报告（写进"T18 结果"）：
-- 上线的是哪个 Pillar（PP）；
-- summary.md 里六份报告的主要指标，并排成一张表（行是指标，列是六个名字）；
+- summary.md 里七份报告的主要指标，并排成一张表（行是指标，列是七个名字）；
 - deploy 报告里的几张表：检测、跟踪、"Where the errors are"（含盲区三个区）、运动状态、预测（moving 那张）、预警、耗时；
+- v2_pp 和 deploy 并排的"missed vehicles (FN)"表（按距离、点数）和盲区三个区的表，看 10 m 内差在哪里；
 - deploy 的 issues 各类条数，和每类最严重的 3 条（场景、秒数、说明）；
 - 拼接数；MCAP 目录和总大小；第 3 步每条的耗时。
 ```
@@ -2132,6 +2161,8 @@ GPU 只在第 2 步用（Pillar 不加 TTA，每个进程约 3 GB）；其余都
 ## H4 在 Foxglove 里看基线（人做）
 
 T18 之后，把 `data/tune/T18_mcap/` 拷到本机，用 Foxglove 打开，Layout → Import from file 选同目录的 `foxglove_layout.json`。
+`data/tune/T18_mcap_v2/` 是同样的场景换成 v2 Pillar：10 m 内 v2 的 AP 只有 0.545（nusc_pp 0.930），
+在 164127_s005、165659_s006 里对照看 v2 是没检出、框偏了，还是一车多框。
 
 - 先看 `data/reports/T18/deploy/report.md` 的主要指标，再按 `issues.csv` 逐条看：t 列是场景开始后的秒数，拖到那里。
 - 3D 面板里可以开关的话题见 PIPELINE_TUNING.md 第 3 节。看问题时有用的几个：
@@ -2159,7 +2190,7 @@ T18 之后，把 `data/tune/T18_mcap/` 拷到本机，用 Foxglove 打开，Layo
 
 ## T19 后处理扫参
 
-扫上报阈值和三道几何过滤。A 组（验证场景、上线 Pillar）定参数，B 组（训练场景、nuScenes Pillar）检查不变差。每组参数的第 1 行是现在的默认值（参考）。
+扫上报阈值和三道几何过滤。A 组（验证场景）定参数，B 组（训练场景）检查不变差，两组都用上线的 nuScenes Pillar。每组参数的第 1 行是现在的默认值（参考）。
 
 ```text
 任务 T19：扫后处理参数，定车辆的上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉上限。
@@ -2170,7 +2201,8 @@ T18 之后，把 `data/tune/T18_mcap/` 拷到本机，用 Foxglove 打开，Layo
    B() { local n=$1; shift; ev ${n}_B "$TRAIN" "data/tune/nusc_pp_train/{scene}/pillar/results.pkl" --detections raw --no-mcap $BASE "$@"; }
    每组都跑 A、B 两次，结果在 data/reports/T19/<组>_A/sweep.md、<组>_B/sweep.md。
 1. 上报阈值（也是新建轨迹的阈值）：
-     A score --set tracker.high_score=0.35,0.2,0.25,0.3,0.4,0.45;  B score --set tracker.high_score=0.35,0.2,0.25,0.3,0.4,0.45
+     A score --set tracker.high_score=0.35,0.3,0.4,0.45,0.5,0.55;  B score --set tracker.high_score=0.35,0.3,0.4,0.45,0.5,0.55
+   （nuScenes Pillar 的分数偏高：T15 里阈值 0.35 时 40 m 内误检 618 个，F1 最高在 0.40–0.45，所以往高扫。）
 2. 轨迹输出分数、低分门槛：
      A output --set tracker.output_min_score=0.3,0.2,0.25,0.35 --set tracker.low_score=0.1,0.15,0.2
      B output（同上）
@@ -2182,12 +2214,13 @@ T18 之后，把 `data/tune/T18_mcap/` 拷到本机，用 Foxglove 打开，Layo
    第 1 组定了 high_score，第 2 组起都带着它。
 
 怎么选（每组单独定；看 sweep.md 的两张表，第二张是和第 1 行的差，括号里是重抽里这一行更好的比例）：
-- 第 1、2 组：主指标 det recall（30 m 内）。在 A 上同时满足下面几条的行里，选 det recall 最高的：
-  a. det recall 的领先比例 ≥ 90%；
-  b. false tracks / min 不超过第 1 行的 1.1 倍；
-  c. false moving / h 不超过第 1 行。
-  B 上这一行的 det recall 也不能低于第 1 行，b、c 两条也要满足。
-- 第 3、4 组：同上，b 换成"det FP / frame 不超过第 1 行的 1.1 倍"。
+- 第 1、3、4 组（检测）：主指标 det F1（30 m 内，召回和精确率一起看）。在 A 上同时满足下面几条的行里，选 det F1 最高的：
+  a. det F1 的领先比例 ≥ 90%；
+  b. moving missed 不多于第 1 行（不能为了少误检把运动的车漏掉）；
+  c. det recall 不比第 1 行低 0.05 以上。
+  B 上这一行的 det F1 也不能低于第 1 行，b 也要满足。
+- 第 2 组（轨迹输出）：主指标 IDF1，同样要领先比例 ≥ 90%、B 上不低于第 1 行；约束是 moving missed 不多于第 1 行、
+  confirm p90 不比第 1 行长 0.5 s 以上。
 - 没有满足的行：这组留默认值（第 1 行）。
 停止条件：任何报错。
 提交：data/reports/T19/、本文档。

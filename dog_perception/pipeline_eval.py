@@ -770,6 +770,7 @@ def summarize(results, step=0.5, tables=True):
         tp, fp, fn = c["det_tp_" + near], c["det_fp_" + near], c["det_fn_" + near]
         m["det_recall_" + near] = tp / (tp + fn) if tp + fn else float("nan")
         m["det_precision_" + near] = tp / (tp + fp) if tp + fp else float("nan")
+        m["det_f1_" + near] = 2 * tp / (2 * tp + fp + fn) if tp + fp + fn else float("nan")
     kf = sum(r.keyframes for r in results)
     m["det_fp_per_frame"] = (c["det_fp_near"] + c["det_fp_far"]) / kf if kf else float("nan")
     k = Counter()
@@ -847,7 +848,8 @@ def bootstrap(results_by_config, n=500, seed=0, step=0.5):
 
 
 # Main metrics of docs/PIPELINE_TUNING.md, and which way is better
-MAIN_METRICS = (("det_recall_near", +1), ("det_precision_near", +1), ("det_fp_per_frame", -1), ("MOTA", +1),
+MAIN_METRICS = (("det_recall_near", +1), ("det_precision_near", +1), ("det_f1_near", +1), ("det_fp_per_frame", -1),
+                ("MOTA", +1),
                 ("IDF1", +1), ("IDSW_per_min", -1), ("false_tracks_per_min", -1), ("confirm_p90", -1),
                 ("motion_relevant_missed", -1), ("motion_false_episodes_per_h", -1), ("IMM_FDE3_moving", -1),
                 ("IMM_MR3_moving", -1))

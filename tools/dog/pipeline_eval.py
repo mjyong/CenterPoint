@@ -54,13 +54,15 @@ LAYOUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "foxglove_pipe
 KEEP = ("stamp", "T_world_det", "T_world_body", "pose_bad", "detections", "raw_detections", "raw_measured")
 METRIC_NAMES = {
     "det_recall_near": "detections: recall within near range", "det_precision_near": "detections: precision within near range",
+    "det_f1_near": "detections: F1 within near range",
     "det_fp_per_frame": "detections: false per keyframe", "MOTA": "tracks: MOTA", "IDF1": "tracks: IDF1",
     "IDSW_per_min": "tracks: ID switches / min", "false_tracks_per_min": "tracks: false tracks / min",
     "confirm_p90": "tracks: confirm delay p90 [s]", "motion_relevant_missed": "motion: relevant moving stretches missed",
     "motion_false_episodes_per_h": "motion: parked reported moving / h", "IMM_FDE3_moving": "prediction: FDE 3 s, moving [m]",
     "IMM_MR3_moving": "prediction: miss rate 3 s, moving",
 }
-SHORT = {"det_recall_near": "det recall", "det_precision_near": "det precision", "det_fp_per_frame": "det FP / frame",
+SHORT = {"det_recall_near": "det recall", "det_precision_near": "det precision", "det_f1_near": "det F1",
+         "det_fp_per_frame": "det FP / frame",
          "MOTA": "MOTA", "IDF1": "IDF1", "IDSW_per_min": "IDSW / min", "false_tracks_per_min": "false tracks / min",
          "confirm_p90": "confirm p90 s", "motion_relevant_missed": "moving missed",
          "motion_false_episodes_per_h": "false moving / h", "IMM_FDE3_moving": "FDE 3 s", "IMM_MR3_moving": "MR 3 s"}
