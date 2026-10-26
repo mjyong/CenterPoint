@@ -83,7 +83,7 @@
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
 | T11 | 验证集加多模型候选框（红框"候选"）；35 个场景写上模型框，供 Ctrl + 拖框用 | Agent | T7 | 20 分钟 | 完成（物体最高分门槛 0.5，306 个候选物体） |
 | T11b | 重做候选：只要车辆，只用 v1 Voxel、v1 Pillar 两个模型（T11 混进了行人、骑行者） | Agent | T11 | 15 分钟 | 完成（物体最高分门槛 0.3，54 个候选物体） |
-| T16 | 双教师的自动标注导成新的 SUSTechPOINTS 场景（35 个），沿用 H1 的审核结论，验证集再加 v1 候选；只有新的东西是红框 | Agent | T14 | 20 分钟 | 完成（2026-10-26） |
+| T16 | 双教师的自动标注导成新的 SUSTechPOINTS 场景（35 个），沿用 H1 的审核结论；训练和验证一样，只留两个教师的框 | Agent | T14 | 20 分钟 | 完成（2026-10-26，验证集的 v1 候选已去掉） |
 | H3 | 在双教师的场景里审红框（训练 + 验证 35 个场景，只审车）；漏掉的车 Ctrl + 拖框补上 | 人 | T16 | 2–3 小时 | 待做（等 T16） |
 | T17 | 导回 H3，训练场景传播到每一帧、补停着的车的空档，导出 v2 数据集 | Agent | H3 | 40 分钟 | 待做 |
 | T12 | 在新的验证标签上重评所有模型；选下一轮的两个教师（Voxel、Pillar 各一个） | Agent | T15 | 1 小时 | 暂缓：T15 里 v2 当教师比 nuScenes 教师好才需要，否则不做 |
@@ -95,7 +95,7 @@
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
 - 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
 - v0 只用未审核的自动标注，主要作用是把 GPU 训练流程跑通、得到一个基线，**不上线**。要上线的是 v1。
-- 2026-10-26 起的顺序：T16 → H3 → T17 → T15。T12 等 T15：v2 当教师不比两个 nuScenes 教师好，教师就不换，T12 不做。H3 改成审双教师的训练、验证数据（人决定），T11b 的候选不再单独审（T16 在新的验证场景里重新加）。
+- 2026-10-26 起的顺序：T16 → H3 → T17 → T15。T12 等 T15：v2 当教师不比两个 nuScenes 教师好，教师就不换，T12 不做。H3 改成审双教师的训练、验证数据（人决定）。验证集不加 v1 候选，和训练集一样只审两个教师的框。
 - T11 → T11b → H3 → T12（2026-10-24 加，T11b 是 10-25 加的）：验证标签是审教师的框得来的，教师漏掉的车不在里面，评哪个模型都偏向教师（T7 复核）。先把其他模型多检出的东西让人判一遍，再重评、选下一轮的教师（[DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md) 第 1 节）。和 T8、T9 不冲突，可以同时做；T9 用哪个教师，等 T12 的结论更好。
 
 ## 背景：已经有的东西
@@ -1410,11 +1410,11 @@ H3 要审的是双教师（nuScenes Voxel + TTA、nuScenes Pillar + TTA，T14）
 - H1 有、双教师没检出的车（包括 H1 里人新画的）：照搬过来（ID 前面加 h）；
 - 剩下的：H1 没见过的新目标，标红。
 
-人只要看红框：新目标、H1 剩下没定的、验证集里 v1 两个模型的候选。
+人只要看红框：新目标、H1 剩下没定的。训练和验证一样，不加 v1 候选。
 
 ```text
 任务 T16：把 T14 的双教师自动标注（data/labels_dual）导成新的 SUSTechPOINTS 场景（35 个，公共盘 sustech_dual/），
-沿用 H1 的审核结论，验证集再加 v1 两个模型的候选框；SUSTechPOINTS 改指向新场景。
+沿用 H1 的审核结论；训练和验证一样，只留两个教师的框，不加 v1 候选。SUSTechPOINTS 改指向新场景。
 先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了代码改动，跑快速测试）。前置：T14 完成。不用 GPU。
 旧的 sustech/ 不要动（H1 的结果在里面），只新建 sustech_dual/。
 
@@ -1431,11 +1431,7 @@ H3 要审的是双教师（nuScenes Voxel + TTA、nuScenes Pillar + TTA，T14）
      ALL=$(awk -F, 'NR>1 && $2!="drop" {print $1}' $SPLIT)
      python tools/dog/sustechpoints_convert.py carry --from-root $OLD --root $NEW --scenes $ALL | tee data/reports/T16/carry.txt
    "frames without an earlier review" 应该没有（帧对不上）；有就停下报告。
-4. 验证集加 v1 两个模型的候选（同 T11b 的设置）：
-     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
-     python tools/dog/sustechpoints_convert.py candidates --root $NEW --scenes $VAL --classes vehicle \
-         --results v1_voxel=data/runs_veh_v1/{scene}/voxel/results.pkl v1_pp=data/runs_veh_v1/{scene}/pillar/results.pkl \
-         --min-score 0.3 --max-range 40 --min-keyframes 2 --object-min-score 0.3 | tee data/reports/T16/candidates.txt
+4. （不要再跑。）曾按 T11b 给验证集加过 v1 候选，2026-10-26 已去掉。
 5. Ctrl + 拖框用的模型框（两个教师的）：
      python tools/dog/sustechpoints_convert.py detections --root $NEW --scenes $ALL --classes vehicle \
          --results teacher=data/runs/{scene}/voxel/results.pkl pp_tta=data/runs_pp_tta/{scene}/pillar/results.pkl \
@@ -1456,9 +1452,9 @@ stats 里训练、验证各有多少帧、框、红框；SUSTechPOINTS 地址。
 
 35 个场景导出到 `/public/zjst/robot/centerpoint_data/sustech_dual`，每个场景的帧数和 T1S 一样。旧的 `sustech/` 没动。
 
-- carry.txt total：沿用 H1 的结论 **6424** 框，H1 删过、双教师又检出再删 **10** 框，H1 有而双教师没有、照搬过来 **655** 框，新目标标红 **471** 框。另外 H1 还红着的 **310** 框仍是红的。没有对不上的帧。审核人挪过的框用了 H1 几何的有 3 个。T11b 的旧候选没照搬 151 框（验证集重新加 v1 候选）。
-- candidates.txt total：225 个候选框（49 个物体）；v1_voxel 161（只它 151），v1_pp 74（只它 64）。
-- stats：训练 **1476** 帧、**4939** 框、红框 **584**；验证 **580** 帧、**2836** 框、红框 **422**。合计红框 **1006**，没超过 3,000。
+- carry.txt total：沿用 H1 的结论 **6424** 框，H1 删过、双教师又检出再删 **10** 框，H1 有而双教师没有、照搬过来 **655** 框，新目标标红 **471** 框。另外 H1 还红着的 **310** 框仍是红的。没有对不上的帧。审核人挪过的框用了 H1 几何的有 3 个。T11b 的旧候选没照搬 151 框。
+- 第 4 步曾加上 225 个 v1 候选框。2026-10-26 按审核人的要求去掉了（`stats_no_candidates.txt`）：每个验证场景里非候选框一个没少。验证集和训练集一样，只留两个 nuScenes 教师的框。去掉之后验证集 **580** 帧、**2611** 框、红框 **196**。Ctrl + 拖框仍是两个教师（`teacher`、`pp_tta`）。`0921_165659_s004` 去掉候选后没有框。
+- 去掉之前的 stats：训练 **1476** 帧、**4939** 框、红框 **584**；验证 **580** 帧、**2836** 框、红框 **422**。合计红框 **1006**，没超过 3,000。
 
 SUSTechPOINTS 已重新起好：`python tools/dog/sustechpoints_convert.py serve --host 10.36.136.7`，地址 http://10.36.136.7:8081 。可以开始 H3（先验证集，Ctrl+F5，只审红框）。
 
@@ -1468,10 +1464,9 @@ SUSTechPOINTS 已重新起好：`python tools/dog/sustechpoints_convert.py serve
 
 T16 之后，在 SUSTechPOINTS 里审 35 个场景（先验证集，再训练集），浏览器重新打开页面（Ctrl+F5）。**只审车辆**（主要是小轿车和货车），行人、骑行者不审。
 
-H1 定过的框不用再看（不是红的）。要看的红框有三种：
+H1 定过的框不用再看（不是红的）。要看的红框有两种，训练和验证一样：
 - **新目标**：两个教师看到、H1 没见过的；
-- **H1 剩下没定的**：H1 时就红着的；
-- **候选**（只在验证集）：标签写"候选"和模型，例如 `候选 v1_pp 0.62`，是 v1 两个模型多检出的。
+- **H1 剩下没定的**：H1 时就红着的。
 
 | 看到的 | 操作 |
 |---|---|
