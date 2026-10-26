@@ -118,6 +118,8 @@ class McapViz:
         }
         cubes = []
         for box, score, label in zip(detections.boxes, detections.scores, detections.labels):
+            if int(label) != 0:          # vehicle only; pedestrians and cyclists are not drawn
+                continue
             r, g, b, a = _COLORS.get(int(label), (1, 1, 1, 0.5))
             cubes.append({
                 "pose": {"position": {"x": float(box[0]), "y": float(box[1]), "z": float(box[2])},
@@ -136,6 +138,8 @@ class McapViz:
             "frame_locked": False, "cubes": [], "texts": [],
         }]}
         for t in tracks or ():
+            if int(t.label) != 0:
+                continue
             r, g, b, _ = _COLORS.get(int(t.label), (1, 1, 1, 0.5))
             pos = {"x": float(t.position[0]), "y": float(t.position[1]), "z": float(t.position[2])}
             track_scene["entities"][0]["cubes"].append({

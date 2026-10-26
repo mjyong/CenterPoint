@@ -1,0 +1,62 @@
+kind,scene,t,duration,track,gt,range,zone,value,note
+ID switch,0921_165659_s011,10.0,0.0,2,3,37.7,elsewhere,1.0,T1 -> T2
+ID switch,0921_165659_s015,10.0,0.0,14,8,32.2,elsewhere,1.0,T8 -> T14
+ID switch,0921_165659_s016,22.5,0.0,12,4,11.9,elsewhere,1.0,T4 -> T12
+ID switch,0921_165659_s016,22.5,0.0,13,6,9.6,elsewhere,1.0,T6 -> T13
+ID switch,0921_165659_s016,22.5,0.0,14,66,33.7,elsewhere,1.0,T9 -> T14
+ID switch,0921_165659_s016,22.5,0.0,15,72,36.7,elsewhere,1.0,T10 -> T15
+ID switch,0921_165659_s016,22.5,0.0,16,5,16.1,elsewhere,1.0,T5 -> T16
+ID switch,0921_165659_s016,22.5,0.0,19,3,35.0,elsewhere,1.0,T3 -> T19
+ID switch,0921_165659_s016,23.0,0.0,21,2,28.9,elsewhere,1.0,T2 -> T21
+ID switch,0921_165659_s016,23.5,0.0,18,1,20.8,elsewhere,1.0,T1 -> T18
+ID switch,0921_165659_s016,24.0,0.0,23,7,28.6,edge,1.0,T7 -> T23
+ID switch,0921_165659_s017,7.0,0.0,10,5,36.0,elsewhere,1.0,T3 -> T10
+ID switch,0921_165659_s017,10.0,0.0,12,4,36.7,elsewhere,1.0,T2 -> T12
+ID switch,0921_165659_s023,27.0,0.0,10,88,26.6,elsewhere,1.0,T8 -> T10
+ID switch,0921_165659_s024,14.0,0.0,13,4,9.4,elsewhere,1.0,T3 -> T13
+ID switch,0921_165659_s024,14.0,0.0,14,5,6.6,elsewhere,1.0,T4 -> T14
+ID switch,0921_165659_s024,14.0,0.0,15,26,23.0,elsewhere,1.0,T10 -> T15
+ID switch,0921_165659_s024,14.0,0.0,16,30,32.0,elsewhere,1.0,T12 -> T16
+ID switch,0921_165659_s024,14.0,0.0,18,6,16.0,edge,1.0,T5 -> T18
+ID switch,0921_165659_s024,14.0,0.0,20,22,17.0,elsewhere,1.0,T8 -> T20
+ID switch,0921_165659_s024,14.0,0.0,19,87,7.3,elsewhere,1.0,T6 -> T19
+ID switch,0921_165659_s024,25.5,0.0,23,5,7.1,elsewhere,1.0,T14 -> T23
+ID switch,0921_165659_s024,25.5,0.0,24,37,23.7,elsewhere,1.0,T17 -> T24
+ID switch,0921_165659_s024,25.5,0.0,25,6,16.9,elsewhere,1.0,T18 -> T25
+ID switch,0921_165659_s024,25.5,0.0,26,13,22.0,edge,1.0,T7 -> T26
+ID switch,0921_165659_s024,27.5,0.0,28,5,7.1,elsewhere,1.0,T23 -> T28
+ID switch,0921_165659_s024,27.5,0.0,29,37,23.9,elsewhere,1.0,T24 -> T29
+ID switch,0921_165659_s024,27.5,0.0,30,6,17.3,elsewhere,1.0,T25 -> T30
+ID switch,0921_165659_s024,27.5,0.0,31,87,5.3,elsewhere,1.0,T19 -> T31
+ID switch,0921_165659_s025,5.5,0.0,8,4,6.4,elsewhere,1.0,T4 -> T8
+bad prediction,0921_165659_s020,16.5,3.0,3,117,17.8,elsewhere,6.5,"FDE 6.5 m at 3 s, straight, 2.2 m/s"
+bad prediction,0921_165659_s021,3.5,3.0,1,13,36.9,elsewhere,6.3,"FDE 6.3 m at 3 s, straight, 1.2 m/s"
+bad prediction,0921_165659_s021,4.0,3.0,1,13,38.4,elsewhere,6.0,"FDE 6.0 m at 3 s, straight, 0.9 m/s"
+bad prediction,0921_165659_s017,15.5,3.0,11,51,39.5,edge,5.5,"FDE 5.5 m at 3 s, straight, 1.7 m/s"
+bad prediction,0921_165659_s020,18.5,3.0,2,120,36.6,elsewhere,5.3,"FDE 5.3 m at 3 s, straight, 0.9 m/s"
+bad prediction,0921_165659_s028,12.0,3.0,1,1,18.9,edge,5.2,"FDE 5.2 m at 3 s, turning, 1.0 m/s"
+bad prediction,0921_165659_s020,2.0,3.0,1,13,34.7,elsewhere,5.1,"FDE 5.1 m at 3 s, straight, 3.6 m/s"
+bad prediction,0921_165659_s020,19.0,3.0,2,120,37.5,elsewhere,4.9,"FDE 4.9 m at 3 s, straight, 0.7 m/s"
+bad prediction,0921_165659_s020,17.0,3.0,3,117,17.8,elsewhere,4.8,"FDE 4.8 m at 3 s, straight, 2.4 m/s"
+bad prediction,0921_165659_s027,23.5,3.0,12,60,39.0,elsewhere,4.7,"FDE 4.7 m at 3 s, straight, 0.8 m/s"
+bad prediction,0921_165659_s021,3.0,3.0,1,13,35.2,elsewhere,4.7,"FDE 4.7 m at 3 s, straight, 1.8 m/s"
+bad prediction,0921_165659_s016,25.5,3.0,17,91,15.7,elsewhere,4.6,"FDE 4.6 m at 3 s, straight, 0.6 m/s"
+bad prediction,0921_165659_s020,25.0,3.0,3,117,16.7,elsewhere,4.6,"FDE 4.6 m at 3 s, turning, 4.0 m/s"
+bad prediction,0921_165659_s028,14.5,3.0,1,1,19.2,edge,4.4,"FDE 4.4 m at 3 s, turning, 1.5 m/s"
+bad prediction,0921_165659_s020,12.0,3.0,2,120,28.7,elsewhere,4.4,"FDE 4.4 m at 3 s, turning, 1.9 m/s"
+bad prediction,0921_165659_s027,6.0,3.0,1,1,37.7,elsewhere,4.3,"FDE 4.3 m at 3 s, straight, 1.1 m/s"
+bad prediction,0921_165659_s028,12.5,3.0,1,1,19.4,edge,4.3,"FDE 4.3 m at 3 s, turning, 1.2 m/s"
+bad prediction,0921_165659_s020,1.5,3.0,1,13,37.6,elsewhere,4.3,"FDE 4.3 m at 3 s, straight, 4.1 m/s"
+bad prediction,0921_165659_s028,11.5,3.0,4,19,27.7,elsewhere,4.3,"FDE 4.3 m at 3 s, straight, 0.5 m/s"
+bad prediction,0921_165659_s009,18.5,3.0,2,2,19.4,elsewhere,4.2,"FDE 4.2 m at 3 s, turning, 1.4 m/s"
+bad prediction,0921_165659_s027,5.5,3.0,1,1,37.4,elsewhere,4.1,"FDE 4.1 m at 3 s, straight, 1.1 m/s"
+bad prediction,0921_165659_s028,15.0,3.0,1,1,19.3,edge,4.1,"FDE 4.1 m at 3 s, turning, 1.3 m/s"
+bad prediction,0921_165659_s016,25.0,3.0,17,91,17.4,elsewhere,4.0,"FDE 4.0 m at 3 s, straight, 1.0 m/s"
+bad prediction,0921_165659_s020,25.5,3.0,3,117,17.2,elsewhere,4.0,"FDE 4.0 m at 3 s, turning, 4.1 m/s"
+bad prediction,0921_165659_s009,19.0,3.0,2,2,18.7,elsewhere,4.0,"FDE 4.0 m at 3 s, turning, 1.7 m/s"
+bad prediction,0921_165659_s020,16.0,3.0,2,120,33.8,elsewhere,3.7,"FDE 3.7 m at 3 s, straight, 2.0 m/s"
+bad prediction,0921_165659_s018,25.5,3.0,3,145,13.4,elsewhere,3.7,"FDE 3.7 m at 3 s, turning, 4.5 m/s"
+bad prediction,0921_165659_s020,16.5,3.0,2,120,33.7,elsewhere,3.6,"FDE 3.6 m at 3 s, straight, 2.1 m/s"
+bad prediction,0921_165659_s026,25.5,3.0,18,59,36.7,elsewhere,3.6,"FDE 3.6 m at 3 s, turning, 0.6 m/s"
+bad prediction,0921_165659_s018,23.5,3.0,3,145,14.1,elsewhere,3.6,"FDE 3.6 m at 3 s, straight, 4.2 m/s"
+hazard not reported,0921_165659_s016,0.0,0.5,,7,3.6,,1.0,"moving vehicle within 5 m, no alarm"

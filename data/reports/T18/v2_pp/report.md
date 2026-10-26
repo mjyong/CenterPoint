@@ -12,13 +12,13 @@
 | metric | value | interval |
 |---|---|---|
 | detections: recall within near range | **0.765** | 0.623 – 0.825 |
-| detections: precision within near range | **0.893** | 0.724 – 0.965 |
-| detections: F1 within near range | **0.824** | 0.677 – 0.884 |
-| detections: false per keyframe | **0.314** | 0.175 – 0.501 |
-| tracks: MOTA | **0.631** | 0.395 – 0.732 |
-| tracks: IDF1 | **0.777** | 0.654 – 0.833 |
+| detections: precision within near range | **0.894** | 0.725 – 0.966 |
+| detections: F1 within near range | **0.824** | 0.677 – 0.885 |
+| detections: false per keyframe | **0.309** | 0.168 – 0.497 |
+| tracks: MOTA | **0.635** | 0.399 – 0.738 |
+| tracks: IDF1 | **0.779** | 0.656 – 0.835 |
 | tracks: ID switches / min | **1.862** | 0.414 – 4.167 |
-| tracks: false tracks / min | **14.482** | 12.399 – 17.202 |
+| tracks: false tracks / min | **13.447** | 11.747 – 15.824 |
 | tracks: confirm delay p90 [s] | **4.950** | 0.501 – 13.350 |
 | motion: relevant moving stretches missed | **1** | 0.000 – 3.000 |
 | motion: parked reported moving / h | **74.478** | 12.412 – 159.435 |
@@ -31,10 +31,10 @@ Vehicle threshold 0.35 (`tracker.high_score`), 2 m match, keyframes. Near: withi
 
 | range | precision | recall | TP | FP | FN |
 |---|---|---|---|---|---|
-| 0-30 m | 0.893 | 0.765 | 1212 | 145 | 373 |
-| 30-40 m | 0.865 | 0.542 | 238 | 37 | 201 |
+| 0-30 m | 0.894 | 0.765 | 1212 | 144 | 373 |
+| 30-40 m | 0.872 | 0.542 | 238 | 35 | 201 |
 
-False detections per keyframe 0.314. AP over all scores: AP@2.0 0.835, AP@4.0 0.875, AP@2.0 0-20 m 0.861, 20-40 m 0.816.
+False detections per keyframe 0.309. AP over all scores: AP@2.0 0.836, AP@4.0 0.875, AP@2.0 0-20 m 0.861, 20-40 m 0.817.
 
 ## Tracking
 
@@ -42,9 +42,9 @@ Reported tracks (confirmed, coasting included) against the scored vehicles, keyf
 
 | MOTA | MOTP m | IDF1 | recall | precision | IDSW | IDSW / min | FRAG | MT | ML | vehicles | TP | FP | FN |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **0.631** | 0.38 | **0.777** | 0.736 | 0.880 | 9 | 1.86 | 37 | 36 | 14 | 67 | 1489 | 203 | 535 |
+| **0.635** | 0.38 | **0.779** | 0.736 | 0.885 | 9 | 1.86 | 37 | 36 | 14 | 67 | 1489 | 194 | 535 |
 
-- false tracks (a track false on consecutive keyframes counts once): 14.48 per minute
+- false tracks (a track false on consecutive keyframes counts once): 13.45 per minute
 - a vehicle coming into 30 m waits for its first matched track: median 0.0 s, p90 4.9 s (18 vehicles; 5 never tracked; 0.5 s resolution)
 
 ### Where the errors are
@@ -53,8 +53,8 @@ Reported tracks (confirmed, coasting included) against the scored vehicles, keyf
 |---|---|
 | second track on a tracked vehicle | 0 |
 | beside a vehicle (2-4 m off) | 48 |
-| coasting after the vehicle was lost | 13 |
-| nothing labelled nearby | 142 |
+| coasting after the vehicle was lost | 6 |
+| nothing labelled nearby | 140 |
 
 | missed vehicles (FN) | count |
 |---|---|
@@ -72,9 +72,9 @@ Blind sector (142-218 deg behind the robot) and the 20 deg bands beside it:
 
 | zone | scored vehicles | missed | missed share | tracks | false | false share |
 |---|---|---|---|---|---|---|
-| elsewhere | 1597 | 421 | 0.264 | 1327 | 157 | 0.118 |
+| elsewhere | 1597 | 421 | 0.264 | 1321 | 151 | 0.114 |
 | edge | 408 | 106 | 0.260 | 339 | 33 | 0.097 |
-| blind | 19 | 8 | 0.421 | 26 | 13 | 0.500 |
+| blind | 19 | 8 | 0.421 | 23 | 10 | 0.435 |
 
 ## Motion state
 
@@ -165,9 +165,9 @@ A moving vehicle that comes within 5 m of the robot within 3 s (labelled future,
 
 | stage | median | p90 |
 |---|---|---|
-| filter | 0.00 | 0.00 |
-| track | 1.98 | 7.95 |
-| predict | 0.78 | 3.46 |
+| filter | 0.00 | 0.01 |
+| track | 1.91 | 8.78 |
+| predict | 0.78 | 3.57 |
 
 ## Issues (`issues.csv`)
 
@@ -176,7 +176,7 @@ A moving vehicle that comes within 5 m of the robot within 3 s (labelled future,
 | ID switch | 9 |
 | bad prediction | 26 |
 | false moving | 6 |
-| false track | 30 |
+| false track | 26 |
 | hazard not reported | 1 |
 | lost vehicle | 36 |
 | missed moving vehicle | 1 |
@@ -198,15 +198,15 @@ Middle keyframe of each scene, robot at the center heading up. Green / red outli
 
 ## Foxglove
 
-- `data/tune/T18_mcap_v2/0921_164127_s000.mcap`: 3324 messages, 83 MB
+- `data/tune/T18_mcap_v2/0921_164127_s000.mcap`: 3322 messages, 83 MB
 - `data/tune/T18_mcap_v2/0921_164127_s001.mcap`: 3301 messages, 84 MB
 - `data/tune/T18_mcap_v2/0921_164127_s002.mcap`: 3290 messages, 79 MB
 - `data/tune/T18_mcap_v2/0921_164127_s003.mcap`: 3279 messages, 76 MB
-- `data/tune/T18_mcap_v2/0921_164127_s004.mcap`: 3294 messages, 88 MB
+- `data/tune/T18_mcap_v2/0921_164127_s004.mcap`: 3293 messages, 88 MB
 - `data/tune/T18_mcap_v2/0921_164127_s005.mcap`: 3290 messages, 95 MB
 - `data/tune/T18_mcap_v2/0921_165659_s003.mcap`: 3151 messages, 91 MB
 - `data/tune/T18_mcap_v2/0921_165659_s004.mcap`: 3149 messages, 93 MB
 - `data/tune/T18_mcap_v2/0921_165659_s005.mcap`: 3467 messages, 104 MB
-- `data/tune/T18_mcap_v2/0921_165659_s006.mcap`: 3457 messages, 107 MB
+- `data/tune/T18_mcap_v2/0921_165659_s006.mcap`: 3456 messages, 107 MB
 
 Open a file in Foxglove, then Layout -> Import from file: `foxglove_layout.json` (3D following `ego`, Plot of `/metrics/frame`, Log of `/log`). Jump to the times in `issues.csv` (column t: seconds after the scene start).

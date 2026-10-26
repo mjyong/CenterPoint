@@ -76,7 +76,7 @@ def _weighted_median(x, w):
 
 def associate_offline(frames, tracker_cfg=None):
     """frames: list of (stamp, Detections in world frame). Returns {track_id: list of obs}."""
-    trk = MultiObjectTracker(tracker_cfg or TrackerConfig())
+    trk = MultiObjectTracker(tracker_cfg or TrackerConfig(classes=CLASSES))
     obs = defaultdict(list)
     for stamp, dets in frames:
         trk.step(dets, stamp)
