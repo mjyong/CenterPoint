@@ -40,7 +40,7 @@
    - `batch_label.py --dry-run` 的 FREE / busy 是给批量教师推理定的（至少 8 GB 空闲、利用率不超过 20%），比上面严，别的任务不用照它。
 6. 大的输出写到 `/public/zjst/robot`（仓库盘只剩约 27 GB，T0）（和 `data/seq`、`data/runs` 同一块盘）。空闲空间用 `df -h /public/zjst/robot` 看，至少 80 GB。不要用 `df -h .`：那是仓库所在盘，后面的导出、训练权重、推理结果都不写到那里。第一次往下面这些目录写之前，先链过去（已经是这个链接就不用再做）：
    ```bash
-   for d in train deploy runs_veh_v0 runs_nusc_pp runs_nusc_voxel runs_veh_v1 runs_veh_v1_view runs_r2 labels_r2 seq_lever; do
+   for d in train deploy runs_veh_v0 runs_nusc_pp runs_nusc_voxel runs_veh_v1 runs_veh_v1_view runs_r2 labels_r2 seq_lever tune; do
      mkdir -p /public/zjst/robot/centerpoint_data/$d
      ln -sfn /public/zjst/robot/centerpoint_data/$d data/$d
    done
@@ -90,7 +90,7 @@
 | T13 | 雷达后方盲区：量出盲区，看各模型在盲区边上是不是误检更多 | Agent | T7 | 10 分钟 | 完成（盲区 142°–218°；v1 Pillar 在 10–40 m 边上算明显） |
 | T14 | 双教师（nuScenes Voxel + TTA、nuScenes Pillar + TTA）重新自动标注 0921，补进审过的训练标签（不丢 H1） | Agent | T7 | 1 小时 | 完成（双教师标注 T16 接着用；labels_merged.pkl 不再用） |
 | T15 | 用 v2 数据集训练 v2；定上线用哪个 Pillar、教师换不换 | Agent | T17 | 3.5 小时 | 完成。上线用 nuScenes Pillar（人定：v1、v2 都不如它，见复核）；教师不换 |
-| T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 待做 |
+| T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 停在第 3 步（训练场景标签拼接 80 > 40，oracle_train 和汇总没跑） |
 | H4 | 在 Foxglove 里看基线，按问题清单归类典型问题 | 人 | T18 | 1 小时 | 待做 |
 | T19 | 后处理扫参（上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉） | Agent | T18 | 30 分钟 | 待做 |
 | T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 待做 |
@@ -2154,7 +2154,41 @@ GPU 只在第 2 步用（Pillar 不加 TTA，每个进程约 3 GB）；其余都
 
 ### T18 结果
 
-（待填）
+**停在第 3 步。** `nusc_pp_train` 报告开头 "Label tracks stitched into one vehicle" 是 **80**，超过 40。`oracle_train` 和第 4 步汇总没有跑。验证集那五份都是 20，没超过。
+
+| 报告 | 场景 | 拼接数 |
+|---|---|---|
+| deploy、v2_pp、v1_pp、teacher、oracle_val | 验证 10 个 | 20 |
+| nusc_pp_train | 训练 25 个 | 80 |
+| oracle_train | — | 未跑 |
+
+已经做完的部分：
+
+- 约定 6 的链接加上了 `tune`：`data/tune` → `/public/zjst/robot/centerpoint_data/tune`。
+- 验证集传播到 10 Hz。去掉 `pose_bad` 之后留下的帧最低是 `0921_164127_s001` 的 97.2%（277/285），其余 ≥ 98.9%。
+- 重放用的是 GPU 5。当时空闲 8520 MiB，`--jobs 4` 放不下（每个进程按约 3 GB、再留 1 GB），所以是 `--jobs 2`、`--device cuda:0`。两个进程当时各约 0.8 GB。验证 10 个场景 5 分 20 秒，训练 25 个 15 分 23 秒，都退出码 0。网络中位数大约 24–37 ms。
+- 第 3 步耗时：deploy 44 s，v2_pp 28 s，v1_pp 11 s，teacher 14 s，oracle_val 12 s，nusc_pp_train 34 s。
+- MCAP（不提交）：`data/tune/T18_mcap` 936 MB，`data/tune/T18_mcap_v2` 858 MB，各 10 个场景。
+
+已经写出来的六份主要指标（30 m 内；完整表在各目录的 `report.md`）：
+
+| metric | deploy | v2_pp | v1_pp | teacher | oracle_val | nusc_pp_train |
+|---|---|---|---|---|---|---|
+| detections: recall within near range | 0.867 | 0.765 | 0.727 | 0.857 | 1.000 | 0.845 |
+| detections: precision within near range | 0.781 | 0.893 | 0.949 | 0.952 | 1.000 | 0.736 |
+| detections: F1 within near range | 0.822 | 0.824 | 0.823 | 0.902 | 1.000 | 0.787 |
+| detections: false per keyframe | 1.047 | 0.314 | 0.172 | 0.219 | 0.000 | 0.776 |
+| tracks: MOTA | 0.518 | 0.631 | 0.660 | 0.796 | 0.939 | 0.512 |
+| tracks: IDF1 | 0.750 | 0.777 | 0.782 | 0.873 | 0.950 | 0.727 |
+| tracks: ID switches / min | 2.689 | 1.862 | 1.655 | 1.655 | 1.655 | 3.902 |
+| tracks: false tracks / min | 59.789 | 14.482 | 13.034 | 14.275 | 6.206 | 47.312 |
+| tracks: confirm delay p90 [s] | 0.950 | 4.950 | 2.500 | 0.501 | 0.501 | 0.501 |
+| motion: relevant moving stretches missed | 2 | 1 | 1 | 1 | 0 | 1 |
+| motion: parked reported moving / h | 148.956 | 74.478 | 74.478 | 24.826 | 0.000 | 34.143 |
+| prediction: FDE 3 s, moving [m] | 2.818 | 2.705 | 2.409 | 1.917 | 1.404 | 3.050 |
+| prediction: miss rate 3 s, moving | 0.519 | 0.473 | 0.398 | 0.377 | 0.285 | 0.649 |
+
+deploy 的检测、跟踪、盲区、运动、预测、预警、耗时和 issues 在 `data/reports/T18/deploy/report.md`。v2_pp 的漏报和盲区表在 `data/reports/T18/v2_pp/report.md`。七列并排的 summary.md 没有写。
 
 ---
 

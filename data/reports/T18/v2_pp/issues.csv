@@ -1,0 +1,104 @@
+kind,scene,t,duration,track,gt,range,zone,value,note
+ID switch,0921_164127_s000,4.0,0.0,15,19,29.7,elsewhere,1.0,T14 -> T15
+ID switch,0921_164127_s000,21.5,0.0,20,11,24.4,edge,1.0,T7 -> T20
+ID switch,0921_164127_s000,23.0,0.0,22,9,29.2,elsewhere,1.0,T8 -> T22
+ID switch,0921_164127_s000,23.5,0.0,23,3,26.8,elsewhere,1.0,T2 -> T23
+ID switch,0921_164127_s000,24.0,0.0,24,6,31.3,elsewhere,1.0,T13 -> T24
+ID switch,0921_164127_s000,27.5,0.0,32,5,23.1,elsewhere,1.0,T3 -> T32
+ID switch,0921_164127_s001,28.0,0.0,27,14,30.8,elsewhere,1.0,T13 -> T27
+ID switch,0921_164127_s003,21.0,0.0,20,2,35.4,elsewhere,1.0,T1 -> T20
+ID switch,0921_165659_s006,13.0,0.0,11,8,18.9,elsewhere,1.0,T4 -> T11
+bad prediction,0921_164127_s000,2.5,3.0,14,19,39.1,elsewhere,19.4,"FDE 19.4 m at 3 s, straight, 6.4 m/s"
+bad prediction,0921_164127_s000,3.0,3.0,14,19,36.0,elsewhere,16.2,"FDE 16.2 m at 3 s, straight, 6.4 m/s"
+bad prediction,0921_164127_s000,4.0,3.0,15,19,29.7,elsewhere,9.6,"FDE 9.6 m at 3 s, straight, 6.4 m/s"
+bad prediction,0921_164127_s000,4.5,3.0,15,19,26.7,elsewhere,8.8,"FDE 8.8 m at 3 s, straight, 6.4 m/s"
+bad prediction,0921_164127_s000,19.0,3.0,17,54,4.7,elsewhere,8.5,"FDE 8.5 m at 3 s, straight, 2.5 m/s"
+bad prediction,0921_165659_s005,27.0,3.0,1,63,4.4,elsewhere,8.1,"FDE 8.1 m at 3 s, straight, 0.5 m/s"
+bad prediction,0921_164127_s000,5.0,3.0,15,19,23.7,elsewhere,7.8,"FDE 7.8 m at 3 s, straight, 6.4 m/s"
+bad prediction,0921_164127_s000,7.0,3.0,15,19,12.7,elsewhere,7.4,"FDE 7.4 m at 3 s, straight, 6.3 m/s"
+bad prediction,0921_165659_s006,6.0,3.0,1,70,4.7,elsewhere,7.1,"FDE 7.1 m at 3 s, straight, 0.6 m/s"
+bad prediction,0921_165659_s005,26.0,3.0,1,63,4.9,elsewhere,6.5,"FDE 6.5 m at 3 s, straight, 0.5 m/s"
+bad prediction,0921_164127_s000,6.5,3.0,15,19,15.2,elsewhere,6.3,"FDE 6.3 m at 3 s, straight, 6.4 m/s"
+bad prediction,0921_164127_s000,6.0,3.0,15,19,17.9,elsewhere,6.3,"FDE 6.3 m at 3 s, straight, 6.4 m/s"
+bad prediction,0921_164127_s000,5.5,3.0,15,19,20.7,elsewhere,6.1,"FDE 6.1 m at 3 s, straight, 6.4 m/s"
+bad prediction,0921_164127_s000,25.0,3.0,25,39,5.6,edge,4.9,"FDE 4.9 m at 3 s, straight, 2.6 m/s"
+bad prediction,0921_164127_s000,24.5,3.0,25,39,6.5,blind,4.8,"FDE 4.8 m at 3 s, straight, 2.6 m/s"
+bad prediction,0921_164127_s000,24.0,3.0,25,39,7.4,blind,4.6,"FDE 4.6 m at 3 s, straight, 2.5 m/s"
+bad prediction,0921_164127_s000,18.0,3.0,17,54,5.5,edge,4.0,"FDE 4.0 m at 3 s, straight, 2.5 m/s"
+bad prediction,0921_164127_s000,17.0,3.0,7,11,25.8,edge,3.9,"FDE 3.9 m at 3 s, turning, 1.1 m/s"
+bad prediction,0921_164127_s001,22.0,3.0,6,5,22.7,elsewhere,3.7,"FDE 3.7 m at 3 s, straight, 0.9 m/s"
+bad prediction,0921_164127_s001,10.0,3.0,1,2,32.5,elsewhere,3.7,"FDE 3.7 m at 3 s, straight, 2.6 m/s"
+bad prediction,0921_164127_s000,25.5,3.0,25,39,4.7,edge,3.6,"FDE 3.6 m at 3 s, straight, 2.6 m/s"
+bad prediction,0921_165659_s005,1.0,3.0,1,63,37.6,elsewhere,3.2,"FDE 3.2 m at 3 s, straight, 1.2 m/s"
+bad prediction,0921_165659_s005,0.5,3.0,1,63,38.1,elsewhere,3.2,"FDE 3.2 m at 3 s, straight, 1.2 m/s"
+bad prediction,0921_164127_s003,0.5,3.0,4,1,29.9,elsewhere,3.1,"FDE 3.1 m at 3 s, straight, 0.7 m/s"
+bad prediction,0921_164127_s001,21.5,3.0,6,5,23.2,elsewhere,3.1,"FDE 3.1 m at 3 s, straight, 0.9 m/s"
+bad prediction,0921_164127_s000,18.5,3.0,17,54,5.1,elsewhere,3.0,"FDE 3.0 m at 3 s, straight, 2.6 m/s"
+false moving,0921_165659_s005,20.0,2.5,,61,25.8,,2.5,parked vehicle reported moving
+false moving,0921_165659_s005,26.5,2.0,,61,16.0,,2.0,parked vehicle reported moving
+false moving,0921_165659_s005,29.5,1.0,,61,12.5,,1.0,parked vehicle reported moving
+false moving,0921_164127_s004,20.0,0.5,,2,4.7,,0.5,parked vehicle reported moving
+false moving,0921_165659_s005,23.0,0.5,,61,22.7,,0.5,parked vehicle reported moving
+false moving,0921_164127_s002,7.5,0.1,,3,24.4,,0.1,parked vehicle reported moving
+false track,0921_164127_s005,14.5,14.5,1,,10.7,elsewhere,14.5,
+false track,0921_164127_s005,15.0,8.5,2,,2.1,elsewhere,8.5,
+false track,0921_164127_s005,6.0,8.0,1,,10.8,elsewhere,8.0,
+false track,0921_165659_s006,0.5,6.5,2,,5.8,elsewhere,6.5,
+false track,0921_164127_s003,23.0,5.0,21,,8.8,elsewhere,5.0,
+false track,0921_164127_s005,0.5,4.0,1,,10.6,elsewhere,4.0,
+false track,0921_164127_s005,24.5,4.0,2,,2.0,elsewhere,4.0,
+false track,0921_165659_s006,24.0,3.0,6,,2.1,elsewhere,3.0,
+false track,0921_165659_s005,1.5,2.5,1,,36.4,elsewhere,2.5,
+false track,0921_165659_s006,7.0,2.5,1,,4.7,elsewhere,2.5,
+false track,0921_164127_s003,16.5,2.0,17,,31.8,edge,2.0,
+false track,0921_165659_s004,25.0,2.0,11,,9.5,elsewhere,2.0,
+false track,0921_164127_s001,0.5,1.5,7,,24.9,edge,1.5,
+false track,0921_164127_s000,27.5,1.5,33,,24.7,edge,1.5,
+false track,0921_164127_s004,3.0,1.0,12,,36.6,elsewhere,1.0,
+false track,0921_164127_s004,7.5,1.0,12,,31.8,elsewhere,1.0,
+false track,0921_164127_s004,12.0,1.0,1,,34.6,blind,1.0,
+false track,0921_164127_s004,26.0,1.0,24,,2.0,elsewhere,1.0,
+false track,0921_164127_s003,20.5,1.0,21,,7.8,edge,1.0,
+false track,0921_164127_s001,14.0,1.0,18,,33.1,edge,1.0,
+false track,0921_165659_s005,4.0,1.0,3,,4.5,elsewhere,1.0,
+false track,0921_165659_s005,11.5,1.0,4,,38.4,elsewhere,1.0,
+false track,0921_164127_s000,25.5,1.0,27,,38.9,elsewhere,1.0,
+false track,0921_164127_s000,27.5,1.0,23,,27.2,elsewhere,1.0,
+false track,0921_165659_s003,13.5,1.0,9,,24.1,elsewhere,1.0,
+false track,0921_165659_s003,14.0,1.0,10,,37.3,elsewhere,1.0,
+false track,0921_165659_s006,5.5,1.0,6,,26.0,elsewhere,1.0,
+false track,0921_165659_s006,15.0,1.0,7,,20.4,elsewhere,1.0,
+false track,0921_165659_s006,17.0,1.0,13,,9.4,elsewhere,1.0,
+false track,0921_164127_s002,11.0,1.0,19,,36.2,elsewhere,1.0,
+hazard not reported,0921_165659_s006,7.0,1.0,,70,3.9,,1.0,"moving vehicle within 5 m, no alarm"
+lost vehicle,0921_164127_s005,0.5,28.5,,5,5.1,elsewhere,28.5,"within 30 m, no track"
+lost vehicle,0921_164127_s001,9.0,16.0,,131,19.6,elsewhere,16.0,"within 30 m, no track"
+lost vehicle,0921_164127_s002,10.0,13.0,,67,24.2,elsewhere,13.0,"within 30 m, no track"
+lost vehicle,0921_165659_s006,0.0,10.5,,2,16.8,elsewhere,10.5,"within 30 m, no track"
+lost vehicle,0921_165659_s003,8.0,7.5,,5,28.0,elsewhere,7.5,"within 30 m, no track"
+lost vehicle,0921_164127_s001,14.0,7.0,,7,28.9,edge,7.0,"within 30 m, no track"
+lost vehicle,0921_164127_s004,13.5,6.5,,2,4.5,elsewhere,6.5,"within 30 m, no track"
+lost vehicle,0921_164127_s004,22.5,6.5,,82,5.2,elsewhere,6.5,"within 30 m, no track"
+lost vehicle,0921_164127_s004,6.5,6.0,,2,13.9,elsewhere,6.0,"within 30 m, no track"
+lost vehicle,0921_164127_s000,1.0,5.0,,11,26.4,edge,5.0,"within 30 m, no track"
+lost vehicle,0921_164127_s001,15.0,4.5,,14,29.2,elsewhere,4.5,"within 30 m, no track"
+lost vehicle,0921_164127_s000,17.5,4.0,,11,24.9,edge,4.0,"within 30 m, no track"
+lost vehicle,0921_164127_s000,24.5,4.0,,54,17.2,elsewhere,4.0,"within 30 m, no track"
+lost vehicle,0921_164127_s004,0.0,3.0,,2,23.7,elsewhere,3.0,"within 30 m, no track"
+lost vehicle,0921_164127_s003,26.0,3.0,,84,27.4,elsewhere,3.0,"within 30 m, no track"
+lost vehicle,0921_164127_s001,0.0,3.0,,8,26.5,elsewhere,3.0,"within 30 m, no track"
+lost vehicle,0921_165659_s006,7.0,2.5,,70,4.3,elsewhere,2.5,"within 30 m, no track"
+lost vehicle,0921_164127_s003,13.5,2.0,,2,29.5,edge,2.0,"within 30 m, no track"
+lost vehicle,0921_164127_s001,0.0,2.0,,7,26.3,edge,2.0,"within 30 m, no track"
+lost vehicle,0921_164127_s001,6.0,2.0,,14,30.0,elsewhere,2.0,"within 30 m, no track"
+lost vehicle,0921_164127_s000,27.0,2.0,,11,26.4,edge,2.0,"within 30 m, no track"
+lost vehicle,0921_164127_s000,19.5,2.0,,54,5.1,elsewhere,2.0,"within 30 m, no track"
+lost vehicle,0921_165659_s006,27.0,2.0,,55,21.2,elsewhere,2.0,"within 30 m, no track"
+lost vehicle,0921_164127_s004,3.5,1.5,,2,20.3,elsewhere,1.5,"within 30 m, no track"
+lost vehicle,0921_164127_s001,15.0,1.5,,4,23.5,edge,1.5,"within 30 m, no track"
+lost vehicle,0921_165659_s005,18.5,1.5,,61,28.9,elsewhere,1.5,"within 30 m, no track"
+lost vehicle,0921_164127_s002,4.0,1.5,,5,26.2,edge,1.5,"within 30 m, no track"
+lost vehicle,0921_164127_s002,6.0,1.5,,10,28.8,edge,1.5,"within 30 m, no track"
+lost vehicle,0921_164127_s001,10.0,1.0,,14,29.8,elsewhere,1.0,"within 30 m, no track"
+lost vehicle,0921_164127_s001,11.5,1.0,,14,29.7,elsewhere,1.0,"within 30 m, no track"
+missed moving vehicle,0921_164127_s001,11.5,15.5,,131,19.3,,15.5,label 2.0 m/s

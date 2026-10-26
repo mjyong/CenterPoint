@@ -1,0 +1,20 @@
+== 0921_164127_s000
+286 of 288 frames, {'other classes, copied as they are': 889, 'keyframe boxes': 641, 'interpolated boxes': 2472, 'ignore: reviewed at one end': 35, 'frames left out (outside the keyframes)': 2} -> data/labels/0921_164127_s000/labels_full2.pkl
+== 0921_164127_s001
+277 of 288 frames, {'other classes, copied as they are': 677, 'keyframe boxes': 678, 'interpolated boxes': 2568, 'ignore: reviewed at one end': 30, 'left out: removed by the reviewer': 30, 'frames left out (outside the keyframes)': 8} -> data/labels/0921_164127_s001/labels_full2.pkl
+== 0921_164127_s002
+286 of 288 frames, {'other classes, copied as they are': 706, 'keyframe boxes': 419, 'interpolated boxes': 1604, 'ignore: reviewed at one end': 36, 'frames left out (outside the keyframes)': 2} -> data/labels/0921_164127_s002/labels_full2.pkl
+== 0921_164127_s003
+277 of 287 frames, {'other classes, copied as they are': 359, 'keyframe boxes': 230, 'interpolated boxes': 852, 'ignore: reviewed at one end': 22, 'frames left out (outside the keyframes)': 3} -> data/labels/0921_164127_s003/labels_full2.pkl
+== 0921_164127_s004
+286 of 288 frames, {'other classes, copied as they are': 226, 'keyframe boxes': 194, 'interpolated boxes': 716, 'ignore: reviewed at one end': 32, 'frames left out (outside the keyframes)': 2} -> data/labels/0921_164127_s004/labels_full2.pkl
+== 0921_164127_s005
+286 of 288 frames, {'other classes, copied as they are': 462, 'keyframe boxes': 57, 'interpolated boxes': 224, 'ignore: reviewed at one end': 3, 'frames left out (outside the keyframes)': 2} -> data/labels/0921_164127_s005/labels_full2.pkl
+== 0921_165659_s003
+276 of 276 frames, {'other classes, copied as they are': 1450, 'keyframe boxes': 80, 'interpolated boxes': 304} -> data/labels/0921_165659_s003/labels_full2.pkl
+== 0921_165659_s004
+276 of 276 frames, {'other classes, copied as they are': 305, 'keyframe boxes': 0, 'interpolated boxes': 0} -> data/labels/0921_165659_s004/labels_full2.pkl
+== 0921_165659_s005
+301 of 303 frames, {'other classes, copied as they are': 1035, 'keyframe boxes': 114, 'interpolated boxes': 428, 'ignore: reviewed at one end': 5, 'frames left out (outside the keyframes)': 2} -> data/labels/0921_165659_s005/labels_full2.pkl
+== 0921_165659_s006
+301 of 302 frames, {'other classes, copied as they are': 850, 'keyframe boxes': 162, 'interpolated boxes': 612, 'left out: removed by the reviewer': 96, 'ignore: reviewed at one end': 15, 'frames left out (outside the keyframes)': 1} -> data/labels/0921_165659_s006/labels_full2.pkl

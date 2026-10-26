@@ -1,0 +1,107 @@
+GPU5 free MiB=8520
+JOBS=2
+=== replay val 2026-10-26T16:43:05+08:00 jobs=2 ===
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+== 0921_164127_s000
+[pillar] 288 frames, network 30.5 ms (median)
+== 0921_164127_s001
+[pillar] 288 frames, network 31.2 ms (median)
+== 0921_164127_s002
+[pillar] 288 frames, network 25.8 ms (median)
+== 0921_164127_s003
+[pillar] 287 frames, network 23.7 ms (median)
+== 0921_164127_s004
+[pillar] 288 frames, network 28.3 ms (median)
+== 0921_164127_s005
+[pillar] 288 frames, network 28.5 ms (median)
+== 0921_165659_s003
+[pillar] 276 frames, network 32.9 ms (median)
+== 0921_165659_s004
+[pillar] 276 frames, network 28.0 ms (median)
+== 0921_165659_s005
+[pillar] 303 frames, network 25.3 ms (median)
+== 0921_165659_s006
+[pillar] 302 frames, network 23.7 ms (median)
+VAL_REPLAY_DONE 2026-10-26T16:48:25+08:00 exit=0
+=== replay train 2026-10-26T16:48:25+08:00 ===
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+== 0921_165659_s000
+[pillar] 276 frames, network 28.9 ms (median)
+== 0921_165659_s001
+[pillar] 276 frames, network 30.7 ms (median)
+== 0921_165659_s002
+[pillar] 275 frames, network 31.3 ms (median)
+== 0921_165659_s007
+[pillar] 303 frames, network 34.0 ms (median)
+== 0921_165659_s008
+[pillar] 302 frames, network 31.7 ms (median)
+== 0921_165659_s009
+[pillar] 302 frames, network 34.6 ms (median)
+== 0921_165659_s010
+[pillar] 303 frames, network 33.1 ms (median)
+== 0921_165659_s011
+[pillar] 302 frames, network 31.6 ms (median)
+== 0921_165659_s012
+[pillar] 302 frames, network 28.3 ms (median)
+== 0921_165659_s013
+[pillar] 303 frames, network 32.0 ms (median)
+== 0921_165659_s014
+[pillar] 302 frames, network 30.1 ms (median)
+== 0921_165659_s015
+[pillar] 302 frames, network 30.3 ms (median)
+== 0921_165659_s016
+[pillar] 303 frames, network 28.4 ms (median)
+== 0921_165659_s017
+[pillar] 302 frames, network 26.2 ms (median)
+== 0921_165659_s018
+[pillar] 302 frames, network 31.6 ms (median)
+== 0921_165659_s019
+[pillar] 303 frames, network 34.7 ms (median)
+== 0921_165659_s020
+[pillar] 302 frames, network 31.6 ms (median)
+== 0921_165659_s021
+[pillar] 303 frames, network 29.2 ms (median)
+== 0921_165659_s022
+[pillar] 302 frames, network 29.8 ms (median)
+== 0921_165659_s023
+[pillar] 302 frames, network 36.8 ms (median)
+== 0921_165659_s024
+[pillar] 303 frames, network 28.9 ms (median)
+== 0921_165659_s025
+[pillar] 302 frames, network 28.0 ms (median)
+== 0921_165659_s026
+[pillar] 302 frames, network 24.8 ms (median)
+== 0921_165659_s027
+[pillar] 303 frames, network 29.6 ms (median)
+== 0921_165659_s028
+[pillar] 302 frames, network 24.3 ms (median)
+TRAIN_REPLAY_DONE 2026-10-26T17:03:48+08:00 exit=0
+val pkls 10 train pkls 25
