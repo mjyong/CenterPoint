@@ -255,18 +255,24 @@ def load_scene(name, rows, labels, dense=None, **stitch):
                            box=np.array([x[4] for x in v]), v_start=_edge_velocity(t, xy, False),
                            v_end=_edge_velocity(t, xy, True))
     dense_key = None if dense is None else {_key(f["stamp"]): f for f in dense["frames"] if not f.get("pose_bad")}
-    # propagate_keyframes renumbers the boxes the reviewer added: match the 10 Hz ids at the keyframes
-    dense_id = {}
-    for k, f in key.items():
-        d = (dense_key or {}).get(k)
-        kv = [o for o in f["objects"] if o["label"] == "vehicle"]
+    return SceneData(name, rows, key, dense_key, gt_id, gt_track, merges, match_dense_ids(key, dense_key or {}))
+
+
+def match_dense_ids(keyframes, dense, label="vehicle", dist=0.5):
+    """{10 Hz label track id: keyframe label track id}. ``propagate_keyframes`` renumbers the boxes the
+    reviewer added, so the ids are matched where both have a box: at the keyframes, by position.
+    ``keyframes`` / ``dense``: {round(stamp, 6): labels frame}."""
+    out = {}
+    for k, f in keyframes.items():
+        d = dense.get(k)
+        kv = [o for o in f["objects"] if o["label"] == label]
         for o in (d["objects"] if d else []):
-            if o["label"] != "vehicle" or o["track_id"] in dense_id or not kv:
+            if o["label"] != label or o["track_id"] in out or not kv:
                 continue
-            dist = [np.hypot(*(np.asarray(o["box"][:2]) - q["box"][:2])) for q in kv]
-            if min(dist) < 0.5:
-                dense_id[o["track_id"]] = kv[int(np.argmin(dist))]["track_id"]
-    return SceneData(name, rows, key, dense_key, gt_id, gt_track, merges, dense_id)
+            gap = [np.hypot(*(np.asarray(o["box"][:2]) - q["box"][:2])) for q in kv]
+            if min(gap) < dist:
+                out[o["track_id"]] = kv[int(np.argmin(gap))]["track_id"]
+    return out
 
 
 def _at(track, times, tol=0.06):

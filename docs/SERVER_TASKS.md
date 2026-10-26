@@ -2209,6 +2209,12 @@ deploy 的检测、跟踪、盲区、运动、预测、预警、耗时和 issues
   - v2_pp 在 10 m 内的 96 个漏报里，s005 这一辆就占了 57 个。
   - 所以 T15 里 nusc_pp 在 20 m 内的优势，很大一部分来自这一辆车。它是什么车，H4 里人看一下：
     像是 DATA_COLLECTION_PLAN.md 第 4 节问过的那种 2.5–3.1 m 长、2.3 m 高的"truck"。
+  - **2026-10-26 人确认：是下货的叉车，不要求检出。** 标签里按尺寸把叉车改成了忽略框（`tools/dog/ignore_tracks.py`）：
+    - 范围：长 2.3–3.6 m、宽 1.3–1.85 m、高 1.95–2.6 m（轨迹的中位尺寸），共 7 个场景、9 条轨迹，在四个固定的位置（装卸点）；
+    - 改动：关键帧 341 框；10 Hz 标签 `labels_full2` 1,674 框、`labels_train2` 101 框；
+    - 改完后验证集 10 m 内的车框从 186 个降到 74 个。
+    - s000 里有一辆在动的叉车（离狗约 30 m），也一样作忽略框。
+    T18 续里在新标签上重算三个 Pillar 的 AP。
 - **nusc_pp 在默认阈值 0.35 下假轨迹太多**：
   - 每分钟约 60 条，681 个假轨迹关键帧里 567 个是"附近没有标注"；
   - 停着的车被报成在动，每小时 149 次（v2、v1 是 74 次）。
@@ -2232,13 +2238,22 @@ deploy 的检测、跟踪、盲区、运动、预测、预警、耗时和 issues
 
 0. 同 T18 第 0 步设好 TASK=T18、VAL、TRAIN、PP，同 T18 第 3 步定义 ev。
    报告和 MCAP 直接覆盖（旧的数字留在上面的表里和 git 历史里）。
+   拉下来的标签里叉车已经是忽略框（见上面复核），不用自己改。
 1. T18 第 3 步的七条全部重跑（包括上次没跑的 oracle_train）。
 2. T18 第 4 步汇总，写 data/reports/T18/summary.md。
+3. 叉车改成忽略框以后，三个 Pillar 和教师重算 AP（T15 第 4 步的做法，只留这四个）：
+     RES=$(for r in $VAL; do echo nusc_pp=data/runs_nusc_pp/$r/pillar/results.pkl v2_pp=data/runs_veh_v2/$r/pillar/results.pkl \
+         v1_pp=data/runs_veh_v1/$r/pillar/results.pkl teacher=data/runs/$r/voxel/results.pkl; done)
+     python tools/dog/compare_detectors.py --classes vehicle --max-range 40 --results $RES \
+         --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech2.pkl; done) \
+         --thresholds 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 --target-recall 0.9 --bootstrap 1000 \
+         | tee data/reports/T18/compare_val_noforklift.md
 
 停止条件：任何报错；拼接数超过场景数的 4 倍；oracle_val 的 false tracks / min 大于 1（修正没生效）。
 提交：data/reports/T18/（MCAP 不在里面）、本文档。
 报告（写进下面"T18 续结果"）：summary.md 七列并排的主要指标表；deploy、v2_pp 两份报告的"Where the errors are"、运动状态、
-预测（moving）、预警几张表；和修正前（上面的表）比，各份 false tracks / min 变了多少；oracle_train 的预测表（moving）。
+预测（moving）、预警几张表；和修正前（上面的表）比，各份 false tracks / min 变了多少；oracle_train 的预测表（moving）；
+第 3 步的 AP 表、重抽表里 v2_pp − nusc_pp、v1_pp − nusc_pp 两行，和 T15 的数（叉车算车时）并排。
 ```
 
 ### T18 续结果

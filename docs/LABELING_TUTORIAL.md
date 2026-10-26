@@ -275,7 +275,7 @@ T9 说明验证集为什么要逐框看。分数 0.50 刚好在待审核线（0.
 ### 5.4 标注约定
 
 - 只标三类：车、行人（Pedestrian、Child、RoadWorker）、骑行者（BicycleRider、MotorcyleRider、ScooterRider；停着的 Bicycle、Motorcycle、Scooter 也算，和 nuScenes 的约定一致）。其他类型导回时会被跳过并计数。
-- 车的类型要选对，它决定 5 个 head 的模型训练哪个 head。按 nuScenes 的定义：轿车、SUV、面包车选 Car 或 Van → car；皮卡、货车和工程车（Truck、ConcreteTruck、Excavator、ForkLift、Crane 等）→ truck；公交、有轨电车、挂车这类长车（Bus、Tram、LongVehicle）→ bus。皮卡没有单独的类型，选 Truck。导回后三者都是 vehicle，子类记在 `subclass` 里。点太稀、分不出子类时，保留教师给的。只检车辆的模型（`*_veh.py`）按尺寸分 car / truck，不看类型。
+- 车的类型要选对，它决定 5 个 head 的模型训练哪个 head。按 nuScenes 的定义：轿车、SUV、面包车选 Car 或 Van → car；皮卡、货车和工程车（Truck、ConcreteTruck、Excavator、ForkLift、Crane 等）→ truck；公交、有轨电车、挂车这类长车（Bus、Tram、LongVehicle）→ bus。皮卡没有单独的类型，选 Truck。导回后三者都是 vehicle，子类记在 `subclass` 里。点太稀、分不出子类时，保留教师给的。只检车辆的模型（`*_veh.py`）按尺寸分 car / truck，不看类型。叉车不要求检出（2026-10-26），审核时作忽略框（右键 → 看不清），不要确认成车。
 - 小三轮车、老年代步车选 Trimotorcycle / FreightTricycle，算骑行者，不算车。
 - 框贴住物体的点。朝向是车头 / 人面朝的方向，看不出时取运动方向。
 - 点少到人也看不出是什么的，不新标（标了也是猜）；已有的框用"看不清"作忽略框。

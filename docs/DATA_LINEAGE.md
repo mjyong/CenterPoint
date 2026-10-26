@@ -479,6 +479,8 @@ mindmap
 
 只用于训练场景（DOG_FINETUNE.md 第 17 节）。
 
+`tools/dog/ignore_tracks.py` 把按尺寸（或按场景:轨迹号）选出的轨迹改成忽略框（`ignore = True`、`ignore_reason`），关键帧标签和传播出的 10 Hz 标签一起改（审核人加的框在 10 Hz 标签里被重新编了号，按关键帧上的位置对回来）。2026-10-26 用它把叉车改成忽略框：`labels_sustech2.pkl`、`labels_full2.pkl`、`labels_train2.pkl`，原地改（文件在 git 里）。SUSTechPOINTS 的场景里叉车还是车，以后再从 `sustech_dual/` 导回时，要再跑一次同样的命令。
+
 ---
 
 ## 8. ⑦ 导出数据集：`tools/dog/export_dataset.py`

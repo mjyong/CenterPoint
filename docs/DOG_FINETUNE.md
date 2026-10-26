@@ -392,6 +392,9 @@ python tools/dog/sustechpoints_convert.py stats
 
 1. **head 只留 car、truck**（`configs/dog/dog_centerpoint_{pp,voxel}_xt32_veh.py`，预设 `dog_pillar_veh` / `dog_voxel_veh`，各工具按权重里的 task 数自动识别）。bus head 没有数据，留着只会在微调里学成"不出框"；行人、骑行者的 head 去掉。两个 head 分别从 nuScenes 的 car、truck head 迁移：在 0921 上，教师 truck head 给 ≥ 10 m 货车的平均分中位是 0.53，bus head 给它判成公交的那些只有 0.36。少了 3 个 task 的 head，按第 12 节的测量（每个 task 的 head：Pillar 约 2.4 GMAC，Voxel 约 4.2 GMAC）估算，Pillar 约 31.7 GMAC（5 个 head 时 38.9），Voxel 约 63.3 GMAC（75.9）。
 2. **按尺寸分 head，不再用教师的子类**：长 ≥ 5.5 m 或高 ≥ 2.5 m 为 truck，否则为 car（`dog_perception/detection/boxes.py` 的 `vehicle_head`）。公交、挂车、工程车都归 truck。同样大小的车永远进同一个 head，审核时也不用再改 car / truck / bus。
+   **叉车不检（2026-10-26 人定）**：上面那批长 2.4–3.4 m、宽 1.4–1.8 m、高 2.0–2.5 m 的"truck"是下货的叉车，不要求检出，作忽略框（第 3 条）。
+   - 已有的标签用 `tools/dog/ignore_tracks.py` 按尺寸改：0921 里 7 个场景、9 条轨迹，关键帧 341 框；
+   - 以后审核时，叉车右键选"看不清（作忽略框）"，不要确认成车。
 3. **拿不准的轨迹作忽略框**（第 ⑤ 步，`gt_ignore`）：既不当正样本，也不当负样本，评估时不计分。哪些算拿不准：
    - 还标着待审核（平均分 < 0.5）、没人审过的轨迹；
    - 没人审过、教师子类和尺寸对不上的（教师说 truck / bus，尺寸却是小车）；

@@ -213,6 +213,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/nusc_autolabel_eval.py` | 在 nuScenes 上用真值检查自动标注质量 |
 | `tools/dog/compare_detectors.py` | 多个检测器对比（AP、分段 AP、延迟、轨迹碎片化）；`--thresholds` 扫上报阈值，`--bootstrap` 按录制重抽给出差值的区间 |
 | `tools/dog/motion_eval.py` | 在验证场景上重跑跟踪，扫运动状态的阈值（`--on-speed`、`--on-frames`），`--details` 列出每个漏报和误报 |
+| `tools/dog/ignore_tracks.py` | 按尺寸或轨迹号把标签里的轨迹改成忽略框（叉车不检），关键帧和 10 Hz 标签一起改 |
 | `tools/dog/pipeline_eval.py`（`dog_perception/pipeline_eval.py`） | 狗数据上离线重跑过滤、跟踪、预测，和审过的标签比：检测、MOT、运动状态、预测、预警的指标和场景重抽区间；问题清单；每个场景的 Foxglove MCAP；`--set` 扫参。见 [PIPELINE_TUNING.md](PIPELINE_TUNING.md) |
 | `tools/dog/bench_dataloader.py` | 训练数据读取够不够快：每个变换的耗时、读盘速度、DataLoader 每批耗时 |
 | `tools/dog/convert_nusc_ckpt.py` | nuScenes 10 类 head 到狗的 5 个 head（或旧的 3 个）的权重迁移 |
