@@ -314,8 +314,26 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         box.position.y=0;
         box.position.z=0;
         box.computeLineDistances();
-        this.rangeCircle = box;
-        this.scene.add(box);
+
+        // Training keeps points inside ±40.8 m (configs/dog PC_RANGE). A dim dashed square, not a label.
+        var s = 40.8, zh = -3;
+        var square = new THREE.BufferGeometry();
+        square.setAttribute('position', new THREE.Float32BufferAttribute([
+            -s, -s, zh,  s, -s, zh,
+             s, -s, zh,  s,  s, zh,
+             s,  s, zh, -s,  s, zh,
+            -s,  s, zh, -s, -s, zh,
+        ], 3));
+        var trainRange = new THREE.LineSegments(square, new THREE.LineDashedMaterial({
+            color: 0x8aa0a0, dashSize: 1.5, gapSize: 1.0, opacity: 0.45, transparent: true,
+        }));
+        trainRange.computeLineDistances();
+
+        var group = new THREE.Group();
+        group.add(box);
+        group.add(trainRange);
+        this.rangeCircle = group;
+        this.scene.add(group);
     };
 
 
