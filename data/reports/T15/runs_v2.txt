@@ -1,0 +1,180 @@
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1026 15:59:14.788000 1251976 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+== 0921_164127_s000
+frame 20  pillar: 17 dets 34.8 ms  voxel: 13 dets 56.7 ms
+frame 40  pillar: 19 dets 14.7 ms  voxel: 17 dets 52.4 ms
+frame 60  pillar: 18 dets 6.5 ms  voxel: 14 dets 28.9 ms
+frame 80  pillar: 15 dets 33.9 ms  voxel: 13 dets 65.6 ms
+frame 100  pillar: 20 dets 44.9 ms  voxel: 14 dets 121.0 ms
+frame 120  pillar: 19 dets 6.4 ms  voxel: 13 dets 12.8 ms
+frame 140  pillar: 18 dets 6.4 ms  voxel: 14 dets 25.3 ms
+frame 160  pillar: 19 dets 36.5 ms  voxel: 13 dets 36.9 ms
+frame 180  pillar: 14 dets 15.4 ms  voxel: 16 dets 58.5 ms
+frame 200  pillar: 19 dets 81.0 ms  voxel: 14 dets 23.3 ms
+frame 220  pillar: 14 dets 87.2 ms  voxel: 16 dets 74.4 ms
+frame 240  pillar: 19 dets 6.9 ms  voxel: 17 dets 14.6 ms
+frame 260  pillar: 15 dets 27.1 ms  voxel: 14 dets 28.7 ms
+frame 280  pillar: 15 dets 8.1 ms  voxel: 13 dets 16.1 ms
+[pillar] 288 frames, network 18.8 ms (median)
+[voxel] 288 frames, network 31.3 ms (median)
+== 0921_164127_s001
+frame 20  pillar: 18 dets 88.4 ms  voxel: 15 dets 102.7 ms
+frame 40  pillar: 19 dets 49.5 ms  voxel: 14 dets 80.4 ms
+frame 60  pillar: 22 dets 22.9 ms  voxel: 15 dets 70.8 ms
+frame 80  pillar: 14 dets 7.5 ms  voxel: 13 dets 31.1 ms
+frame 100  pillar: 20 dets 44.0 ms  voxel: 16 dets 76.1 ms
+frame 120  pillar: 18 dets 18.8 ms  voxel: 19 dets 13.9 ms
+frame 140  pillar: 18 dets 103.7 ms  voxel: 16 dets 98.6 ms
+frame 160  pillar: 17 dets 35.0 ms  voxel: 14 dets 101.0 ms
+frame 180  pillar: 11 dets 21.0 ms  voxel: 16 dets 13.7 ms
+frame 200  pillar: 15 dets 11.2 ms  voxel: 14 dets 22.4 ms
+frame 220  pillar: 14 dets 13.3 ms  voxel: 15 dets 15.1 ms
+frame 240  pillar: 14 dets 6.9 ms  voxel: 12 dets 40.3 ms
+frame 260  pillar: 10 dets 72.9 ms  voxel: 11 dets 86.2 ms
+frame 280  pillar: 12 dets 48.6 ms  voxel: 9 dets 74.1 ms
+[pillar] 288 frames, network 22.3 ms (median)
+[voxel] 288 frames, network 23.4 ms (median)
+== 0921_164127_s002
+frame 20  pillar: 9 dets 7.7 ms  voxel: 8 dets 13.6 ms
+frame 40  pillar: 15 dets 29.8 ms  voxel: 12 dets 22.8 ms
+frame 60  pillar: 7 dets 9.4 ms  voxel: 5 dets 23.7 ms
+frame 80  pillar: 11 dets 23.1 ms  voxel: 8 dets 64.2 ms
+frame 100  pillar: 8 dets 41.9 ms  voxel: 8 dets 28.1 ms
+frame 120  pillar: 13 dets 17.8 ms  voxel: 7 dets 36.0 ms
+frame 140  pillar: 11 dets 9.1 ms  voxel: 11 dets 47.7 ms
+frame 160  pillar: 10 dets 26.4 ms  voxel: 8 dets 38.3 ms
+frame 180  pillar: 9 dets 55.9 ms  voxel: 8 dets 90.9 ms
+frame 200  pillar: 3 dets 7.6 ms  voxel: 7 dets 13.6 ms
+frame 220  pillar: 6 dets 55.0 ms  voxel: 5 dets 47.9 ms
+frame 240  pillar: 6 dets 16.1 ms  voxel: 6 dets 14.3 ms
+frame 260  pillar: 3 dets 62.7 ms  voxel: 3 dets 13.7 ms
+frame 280  pillar: 8 dets 8.4 ms  voxel: 5 dets 17.3 ms
+[pillar] 288 frames, network 21.2 ms (median)
+[voxel] 288 frames, network 28.4 ms (median)
+== 0921_164127_s003
+frame 20  pillar: 5 dets 31.8 ms  voxel: 4 dets 34.3 ms
+frame 40  pillar: 5 dets 37.6 ms  voxel: 2 dets 47.7 ms
+frame 60  pillar: 3 dets 22.7 ms  voxel: 2 dets 33.4 ms
+frame 80  pillar: 6 dets 55.0 ms  voxel: 3 dets 96.8 ms
+frame 100  pillar: 7 dets 45.0 ms  voxel: 6 dets 94.8 ms
+frame 120  pillar: 12 dets 87.9 ms  voxel: 2 dets 31.5 ms
+frame 140  pillar: 5 dets 7.0 ms  voxel: 4 dets 41.7 ms
+frame 160  pillar: 5 dets 15.2 ms  voxel: 4 dets 14.7 ms
+frame 180  pillar: 7 dets 98.0 ms  voxel: 3 dets 70.8 ms
+frame 200  pillar: 5 dets 7.4 ms  voxel: 3 dets 13.5 ms
+frame 220  pillar: 13 dets 6.7 ms  voxel: 7 dets 13.2 ms
+frame 240  pillar: 8 dets 14.2 ms  voxel: 8 dets 15.7 ms
+frame 260  pillar: 10 dets 34.3 ms  voxel: 8 dets 50.7 ms
+frame 280  pillar: 10 dets 96.4 ms  voxel: 8 dets 108.7 ms
+[pillar] 287 frames, network 18.7 ms (median)
+[voxel] 287 frames, network 29.6 ms (median)
+== 0921_164127_s004
+frame 20  pillar: 10 dets 7.6 ms  voxel: 5 dets 112.8 ms
+frame 40  pillar: 7 dets 39.5 ms  voxel: 5 dets 99.5 ms
+frame 60  pillar: 12 dets 43.8 ms  voxel: 5 dets 90.8 ms
+frame 80  pillar: 6 dets 13.7 ms  voxel: 4 dets 14.1 ms
+frame 100  pillar: 5 dets 6.9 ms  voxel: 3 dets 14.3 ms
+frame 120  pillar: 4 dets 36.3 ms  voxel: 2 dets 27.5 ms
+frame 140  pillar: 2 dets 10.6 ms  voxel: 1 dets 13.4 ms
+frame 160  pillar: 2 dets 10.2 ms  voxel: 1 dets 22.8 ms
+frame 180  pillar: 6 dets 61.6 ms  voxel: 4 dets 139.6 ms
+frame 200  pillar: 4 dets 7.2 ms  voxel: 3 dets 13.2 ms
+frame 220  pillar: 4 dets 6.4 ms  voxel: 6 dets 13.5 ms
+frame 240  pillar: 8 dets 6.4 ms  voxel: 2 dets 13.0 ms
+frame 260  pillar: 3 dets 11.2 ms  voxel: 1 dets 29.6 ms
+frame 280  pillar: 2 dets 7.0 ms  voxel: 0 dets 13.1 ms
+[pillar] 288 frames, network 16.3 ms (median)
+[voxel] 288 frames, network 26.0 ms (median)
+== 0921_164127_s005
+frame 20  pillar: 2 dets 7.7 ms  voxel: 0 dets 14.0 ms
+frame 40  pillar: 4 dets 14.4 ms  voxel: 0 dets 13.9 ms
+frame 60  pillar: 3 dets 107.7 ms  voxel: 0 dets 66.8 ms
+frame 80  pillar: 4 dets 17.6 ms  voxel: 1 dets 107.1 ms
+frame 100  pillar: 4 dets 19.6 ms  voxel: 1 dets 32.7 ms
+frame 120  pillar: 4 dets 12.8 ms  voxel: 0 dets 100.5 ms
+frame 140  pillar: 2 dets 10.1 ms  voxel: 0 dets 62.2 ms
+frame 160  pillar: 4 dets 8.6 ms  voxel: 1 dets 28.5 ms
+frame 180  pillar: 4 dets 10.9 ms  voxel: 1 dets 14.8 ms
+frame 200  pillar: 4 dets 6.3 ms  voxel: 0 dets 12.7 ms
+frame 220  pillar: 4 dets 12.7 ms  voxel: 1 dets 13.3 ms
+frame 240  pillar: 4 dets 7.4 ms  voxel: 1 dets 18.6 ms
+frame 260  pillar: 4 dets 23.9 ms  voxel: 1 dets 26.7 ms
+frame 280  pillar: 4 dets 22.3 ms  voxel: 1 dets 69.2 ms
+[pillar] 288 frames, network 16.8 ms (median)
+[voxel] 288 frames, network 24.3 ms (median)
+== 0921_165659_s003
+frame 20  pillar: 4 dets 33.6 ms  voxel: 1 dets 15.3 ms
+frame 40  pillar: 5 dets 79.9 ms  voxel: 2 dets 71.9 ms
+frame 60  pillar: 2 dets 46.0 ms  voxel: 2 dets 101.6 ms
+frame 80  pillar: 7 dets 26.0 ms  voxel: 1 dets 19.0 ms
+frame 100  pillar: 4 dets 11.6 ms  voxel: 1 dets 21.7 ms
+frame 120  pillar: 5 dets 18.5 ms  voxel: 3 dets 37.3 ms
+frame 140  pillar: 6 dets 7.4 ms  voxel: 2 dets 13.3 ms
+frame 160  pillar: 5 dets 44.2 ms  voxel: 2 dets 109.2 ms
+frame 180  pillar: 2 dets 40.2 ms  voxel: 1 dets 30.6 ms
+frame 200  pillar: 3 dets 7.2 ms  voxel: 2 dets 13.2 ms
+frame 220  pillar: 5 dets 7.4 ms  voxel: 1 dets 27.1 ms
+frame 240  pillar: 3 dets 19.1 ms  voxel: 2 dets 29.7 ms
+frame 260  pillar: 2 dets 90.2 ms  voxel: 1 dets 69.8 ms
+[pillar] 276 frames, network 19.3 ms (median)
+[voxel] 276 frames, network 25.4 ms (median)
+== 0921_165659_s004
+frame 20  pillar: 2 dets 7.3 ms  voxel: 0 dets 13.5 ms
+frame 40  pillar: 1 dets 62.9 ms  voxel: 0 dets 32.0 ms
+frame 60  pillar: 1 dets 100.5 ms  voxel: 0 dets 75.8 ms
+frame 80  pillar: 2 dets 7.2 ms  voxel: 0 dets 13.8 ms
+frame 100  pillar: 4 dets 75.9 ms  voxel: 0 dets 35.9 ms
+frame 120  pillar: 1 dets 30.3 ms  voxel: 1 dets 14.5 ms
+frame 140  pillar: 0 dets 10.4 ms  voxel: 0 dets 21.7 ms
+frame 160  pillar: 0 dets 34.4 ms  voxel: 0 dets 35.4 ms
+frame 180  pillar: 3 dets 7.1 ms  voxel: 0 dets 38.3 ms
+frame 200  pillar: 4 dets 15.1 ms  voxel: 1 dets 33.3 ms
+frame 220  pillar: 1 dets 7.7 ms  voxel: 0 dets 13.7 ms
+frame 240  pillar: 3 dets 41.4 ms  voxel: 0 dets 119.0 ms
+frame 260  pillar: 3 dets 42.0 ms  voxel: 0 dets 43.7 ms
+[pillar] 276 frames, network 20.0 ms (median)
+[voxel] 276 frames, network 27.2 ms (median)
+== 0921_165659_s005
+frame 20  pillar: 2 dets 7.9 ms  voxel: 3 dets 29.4 ms
+frame 40  pillar: 3 dets 13.0 ms  voxel: 5 dets 13.4 ms
+frame 60  pillar: 6 dets 55.4 ms  voxel: 2 dets 72.1 ms
+frame 80  pillar: 3 dets 11.8 ms  voxel: 3 dets 22.5 ms
+frame 100  pillar: 5 dets 8.1 ms  voxel: 2 dets 13.9 ms
+frame 120  pillar: 3 dets 24.9 ms  voxel: 2 dets 18.1 ms
+frame 140  pillar: 4 dets 17.6 ms  voxel: 2 dets 33.8 ms
+frame 160  pillar: 5 dets 72.5 ms  voxel: 1 dets 115.9 ms
+frame 180  pillar: 2 dets 15.3 ms  voxel: 2 dets 32.1 ms
+frame 200  pillar: 4 dets 20.9 ms  voxel: 3 dets 26.7 ms
+frame 220  pillar: 6 dets 24.3 ms  voxel: 3 dets 18.6 ms
+frame 240  pillar: 4 dets 7.7 ms  voxel: 3 dets 17.2 ms
+frame 260  pillar: 4 dets 16.6 ms  voxel: 2 dets 15.3 ms
+frame 280  pillar: 4 dets 7.6 ms  voxel: 4 dets 13.9 ms
+frame 300  pillar: 5 dets 7.4 ms  voxel: 6 dets 14.6 ms
+[pillar] 303 frames, network 18.7 ms (median)
+[voxel] 303 frames, network 25.0 ms (median)
+== 0921_165659_s006
+frame 20  pillar: 3 dets 50.0 ms  voxel: 3 dets 44.8 ms
+frame 40  pillar: 3 dets 50.2 ms  voxel: 4 dets 13.6 ms
+frame 60  pillar: 7 dets 102.6 ms  voxel: 4 dets 91.0 ms
+frame 80  pillar: 5 dets 28.4 ms  voxel: 4 dets 13.4 ms
+frame 100  pillar: 7 dets 6.9 ms  voxel: 5 dets 14.2 ms
+frame 120  pillar: 5 dets 17.1 ms  voxel: 4 dets 36.8 ms
+frame 140  pillar: 7 dets 6.9 ms  voxel: 4 dets 17.9 ms
+frame 160  pillar: 5 dets 10.7 ms  voxel: 3 dets 13.5 ms
+frame 180  pillar: 5 dets 44.9 ms  voxel: 3 dets 23.1 ms
+frame 200  pillar: 7 dets 7.2 ms  voxel: 4 dets 83.8 ms
+frame 220  pillar: 5 dets 16.1 ms  voxel: 3 dets 39.5 ms
+frame 240  pillar: 7 dets 46.1 ms  voxel: 5 dets 74.6 ms
+frame 260  pillar: 8 dets 47.2 ms  voxel: 6 dets 85.4 ms
+frame 280  pillar: 7 dets 43.9 ms  voxel: 5 dets 65.8 ms
+frame 300  pillar: 6 dets 7.5 ms  voxel: 4 dets 22.6 ms
+[pillar] 302 frames, network 20.0 ms (median)
+[voxel] 302 frames, network 26.1 ms (median)
