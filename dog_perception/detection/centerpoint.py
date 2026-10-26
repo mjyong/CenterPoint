@@ -186,6 +186,7 @@ class CenterPointDetector:
         r = np.asarray(vg.range, np.float64)
         self._mirror = bool(np.allclose(r[0], -r[3]) and np.allclose(r[1], -r[4]))   # grid symmetric in x, y
         self.last_timing = {}
+        self.last_raw = None
 
     # ------------------------------------------------------------------ input
     def _crop(self, points_det):
@@ -261,6 +262,7 @@ class CenterPointDetector:
         t0 = time.perf_counter()
         pts = self.frame.points_to_model(self._crop(points_det))
         if len(pts) == 0:
+            self.last_raw = Detections(stamp=stamp)
             return Detections(stamp=stamp)
         example = self.build_example(pts)
         self.net.test_cfg.double_flip = self.tta
@@ -272,6 +274,7 @@ class CenterPointDetector:
         dets = self.postprocess(out["box3d_lidar"].float().cpu().numpy(), out["scores"].float().cpu().numpy(),
                                 out["label_preds"].cpu().numpy(), stamp)
         self.last_raw_count = len(dets)
+        self.last_raw = dets                       # before the geometric filters (run_sequence.py --save-raw)
         if self.filter_cfg is not None:
             dets = filter_detections(dets, points_det, self.filter_cfg)
         t3 = time.perf_counter()

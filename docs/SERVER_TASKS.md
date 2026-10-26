@@ -90,19 +90,19 @@
 | T13 | 雷达后方盲区：量出盲区，看各模型在盲区边上是不是误检更多 | Agent | T7 | 10 分钟 | 完成（盲区 142°–218°；v1 Pillar 在 10–40 m 边上算明显） |
 | T14 | 双教师（nuScenes Voxel + TTA、nuScenes Pillar + TTA）重新自动标注 0921，补进审过的训练标签（不丢 H1） | Agent | T7 | 1 小时 | 完成（双教师标注 T16 接着用；labels_merged.pkl 不再用） |
 | T15 | 用 v2 数据集训练 v2；定上线用哪个 Pillar、教师换不换 | Agent | T17 | 3.5 小时 | 待做 |
-| T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单 | Agent | T15、工具 | 30 分钟 | 计划（命令等工具做好再写） |
-| H4 | 在 Foxglove 里看基线，按问题清单归类典型问题 | 人 | T18 | 1 小时 | 计划 |
-| T19 | 后处理扫参（上报阈值、低分门槛、最少点数、离地 / 下沉、跨类 NMS） | Agent | T18 | 30 分钟 | 计划 |
-| T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 计划 |
-| T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 计划 |
-| T22 | 定版：参数改成默认值，从原始扫描完整跑验证场景，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 计划 |
-| H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 计划 |
+| T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 待做 |
+| H4 | 在 Foxglove 里看基线，按问题清单归类典型问题 | 人 | T18 | 1 小时 | 待做 |
+| T19 | 后处理扫参（上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉） | Agent | T18 | 30 分钟 | 待做 |
+| T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 待做 |
+| T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 待做 |
+| T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 待做（等我改代码） |
+| H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
 - 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
 - v0 只用未审核的自动标注，主要作用是把 GPU 训练流程跑通、得到一个基线，**不上线**。要上线的是 v1。
-- 2026-10-26 加：后处理、跟踪、预测的调试 T18 → H4 → T19 → T20 → T21 → T22 → H5，计划和指标见 [PIPELINE_TUNING.md](PIPELINE_TUNING.md)。T18 要等两件事：T15 定出上线的 Pillar，`tools/dog/pipeline_eval.py` 做好（和 T15 同时做）。后半段都在 CPU 上跑，不占 GPU。
+- 2026-10-26 加：后处理、跟踪、预测的调试 T18 → H4 → T19 → T20 → T21 → T22 → H5，计划和指标见 [PIPELINE_TUNING.md](PIPELINE_TUNING.md)。工具 `tools/dog/pipeline_eval.py` 已经做好，T18 只等 T15 定出上线的 Pillar。除了 T18、T22 各有一步 Pillar 推理，都在 CPU 上跑，不占 GPU。
 - 2026-10-26 起的顺序：T16 → H3 → T17 → T15。T12 等 T15：v2 当教师不比两个 nuScenes 教师好，教师就不换，T12 不做。H3 改成审双教师的训练、验证数据（人决定）。验证集不加 v1 候选，和训练集一样只审两个教师的框。
 - T11 → T11b → H3 → T12（2026-10-24 加，T11b 是 10-25 加的）：验证标签是审教师的框得来的，教师漏掉的车不在里面，评哪个模型都偏向教师（T7 复核）。先把其他模型多检出的东西让人判一遍，再重评、选下一轮的教师（[DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md) 第 1 节）。和 T8、T9 不冲突，可以同时做；T9 用哪个教师，等 T12 的结论更好。
 
@@ -1958,3 +1958,277 @@ v2_voxel − v1_voxel、v2_pp − v1_pp、v2_pp − nusc_pp、v2_voxel_tta − t
 
 （待填）
 
+
+---
+
+## T18 后处理、跟踪、预测的基线
+
+计划、指标和可视化见 [PIPELINE_TUNING.md](PIPELINE_TUNING.md)。这一步不改参数，用默认参数做出六份报告：
+
+| 名字 | 场景 | 检测 | 用来 |
+|---|---|---|---|
+| `deploy` | 验证 10 个 | 上线的 Pillar（T15 定），过滤前的检测在这里重新过滤 | **基线**，带 Foxglove MCAP。后面调参的 A 组 |
+| `other` | 验证 | 另一个 Pillar 候选（存好的结果） | 检测模型对跟踪的影响 |
+| `teacher` | 验证 | nuScenes Voxel + TTA 教师 | 检测强很多时，跟踪能到哪 |
+| `oracle_val` | 验证 | 10 Hz 标签当检测 | 跟踪、预测本身的上限 |
+| `nusc_pp_train` | 训练 25 个 | nuScenes Pillar（没见过这些场景），过滤前的检测 | 调参的 B 组：防止调到验证集的偶然上去 |
+| `oracle_train` | 训练 | 10 Hz 标签当检测 | 预测样本多一些（T21） |
+
+```text
+任务 T18：用默认参数做后处理、跟踪、预测的基线：六份报告、验证场景的 Foxglove MCAP、问题清单。
+先按 docs/SERVER_TASKS.md 的"通用约定"做（拉到了代码改动，跑快速测试）。前置：T15 完成，结论里写了上线用哪个 Pillar。
+GPU 只在第 2 步用（Pillar 不加 TTA，每个进程约 3 GB）；其余都是 CPU。
+
+0. 通用约定 6 的链接循环里加上 tune 目录（照约定 6 先链到公共盘）。
+     mkdir -p data/reports/T18; TASK=T18
+     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); TRAIN=$(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT)
+   按 T15 第 7 步的结论设上线的 Pillar：
+     换成了 v2_pp：PP=data/train/dog_pp_veh_v2/epoch_<E_v2_pp>.pth; OTHER=data/runs_veh_v1
+     留 v1_pp：    PP=data/train/dog_pp_veh_v1/epoch_20.pth;        OTHER=data/runs_veh_v2
+1. 验证场景的 10 Hz 标签（只画图和 oracle 用，不算 AP），照 T17 第 2 步的 propagate：
+     for r in $VAL; do
+       echo "== $r"
+       python tools/dog/sustechpoints_convert.py propagate --full data/labels_dual/$r/labels.pkl \
+           --keyframes data/labels/$r/labels_sustech2.pkl --out data/labels/$r/labels_full2.pkl
+     done 2>&1 | tee data/reports/T18/propagate_val.txt
+2. 重放，存过滤之前的检测（--save-raw），各约 2–5 分钟：
+     python tools/dog/run_sequence.py --replay $(for r in $VAL; do echo data/runs/$r; done) --detectors pillar \
+         --ckpt-pillar $PP --save-raw --no-predict --no-mcap --jobs 4 --device cuda:0 --out "data/tune/deploy/{scene}"
+     python tools/dog/run_sequence.py --replay $(for r in $TRAIN; do echo data/runs/$r; done) --detectors pillar \
+         --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --save-raw --no-predict --no-mcap --jobs 4 --device cuda:0 \
+         --out "data/tune/nusc_pp_train/{scene}"
+3. 评估。先定义（后面的任务也用）：
+     ev() {  # ev <名字> "<场景>" <results 路径> [pipeline_eval.py 的其他参数]；输出在 data/reports/$TASK/<名字>/
+       local name=$1 scenes=$2 res=$3 t0=$SECONDS; shift 3
+       python tools/dog/pipeline_eval.py --scenes $scenes --results "$res" \
+           --labels "data/labels/{scene}/labels_sustech2.pkl" --jobs 8 --out data/reports/$TASK/$name "$@" \
+           > data/reports/$TASK/$name.log 2>&1 || echo "FAILED: $name (data/reports/$TASK/$name.log)"
+       echo "$name: $((SECONDS - t0)) s"
+     }
+   然后：
+     ev deploy "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections raw \
+         --dense-labels "data/labels/{scene}/labels_full2.pkl" --frames "data/runs/{scene}/frames" --mcap-dir data/tune/T18_mcap
+     ev other "$VAL" "$OTHER/{scene}/pillar/results.pkl" --no-mcap
+     ev teacher "$VAL" "data/runs/{scene}/voxel/results.pkl" --no-mcap
+     ev oracle_val "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections labels \
+         --dense-labels "data/labels/{scene}/labels_full2.pkl" --no-mcap
+     ev nusc_pp_train "$TRAIN" "data/tune/nusc_pp_train/{scene}/pillar/results.pkl" --detections raw --no-mcap
+     ev oracle_train "$TRAIN" "data/tune/nusc_pp_train/{scene}/pillar/results.pkl" --detections labels \
+         --dense-labels "data/labels/{scene}/labels_train2.pkl" --no-mcap
+4. 汇总：
+     for n in deploy other teacher oracle_val nusc_pp_train oracle_train; do
+       echo "== $n"; sed -n '/^## Main metrics/,/^## Detections/p' data/reports/T18/$n/report.md | grep '^|'
+     done | tee data/reports/T18/summary.md
+     ls -la data/tune/T18_mcap; du -sh data/tune/T18_mcap
+
+停止条件：任何报错；第 1 步某个场景传播后留下的帧少于原来的 90%（pose_bad 的帧不算，见 T17）；
+某份报告开头"Label tracks stitched into one vehicle"超过 40（拼得太多，可能拼错）。
+提交：data/reports/T18/（MCAP 不在里面）、验证场景新生成的 data/labels/0921_*/labels_full2.pkl、本文档。
+报告（写进"T18 结果"）：
+- 上线的是哪个 Pillar（PP）；
+- summary.md 里六份报告的主要指标，并排成一张表（行是指标，列是六个名字）；
+- deploy 报告里的几张表：检测、跟踪、"Where the errors are"（含盲区三个区）、运动状态、预测（moving 那张）、预警、耗时；
+- deploy 的 issues 各类条数，和每类最严重的 3 条（场景、秒数、说明）；
+- 拼接数；MCAP 目录和总大小；第 3 步每条的耗时。
+```
+
+### T18 结果
+
+（待填）
+
+---
+
+## H4 在 Foxglove 里看基线（人做）
+
+T18 之后，把 `data/tune/T18_mcap/` 拷到本机，用 Foxglove 打开，Layout → Import from file 选同目录的 `foxglove_layout.json`。
+
+- 先看 `data/reports/T18/deploy/report.md` 的主要指标，再按 `issues.csv` 逐条看：t 列是场景开始后的秒数，拖到那里。
+- 3D 面板里可以开关的话题见 PIPELINE_TUNING.md 第 3 节。看问题时有用的几个：
+  - `/det/filtered`（默认关）：被过滤掉的检测和原因；
+  - `/det/low_score`（默认关）：只给跟踪用的低分检测；
+  - `/blind`：盲区扇形。
+- 每类问题记几条典型的（场景、秒数、看到了什么），归到下面几类，写进"H4 结果"：
+
+| 类 | 例子 |
+|---|---|
+| ID 切换 | 两辆车交错、长货车一车两框、遮挡后换了号 |
+| 盲区 | 车进出盲区时丢了、盲区边上的杂物成了轨迹 |
+| 假轨迹 | 墙角、集装箱、货堆；检测框本身就有（看 `/det/boxes`）还是跟踪 coast 出来的 |
+| 漏了 / 确认慢 | 远处点少、被挡、刚出现 |
+| 运动误判 | 停着的车被报成在动（框在漂？速度头？），动的车报晚了 |
+| 预测偏 | 转弯、加减速、掉头；方向反了 |
+
+这些归类决定 D2 改什么代码。
+
+### H4 结果
+
+（待填）
+
+---
+
+## T19 后处理扫参
+
+扫上报阈值和三道几何过滤。A 组（验证场景、上线 Pillar）定参数，B 组（训练场景、nuScenes Pillar）检查不变差。每组参数的第 1 行是现在的默认值（参考）。
+
+```text
+任务 T19：扫后处理参数，定车辆的上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉上限。
+先按通用约定做。前置：T18 完成。不用 GPU。
+
+0. mkdir -p data/reports/T19; TASK=T19; VAL、TRAIN 和 ev 同 T18 第 0、3 步；BASE=""
+   A() { local n=$1; shift; ev ${n}_A "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections raw --no-mcap $BASE "$@"; }
+   B() { local n=$1; shift; ev ${n}_B "$TRAIN" "data/tune/nusc_pp_train/{scene}/pillar/results.pkl" --detections raw --no-mcap $BASE "$@"; }
+   每组都跑 A、B 两次，结果在 data/reports/T19/<组>_A/sweep.md、<组>_B/sweep.md。
+1. 上报阈值（也是新建轨迹的阈值）：
+     A score --set tracker.high_score=0.35,0.2,0.25,0.3,0.4,0.45;  B score --set tracker.high_score=0.35,0.2,0.25,0.3,0.4,0.45
+2. 轨迹输出分数、低分门槛：
+     A output --set tracker.output_min_score=0.3,0.2,0.25,0.35 --set tracker.low_score=0.1,0.15,0.2
+     B output（同上）
+3. 当前帧最少点数：
+     A points --set filter.min_points.vehicle=5,3,8,12;  B points（同上）
+4. 离地 / 下沉上限：
+     A ground --set filter.max_float=0.7,0.5,1.0 --set filter.max_sink=1.2,0.8,1.6;  B ground（同上）
+   每组定下来以后，把选中的值加进 BASE（例如 BASE="$BASE --set tracker.high_score=0.3"），再跑下一组。
+   第 1 组定了 high_score，第 2 组起都带着它。
+
+怎么选（每组单独定；看 sweep.md 的两张表，第二张是和第 1 行的差，括号里是重抽里这一行更好的比例）：
+- 第 1、2 组：主指标 det recall（30 m 内）。在 A 上同时满足下面几条的行里，选 det recall 最高的：
+  a. det recall 的领先比例 ≥ 90%；
+  b. false tracks / min 不超过第 1 行的 1.1 倍；
+  c. false moving / h 不超过第 1 行。
+  B 上这一行的 det recall 也不能低于第 1 行，b、c 两条也要满足。
+- 第 3、4 组：同上，b 换成"det FP / frame 不超过第 1 行的 1.1 倍"。
+- 没有满足的行：这组留默认值（第 1 行）。
+停止条件：任何报错。
+提交：data/reports/T19/、本文档。
+报告（写进"T19 结果"）：每组 A、B 两张 sweep.md 的表（贴原表）；每组选了哪一行、按哪条规则；最后的 BASE。
+```
+
+### T19 结果
+
+（待填）
+
+---
+
+## T20 跟踪扫参
+
+```text
+任务 T20：扫跟踪参数和运动状态的开关，定车辆的关联半径、coast 时间、确认帧数、观测噪声、运动状态阈值。
+先按通用约定做。前置：T19 完成。不用 GPU。
+
+0. mkdir -p data/reports/T20; TASK=T20; VAL、TRAIN、ev 同 T18；A、B 同 T19 第 0 步；BASE=T19 报告里最后的 BASE。
+1. 关联半径：             A gate --set tracker.vehicle.gate=3,2,2.5,4
+2. 最长 coast 时间：      A age --set tracker.vehicle.max_age=1.0,0.5,1.5,2.0
+3. 确认帧数、试探寿命：   A hits --set tracker.vehicle.min_hits=2,1,3 --set tracker.tentative_max_age=0.15,0.25
+4. 观测噪声：             A noise --set tracker.vehicle.pos_std=0.3,0.2,0.5 --set tracker.vehicle.vel_std=0.8,0.5,1.5
+5. 速度头、匹配方法：     A assoc --set tracker.use_velocity=true,false --set tracker.matching=greedy,hungarian
+6. 运动状态：             A motion --set tracker.motion_on_speed=0.7,0.5,1.0 --set tracker.motion_on_frames=3,2,5
+   每组 A、B 都跑（B 同样的参数），定下来的值加进 BASE 再跑下一组，和 T19 一样。
+
+怎么选：
+- 第 1–5 组：主指标 IDF1。在 A 上同时满足下面几条的行里，选 IDF1 最高的：
+  a. IDF1 的领先比例 ≥ 90%；
+  b. moving missed 不多于第 1 行；
+  c. confirm p90 不比第 1 行长 0.5 s 以上；
+  d. false tracks / min 不超过第 1 行的 1.1 倍。
+  B 上这一行的 IDF1 也不能低于第 1 行。
+- 第 6 组：先要 moving missed 在 A、B 上都不多于第 1 行；这些行里选 false moving / h 最低的，它对第 1 行的领先比例要 ≥ 90%。
+- 没有满足的行：留默认值。
+停止条件：任何报错。
+提交：data/reports/T20/、本文档。
+报告（写进"T20 结果"）：每组 A、B 的 sweep.md 表；每组选了哪一行、按哪条规则；最后的 BASE；
+用最后的 BASE 在 A 上出一份完整报告（ev final_A "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections raw
+--no-mcap $BASE），贴主要指标，和 T18 的 deploy 并排。
+```
+
+### T20 结果
+
+（待填）
+
+---
+
+## T21 预测
+
+IMM（现在在线用的）和匀速（CV）比，再调 IMM 的模型。oracle（标签当检测）只看预测器本身；端到端（A 组）看整条流水线。预测样本少，oracle 用训练、验证两组一起看。
+
+```text
+任务 T21：比较 IMM 和匀速预测，扫 IMM 的运动模型和模式合并距离。
+先按通用约定做。前置：T20 完成（D2 的代码改动如果有，已经拉下来、T20 复测过）。不用 GPU。
+
+0. mkdir -p data/reports/T21; TASK=T21; VAL、TRAIN、ev 同 T18；A 同 T19；BASE=T20 报告里最后的 BASE。
+   OV() { local n=$1; shift; ev ${n}_oracle_val "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections labels \
+            --dense-labels "data/labels/{scene}/labels_full2.pkl" --no-mcap $BASE "$@"; }
+   OT() { local n=$1; shift; ev ${n}_oracle_train "$TRAIN" "data/tune/nusc_pp_train/{scene}/pillar/results.pkl" \
+            --detections labels --dense-labels "data/labels/{scene}/labels_train2.pkl" --no-mcap $BASE "$@"; }
+1. 现状（一组参数，出完整报告，看 Prediction 一节 IMM 和 CV 的表）：OV base; OT base; A base
+2. 运动模型（"cv:<过程噪声>+ct:<过程噪声>:<角速度噪声>"；最后一个只有匀速一个模型）：
+     M="tracker.vehicle.models=cv:1.5+ct:1.5:0.25,cv:1.0+ct:1.0:0.25,cv:2.5+ct:2.5:0.25,cv:1.5+ct:1.5:0.5,cv:1.5"
+     OV models --set "$M"; OT models --set "$M"; A models --set "$M"
+3. 模式合并距离：OV merge --set predict.merge_dist=0.25,0.5,1.0; OT merge（同上）; A merge（同上）
+
+怎么选：
+- 主指标 FDE 3 s（moving）。选的行要在 OT、OV、A 三份 sweep.md 里都比第 1 行低，并且至少两份领先比例 ≥ 90%；
+  MR 3 s 不比第 1 行高；A 上 IDF1 不比第 1 行低 0.01 以上（运动模型也影响跟踪）。
+- 没有满足的行：留默认值。
+- 另外记下第 1 步里 IMM 和 CV 谁好：CV 在三份报告里都不比 IMM 差，写进报告，D2 再看要不要改。
+停止条件：任何报错。
+提交：data/reports/T21/、本文档。
+报告（写进"T21 结果"）：第 1 步三份报告的 Prediction 表（moving、moving straight、moving turning）；第 2、3 步的 sweep.md 表；
+选了哪一行；最后的 BASE（T22 要用）。
+```
+
+### T21 结果
+
+（待填）
+
+---
+
+## T22 定版：参数改成默认值，从原始扫描完整跑一遍
+
+T21 之后，我把 T19–T21 选定的参数改成代码里的默认值（`DEFAULT_SCORE_THRESHOLDS`、`TrackerConfig`、`DetectionFilterConfig`、`IMMPredictor`），
+在这里写出旧默认值的 `configs.json`，推送后再做 T22。这一步不再是重放：
+- 从原始扫描起跑，前半段（读扫描、去畸变、拼帧）也在里面，和线上一样；
+- 新旧两组参数用同一份检测比。
+
+```text
+任务 T22：用新的默认参数，从原始扫描完整跑一遍验证场景，和旧默认参数比，出最终报告和 Foxglove MCAP。
+先按通用约定做（拉到了代码改动，跑快速测试）。前置：T21 完成，并且本节已经写好了 configs.json（我改完代码后补）。
+GPU：第 1 步，Pillar 一个进程约 3 GB。
+
+0. mkdir -p data/reports/T22; TASK=T22; VAL、ev、PP 同 T18。
+1. 从原始扫描跑（不加 --replay），存输入帧和过滤前的检测：
+     python tools/dog/run_sequence.py --seq $(for r in $VAL; do echo data/seq/$r; done) --detectors pillar \
+         --ckpt-pillar $PP --save-raw --save-frames --no-mcap --jobs 4 --device cuda:0 --out "data/tune/final/{scene}"
+2. 最终报告（新默认值，带 MCAP）：
+     ev final "$VAL" "data/tune/final/{scene}/pillar/results.pkl" --detections raw \
+         --dense-labels "data/labels/{scene}/labels_full2.pkl" --frames "data/tune/final/{scene}/frames" \
+         --mcap-dir data/tune/T22_mcap
+3. 新旧对比（同一份检测，配对重抽）：
+     ev compare "$VAL" "data/tune/final/{scene}/pillar/results.pkl" --detections raw --no-mcap \
+         --configs docs/pipeline_tuning/T22_configs.json
+4. 第 1 步每个场景的耗时（中位数；前半段 + 网络，不含跟踪和预测，那两项在 final 报告的 Timing 一节）：
+     for r in $VAL; do python -c "import pickle,numpy as np,sys; R=pickle.load(open(sys.argv[1],'rb'))[1:]; \
+         net=np.median([x['timings']['network_ms'] for x in R]); tot=np.median([sum(x['timings'].values()) for x in R]); \
+         print(sys.argv[1], 'network %.1f ms, preprocess + detector %.1f ms' % (net, tot))" \
+         data/tune/final/$r/pillar/results.pkl; done | tee data/reports/T22/timing.txt
+
+停止条件：任何报错；final 的主要指标比 T20 的 final_A 差很多（IDF1 低 0.05 以上），可能是重放和完整跑不一致，停下报告。
+提交：data/reports/T22/、本文档。
+报告（写进"T22 结果"）：final 报告的主要指标和各节的表；compare 的 sweep.md（第 1 行旧默认值，第 2 行新默认值）；
+和 T18 deploy 并排的主要指标；timing.txt；MCAP 目录和大小。
+```
+
+### T22 结果
+
+（待填）
+
+---
+
+## H5 看最终效果，定上线参数（人做）
+
+用 Foxglove 看 `data/tune/T22_mcap/`（同 H4），对照 T22 的报告，决定新参数是否上线。
+- 上线后，在 Orin 上用 ROS 2 节点录一段（T8、H2 之后），用同一个工具评：录制转成序列，跑 `run_sequence.py`，再跑 `pipeline_eval.py`。
+- 可控场景（DATA_COLLECTION_PLAN.md 3.2）采到并标好以后，用同样的命令评预警。
+
+### H5 结果
+
+（待填）

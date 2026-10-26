@@ -121,6 +121,7 @@ class MotAccumulator:
                 idtp = 0.0
             idfn, idfp = self.n_gt_obs[c] - idtp, self.n_trk_obs[c] - idtp
             r["IDF1"] = 2 * idtp / (2 * idtp + idfp + idfn) if (2 * idtp + idfp + idfn) > 0 else float("nan")
+            r["IDTP"] = idtp                            # IDF1 of several sequences: 2 sum(IDTP) / sum(GT + tracks)
             # trajectory-level
             seqs = [s for (cc, _), s in self.gt_status.items() if cc == c]
             frac = np.array([np.mean(s) for s in seqs]) if seqs else np.zeros(0)

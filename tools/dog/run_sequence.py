@@ -18,6 +18,9 @@ scans: ``--replay data/runs/<scene>`` feeds the saved detector inputs with the p
 results.pkl, which skips reading and preprocessing the scans (about 150 of the 480 ms per frame
 with two detectors on the server) and gives every model exactly the frames the training data was
 exported from. ``--no-predict`` skips the trajectory prediction nobody reads in an evaluation.
+``--save-raw`` adds, per frame, the detections before the geometric filters (``raw_detections``) and
+what the filters measure on them (``raw_measured``: box bottom above the ground, current-sweep points),
+for ``tools/dog/pipeline_eval.py --detections raw``.
 Several scenes go in one call (``--out`` with ``{scene}``), ``--jobs N`` runs N of them at once,
 each worker loading the detectors once:
 
@@ -35,6 +38,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.detection import DEFAULT_SCORE_THRESHOLDS  # noqa: E402
+from dog_perception.detection.filters import DetectionFilterConfig, filter_measurements  # noqa: E402
 from dog_perception.geometry import transform_points  # noqa: E402
 from dog_perception.io import SequenceReader, pose_bad  # noqa: E402
 from dog_perception.mcap_viz import McapViz  # noqa: E402
@@ -137,9 +141,14 @@ def run_scene(source, out, dets, args):
         for n in names:
             d = dets[n](frame.points, frame.stamp)
             res = run_back_half(pipes[n], frame, d)
-            results[n].append(dict(stamp=frame.stamp, T_world_det=frame.T_world_det, pose_bad=bad,
-                                   T_world_body=frame.T_world_body, detections=d, tracks=res[0],
-                                   predictions=res[1], timings=dict(frame.timings, **dets[n].last_timing)))
+            row = dict(stamp=frame.stamp, T_world_det=frame.T_world_det, pose_bad=bad,
+                       T_world_body=frame.T_world_body, detections=d, tracks=res[0],
+                       predictions=res[1], timings=dict(frame.timings, **dets[n].last_timing))
+            raw = getattr(dets[n], "last_raw", None) if getattr(args, "save_raw", False) else None
+            if raw is not None:
+                row.update(raw_detections=raw, raw_measured=filter_measurements(
+                    raw, frame.points, getattr(dets[n], "filter_cfg", None) or DetectionFilterConfig()))
+            results[n].append(row)
             logs[n].add(frame.stamp, res[0], frame.T_world_body, res[1])
             if n == names[0]:
                 shown = (d.above(DEFAULT_SCORE_THRESHOLDS), res[0])
@@ -204,6 +213,9 @@ def main():
     ap.add_argument("--odom-latency", type=float, default=0.0)
     ap.add_argument("--save-frames", action="store_true")
     ap.add_argument("--no-predict", action="store_true", help="skip the trajectory prediction (evaluation runs)")
+    ap.add_argument("--save-raw", action="store_true",
+                    help="also keep the detections before the geometric filters, with what the filters measure, "
+                         "so tools/dog/pipeline_eval.py can sweep the filter thresholds offline")
     ap.add_argument("--mcap", default=None,
                     help="Foxglove MCAP of the first detector (default: <out>/<scene>_<first>.mcap): "
                          "cloud, reported detections, tracks, pose")

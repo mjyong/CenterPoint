@@ -30,13 +30,9 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.detection.boxes import CLASSES  # noqa: E402
+from dog_perception.blind_sector import body_azimuth, in_intervals  # noqa: E402,F401
 
 CURRENT_SWEEP_LAG = 0.05
-
-
-def body_azimuth(xy):
-    """Degrees, 0 along body +y (forward), positive towards body +x."""
-    return np.degrees(np.arctan2(xy[..., 0], xy[..., 1]))
 
 
 def blind_sector(frames, every=10, min_range=1.0, empty_share=0.9):
@@ -67,15 +63,6 @@ def blind_sector(frames, every=10, min_range=1.0, empty_share=0.9):
     if len(out) > 1 and out[0][0] == -180.0 and out[-1][1] == 180.0:
         out = [(out[-1][0], out[0][1] + 360.0)] + out[1:-1]
     return out
-
-
-def in_intervals(az, intervals, pad=0.0):
-    a = np.asarray(az, float)
-    hit = np.zeros(a.shape, bool)
-    for lo, hi in intervals:
-        for shift in (-360.0, 0.0, 360.0):
-            hit |= (a + shift >= lo - pad) & (a + shift <= hi + pad)
-    return hit
 
 
 def main():

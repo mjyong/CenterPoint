@@ -75,3 +75,26 @@ def test_replay_scene_tracks_and_skips_prediction(tmp_path):
     assert len(last) == 1 and np.allclose(last[0].position[:2], [10.0, 2.0], atol=1e-6)   # one track, in place
     lines = rs.run_scene(str(run), str(tmp_path / "out2"), {"pillar": det}, _args())
     assert any(len(r["predictions"]) for r in pickle.load(open(tmp_path / "out2" / "pillar" / "results.pkl", "rb")))
+
+
+class RawDetector(FakeDetector):
+    """Also keeps a box floating 2 m up as its unfiltered output, like CenterPointDetector.last_raw."""
+
+    def __call__(self, points, stamp):
+        d = super().__call__(points, stamp)
+        self.last_raw = Detections.concat([d, Detections(np.array([[3.0, 3.0, 3.0, 4.5, 1.9, 1.6, 0.0]]), np.zeros((1, 2)),
+                                                         np.array([0.5]), np.array([0], dtype=np.int64))])
+        return d
+
+
+def test_save_raw_keeps_the_unfiltered_detections(tmp_path):
+    run, rows = _run_dir(tmp_path)
+    det = RawDetector()
+    det.T = {round(r["stamp"], 6): r["T_world_det"] for r in rows}
+    rs.run_scene(str(run), str(tmp_path / "out"), {"pillar": det}, _args(no_predict=True, save_raw=True))
+    res = pickle.load(open(tmp_path / "out" / "pillar" / "results.pkl", "rb"))
+    bottom, counts = res[0]["raw_measured"]
+    assert len(res[0]["raw_detections"]) == 2 and len(res[0]["detections"]) == 1
+    assert bottom.shape == (2,) and counts.shape == (2,) and bottom[1] > 1.5
+    rs.run_scene(str(run), str(tmp_path / "out2"), {"pillar": det}, _args(no_predict=True))
+    assert "raw_detections" not in pickle.load(open(tmp_path / "out2" / "pillar" / "results.pkl", "rb"))[0]

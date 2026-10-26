@@ -206,7 +206,7 @@ postprocess 输出 `boxes (84, 7) f64`、`velocities (84, 2) f64`，D 系，yaw 
 
 ## 8. 第八到十步：filter_detections（84 → 55）
 
-这三道过滤对所有分数一视同仁，去掉几何上不可能的框（`filters.py`）。
+这三道过滤对所有分数一视同仁，去掉几何上不可能的框（`filters.py`）。`filter_reasons` 给出每个框被去掉的原因（floating / sunk / few points / duplicate），`tools/dog/pipeline_eval.py` 用它在 Foxglove 的 `/det/filtered` 上标出来，也用它离线扫这三道过滤的阈值（[PIPELINE_TUNING.md](PIPELINE_TUNING.md)）。
 
 **⑧ 地面支撑（84 → 81）**
 

@@ -27,6 +27,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+from dog_perception.clip_viz import bev_figure  # noqa: E402
 from dog_perception.detection import DEFAULT_SCORE_THRESHOLDS, PRESET_CONFIGS, build_detector  # noqa: E402
 from dog_perception.detection.boxes import CLASSES, score_threshold_array  # noqa: E402
 from dog_perception.detection.centerpoint import checkpoint_arch  # noqa: E402
@@ -266,88 +267,6 @@ def run_scene(scene, si, det, tracker, predictor, acc, store, args, timer):
         store["mcap"].append((writer.path, writer.messages, os.path.getsize(writer.path)))
     store["frames"] += n_frames
     store["keyframes"] += sum(1 for s in scene.selected[:n_frames] if s["is_key_frame"])
-
-
-def bev_figure(snap, path, extent=40.0):
-    """Static bird's-eye view of one keyframe for the report (light surface)."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
-    from matplotlib.patches import Patch, Polygon
-
-    from dog_perception.foxglove import box_corners
-
-    INK, INK2, MUTED, GRID, SURF = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#fcfcfb"
-    CLS = {0: "#2a78d6", 1: "#eb6834", 2: "#eda100"}
-    STATUS = {"tracked": "#0ca30c", "missed": "#d03b3b", "ignored": "#c3c2b7"}
-    T = snap["T_global_ego"]
-    R, o = T[:2, :2], T[:2, 3]
-
-    def P(xy):                                   # map -> ego frame rotated so the heading points up
-        e = (np.asarray(xy)[..., :2] - o) @ R
-        return np.stack([-e[..., 1], e[..., 0]], axis=-1)
-
-    fig, ax = plt.subplots(figsize=(9, 9), facecolor=SURF)
-    ax.set_facecolor(SURF)
-    pts = P(snap["lidar"])
-    m = (np.abs(pts) < extent).all(1)
-    ax.scatter(pts[m, 0], pts[m, 1], s=0.3, c="#c3c2b7", linewidths=0, rasterized=True, zorder=1)
-    for it in snap["gt"]:
-        c = P(box_corners(it["box"])[:4])
-        if not (np.abs(c) < extent).all():
-            continue
-        st = it["status"]
-        ax.add_patch(Polygon(c, closed=True, fill=False, ec=STATUS.get(st, MUTED), lw=1.6 if st != "ignored" else 0.8,
-                             zorder=4))
-        if st == "missed":
-            ax.text(c[:, 0].mean(), c[:, 1].max() + 0.6, "FN", color=STATUS["missed"], fontsize=7, ha="center",
-                    zorder=6)
-        if st != "ignored" and it.get("future") is not None and len(it["future"]) > 1:
-            f = P(it["future"])
-            ax.plot(f[:, 0], f[:, 1], ls=(0, (3, 2)), color=INK, lw=0.9, zorder=3)
-    for s in snap["tracks"]:
-        c = P(box_corners(np.r_[s.position, s.size, s.yaw])[:4])
-        if not (np.abs(c) < extent).all():
-            continue
-        col = CLS.get(int(s.label), MUTED)
-        ax.add_patch(Polygon(c, closed=True, fc=col, ec=col, alpha=0.35 if s.coasting else 0.55, lw=0.8, zorder=5))
-        ax.text(c[:, 0].max() + 0.3, c[:, 1].mean(), "T%d" % s.track_id, color=INK2, fontsize=6.5, zorder=7)
-    labels = {s.track_id: int(s.label) for s in snap["tracks"]}
-    start = {s.track_id: s.position[:2] for s in snap["tracks"]}
-    for p in snap["preds"]:
-        if p.track_id not in start or not (np.abs(P(start[p.track_id])) < extent).all():
-            continue
-        for k in np.argsort(-p.probs)[:2]:
-            xy = P(np.vstack([start[p.track_id], p.modes[k]]))
-            ax.plot(xy[:, 0], xy[:, 1], color=CLS.get(labels[p.track_id], MUTED), lw=1.6,
-                    alpha=0.25 + 0.75 * float(p.probs[k]), zorder=6)
-    ego = np.array([[-0.865, -1.0], [0.865, -1.0], [0.865, 3.1], [-0.865, 3.1]])      # rear axle at the origin
-    ax.add_patch(Polygon(ego, closed=True, fc=INK2, ec=INK2, zorder=8))
-    ax.set_xlim(-extent, extent)
-    ax.set_ylim(-extent, extent)
-    ax.set_aspect("equal")
-    ax.grid(color=GRID, lw=0.5)
-    ax.tick_params(colors=MUTED, labelsize=8)
-    for sp in ax.spines.values():
-        sp.set_color(GRID)
-    ax.set_xlabel("right [m]", color=MUTED, fontsize=9)
-    ax.set_ylabel("forward [m]", color=MUTED, fontsize=9)
-    mt = snap.get("metrics") or {}
-    ax.set_title("%s  t=%.1f s  |  GT %s, tracked %s, missed %s, false tracks %s, ID switches %s" % (
-        snap["scene"], snap["t"] - snap.get("t0", snap["t"]), mt.get("gt", "-"), mt.get("trk_tp", "-"),
-        mt.get("trk_fn", "-"), mt.get("trk_fp", "-"), mt.get("idsw", "-")), color=INK, fontsize=10, loc="left")
-    handles = [Line2D([], [], color=STATUS["tracked"], lw=1.6, label="GT, tracked"),
-               Line2D([], [], color=STATUS["missed"], lw=1.6, label="GT, missed (FN)"),
-               Line2D([], [], color=STATUS["ignored"], lw=0.8, label="GT, not evaluated"),
-               Line2D([], [], color=INK, lw=0.9, ls=(0, (3, 2)), label="GT future 3 s")]
-    handles += [Patch(fc=CLS[c], alpha=0.55, label="track: %s" % n) for c, n in enumerate(CLASSES)]
-    handles += [Line2D([], [], color=INK2, lw=1.6, label="predicted modes (opacity = prob.)")]
-    ax.legend(handles=handles, loc="upper left", fontsize=7.5, frameon=True, facecolor=SURF, edgecolor=GRID,
-              labelcolor=INK2)
-    fig.tight_layout()
-    fig.savefig(path, dpi=120, facecolor=SURF)
-    plt.close(fig)
 
 
 FP_CAUSES = ("second track on a tracked object (< 1 m from its track)", "next to a tracked object of its class",

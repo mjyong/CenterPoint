@@ -127,31 +127,66 @@ def cross_class_suppress(dets, margin=0.2):
     return keep
 
 
-def filter_detections(dets, points_det, cfg=None):
-    """Apply the geometric filters. ``points_det``: (N, >=4) det-frame cloud whose
-    last column is the sweep time lag (0 = current sweep)."""
-    cfg = cfg or DetectionFilterConfig()
-    if len(dets) == 0:
-        return dets
-    keep = np.ones(len(dets), dtype=bool)
+def _current_sweep(points_det):
     cur = points_det[points_det[:, -1] <= 1e-6, :3] if points_det is not None else np.zeros((0, 3))
-    tree = cKDTree(cur[:, :2]) if len(cur) else None
+    return cur, (cKDTree(cur[:, :2]) if len(cur) else None)
 
+
+def _bottom_above_ground(dets, cur, cfg):
     ground = np.zeros(len(dets))
     if cfg.local_ground and len(cur):
         g = local_ground_heights(cur, dets.boxes, cfg.ground_cell, cfg.ground_ring, cfg.ground_percentile,
                                  cfg.ground_min_cells)
         ground = np.where(np.isfinite(g), g, 0.0)
-    bottom = dets.boxes[:, 2] - dets.boxes[:, 5] / 2 - ground
-    keep &= (bottom <= cfg.max_float) & (bottom >= -cfg.max_sink)
+    return dets.boxes[:, 2] - dets.boxes[:, 5] / 2 - ground
 
-    if cfg.min_points and points_det is not None:     # an empty current sweep supports nothing
+
+def filter_measurements(dets, points_det, cfg=None):
+    """What the geometric filters test, for every detection: the box bottom above the local ground
+    [m] and the current-sweep points in the box grown by ``box_margin`` (None without a cloud).
+    Saved with the raw detections (``run_sequence.py --save-raw``), they let the thresholds
+    (``max_float``, ``max_sink``, ``min_points``, cross-class NMS) be swept offline without the clouds:
+    ``filter_reasons(dets, None, cfg, measured=...)``."""
+    cfg = cfg or DetectionFilterConfig()
+    cur, tree = _current_sweep(points_det)
+    counts = None if points_det is None else points_in_box_counts(cur, dets.boxes, cfg.box_margin, tree)
+    return _bottom_above_ground(dets, cur, cfg), counts
+
+
+def filter_reasons(dets, points_det, cfg=None, measured=None):
+    """Why each detection is dropped ('' = kept), in the order the filters apply: "floating" /
+    "sunk" (box bottom too far above / below the ground), "few points" (current sweep),
+    "duplicate" (inside a higher-scoring box of another class). ``measured``: (bottom, counts) of
+    ``filter_measurements``, made with the same ``box_margin`` and ground settings, instead of the cloud."""
+    cfg = cfg or DetectionFilterConfig()
+    why = np.full(len(dets), "", dtype=object)
+    if len(dets) == 0:
+        return why
+    if measured is None:
+        cur, tree = _current_sweep(points_det)
+        bottom, counts, have_cloud = _bottom_above_ground(dets, cur, cfg), None, points_det is not None
+    else:
+        bottom, counts = measured
+        have_cloud = counts is not None
+    why[~(bottom <= cfg.max_float)] = "floating"
+    why[(why == "") & ~(bottom >= -cfg.max_sink)] = "sunk"
+
+    if cfg.min_points and have_cloud:                 # an empty current sweep supports nothing
         need = np.array([cfg.min_points.get(CLASSES[l], 0) for l in dets.labels])
-        cand = np.nonzero(keep & (need > 0))[0]
-        counts = points_in_box_counts(cur, dets.boxes[cand], cfg.box_margin, tree)
-        keep[cand[counts < need[cand]]] = False
+        cand = np.nonzero((why == "") & (need > 0))[0]
+        n = counts[cand] if counts is not None else points_in_box_counts(cur, dets.boxes[cand], cfg.box_margin, tree)
+        why[cand[n < need[cand]]] = "few points"
 
-    dets = dets.select(np.nonzero(keep)[0])
-    if cfg.cross_class_nms and len(dets):
-        dets = dets.select(np.nonzero(cross_class_suppress(dets, cfg.cross_class_margin))[0])
-    return dets
+    kept = np.nonzero(why == "")[0]
+    if cfg.cross_class_nms and len(kept):
+        dup = ~cross_class_suppress(dets.select(kept), cfg.cross_class_margin)
+        why[kept[dup]] = "duplicate"
+    return why
+
+
+def filter_detections(dets, points_det, cfg=None):
+    """Apply the geometric filters. ``points_det``: (N, >=4) det-frame cloud whose
+    last column is the sweep time lag (0 = current sweep)."""
+    if len(dets) == 0:
+        return dets
+    return dets.select(np.nonzero(filter_reasons(dets, points_det, cfg) == "")[0])

@@ -342,7 +342,7 @@ mindmap
 | 文件 | 内容 |
 |---|---|
 | `frames/<stamp>.npy` | （`--save-frames`）每帧 (N,5) float32 `[x, y, z, intensity, dt]`，D 系，就是检测器的输入。约 3.7 MB/帧 |
-| `voxel/results.pkl` | 列表，每帧一个 dict：`stamp`、`T_world_det`（D 到 W，4×4）、`T_world_body`、`detections`、`tracks`、`predictions`、`timings` |
+| `voxel/results.pkl` | 列表，每帧一个 dict：`stamp`、`T_world_det`（D 到 W，4×4）、`T_world_body`、`detections`、`tracks`、`predictions`、`timings`。加 `--save-raw` 时还有 `raw_detections`（几何过滤之前的检测）和 `raw_measured`（过滤要看的两样：框底离局部地面的高度、框内当前帧点数），给 `pipeline_eval.py --detections raw` 离线扫过滤阈值 |
 | `voxel/track_log.npz` | 跟踪日志（给轨迹预测模型训练用） |
 | `<场景>_voxel.mcap` | Foxglove 可视化：点云、上报的检测、轨迹、位姿 |
 

@@ -1,0 +1,144 @@
+{
+ "configById": {
+  "3D!eval": {
+   "cameraState": {
+    "distance": 70,
+    "perspective": true,
+    "phi": 40,
+    "thetaOffset": 0,
+    "fovy": 45,
+    "target": [
+     0,
+     0,
+     0
+    ],
+    "targetOffset": [
+     0,
+     0,
+     0
+    ],
+    "targetOrientation": [
+     0,
+     0,
+     0,
+     1
+    ],
+    "near": 0.5,
+    "far": 5000
+   },
+   "followMode": "follow-pose",
+   "followTf": "ego",
+   "scene": {
+    "enableStats": false
+   },
+   "transforms": {},
+   "topics": {
+    "/lidar": {
+     "visible": true,
+     "colorField": "intensity",
+     "colorMode": "colormap",
+     "colorMap": "turbo",
+     "pointSize": 2
+    },
+    "/gt/boxes": {
+     "visible": true
+    },
+    "/gt/paths": {
+     "visible": true
+    },
+    "/det/boxes": {
+     "visible": true
+    },
+    "/det/low_score": {
+     "visible": false
+    },
+    "/det/filtered": {
+     "visible": false
+    },
+    "/track/boxes": {
+     "visible": true
+    },
+    "/track/history": {
+     "visible": true
+    },
+    "/pred/paths": {
+     "visible": true
+    },
+    "/events": {
+     "visible": true
+    },
+    "/ego": {
+     "visible": true
+    },
+    "/blind": {
+     "visible": true
+    }
+   },
+   "layers": {},
+   "publish": {
+    "type": "point"
+   },
+   "imageMode": {}
+  },
+  "Plot!metrics": {
+   "paths": [
+    {
+     "value": "/metrics/frame.mota_cum",
+     "enabled": true,
+     "timestampMethod": "receiveTime",
+     "label": "MOTA (cumulative)"
+    },
+    {
+     "value": "/metrics/frame.trk_fp",
+     "enabled": true,
+     "timestampMethod": "receiveTime",
+     "label": "false tracks"
+    },
+    {
+     "value": "/metrics/frame.trk_fn",
+     "enabled": true,
+     "timestampMethod": "receiveTime",
+     "label": "missed vehicles"
+    },
+    {
+     "value": "/metrics/frame.idsw",
+     "enabled": true,
+     "timestampMethod": "receiveTime",
+     "label": "ID switches"
+    },
+    {
+     "value": "/metrics/frame.fde_top_mean",
+     "enabled": true,
+     "timestampMethod": "receiveTime",
+     "label": "FDE 3 s (m)"
+    }
+   ],
+   "showXAxisLabels": true,
+   "showYAxisLabels": true,
+   "showLegend": true,
+   "legendDisplay": "floating",
+   "isSynced": true,
+   "xAxisVal": "timestamp"
+  },
+  "RosOut!log": {
+   "searchTerms": [],
+   "minLogLevel": 1
+  }
+ },
+ "globalVariables": {},
+ "userNodes": {},
+ "playbackConfig": {
+  "speed": 1
+ },
+ "layout": {
+  "first": "3D!eval",
+  "second": {
+   "first": "Plot!metrics",
+   "second": "RosOut!log",
+   "direction": "column",
+   "splitPercentage": 60
+  },
+  "direction": "row",
+  "splitPercentage": 68
+ }
+}
