@@ -9,26 +9,26 @@
 - 2884 frames, 580 keyframes scored (4.8 min)
 - detections: `results` from `data/runs_veh_v2/{scene}/pillar/results.pkl`
 - parameters: defaults
-- scored: vehicles that are not ignore boxes, within 40 m and with current-sweep points; a detection or track on any other labelled box is not counted. Label tracks stitched into one vehicle: 20.
+- scored: vehicles that are not ignore boxes, within 40 m and with current-sweep points; a detection or track on any other labelled box is not counted. Label tracks stitched into one vehicle: 19.
 - intervals: 90 % over 500 resamples of the scenes
 
 ## Main metrics
 
 | metric | value | interval |
 |---|---|---|
-| detections: recall within near range | **0.765** | 0.623 – 0.825 |
-| detections: precision within near range | **0.894** | 0.725 – 0.966 |
-| detections: F1 within near range | **0.824** | 0.677 – 0.885 |
-| detections: false per keyframe | **0.309** | 0.168 – 0.497 |
-| tracks: MOTA | **0.635** | 0.399 – 0.738 |
-| tracks: IDF1 | **0.779** | 0.656 – 0.835 |
-| tracks: ID switches / min | **1.862** | 0.414 – 4.167 |
-| tracks: false tracks / min | **13.447** | 11.747 – 15.824 |
-| tracks: confirm delay p90 [s] | **4.950** | 0.501 – 13.350 |
+| detections: recall within near range | **0.844** | 0.807 – 0.865 |
+| detections: precision within near range | **0.889** | 0.713 – 0.964 |
+| detections: F1 within near range | **0.866** | 0.768 – 0.902 |
+| detections: false per keyframe | **0.310** | 0.172 – 0.499 |
+| tracks: MOTA | **0.690** | 0.476 – 0.774 |
+| tracks: IDF1 | **0.814** | 0.715 – 0.856 |
+| tracks: ID switches / min | **1.448** | 0.207 – 3.493 |
+| tracks: false tracks / min | **13.654** | 11.856 – 16.025 |
+| tracks: confirm delay p90 [s] | **7.250** | 0.501 – 14.901 |
 | motion: relevant moving stretches missed | **1** | 0.000 – 3.000 |
-| motion: parked reported moving / h | **74.478** | 12.412 – 159.435 |
-| prediction: FDE 3 s, moving [m] | **2.705** | 1.664 – 4.499 |
-| prediction: miss rate 3 s, moving | **0.473** | 0.333 – 0.705 |
+| motion: parked reported moving / h | **62.065** | 0.000 – 148.455 |
+| prediction: FDE 3 s, moving [m] | **2.846** | 1.763 – 4.499 |
+| prediction: miss rate 3 s, moving | **0.500** | 0.358 – 0.705 |
 
 ## Detections at the reporting threshold
 
@@ -36,10 +36,10 @@ Vehicle threshold 0.35 (`tracker.high_score`), 2 m match, keyframes. Near: withi
 
 | range | precision | recall | TP | FP | FN |
 |---|---|---|---|---|---|
-| 0-30 m | 0.894 | 0.765 | 1212 | 144 | 373 |
-| 30-40 m | 0.872 | 0.542 | 238 | 35 | 201 |
+| 0-30 m | 0.889 | 0.844 | 1166 | 145 | 215 |
+| 30-40 m | 0.854 | 0.582 | 205 | 35 | 147 |
 
-False detections per keyframe 0.309. AP over all scores: AP@2.0 0.836, AP@4.0 0.875, AP@2.0 0-20 m 0.861, 20-40 m 0.817.
+False detections per keyframe 0.310. AP over all scores: AP@2.0 0.853, AP@4.0 0.881, AP@2.0 0-20 m 0.940, 20-40 m 0.812.
 
 ## Tracking
 
@@ -47,39 +47,39 @@ Reported tracks (confirmed, coasting included) against the scored vehicles, keyf
 
 | MOTA | MOTP m | IDF1 | recall | precision | IDSW | IDSW / min | FRAG | MT | ML | vehicles | TP | FP | FN |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **0.635** | 0.38 | **0.779** | 0.736 | 0.885 | 9 | 1.86 | 37 | 36 | 14 | 67 | 1489 | 194 | 535 |
+| **0.690** | 0.38 | **0.814** | 0.806 | 0.878 | 7 | 1.45 | 22 | 35 | 11 | 59 | 1397 | 195 | 336 |
 
-- false tracks (a track false on consecutive keyframes counts once): 13.45 per minute
-- a vehicle coming into 30 m waits for its first matched track: median 0.0 s, p90 4.9 s (18 vehicles; 5 never tracked; 0.5 s resolution)
+- false tracks (a track false on consecutive keyframes counts once): 13.65 per minute
+- a vehicle coming into 30 m waits for its first matched track: median 0.0 s, p90 7.2 s (16 vehicles; 2 never tracked; 0.5 s resolution)
 
 ### Where the errors are
 
 | false tracks: cause | count |
 |---|---|
 | second track on a tracked vehicle | 0 |
-| beside a vehicle (2-4 m off) | 48 |
+| beside a vehicle (2-4 m off) | 20 |
 | coasting after the vehicle was lost | 6 |
-| nothing labelled nearby | 140 |
+| nothing labelled nearby | 169 |
 
 | missed vehicles (FN) | count |
 |---|---|
-| detected, not tracked | 42 |
-| not detected | 493 |
-| 0-10 m | 96 |
-| 10-20 m | 60 |
-| 20-30 m | 199 |
-| 30-40 m | 180 |
-| 1-9 pts | 23 |
-| 10-49 pts | 113 |
-| >=50 pts | 399 |
+| detected, not tracked | 32 |
+| not detected | 304 |
+| 0-10 m | 11 |
+| 10-20 m | 32 |
+| 20-30 m | 158 |
+| 30-40 m | 135 |
+| 1-9 pts | 18 |
+| 10-49 pts | 70 |
+| >=50 pts | 248 |
 
 Blind sector (142-218 deg behind the robot) and the 20 deg bands beside it:
 
 | zone | scored vehicles | missed | missed share | tracks | false | false share |
 |---|---|---|---|---|---|---|
-| elsewhere | 1597 | 421 | 0.264 | 1321 | 151 | 0.114 |
-| edge | 408 | 106 | 0.260 | 339 | 33 | 0.097 |
-| blind | 19 | 8 | 0.421 | 23 | 10 | 0.435 |
+| elsewhere | 1317 | 223 | 0.169 | 1240 | 152 | 0.123 |
+| edge | 402 | 106 | 0.264 | 334 | 33 | 0.099 |
+| blind | 14 | 7 | 0.500 | 18 | 10 | 0.556 |
 
 ## Motion state
 
@@ -87,66 +87,66 @@ Online state against the labels' moving flags (tools/dog/motion_eval.py). Releva
 
 | moving recall | false moving | parked reported moving | false episodes (per h) | moving stretches missed | latency median / p90 s | relevant missed | relevant latency median / p90 s |
 |---|---|---|---|---|---|---|---|
-| 0.746 | 0.0229 | 3 / 42 | 6 (74.5) | 5 / 15 | 0.75 / 2.00 | **1 / 7** | 1.00 / 2.00 |
+| 0.746 | 0.0239 | 2 / 37 | 5 (62.1) | 5 / 15 | 0.75 / 2.00 | **1 / 7** | 1.00 / 2.00 |
 
 ## Prediction
 
 Tracks matched to a vehicle with 3 s of labelled future (keyframes every 0.5 s). Moving: >= 1.5 m in 3 s; turning: heading changes > 15 deg. ADE1 / FDE1: the most likely mode; minADE / minFDE: the best; MR: no mode ends within 2 m. IMM is what runs online, CV keeps the track's velocity.
 
-**all matched** (1194 samples)
+**all matched** (1118 samples)
 
 | predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
 |---|---|---|---|---|---|---|
-| IMM | 1 s | 0.53 | 0.59 | 0.53 | 0.59 | 0.060 |
-| IMM | 2 s | 0.65 | 0.83 | 0.65 | 0.83 | 0.121 |
-| IMM | 3 s | 0.77 | 1.09 | 0.77 | 1.09 | 0.160 |
-| CV | 1 s | 0.53 | 0.59 | 0.53 | 0.59 | 0.060 |
-| CV | 2 s | 0.65 | 0.83 | 0.65 | 0.83 | 0.121 |
-| CV | 3 s | 0.77 | 1.09 | 0.77 | 1.09 | 0.161 |
+| IMM | 1 s | 0.54 | 0.60 | 0.54 | 0.60 | 0.064 |
+| IMM | 2 s | 0.66 | 0.85 | 0.66 | 0.85 | 0.128 |
+| IMM | 3 s | 0.79 | 1.11 | 0.79 | 1.11 | 0.165 |
+| CV | 1 s | 0.54 | 0.60 | 0.54 | 0.60 | 0.064 |
+| CV | 2 s | 0.66 | 0.85 | 0.66 | 0.85 | 0.128 |
+| CV | 3 s | 0.79 | 1.11 | 0.79 | 1.11 | 0.165 |
 
-**moving** (110 samples)
-
-| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
-|---|---|---|---|---|---|---|
-| IMM | 1 s | 0.97 | 1.15 | 0.97 | 1.15 | 0.155 |
-| IMM | 2 s | 1.37 | 1.97 | 1.37 | 1.97 | 0.327 |
-| IMM | 3 s | 1.75 | 2.71 | 1.75 | 2.70 | 0.473 |
-| CV | 1 s | 0.97 | 1.15 | 0.97 | 1.15 | 0.155 |
-| CV | 2 s | 1.37 | 1.97 | 1.37 | 1.97 | 0.327 |
-| CV | 3 s | 1.75 | 2.71 | 1.75 | 2.71 | 0.482 |
-
-**moving, straight** (93 samples)
+**moving** (102 samples)
 
 | predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
 |---|---|---|---|---|---|---|
-| IMM | 1 s | 1.07 | 1.26 | 1.07 | 1.26 | 0.183 |
-| IMM | 2 s | 1.49 | 2.12 | 1.49 | 2.12 | 0.387 |
-| IMM | 3 s | 1.89 | 2.90 | 1.89 | 2.89 | 0.516 |
-| CV | 1 s | 1.07 | 1.26 | 1.07 | 1.26 | 0.183 |
-| CV | 2 s | 1.49 | 2.13 | 1.49 | 2.13 | 0.387 |
-| CV | 3 s | 1.89 | 2.90 | 1.89 | 2.90 | 0.527 |
+| IMM | 1 s | 1.01 | 1.20 | 1.01 | 1.20 | 0.167 |
+| IMM | 2 s | 1.43 | 2.07 | 1.42 | 2.06 | 0.353 |
+| IMM | 3 s | 1.84 | 2.85 | 1.83 | 2.84 | 0.500 |
+| CV | 1 s | 1.01 | 1.20 | 1.01 | 1.20 | 0.167 |
+| CV | 2 s | 1.43 | 2.07 | 1.43 | 2.07 | 0.353 |
+| CV | 3 s | 1.84 | 2.85 | 1.84 | 2.85 | 0.510 |
 
-**moving, turning** (17 samples)
-
-| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
-|---|---|---|---|---|---|---|
-| IMM | 1 s | 0.47 | 0.56 | 0.47 | 0.56 | 0.000 |
-| IMM | 2 s | 0.71 | 1.13 | 0.71 | 1.13 | 0.000 |
-| IMM | 3 s | 1.00 | 1.67 | 1.00 | 1.67 | 0.235 |
-| CV | 1 s | 0.47 | 0.56 | 0.47 | 0.56 | 0.000 |
-| CV | 2 s | 0.71 | 1.13 | 0.71 | 1.13 | 0.000 |
-| CV | 3 s | 1.00 | 1.67 | 1.00 | 1.67 | 0.235 |
-
-**moving, < 3 m/s** (101 samples)
+**moving, straight** (90 samples)
 
 | predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
 |---|---|---|---|---|---|---|
-| IMM | 1 s | 0.76 | 0.90 | 0.76 | 0.89 | 0.079 |
-| IMM | 2 s | 1.06 | 1.53 | 1.06 | 1.53 | 0.267 |
-| IMM | 3 s | 1.36 | 2.08 | 1.36 | 2.07 | 0.426 |
-| CV | 1 s | 0.76 | 0.90 | 0.76 | 0.90 | 0.079 |
-| CV | 2 s | 1.07 | 1.53 | 1.07 | 1.53 | 0.267 |
-| CV | 3 s | 1.36 | 2.08 | 1.36 | 2.08 | 0.436 |
+| IMM | 1 s | 1.09 | 1.29 | 1.08 | 1.29 | 0.189 |
+| IMM | 2 s | 1.52 | 2.17 | 1.52 | 2.17 | 0.400 |
+| IMM | 3 s | 1.93 | 2.96 | 1.93 | 2.96 | 0.522 |
+| CV | 1 s | 1.09 | 1.29 | 1.09 | 1.29 | 0.189 |
+| CV | 2 s | 1.52 | 2.17 | 1.52 | 2.17 | 0.400 |
+| CV | 3 s | 1.93 | 2.96 | 1.93 | 2.96 | 0.533 |
+
+**moving, turning** (12 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.42 | 0.53 | 0.42 | 0.53 | 0.000 |
+| IMM | 2 s | 0.73 | 1.26 | 0.73 | 1.26 | 0.000 |
+| IMM | 3 s | 1.10 | 1.98 | 1.10 | 1.98 | 0.333 |
+| CV | 1 s | 0.42 | 0.53 | 0.42 | 0.53 | 0.000 |
+| CV | 2 s | 0.73 | 1.26 | 0.73 | 1.26 | 0.000 |
+| CV | 3 s | 1.10 | 1.98 | 1.10 | 1.98 | 0.333 |
+
+**moving, < 3 m/s** (93 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.78 | 0.92 | 0.78 | 0.92 | 0.086 |
+| IMM | 2 s | 1.10 | 1.59 | 1.10 | 1.59 | 0.290 |
+| IMM | 3 s | 1.41 | 2.18 | 1.41 | 2.17 | 0.452 |
+| CV | 1 s | 0.78 | 0.92 | 0.78 | 0.92 | 0.086 |
+| CV | 2 s | 1.10 | 1.60 | 1.10 | 1.60 | 0.290 |
+| CV | 3 s | 1.41 | 2.18 | 1.41 | 2.18 | 0.462 |
 
 **moving, >= 6 m/s** (9 samples)
 
@@ -171,19 +171,19 @@ A moving vehicle that comes within 5 m of the robot within 3 s (labelled future,
 | stage | median | p90 |
 |---|---|---|
 | filter | 0.00 | 0.01 |
-| track | 1.91 | 8.78 |
-| predict | 0.78 | 3.57 |
+| track | 1.70 | 7.69 |
+| predict | 0.78 | 3.49 |
 
 ## Issues (`issues.csv`)
 
 | kind | count |
 |---|---|
-| ID switch | 9 |
+| ID switch | 7 |
 | bad prediction | 26 |
-| false moving | 6 |
+| false moving | 5 |
 | false track | 26 |
 | hazard not reported | 1 |
-| lost vehicle | 36 |
+| lost vehicle | 23 |
 | missed moving vehicle | 1 |
 
 ## Snapshots
@@ -203,16 +203,16 @@ Middle keyframe of each scene, robot at the center heading up. Green / red outli
 
 ## Foxglove
 
-- `data/tune/T18_mcap_v2/0921_164127_s000.mcap`: 3322 messages, 83 MB
-- `data/tune/T18_mcap_v2/0921_164127_s001.mcap`: 3301 messages, 84 MB
+- `data/tune/T18_mcap_v2/0921_164127_s000.mcap`: 3320 messages, 83 MB
+- `data/tune/T18_mcap_v2/0921_164127_s001.mcap`: 3294 messages, 84 MB
 - `data/tune/T18_mcap_v2/0921_164127_s002.mcap`: 3290 messages, 79 MB
-- `data/tune/T18_mcap_v2/0921_164127_s003.mcap`: 3279 messages, 76 MB
-- `data/tune/T18_mcap_v2/0921_164127_s004.mcap`: 3293 messages, 88 MB
-- `data/tune/T18_mcap_v2/0921_164127_s005.mcap`: 3290 messages, 95 MB
+- `data/tune/T18_mcap_v2/0921_164127_s003.mcap`: 3278 messages, 76 MB
+- `data/tune/T18_mcap_v2/0921_164127_s004.mcap`: 3287 messages, 87 MB
+- `data/tune/T18_mcap_v2/0921_164127_s005.mcap`: 3289 messages, 95 MB
 - `data/tune/T18_mcap_v2/0921_165659_s003.mcap`: 3151 messages, 91 MB
 - `data/tune/T18_mcap_v2/0921_165659_s004.mcap`: 3149 messages, 93 MB
 - `data/tune/T18_mcap_v2/0921_165659_s005.mcap`: 3467 messages, 104 MB
-- `data/tune/T18_mcap_v2/0921_165659_s006.mcap`: 3456 messages, 107 MB
+- `data/tune/T18_mcap_v2/0921_165659_s006.mcap`: 3455 messages, 107 MB
 
 Open a file in Foxglove, then Layout -> Import from file: `foxglove_layout.json` (3D following `ego`, Plot of `/metrics/frame`, Log of `/log`). Jump to the times in `issues.csv` (column t: seconds after the scene start).
 

@@ -82,7 +82,7 @@ Online state against the labels' moving flags (tools/dog/motion_eval.py). Releva
 
 | moving recall | false moving | parked reported moving | false episodes (per h) | moving stretches missed | latency median / p90 s | relevant missed | relevant latency median / p90 s |
 |---|---|---|---|---|---|---|---|
-| 0.843 | 0.0204 | 7 / 123 | 7 (34.1) | 10 / 30 | 0.50 / 0.55 | **1 / 9** | 0.50 / 0.65 |
+| 0.843 | 0.0204 | 7 / 122 | 7 (34.1) | 10 / 30 | 0.50 / 0.55 | **1 / 9** | 0.50 / 0.65 |
 
 ## Prediction
 
@@ -165,9 +165,9 @@ A moving vehicle that comes within 5 m of the robot within 3 s (labelled future,
 
 | stage | median | p90 |
 |---|---|---|
-| filter | 1.23 | 3.36 |
-| track | 2.22 | 8.17 |
-| predict | 1.09 | 3.49 |
+| filter | 1.24 | 3.39 |
+| track | 2.25 | 8.30 |
+| predict | 1.09 | 3.48 |
 
 ## Issues (`issues.csv`)
 

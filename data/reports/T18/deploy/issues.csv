@@ -1,7 +1,6 @@
 kind,scene,t,duration,track,gt,range,zone,value,note
 ID switch,0921_164127_s000,13.0,0.0,30,9,29.7,elsewhere,1.0,T8 -> T30
 ID switch,0921_164127_s000,22.5,0.0,51,5,23.1,elsewhere,1.0,T5 -> T51
-ID switch,0921_164127_s000,23.0,0.0,54,6,31.0,elsewhere,1.0,T9 -> T54
 ID switch,0921_164127_s000,23.5,0.0,55,9,29.7,elsewhere,1.0,T30 -> T55
 ID switch,0921_164127_s000,24.0,0.0,57,3,27.4,elsewhere,1.0,T4 -> T57
 ID switch,0921_164127_s000,27.0,0.0,63,11,26.4,edge,1.0,T7 -> T63
@@ -43,16 +42,11 @@ bad prediction,0921_164127_s001,23.0,3.0,13,5,22.0,elsewhere,4.4,"FDE 4.4 m at 3
 bad prediction,0921_164127_s002,21.0,3.0,61,66,39.4,elsewhere,4.4,"FDE 4.4 m at 3 s, turning, 1.3 m/s"
 bad prediction,0921_165659_s005,25.5,3.0,4,63,5.3,elsewhere,4.3,"FDE 4.3 m at 3 s, straight, 0.4 m/s"
 false moving,0921_164127_s004,5.0,2.0,,4,31.9,,2.0,parked vehicle reported moving
-false moving,0921_164127_s001,27.0,2.0,,14,30.7,,2.0,parked vehicle reported moving
-false moving,0921_164127_s001,13.0,1.5,,14,29.4,,1.5,parked vehicle reported moving
-false moving,0921_165659_s006,16.5,1.5,,2,2.6,,1.5,parked vehicle reported moving
-false moving,0921_164127_s001,5.5,1.5,,14,30.0,,1.5,parked vehicle reported moving
 false moving,0921_164127_s000,9.5,1.5,,5,23.0,,1.5,parked vehicle reported moving
 false moving,0921_164127_s002,1.5,1.0,,4,18.5,,1.0,parked vehicle reported moving
 false moving,0921_164127_s000,19.5,1.0,,5,23.1,,1.0,parked vehicle reported moving
 false moving,0921_164127_s000,28.0,1.0,,5,23.1,,1.0,parked vehicle reported moving
 false moving,0921_164127_s002,5.5,1.0,,33,34.6,,1.0,parked vehicle reported moving
-false moving,0921_164127_s001,11.0,0.5,,14,29.8,,0.5,parked vehicle reported moving
 false moving,0921_164127_s002,7.5,0.1,,3,24.4,,0.1,parked vehicle reported moving
 false track,0921_164127_s005,0.5,28.5,3,,19.5,elsewhere,28.5,
 false track,0921_164127_s005,12.5,16.5,1,,13.0,elsewhere,16.5,
@@ -98,12 +92,8 @@ lost vehicle,0921_164127_s000,20.5,2.0,,11,24.3,edge,2.0,"within 30 m, no track"
 lost vehicle,0921_164127_s001,9.0,1.5,,131,29.1,elsewhere,1.5,"within 30 m, no track"
 lost vehicle,0921_165659_s005,29.0,1.5,,63,4.1,elsewhere,1.5,"within 30 m, no track"
 lost vehicle,0921_164127_s000,18.5,1.5,,11,25.2,edge,1.5,"within 30 m, no track"
-lost vehicle,0921_165659_s006,19.0,1.5,,2,5.4,blind,1.5,"within 30 m, no track"
 lost vehicle,0921_164127_s002,4.0,1.5,,5,26.2,edge,1.5,"within 30 m, no track"
 lost vehicle,0921_164127_s002,4.5,1.5,,26,26.2,elsewhere,1.5,"within 30 m, no track"
-lost vehicle,0921_164127_s004,19.5,1.0,,2,4.6,elsewhere,1.0,"within 30 m, no track"
-lost vehicle,0921_164127_s001,11.5,1.0,,14,29.7,elsewhere,1.0,"within 30 m, no track"
-lost vehicle,0921_164127_s001,21.5,1.0,,14,29.5,elsewhere,1.0,"within 30 m, no track"
 lost vehicle,0921_165659_s005,21.5,1.0,,61,24.6,elsewhere,1.0,"within 30 m, no track"
 lost vehicle,0921_164127_s000,9.5,1.0,,11,26.3,edge,1.0,"within 30 m, no track"
 lost vehicle,0921_164127_s000,15.5,1.0,,11,26.3,edge,1.0,"within 30 m, no track"

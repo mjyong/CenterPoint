@@ -1,11 +1,8 @@
 kind,scene,t,duration,track,gt,range,zone,value,note
-ID switch,0921_164127_s000,22.5,0.0,17,6,31.0,elsewhere,1.0,T10 -> T17
 ID switch,0921_164127_s000,23.0,0.0,18,9,29.2,elsewhere,1.0,T5 -> T18
 ID switch,0921_164127_s000,23.5,0.0,20,3,26.8,elsewhere,1.0,T3 -> T20
 ID switch,0921_164127_s000,27.5,0.0,25,5,23.1,elsewhere,1.0,T4 -> T25
-ID switch,0921_164127_s001,20.0,0.0,36,14,29.2,elsewhere,1.0,T11 -> T36
 ID switch,0921_164127_s003,21.0,0.0,23,2,35.4,elsewhere,1.0,T1 -> T23
-ID switch,0921_164127_s004,21.0,0.0,24,2,5.7,edge,1.0,T13 -> T24
 ID switch,0921_165659_s006,13.0,0.0,11,8,18.9,elsewhere,1.0,T4 -> T11
 bad prediction,0921_164127_s000,2.5,3.0,12,19,39.1,elsewhere,19.5,"FDE 19.5 m at 3 s, straight, 6.4 m/s"
 bad prediction,0921_164127_s000,3.0,3.0,12,19,36.0,elsewhere,16.1,"FDE 16.1 m at 3 s, straight, 6.4 m/s"
@@ -57,34 +54,26 @@ false track,0921_165659_s006,20.0,1.0,19,,33.6,elsewhere,1.0,
 false track,0921_165659_s004,21.0,1.0,11,,29.5,elsewhere,1.0,
 hazard not reported,0921_165659_s006,4.0,2.5,,70,3.9,,1.0,"moving vehicle within 5 m, no alarm"
 hazard not reported,0921_165659_s006,7.0,1.0,,70,3.9,,1.0,"moving vehicle within 5 m, no alarm"
-lost vehicle,0921_164127_s005,0.5,28.5,,5,5.1,elsewhere,28.5,"within 30 m, no track"
 lost vehicle,0921_164127_s000,0.0,25.0,,11,26.3,edge,25.0,"within 30 m, no track"
 lost vehicle,0921_164127_s002,10.0,11.5,,67,24.3,elsewhere,11.5,"within 30 m, no track"
-lost vehicle,0921_164127_s001,10.0,9.5,,14,29.2,elsewhere,9.5,"within 30 m, no track"
 lost vehicle,0921_164127_s001,0.0,9.0,,7,26.2,edge,9.0,"within 30 m, no track"
 lost vehicle,0921_164127_s001,17.5,9.0,,131,16.8,elsewhere,9.0,"within 30 m, no track"
 lost vehicle,0921_165659_s003,8.0,7.5,,5,28.0,elsewhere,7.5,"within 30 m, no track"
 lost vehicle,0921_164127_s001,14.0,7.0,,7,28.9,edge,7.0,"within 30 m, no track"
-lost vehicle,0921_164127_s004,22.5,6.5,,82,5.2,elsewhere,6.5,"within 30 m, no track"
 lost vehicle,0921_164127_s001,9.0,5.5,,131,27.7,elsewhere,5.5,"within 30 m, no track"
 lost vehicle,0921_164127_s000,23.5,5.5,,54,16.6,elsewhere,5.5,"within 30 m, no track"
-lost vehicle,0921_164127_s004,0.0,5.0,,2,22.5,elsewhere,5.0,"within 30 m, no track"
-lost vehicle,0921_164127_s004,5.5,5.0,,2,15.7,elsewhere,5.0,"within 30 m, no track"
-lost vehicle,0921_164127_s004,16.5,4.5,,2,4.2,elsewhere,4.5,"within 30 m, no track"
 lost vehicle,0921_164127_s003,12.0,3.5,,2,29.5,edge,3.5,"within 30 m, no track"
 lost vehicle,0921_164127_s001,7.0,3.5,,33,25.4,edge,3.5,"within 30 m, no track"
-lost vehicle,0921_164127_s003,26.0,3.0,,84,27.4,elsewhere,3.0,"within 30 m, no track"
 lost vehicle,0921_164127_s001,0.0,3.0,,8,26.5,elsewhere,3.0,"within 30 m, no track"
 lost vehicle,0921_164127_s001,18.0,2.5,,4,23.5,edge,2.5,"within 30 m, no track"
 lost vehicle,0921_164127_s001,15.0,2.0,,4,23.5,edge,2.0,"within 30 m, no track"
 lost vehicle,0921_164127_s001,10.5,2.0,,7,27.2,edge,2.0,"within 30 m, no track"
-lost vehicle,0921_164127_s001,6.0,2.0,,14,30.0,elsewhere,2.0,"within 30 m, no track"
-lost vehicle,0921_164127_s001,23.0,2.0,,14,29.5,elsewhere,2.0,"within 30 m, no track"
 lost vehicle,0921_164127_s000,27.0,2.0,,11,26.4,edge,2.0,"within 30 m, no track"
 lost vehicle,0921_164127_s002,3.5,2.0,,5,25.7,edge,2.0,"within 30 m, no track"
-lost vehicle,0921_164127_s004,11.0,1.5,,2,11.2,elsewhere,1.5,"within 30 m, no track"
-lost vehicle,0921_165659_s006,4.5,1.5,,2,16.8,elsewhere,1.5,"within 30 m, no track"
 lost vehicle,0921_164127_s001,6.0,1.0,,4,20.7,edge,1.0,"within 30 m, no track"
-lost vehicle,0921_164127_s001,21.5,1.0,,14,29.5,elsewhere,1.0,"within 30 m, no track"
 lost vehicle,0921_165659_s005,18.5,1.0,,61,29.2,elsewhere,1.0,"within 30 m, no track"
+lost vehicle,0921_164127_s000,2.5,1.0,,4,20.7,edge,1.0,"within 30 m, no track"
+lost vehicle,0921_165659_s006,7.5,1.0,,70,4.4,elsewhere,1.0,"within 30 m, no track"
+lost vehicle,0921_164127_s002,15.0,1.0,,4,29.0,edge,1.0,"within 30 m, no track"
+lost vehicle,0921_164127_s002,6.0,1.0,,10,28.6,edge,1.0,"within 30 m, no track"
 missed moving vehicle,0921_165659_s006,7.0,1.0,,70,4.6,,1.0,label 1.1 m/s
