@@ -1,0 +1,70 @@
+== 0921_164127_s000 val
+58 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_164127_s000
+== 0921_164127_s001 val
+57 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_164127_s001
+== 0921_164127_s002 val
+58 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_164127_s002
+== 0921_164127_s003 val
+57 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_164127_s003
+== 0921_164127_s004 val
+58 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_164127_s004
+== 0921_164127_s005 val
+58 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_164127_s005
+== 0921_165659_s000 train
+56 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s000
+== 0921_165659_s001 train
+53 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s001
+== 0921_165659_s002 train
+55 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s002
+== 0921_165659_s003 val
+56 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s003
+== 0921_165659_s004 val
+56 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s004
+== 0921_165659_s005 val
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s005
+== 0921_165659_s006 val
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s006
+== 0921_165659_s007 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s007
+== 0921_165659_s008 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s008
+== 0921_165659_s009 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s009
+== 0921_165659_s010 train
+59 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s010
+== 0921_165659_s011 train
+56 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s011
+== 0921_165659_s012 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s012
+== 0921_165659_s013 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s013
+== 0921_165659_s014 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s014
+== 0921_165659_s015 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s015
+== 0921_165659_s016 train
+59 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s016
+== 0921_165659_s017 train
+60 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s017
+== 0921_165659_s018 train
+59 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s018
+== 0921_165659_s019 train
+60 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s019
+== 0921_165659_s020 train
+60 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s020
+== 0921_165659_s021 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s021
+== 0921_165659_s022 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s022
+== 0921_165659_s023 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s023
+== 0921_165659_s024 train
+51 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s024
+== 0921_165659_s025 train
+58 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s025
+== 0921_165659_s026 train
+58 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s026
+== 0921_165659_s027 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s027
+== 0921_165659_s028 train
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_dual/0921_165659_s028

@@ -1,0 +1,36 @@
+0921_164127_s000: copied from the earlier review 43, earlier candidates not copied 4, kept the earlier decision 588, new boxes to review 10, of them still to review 0
+0921_164127_s001: copied from the earlier review 76, earlier candidates not copied 14, kept the earlier decision 595, new boxes to review 16, of them still to review 29
+0921_164127_s002: copied from the earlier review 53, earlier candidates not copied 4, kept the earlier decision 338, new boxes to review 28, of them still to review 2
+0921_164127_s003: copied from the earlier review 27, earlier candidates not copied 26, kept the earlier decision 204, new boxes to review 2, of them still to review 8
+0921_164127_s004: copied from the earlier review 8, earlier candidates not copied 57, kept the earlier decision 169, new boxes to review 17, of them still to review 0
+0921_164127_s005: earlier candidates not copied 4, new boxes to review 57
+0921_165659_s000: copied from the earlier review 5, kept the earlier decision 47, new boxes to review 10, of them still to review 5
+0921_165659_s001: copied from the earlier review 25, kept the earlier decision 22, of them still to review 4
+0921_165659_s002: copied from the earlier review 6, kept the earlier decision 48, new boxes to review 4, of them still to review 0
+0921_165659_s003: copied from the earlier review 24, earlier candidates not copied 4, kept the earlier decision 56, of them still to review 4
+0921_165659_s004: earlier candidates not copied 7
+0921_165659_s005: copied from the earlier review 10, earlier candidates not copied 17, kept the earlier decision 101, new boxes to review 3, of them still to review 10
+0921_165659_s006: copied from the earlier review 6, earlier candidates not copied 14, kept the earlier decision 179, new boxes to review 1, of them still to review 10
+0921_165659_s007: copied from the earlier review 22, kept the earlier decision 107, new boxes to review 19, of them still to review 0
+0921_165659_s008: copied from the earlier review 1, kept the earlier decision 165, of them still to review 0
+0921_165659_s009: copied from the earlier review 2, kept the earlier decision 124, of them still to review 2
+0921_165659_s010: kept the earlier decision 72, of them still to review 0
+0921_165659_s011: kept the earlier decision 29, new boxes to review 1, of them still to review 0
+0921_165659_s012: copied from the earlier review 43, kept the earlier decision 101, new boxes to review 3, of them still to review 2
+0921_165659_s013: new boxes to review 28
+0921_165659_s014: copied from the earlier review 18, kept the earlier decision 268, new boxes to review 1, of them still to review 33
+0921_165659_s015: copied from the earlier review 2, kept the earlier decision 599, new boxes to review 9, of them still to review 0
+0921_165659_s016: copied from the earlier review 34, kept the earlier decision 399, new boxes to review 1, of them still to review 26
+0921_165659_s017: copied from the earlier review 2, kept the earlier decision 189, new boxes to review 29, of them still to review 19
+0921_165659_s018: copied from the earlier review 7, kept the earlier decision 105, new boxes to review 10, of them still to review 54
+0921_165659_s019: copied from the earlier review 23, kept the earlier decision 40, new boxes to review 8, of them still to review 21
+0921_165659_s020: copied from the earlier review 44, kept the earlier decision 38, new boxes to review 1, of them still to review 4
+0921_165659_s021: copied from the earlier review 15, kept the earlier decision 14, new boxes to review 4, of them still to review 14
+0921_165659_s022: copied from the earlier review 2, kept the earlier decision 29, new boxes to review 7, of them still to review 4
+0921_165659_s023: copied from the earlier review 2, kept the earlier decision 466, new boxes to review 13, of them still to review 0
+0921_165659_s024: copied from the earlier review 42, deleted earlier, deleted again 1, kept the earlier decision 337, new boxes to review 6, of them still to review 7
+0921_165659_s025: copied from the earlier review 38, kept the earlier decision 326, new boxes to review 5, of them still to review 33
+0921_165659_s026: copied from the earlier review 11, kept the earlier decision 309, new boxes to review 48, of them still to review 6
+0921_165659_s027: copied from the earlier review 26, kept the earlier decision 168, new boxes to review 86, of them still to review 5
+0921_165659_s028: copied from the earlier review 38, deleted earlier, deleted again 9, kept the earlier decision 192, new boxes to review 44, of them still to review 8, took the reviewer's geometry 3
+total: copied from the earlier review 655, deleted earlier, deleted again 10, earlier candidates not copied 151, kept the earlier decision 6424, new boxes to review 471, of them still to review 310, took the reviewer's geometry 3
