@@ -452,6 +452,8 @@ mindmap
 - `dog_meta.json` 加 `candidates`：每次运行的记录，和每帧提过的候选位置。人删掉的候选靠它记住，下次不再提；
 - 改之前，`label/` 先复制到 `label_backup/<时间>/`。
 
+**`carry`**：同一批场景换了教师重新导出（新的 data/）后，把以前审过的结论搬过去：同一辆车沿用类型和属性（挪过的框用审过的框），删掉过的再删，审过、新教师没检出的照搬（ID 前加 h），剩下的新目标标红（DOG_FINETUNE.md 第 17 节）。
+
 **在 SUSTechPOINTS 里**：可以挪框、改尺寸、改朝向、改类型、删框，**也可以新增漏标的物体**（Ctrl + 拖框自动出框）。
 
 **`import`**：生成 `labels_sustech.pkl`，格式和 `labels.pkl` 一样。

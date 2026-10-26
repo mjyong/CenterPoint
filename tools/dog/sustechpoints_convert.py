@@ -19,6 +19,10 @@ SUSTechPOINTS is vendored in third_party/SUSTechPOINTS (see its VENDORED.md); sc
     python tools/dog/sustechpoints_convert.py candidates --scenes rec_001 rec_002 --min-score 0.3 \
         --results v1_pp=data/runs_veh_v1/{scene}/pillar/results.pkl nusc_pp=data/runs_nusc_pp/{scene}/pillar/results.pkl
 
+    # scenes reviewed once, exported again from new auto-labels (e.g. two teachers) into another data/: keep the
+    # review's decisions, only new objects stay red
+    python tools/dog/sustechpoints_convert.py carry --from-root <old data/> --root <new data/> --scenes rec_001
+
     # the imported labels feed export_dataset.py like any labels.pkl (keyframes only); for a training scene,
     # first spread the reviewed keyframes over every frame:
     python tools/dog/sustechpoints_convert.py propagate --full data/labels/rec_001/labels.pkl \
@@ -44,7 +48,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.detection.boxes import CLASSES  # noqa: E402
-from dog_perception.sustechpoints import (add_candidates, export_scene, import_scene,  # noqa: E402
+from dog_perception.sustechpoints import (add_candidates, carry_review, export_scene, import_scene,  # noqa: E402
                                           propagate_keyframes, write_detections)
 from dog_perception.visibility import annotate_points  # noqa: E402
 
@@ -176,6 +180,11 @@ def main():
                    help="[m] a detection this close to a label (or a deleted box) is not a candidate")
     c.add_argument("--min-points", type=int, default=1, help="points (all sweeps) a candidate needs to be judged")
     c.add_argument("--dry-run", action="store_true", help="count only; the scenes are not changed")
+    cr = sub.add_parser("carry", help="an earlier review's decisions -> the same scenes exported again from new "
+                                      "auto-labels; only what is new stays red")
+    cr.add_argument("--from-root", required=True, help="SUSTechPOINTS data/ of the reviewed scenes")
+    cr.add_argument("--root", default=os.path.join(VENDORED, "data"), help="SUSTechPOINTS data/ of the fresh export")
+    cr.add_argument("--scenes", nargs="+", required=True)
     st = sub.add_parser("stats", help="frames, boxes and boxes still marked review per scene")
     st.add_argument("--root", default=os.path.join(VENDORED, "data"), help="SUSTechPOINTS data/ directory")
     v = sub.add_parser("serve", help="start SUSTechPOINTS (works without TensorFlow)")
@@ -188,6 +197,13 @@ def main():
         serve(args.app, args.host, args.port)
     elif args.cmd in ("candidates", "detections"):
         candidates(args)
+    elif args.cmd == "carry":
+        total = Counter()
+        for scene in args.scenes:
+            counts = carry_review(os.path.join(args.root, scene), os.path.join(args.from_root, scene))
+            total.update(counts)
+            print("%s: %s" % (scene, ", ".join("%s %d" % kv for kv in sorted(counts.items()))))
+        print("total: %s" % ", ".join("%s %d" % kv for kv in sorted(total.items())))
     elif args.cmd == "stats":
         totals = {}
         print("scene split frames boxes review")

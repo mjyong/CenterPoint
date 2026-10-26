@@ -480,3 +480,70 @@ def test_candidates_of_an_export_without_label_classes(tmp_path):
     assert {a["obj_type"] for a in json.load(open(root / "label" / (name + ".json")))} == {"Car"}
     write_detections(str(root), results, classes=["vehicle"])
     assert {d["obj_type"] for d in json.load(open(root / "dog_dets" / (name + ".json")))} == {"Car", "Truck"}
+
+
+def test_carry_review_to_a_fresh_export(tmp_path):
+    """An earlier box review carried over to the same scene exported from other auto-labels: decisions kept,
+    deleted things stay deleted, the reviewer's own boxes come along, only new objects are red."""
+    from dog_perception.sustechpoints import carry_review
+    rng = np.random.default_rng(1)
+    world = dict(A=[12.0, 3.0], B=[8.0, -6.0], C=[20.0, 8.0], D=[-10.0, 5.0], E=[25.0, -12.0], N=[-20.0, -15.0])
+
+    def labels(names, ids, jitter):
+        frames = []
+        for k in range(6):
+            T = make_T(rot_z(0.05 * k), [0.4 * k, 0.0, 0.0])
+            Ti = np.linalg.inv(T)
+            objs = []
+            for n in names:
+                p = Ti @ np.r_[world[n], 0.8, 1.0]
+                objs.append(dict(track_id=ids[n], label="vehicle", subclass="car",
+                                 box=np.r_[p[:2] + rng.normal(0, jitter, 2), 0.8, 4.5, 1.9, 1.6, 0.1 - 0.05 * k],
+                                 velocity=np.zeros(2), score=0.7, review=True, interpolated=False, moving=False))
+            frames.append(dict(stamp=1000.0 + 0.1 * k, T_world_det=T, objects=objs))
+        return dict(sequence="t", frames=frames)
+    old = labels("ABCDE", dict(A=1, B=2, C=3, D=4, E=5), 0.0)
+    fdir = _frames_dir(tmp_path, old)
+    export_scene(old, fdir, str(tmp_path / "old"), "rec", label_classes=["vehicle"])
+    root = tmp_path / "old" / "rec"
+    for nm in os.listdir(root / "label"):                           # the review
+        ann = {a["obj_id"]: a for a in json.load(open(root / "label" / nm))}
+        ann["1"]["obj_attr"] = ""                                     # A: confirmed
+        ann["2"]["obj_attr"] = "ignore"                               # B: cannot tell
+        del ann["3"]                                                  # C: not a vehicle
+        ann["4"]["obj_attr"] = "static"                               # D: confirmed static, moved by 0.5 m
+        ann["4"]["obj_type"] = "Truck"
+        ann["4"]["psr"]["position"]["x"] += 0.5
+        drawn = dict(ann["1"], obj_id="x9")                           # a car the reviewer drew, at N
+        drawn["psr"] = json.load(open(root / "label" / nm))[0]["psr"]
+        ann["x9"] = drawn                                             # E: left red
+        json.dump(list(ann.values()), open(root / "label" / nm, "w"))
+    names = sorted(os.listdir(root / "label"))
+    # the reviewer's drawn box sits where A is in this toy; move it to N's place
+    for k, nm in enumerate(names):
+        ann = json.load(open(root / "label" / nm))
+        T = old["frames"][k]["T_world_det"]
+        p = np.linalg.inv(T) @ np.r_[world["N"], 0.8, 1.0]
+        for a in ann:
+            if a["obj_id"] == "x9":
+                a["psr"] = box_to_psr(np.r_[p[:2], 0.8 - 1.8, 4.5, 1.9, 1.6, 0.0])
+        json.dump(ann, open(root / "label" / nm, "w"))
+
+    new = labels("ABCDE", dict(A=11, B=12, C=13, D=14, E=15), 0.1)       # new teachers: same objects, new ids
+    for k, f in enumerate(new["frames"]):                              # ... plus one the review never saw
+        p = np.linalg.inv(f["T_world_det"]) @ np.r_[30.0, 20.0, 0.8, 1.0]
+        f["objects"].append(dict(track_id=16, label="vehicle", subclass="truck", box=np.r_[p[:2], 1.5, 9, 2.5, 3.2, 0],
+                                 velocity=np.zeros(2), score=0.6, review=False, interpolated=False, moving=False))
+    export_scene(new, fdir, str(tmp_path / "new"), "rec", label_classes=["vehicle"])
+    counts = carry_review(str(tmp_path / "new" / "rec"), str(root))
+    assert counts["kept the earlier decision"] == 24 and counts["deleted earlier, deleted again"] == 6
+    assert counts["copied from the earlier review"] == 6 and counts["new boxes to review"] == 6
+    assert counts["took the reviewer's geometry"] == 6 and counts["of them still to review"] == 6     # E
+    ann = json.load(open(tmp_path / "new" / "rec" / "label" / names[2]))
+    by_id = {a["obj_id"]: a for a in ann}
+    assert set(by_id) == {"11", "12", "14", "15", "16", "hx9"}
+    assert by_id["11"]["obj_attr"] == "" and by_id["12"]["obj_attr"] == "ignore"
+    assert by_id["14"]["obj_attr"] == "static" and by_id["14"]["obj_type"] == "Truck"
+    assert "review" in by_id["15"]["obj_attr"] and "review" in by_id["16"]["obj_attr"]
+    old_d = {a["obj_id"]: a for a in json.load(open(root / "label" / names[2]))}["4"]["psr"]["position"]["x"]
+    assert by_id["14"]["psr"]["position"]["x"] == pytest.approx(old_d)

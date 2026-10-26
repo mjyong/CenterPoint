@@ -623,6 +623,100 @@ def add_candidates(scene_dir, results, min_score=0.3, match_dist=2.0, margin=0.5
     return dict(counts)
 
 
+def carry_review(new_dir, old_dir, match_dist=2.0, margin=0.5, moved_tol=0.05):
+    """The decisions of an earlier box review applied to a fresh export of the same scene, so that only what
+    is new needs a look.
+
+    ``old_dir``: the scene exported from other auto-labels (e.g. one teacher) and reviewed in SUSTechPOINTS;
+    ``new_dir``: the scene exported from new auto-labels (e.g. two teachers), not reviewed yet. Frames are
+    matched by name (the stamp). In each frame:
+
+    * a new box that covers an old one (centers within ``match_dist``, or one center inside the other box
+      grown by ``margin``) takes the old decisions: the type, the attributes ignore / static / moving, and
+      ``review`` only when the old box still had it (never confirmed). It keeps the old geometry when the
+      reviewer moved the old box (center more than ``moved_tol`` from where it was exported), else the new
+      auto-label's;
+    * a new box near a box the reviewer deleted (exported, gone from the label file) is deleted;
+    * an old box no new box covers (a vehicle the new auto-labels miss, or one the reviewer drew) is copied
+      over with its decisions, as object ``h<old id>``. Old candidates still red (``add_candidates``) are
+      not copied: run ``add_candidates`` on the new scene instead;
+    * every other new box (an object the earlier review never saw) is marked ``review``: red in the tool.
+
+    Returns counts."""
+    with open(os.path.join(new_dir, META_FILE)) as fh:
+        meta = json.load(fh)
+    with open(os.path.join(old_dir, META_FILE)) as fh:
+        old_meta = {fm["name"]: fm for fm in json.load(fh)["frames"]}
+    counts = defaultdict(int)
+    for fm in meta["frames"]:
+        name = fm["name"]
+        path = os.path.join(new_dir, "label", name + ".json")
+        with open(path) as fh:
+            new = json.load(fh) or []
+        info_path = os.path.join(new_dir, "dog_info", name + ".json")
+        info = json.load(open(info_path)) if os.path.exists(info_path) else {}
+        om = old_meta.get(name)
+        if om is None:
+            counts["frames without an earlier review"] += 1
+            for a in new:
+                a["obj_attr"] = ",".join(sorted(_attrs(a) - {""} | {"review"}))
+            counts["new boxes to review"] += len(new)
+        else:
+            with open(os.path.join(old_dir, "label", name + ".json")) as fh:
+                old = json.load(fh) or []
+            old_info_path = os.path.join(old_dir, "dog_info", name + ".json")
+            old_info = json.load(open(old_info_path)) if os.path.exists(old_info_path) else {}
+            old_ids = {str(a.get("obj_id")) for a in old}
+            deleted = [np.asarray(ex["center"][:2], float) for oid, ex in om.get("objects", {}).items()
+                       if oid not in old_ids]
+            old_boxes = [psr_to_box(a["psr"]) for a in old]
+            used = set()
+            out = []
+            for a in new:
+                box = psr_to_box(a["psr"])
+                j = next((k for k, ob in enumerate(old_boxes)
+                          if k not in used and _same_object(box, ob, match_dist, margin)), None)
+                if j is not None:
+                    used.add(j)
+                    o = old[j]
+                    attrs = _attrs(o) - {""}
+                    a["obj_type"] = o.get("obj_type", a.get("obj_type"))
+                    a["obj_attr"] = ",".join(sorted(attrs))
+                    ex = om.get("objects", {}).get(str(o.get("obj_id")))
+                    if ex is not None and np.hypot(*(old_boxes[j][:2] - np.asarray(ex["center"][:2]))) > moved_tol:
+                        a["psr"] = o["psr"]
+                        counts["took the reviewer's geometry"] += 1
+                    counts["kept the earlier decision"] += 1
+                    counts["of them still to review"] += "review" in attrs
+                    out.append(a)
+                elif any(np.hypot(*(box[:2] - d)) <= match_dist for d in deleted):
+                    counts["deleted earlier, deleted again"] += 1
+                    info.pop(str(a.get("obj_id")), None)
+                else:
+                    a["obj_attr"] = ",".join(sorted(_attrs(a) - {""} | {"review"}))
+                    counts["new boxes to review"] += 1
+                    out.append(a)
+            for k, o in enumerate(old):
+                if k in used:
+                    continue
+                oid = str(o.get("obj_id"))
+                if CANDIDATE_ID.match(oid) and "review" in _attrs(o):
+                    counts["earlier candidates not copied"] += 1
+                    continue
+                copy = dict(o, obj_id="h" + oid)
+                out.append(copy)
+                if oid in old_info:
+                    info["h" + oid] = old_info[oid]
+                counts["copied from the earlier review"] += 1
+                counts["of them still to review"] += "review" in _attrs(o)
+            new = out
+        with open(path, "w") as fh:
+            json.dump(new, fh)
+        with open(info_path, "w") as fh:
+            json.dump(info, fh)
+    return dict(counts)
+
+
 def _to_world(box, vel, T):
     d = Detections(np.asarray(box, float)[None], np.asarray(vel, float).reshape(1, 2), np.ones(1),
                    np.zeros(1, np.int64)).transform(np.asarray(T, float), "world")
