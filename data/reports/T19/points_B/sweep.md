@@ -1,0 +1,22 @@
+# Parameter sweep
+
+- scenes: 0921_165659_s000, 0921_165659_s001, 0921_165659_s002, 0921_165659_s007, 0921_165659_s008, 0921_165659_s009, 0921_165659_s010, 0921_165659_s011, 0921_165659_s012, 0921_165659_s013, 0921_165659_s014, 0921_165659_s015, 0921_165659_s016, 0921_165659_s017, 0921_165659_s018, 0921_165659_s019, 0921_165659_s020, 0921_165659_s021, 0921_165659_s022, 0921_165659_s023, 0921_165659_s024, 0921_165659_s025, 0921_165659_s026, 0921_165659_s027, 0921_165659_s028
+- detections: `raw` from `data/tune/nusc_pp_train/{scene}/pillar/results.pkl`
+- every row against row 1; ahead: share of 500 paired resamples of the scenes in which the row is better
+
+Columns: det recall = detections: recall within near range; det precision = detections: precision within near range; det F1 = detections: F1 within near range; det FP / frame = detections: false per keyframe; MOTA = tracks: MOTA; IDF1 = tracks: IDF1; IDSW / min = tracks: ID switches / min; false tracks / min = tracks: false tracks / min; confirm p90 s = tracks: confirm delay p90 [s]; moving missed = motion: relevant moving stretches missed; false moving / h = motion: parked reported moving / h; FDE 3 s = prediction: FDE 3 s, moving [m]; MR 3 s = prediction: miss rate 3 s, moving.
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, filter.min_points.vehicle=5 | 0.808 | 0.808 | 0.808 | 0.499 | 0.618 | 0.757 | 3.983 | 32.029 | 0.501 | 0 | 34.143 | 3.139 | 0.645 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, filter.min_points.vehicle=3 | 0.812 | 0.806 | 0.809 | 0.512 | 0.615 | 0.756 | 3.983 | 32.842 | 0.501 | 0 | 34.143 | 3.140 | 0.645 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, filter.min_points.vehicle=8 | 0.804 | 0.811 | 0.807 | 0.483 | 0.617 | 0.755 | 4.146 | 30.729 | 1.000 | 0 | 29.265 | 3.139 | 0.645 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, filter.min_points.vehicle=12 | 0.796 | 0.812 | 0.804 | 0.464 | 0.613 | 0.752 | 4.227 | 29.265 | 1.100 | 0 | 29.265 | 3.098 | 0.643 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.004 (99%) | -0.002 (0%) | 0.001 (72%) | 0.013 (0%) | -0.003 (3%) | -0.001 (34%) | 0.000 (32%) | 0.813 (0%) | -0.000 (56%) | 0 (0%) | 0.000 (0%) | 0.001 (0%) | 0.000 (0%) |
+| 3 | -0.004 (0%) | 0.003 (96%) | -0.001 (35%) | -0.016 (100%) | -0.001 (46%) | -0.002 (34%) | 0.163 (22%) | -1.301 (100%) | 0.499 (0%) | 0 (0%) | -4.878 (62%) | 0.000 (0%) | 0.000 (0%) |
+| 4 | -0.012 (0%) | 0.004 (93%) | -0.004 (14%) | -0.035 (100%) | -0.005 (35%) | -0.005 (32%) | 0.244 (16%) | -2.764 (100%) | 0.599 (0%) | 0 (0%) | -4.878 (62%) | -0.041 (69%) | -0.002 (69%) |
