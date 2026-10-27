@@ -1,0 +1,193 @@
+# Pipeline evaluation
+
+- scenes (10): 0921_164127_s000, 0921_164127_s001, 0921_164127_s002, 0921_164127_s003, 0921_164127_s004, 0921_164127_s005, 0921_165659_s003, 0921_165659_s004, 0921_165659_s005, 0921_165659_s006
+- 2884 frames, 580 keyframes scored (4.8 min)
+- detections: `labels` from `data/tune/deploy/{scene}/pillar/results.pkl`
+- parameters: `tracker.high_score=0.4`, `tracker.output_min_score=0.35`, `tracker.low_score=0.2`, `tracker.vehicle.max_age=1.5`, `tracker.vehicle.min_hits=3`
+- scored: vehicles that are not ignore boxes, within 40 m and with current-sweep points; a detection or track on any other labelled box is not counted. Label tracks stitched into one vehicle: 19.
+- intervals: 90 % over 500 resamples of the scenes
+
+## Main metrics
+
+| metric | value | interval |
+|---|---|---|
+| detections: recall within near range | **1.000** | 1.000 – 1.000 |
+| detections: precision within near range | **1.000** | 1.000 – 1.000 |
+| detections: F1 within near range | **1.000** | 1.000 – 1.000 |
+| detections: false per keyframe | **0.000** | 0.000 – 0.000 |
+| tracks: MOTA | **0.961** | 0.952 – 0.966 |
+| tracks: IDF1 | **0.957** | 0.929 – 0.974 |
+| tracks: ID switches / min | **1.655** | 0.620 – 3.125 |
+| tracks: false tracks / min | **0.000** | 0.000 – 0.000 |
+| tracks: confirm delay p90 [s] | **0.501** | 0.500 – 0.501 |
+| motion: relevant moving stretches missed | **0** | 0.000 – 0.000 |
+| motion: parked reported moving / h | **0.000** | 0.000 – 0.000 |
+| prediction: FDE 3 s, moving [m] | **1.388** | 1.177 – 1.991 |
+| prediction: miss rate 3 s, moving | **0.286** | 0.222 – 0.443 |
+
+## Detections at the reporting threshold
+
+Vehicle threshold 0.40 (`tracker.high_score`), 2 m match, keyframes. Near: within 30 m.
+
+| range | precision | recall | TP | FP | FN |
+|---|---|---|---|---|---|
+| 0-30 m | 1.000 | 1.000 | 1390 | 0 | 0 |
+| 30-40 m | 1.000 | 1.000 | 343 | 0 | 0 |
+
+False detections per keyframe 0.000. AP over all scores: AP@2.0 1.000, AP@4.0 1.000, AP@2.0 0-20 m 1.000, 20-40 m 1.000.
+
+## Tracking
+
+Reported tracks (confirmed, coasting included) against the scored vehicles, keyframes, 2 m.
+
+| MOTA | MOTP m | IDF1 | recall | precision | IDSW | IDSW / min | FRAG | MT | ML | vehicles | TP | FP | FN |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **0.961** | 0.04 | **0.957** | 0.965 | 1.000 | 8 | 1.66 | 8 | 54 | 2 | 59 | 1673 | 0 | 60 |
+
+- false tracks (a track false on consecutive keyframes counts once): 0.00 per minute
+- a vehicle coming into 30 m waits for its first matched track: median 0.5 s, p90 0.5 s (17 vehicles; 1 never tracked; 0.5 s resolution)
+
+### Where the errors are
+
+| false tracks: cause | count |
+|---|---|
+| second track on a tracked vehicle | 0 |
+| beside a vehicle (2-4 m off) | 0 |
+| coasting after the vehicle was lost | 0 |
+| nothing labelled nearby | 0 |
+
+| missed vehicles (FN) | count |
+|---|---|
+| detected, not tracked | 60 |
+| not detected | 0 |
+| 0-10 m | 3 |
+| 10-20 m | 11 |
+| 20-30 m | 27 |
+| 30-40 m | 19 |
+| 1-9 pts | 1 |
+| 10-49 pts | 15 |
+| >=50 pts | 44 |
+
+Blind sector (142-218 deg behind the robot) and the 20 deg bands beside it:
+
+| zone | scored vehicles | missed | missed share | tracks | false | false share |
+|---|---|---|---|---|---|---|
+| elsewhere | 1317 | 47 | 0.036 | 1270 | 0 | 0.000 |
+| edge | 402 | 11 | 0.027 | 391 | 0 | 0.000 |
+| blind | 14 | 2 | 0.143 | 12 | 0 | 0.000 |
+
+## Motion state
+
+Online state against the labels' moving flags (tools/dog/motion_eval.py). Relevant: >= 1 m/s and within 30 m.
+
+| moving recall | false moving | parked reported moving | false episodes (per h) | moving stretches missed | latency median / p90 s | relevant missed | relevant latency median / p90 s |
+|---|---|---|---|---|---|---|---|
+| 0.727 | 0.0044 | 0 / 39 | 0 (0.0) | 6 / 27 | 0.50 / 1.50 | **0 / 9** | 0.50 / 1.50 |
+
+## Prediction
+
+Tracks matched to a vehicle with 3 s of labelled future (keyframes every 0.5 s). Moving: >= 1.5 m in 3 s; turning: heading changes > 15 deg. ADE1 / FDE1: the most likely mode; minADE / minFDE: the best; MR: no mode ends within 2 m. IMM is what runs online, CV keeps the track's velocity.
+
+**all matched** (1285 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.11 | 0.14 | 0.11 | 0.14 | 0.002 |
+| IMM | 2 s | 0.17 | 0.27 | 0.17 | 0.27 | 0.023 |
+| IMM | 3 s | 0.24 | 0.39 | 0.24 | 0.39 | 0.057 |
+| CV | 1 s | 0.11 | 0.14 | 0.11 | 0.14 | 0.002 |
+| CV | 2 s | 0.17 | 0.27 | 0.17 | 0.27 | 0.023 |
+| CV | 3 s | 0.24 | 0.39 | 0.24 | 0.39 | 0.057 |
+
+**moving** (161 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.29 | 0.39 | 0.29 | 0.39 | 0.012 |
+| IMM | 2 s | 0.53 | 0.90 | 0.52 | 0.89 | 0.106 |
+| IMM | 3 s | 0.78 | 1.39 | 0.77 | 1.38 | 0.286 |
+| CV | 1 s | 0.29 | 0.39 | 0.29 | 0.39 | 0.012 |
+| CV | 2 s | 0.53 | 0.90 | 0.53 | 0.90 | 0.106 |
+| CV | 3 s | 0.78 | 1.39 | 0.78 | 1.39 | 0.286 |
+
+**moving, straight** (132 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.26 | 0.35 | 0.26 | 0.35 | 0.008 |
+| IMM | 2 s | 0.47 | 0.79 | 0.47 | 0.79 | 0.083 |
+| IMM | 3 s | 0.69 | 1.25 | 0.69 | 1.25 | 0.250 |
+| CV | 1 s | 0.26 | 0.35 | 0.26 | 0.35 | 0.008 |
+| CV | 2 s | 0.47 | 0.79 | 0.47 | 0.79 | 0.083 |
+| CV | 3 s | 0.69 | 1.25 | 0.69 | 1.25 | 0.250 |
+
+**moving, turning** (29 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.42 | 0.56 | 0.41 | 0.56 | 0.034 |
+| IMM | 2 s | 0.79 | 1.37 | 0.78 | 1.36 | 0.207 |
+| IMM | 3 s | 1.16 | 2.01 | 1.15 | 2.00 | 0.448 |
+| CV | 1 s | 0.41 | 0.56 | 0.41 | 0.56 | 0.034 |
+| CV | 2 s | 0.79 | 1.37 | 0.79 | 1.37 | 0.207 |
+| CV | 3 s | 1.16 | 2.01 | 1.16 | 2.01 | 0.448 |
+
+**moving, < 3 m/s** (152 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.30 | 0.41 | 0.30 | 0.40 | 0.013 |
+| IMM | 2 s | 0.55 | 0.94 | 0.55 | 0.94 | 0.112 |
+| IMM | 3 s | 0.81 | 1.46 | 0.81 | 1.45 | 0.303 |
+| CV | 1 s | 0.30 | 0.41 | 0.30 | 0.41 | 0.013 |
+| CV | 2 s | 0.55 | 0.94 | 0.55 | 0.94 | 0.112 |
+| CV | 3 s | 0.81 | 1.46 | 0.81 | 1.46 | 0.303 |
+
+**moving, >= 6 m/s** (9 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.05 | 0.07 | 0.05 | 0.07 | 0.000 |
+| IMM | 2 s | 0.09 | 0.14 | 0.09 | 0.14 | 0.000 |
+| IMM | 3 s | 0.11 | 0.18 | 0.11 | 0.18 | 0.000 |
+| CV | 1 s | 0.05 | 0.07 | 0.05 | 0.07 | 0.000 |
+| CV | 2 s | 0.09 | 0.14 | 0.09 | 0.14 | 0.000 |
+| CV | 3 s | 0.11 | 0.18 | 0.11 | 0.18 | 0.000 |
+
+## Hazard proxy
+
+A moving vehicle that comes within 5 m of the robot within 3 s (labelled future, the robot's own path) should raise an alarm: a moving track whose most likely predicted path, or its position now, comes that close. Few such vehicles in 0921; the numbers are for the controlled scenes to come (DATA_COLLECTION_PLAN.md 3.2).
+
+- events 6, reported 5, lead before the closest approach: median 1.5 s, min -2.5 s
+- alarms without such a vehicle: 0 (0.0 per hour)
+
+## Timing (this machine, ms per frame: median / p90)
+
+| stage | median | p90 |
+|---|---|---|
+| filter | 0.03 | 0.04 |
+| track | 0.87 | 3.88 |
+| predict | 0.70 | 3.33 |
+
+## Issues (`issues.csv`)
+
+| kind | count |
+|---|---|
+| ID switch | 8 |
+| bad prediction | 12 |
+| hazard not reported | 1 |
+
+## Snapshots
+
+Middle keyframe of each scene, robot at the center heading up. Green / red outlines: scored vehicles tracked / missed; grey: not scored; filled: reported tracks; lines: the two most likely predicted modes; dashes: labelled 3 s future; shaded: the blind sector.
+
+![0921_164127_s000_bev.png](0921_164127_s000_bev.png)
+![0921_164127_s001_bev.png](0921_164127_s001_bev.png)
+![0921_164127_s002_bev.png](0921_164127_s002_bev.png)
+![0921_164127_s003_bev.png](0921_164127_s003_bev.png)
+![0921_164127_s004_bev.png](0921_164127_s004_bev.png)
+![0921_164127_s005_bev.png](0921_164127_s005_bev.png)
+![0921_165659_s003_bev.png](0921_165659_s003_bev.png)
+![0921_165659_s004_bev.png](0921_165659_s004_bev.png)
+![0921_165659_s005_bev.png](0921_165659_s005_bev.png)
+![0921_165659_s006_bev.png](0921_165659_s006_bev.png)

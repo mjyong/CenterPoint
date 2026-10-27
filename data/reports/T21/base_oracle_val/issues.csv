@@ -1,0 +1,22 @@
+kind,scene,t,duration,track,gt,range,zone,value,note
+ID switch,0921_164127_s000,23.5,0.0,13,9,29.7,elsewhere,1.0,T8 -> T13
+ID switch,0921_164127_s000,24.0,0.0,14,3,27.4,elsewhere,1.0,T3 -> T14
+ID switch,0921_164127_s000,27.5,0.0,17,11,26.4,edge,1.0,T9 -> T17
+ID switch,0921_164127_s000,28.0,0.0,18,5,23.1,elsewhere,1.0,T5 -> T18
+ID switch,0921_164127_s001,8.0,0.0,15,131,31.2,elsewhere,1.0,T12 -> T15
+ID switch,0921_164127_s002,25.0,0.0,14,68,35.9,elsewhere,1.0,T13 -> T14
+ID switch,0921_164127_s003,21.5,0.0,7,2,35.4,elsewhere,1.0,T2 -> T7
+ID switch,0921_165659_s006,13.5,0.0,4,8,19.1,elsewhere,1.0,T2 -> T4
+bad prediction,0921_164127_s000,20.0,3.0,9,11,24.0,edge,5.8,"FDE 5.8 m at 3 s, straight, 1.0 m/s"
+bad prediction,0921_164127_s000,20.5,3.0,9,11,24.0,edge,5.6,"FDE 5.6 m at 3 s, straight, 1.1 m/s"
+bad prediction,0921_164127_s002,2.0,3.0,4,5,22.6,edge,5.0,"FDE 5.0 m at 3 s, straight, 1.8 m/s"
+bad prediction,0921_164127_s000,17.5,3.0,11,54,5.9,edge,4.1,"FDE 4.1 m at 3 s, straight, 2.3 m/s"
+bad prediction,0921_164127_s002,21.0,3.0,12,66,39.4,elsewhere,3.8,"FDE 3.8 m at 3 s, turning, 1.3 m/s"
+bad prediction,0921_164127_s001,20.5,3.0,15,131,15.2,elsewhere,3.8,"FDE 3.8 m at 3 s, straight, 2.7 m/s"
+bad prediction,0921_164127_s002,21.5,3.0,12,66,39.1,elsewhere,3.6,"FDE 3.6 m at 3 s, turning, 1.3 m/s"
+bad prediction,0921_164127_s000,21.0,3.0,9,11,24.2,edge,3.6,"FDE 3.6 m at 3 s, straight, 1.0 m/s"
+bad prediction,0921_164127_s001,6.5,3.0,9,130,35.5,elsewhere,3.6,"FDE 3.6 m at 3 s, straight, 1.3 m/s"
+bad prediction,0921_164127_s002,20.5,3.0,12,66,39.6,elsewhere,3.4,"FDE 3.4 m at 3 s, turning, 1.1 m/s"
+bad prediction,0921_164127_s002,1.5,3.0,4,5,22.1,edge,3.3,"FDE 3.3 m at 3 s, straight, 1.3 m/s"
+bad prediction,0921_164127_s000,18.0,3.0,11,54,5.5,edge,3.0,"FDE 3.0 m at 3 s, straight, 2.5 m/s"
+hazard not reported,0921_165659_s006,4.0,2.5,,70,3.9,,1.0,"moving vehicle within 5 m, no alarm"

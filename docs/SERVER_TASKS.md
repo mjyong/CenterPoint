@@ -94,7 +94,7 @@
 | H4 | 在 Foxglove 里看基线，按问题清单归类典型问题 | 人 | T18 | 1 小时 | 待做 |
 | T19 | 后处理扫参（上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉）；第 1b 步三个 Pillar 各用最合适的阈值比，可能要人重新定上线模型 | Agent | T18 | 30 分钟 | 完成（人定仍用 nuScenes Pillar）。上报阈值 0.40，轨迹输出分数 0.35，低分门槛 0.2；最少点数、离地、下沉留默认 |
 | T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 完成。coast 1.5 s，确认 3 帧；关联半径、观测噪声、速度头、匹配、运动状态留默认 |
-| T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 待做 |
+| T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 完成。运动模型、合并距离留默认（cv:1.5+ct:1.5:0.25，merge_dist 0.25）；训练 oracle 上 CV 比 IMM 差 |
 | T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 待做（等我改代码） |
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
 
@@ -3156,7 +3156,249 @@ IMM（现在在线用的）和匀速（CV）比，再调 IMM 的模型。oracle�
 
 ### T21 结果
 
-（待填）
+远程没有新提交，没有跑测试。BASE 沿用 T20。耗时：现状 oracle_val / oracle_train / A 为 11 / 19 / 11 s，运动模型 36 / 70 / 41 s，合并距离 22 / 44 / 25 s。
+
+第 1 步用默认 IMM（`cv:1.5+ct:1.5:0.25`，merge_dist 0.25）。moving、3 s 的 FDE1 / MR：
+
+| 报告 | 样本 moving / straight / turning | IMM FDE1 | CV FDE1 | IMM MR | CV MR |
+|---|---|---|---|---|---|
+| oracle_val | 161 / 132 / 29 | 1.39 | 1.39 | 0.286 | 0.286 |
+| oracle_train | 217 / 148 / 69 | 2.19 | 2.22 | 0.521 | 0.571 |
+| A | 117 / 101 / 16 | 2.80 | 2.80 | 0.521 | 0.521 |
+
+训练 oracle 上 CV 比 IMM 差，所以不满足「CV 在三份里都不比 IMM 差」，D2 不用据此改成匀速。验证 oracle 和端到端 A 上，moving 的 FDE1、MR 相同；minFDE 上 IMM 略好（验证 1.38 对 1.39，A 上 2.79 对 2.80）。训练 oracle：moving 的 FDE1 2.22 对 2.19，MR 0.571 对 0.521；转弯 69 个样本，FDE1 2.65 对 2.59，MR 0.754 对 0.638。
+
+第 2 步留第 1 行 `tracker.vehicle.models=cv:1.5+ct:1.5:0.25`。主指标是 moving 的 FDE 3 s：要在 OT、OV、A 上都低于第 1 行，并且至少两份领先比例 ≥ 90%；三份的 MR 3 s 都不高于第 1 行；A 上 IDF1 下降不超过 0.01。
+
+- 第 2 行 `cv:1.0+ct:1.0:0.25`：A 的 FDE 2.499（第 1 行 2.795，领先 100%），MR 0.483，IDF1 0.787。OT 的 FDE 2.225 高于 2.188，MR 0.525 高于 0.521。OV 的 FDE 低 0.001，领先只有 52%。只有一份领先 ≥ 90%。
+- 第 3 行 `cv:2.5+ct:2.5:0.25`：只有 OT 更低（2.101，领先 100%，MR 0.461）。OV 1.391 高于 1.388，A 3.213 高于 2.795。
+- 第 4 行 `cv:1.5+ct:1.5:0.5`：OV 1.389、OT 2.190 都略高于第 1 行。A 上 2.792，领先 89%，不到 90%。
+- 第 5 行只有 `cv:1.5`：OV 1.390、OT 2.238 都更高（OT 的 MR 0.581）。A 上 2.794，领先 64%。
+
+第 3 步在没改运动模型的 BASE 上扫合并距离，留第 1 行 `predict.merge_dist=0.25`。
+
+- 第 2 行 0.5：OT 的 FDE 2.174，低 0.014，领先 100%，MR 0.525 高于 0.521。OV 的差是 −0.000，领先 55%。A 的 FDE 2.801 高于 2.795。
+- 第 3 行 1.0：OT 的 FDE 2.157，低 0.031，领先 100%，MR 0.530 更高。OV 1.389、A 2.811 都更高，A 的 MR 也是 0.530。
+
+最后的 BASE（和 T20 相同，没改的参数不写）：
+
+```text
+--set tracker.high_score=0.4 --set tracker.output_min_score=0.35 --set tracker.low_score=0.2 --set tracker.vehicle.max_age=1.5 --set tracker.vehicle.min_hits=3
+```
+
+第 1 步 Prediction（moving、moving straight、moving turning）：
+
+验证 oracle（`base_oracle_val/report.md`）：
+
+**moving** (161 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.29 | 0.39 | 0.29 | 0.39 | 0.012 |
+| IMM | 2 s | 0.53 | 0.90 | 0.52 | 0.89 | 0.106 |
+| IMM | 3 s | 0.78 | 1.39 | 0.77 | 1.38 | 0.286 |
+| CV | 1 s | 0.29 | 0.39 | 0.29 | 0.39 | 0.012 |
+| CV | 2 s | 0.53 | 0.90 | 0.53 | 0.90 | 0.106 |
+| CV | 3 s | 0.78 | 1.39 | 0.78 | 1.39 | 0.286 |
+
+**moving, straight** (132 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.26 | 0.35 | 0.26 | 0.35 | 0.008 |
+| IMM | 2 s | 0.47 | 0.79 | 0.47 | 0.79 | 0.083 |
+| IMM | 3 s | 0.69 | 1.25 | 0.69 | 1.25 | 0.250 |
+| CV | 1 s | 0.26 | 0.35 | 0.26 | 0.35 | 0.008 |
+| CV | 2 s | 0.47 | 0.79 | 0.47 | 0.79 | 0.083 |
+| CV | 3 s | 0.69 | 1.25 | 0.69 | 1.25 | 0.250 |
+
+**moving, turning** (29 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.42 | 0.56 | 0.41 | 0.56 | 0.034 |
+| IMM | 2 s | 0.79 | 1.37 | 0.78 | 1.36 | 0.207 |
+| IMM | 3 s | 1.16 | 2.01 | 1.15 | 2.00 | 0.448 |
+| CV | 1 s | 0.41 | 0.56 | 0.41 | 0.56 | 0.034 |
+| CV | 2 s | 0.79 | 1.37 | 0.79 | 1.37 | 0.207 |
+| CV | 3 s | 1.16 | 2.01 | 1.16 | 2.01 | 0.448 |
+
+训练 oracle（`base_oracle_train/report.md`）：
+
+**moving** (217 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.37 | 0.52 | 0.36 | 0.50 | 0.009 |
+| IMM | 2 s | 0.73 | 1.28 | 0.70 | 1.23 | 0.189 |
+| IMM | 3 s | 1.14 | 2.19 | 1.09 | 2.09 | 0.521 |
+| CV | 1 s | 0.38 | 0.52 | 0.38 | 0.52 | 0.009 |
+| CV | 2 s | 0.73 | 1.29 | 0.73 | 1.29 | 0.203 |
+| CV | 3 s | 1.15 | 2.22 | 1.15 | 2.22 | 0.571 |
+
+**moving, straight** (148 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.33 | 0.47 | 0.33 | 0.46 | 0.000 |
+| IMM | 2 s | 0.65 | 1.14 | 0.64 | 1.11 | 0.169 |
+| IMM | 3 s | 1.02 | 2.00 | 1.00 | 1.96 | 0.466 |
+| CV | 1 s | 0.34 | 0.47 | 0.34 | 0.47 | 0.000 |
+| CV | 2 s | 0.65 | 1.15 | 0.65 | 1.15 | 0.176 |
+| CV | 3 s | 1.03 | 2.01 | 1.03 | 2.01 | 0.486 |
+
+**moving, turning** (69 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.46 | 0.63 | 0.44 | 0.60 | 0.029 |
+| IMM | 2 s | 0.89 | 1.57 | 0.84 | 1.48 | 0.232 |
+| IMM | 3 s | 1.38 | 2.59 | 1.28 | 2.37 | 0.638 |
+| CV | 1 s | 0.46 | 0.63 | 0.46 | 0.63 | 0.029 |
+| CV | 2 s | 0.90 | 1.60 | 0.90 | 1.60 | 0.261 |
+| CV | 3 s | 1.40 | 2.65 | 1.40 | 2.65 | 0.754 |
+
+端到端 A（`base_A/report.md`）：
+
+**moving** (117 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.94 | 1.13 | 0.94 | 1.13 | 0.188 |
+| IMM | 2 s | 1.35 | 1.98 | 1.35 | 1.98 | 0.368 |
+| IMM | 3 s | 1.77 | 2.80 | 1.77 | 2.79 | 0.521 |
+| CV | 1 s | 0.94 | 1.13 | 0.94 | 1.13 | 0.188 |
+| CV | 2 s | 1.35 | 1.99 | 1.35 | 1.99 | 0.368 |
+| CV | 3 s | 1.77 | 2.80 | 1.77 | 2.80 | 0.521 |
+
+**moving, straight** (101 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.94 | 1.12 | 0.94 | 1.12 | 0.198 |
+| IMM | 2 s | 1.34 | 1.96 | 1.34 | 1.96 | 0.376 |
+| IMM | 3 s | 1.75 | 2.76 | 1.75 | 2.76 | 0.525 |
+| CV | 1 s | 0.94 | 1.12 | 0.94 | 1.12 | 0.198 |
+| CV | 2 s | 1.34 | 1.96 | 1.34 | 1.96 | 0.376 |
+| CV | 3 s | 1.75 | 2.76 | 1.75 | 2.76 | 0.525 |
+
+**moving, turning** (16 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |
+|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.94 | 1.17 | 0.94 | 1.17 | 0.125 |
+| IMM | 2 s | 1.42 | 2.13 | 1.42 | 2.13 | 0.312 |
+| IMM | 3 s | 1.89 | 3.02 | 1.89 | 3.02 | 0.500 |
+| CV | 1 s | 0.94 | 1.17 | 0.94 | 1.17 | 0.125 |
+| CV | 2 s | 1.42 | 2.13 | 1.42 | 2.13 | 0.312 |
+| CV | 3 s | 1.89 | 3.02 | 1.89 | 3.02 | 0.500 |
+
+第 2 步运动模型：
+
+`models_oracle_val/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.5+ct:1.5:0.25 | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.388 | 0.286 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.0+ct:1.0:0.25 | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.388 | 0.273 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:2.5+ct:2.5:0.25 | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.391 | 0.298 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.5+ct:1.5:0.5 | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.389 | 0.286 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.5 | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.390 | 0.286 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.001 (52%) | -0.012 (79%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.003 (48%) | 0.012 (0%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.001 (38%) | 0.000 (0%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.002 (30%) | 0.000 (0%) |
+
+`models_oracle_train/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.5+ct:1.5:0.25 | 1.000 | 1.000 | 1.000 | 0.000 | 0.953 | 0.917 | 2.601 | 0.000 | 0.501 | 0 | 0.000 | 2.188 | 0.521 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.0+ct:1.0:0.25 | 1.000 | 1.000 | 1.000 | 0.000 | 0.952 | 0.917 | 2.601 | 0.000 | 0.501 | 0 | 0.000 | 2.225 | 0.525 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:2.5+ct:2.5:0.25 | 1.000 | 1.000 | 1.000 | 0.000 | 0.953 | 0.917 | 2.601 | 0.000 | 0.501 | 0 | 0.000 | 2.101 | 0.461 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.5+ct:1.5:0.5 | 1.000 | 1.000 | 1.000 | 0.000 | 0.953 | 0.917 | 2.601 | 0.000 | 0.501 | 0 | 0.000 | 2.190 | 0.507 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.5 | 1.000 | 1.000 | 1.000 | 0.000 | 0.953 | 0.917 | 2.601 | 0.000 | 0.501 | 0 | 0.000 | 2.238 | 0.581 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.000 (0%) | -0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.037 (21%) | 0.005 (44%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.087 (100%) | -0.060 (99%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.002 (45%) | -0.014 (88%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.050 (0%) | 0.060 (0%) |
+
+`models_A/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.5+ct:1.5:0.25 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.0+ct:1.0:0.25 | 0.839 | 0.825 | 0.832 | 0.641 | 0.612 | 0.787 | 1.862 | 26.895 | 1.200 | 2 | 86.891 | 2.499 | 0.483 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:2.5+ct:2.5:0.25 | 0.839 | 0.825 | 0.832 | 0.641 | 0.606 | 0.781 | 2.069 | 27.309 | 1.200 | 2 | 74.478 | 3.213 | 0.573 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.5+ct:1.5:0.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.792 | 0.521 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.vehicle.models=cv:1.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.794 | 0.521 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.003 (90%) | 0.001 (90%) | 0.000 (0%) | -0.207 (64%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.296 (100%) | -0.038 (98%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.002 (0%) | -0.006 (0%) | 0.207 (0%) | 0.207 (0%) | 0.000 (0%) | 0 (0%) | -12.413 (67%) | 0.418 (0%) | 0.051 (0%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.003 (89%) | 0.000 (0%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.002 (64%) | 0.000 (0%) |
+
+第 3 步合并距离：
+
+`merge_oracle_val/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, predict.merge_dist=0.25 | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.388 | 0.286 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, predict.merge_dist=0.5 | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.388 | 0.286 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, predict.merge_dist=1.0 | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.389 | 0.286 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.000 (55%) | 0.000 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.001 (0%) | 0.000 (0%) |
+
+`merge_oracle_train/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, predict.merge_dist=0.25 | 1.000 | 1.000 | 1.000 | 0.000 | 0.953 | 0.917 | 2.601 | 0.000 | 0.501 | 0 | 0.000 | 2.188 | 0.521 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, predict.merge_dist=0.5 | 1.000 | 1.000 | 1.000 | 0.000 | 0.953 | 0.917 | 2.601 | 0.000 | 0.501 | 0 | 0.000 | 2.174 | 0.525 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, predict.merge_dist=1.0 | 1.000 | 1.000 | 1.000 | 0.000 | 0.953 | 0.917 | 2.601 | 0.000 | 0.501 | 0 | 0.000 | 2.157 | 0.530 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.014 (100%) | 0.005 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.031 (100%) | 0.009 (0%) |
+
+`merge_A/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, predict.merge_dist=0.25 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, predict.merge_dist=0.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.801 | 0.521 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, predict.merge_dist=1.0 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.811 | 0.530 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.006 (5%) | 0.000 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.016 (0%) | 0.009 (0%) |
+
 
 ---
 
