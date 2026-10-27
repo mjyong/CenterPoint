@@ -93,7 +93,7 @@
 | T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 完成（修正后重跑；oracle 假轨迹 0 / 分钟；跟踪只计车辆）。续 2 完成：叉车忽略后验证车框 1721，oracle 假轨迹仍是 0；v2_pp − nusc_pp 的 ΔmAP 从 −0.041 收到 0.000 |
 | H4 | 在 Foxglove 里看基线，按问题清单归类典型问题 | 人 | T18 | 1 小时 | 待做 |
 | T19 | 后处理扫参（上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉）；第 1b 步三个 Pillar 各用最合适的阈值比，可能要人重新定上线模型 | Agent | T18 | 30 分钟 | 完成（人定仍用 nuScenes Pillar）。上报阈值 0.40，轨迹输出分数 0.35，低分门槛 0.2；最少点数、离地、下沉留默认 |
-| T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 待做 |
+| T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 完成。coast 1.5 s，确认 3 帧；关联半径、观测噪声、速度头、匹配、运动状态留默认 |
 | T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 待做 |
 | T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 待做（等我改代码） |
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
@@ -2828,7 +2828,299 @@ v2、v1 只跑了 A。两份里没有任何一行的 det F1 领先比例 ≥ 90%
 
 ### T20 结果
 
-（待填）
+远程没有新提交，没有跑测试。BASE 从 T19 接着：`tracker.high_score=0.4`、`tracker.output_min_score=0.35`、`tracker.low_score=0.2`。耗时：gate 35 / 72 s，age 44 / 88 s，hits 52 / 107 s，noise 76 / 157 s，assoc 34 / 70 s，motion 74 / 148 s，final_A 12 s（都是 A / B）。
+
+第 1 组（关联半径）留 **第 1 行 `tracker.vehicle.gate=3`**。A 上只有第 4 行（gate=4）IDF1 领先比例 ≥ 90%（91%，IDF1 0.775），moving missed、confirm p90、false tracks / min 都过。B 上这一行 IDF1 0.756，低于第 1 行的 0.757。
+
+第 2 组（最长 coast）选 **第 3 行 `tracker.vehicle.max_age=1.5`**。A 上 IDF1 领先 100%，IDF1 0.773；moving missed 2 不多于第 1 行，confirm p90 仍是 1.200 s，false tracks / min 36.825，不超过第 1 行 38.066 的 1.1 倍。第 4、5 行 IDF1 更高（0.774、0.778），领先比例只有 64% 和 71%，不选。B 上第 3 行 IDF1 0.771，不低于第 1 行的 0.757。
+
+第 3 组（确认帧数、试探寿命）选 **第 5 行 `tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15`**。A 上 IDF1 0.786，领先 100%；moving missed、confirm p90 与第 1 行相同，false tracks / min 27.102，低于第 1 行。第 6 行也领先 100%，IDF1 0.785，低于第 5 行。B 上第 5 行 IDF1 0.785，不低于第 1 行的 0.771。试探寿命仍是默认的 0.15 s。
+
+第 4 组（观测噪声）留 **第 1 行 `pos_std=0.3, vel_std=0.8`**。A 上第 3、4、6、9 行 IDF1 领先都 ≥ 90%，最高是第 4、6 行的 0.795。这四行在 B 上的 IDF1 都低于第 1 行的 0.785（0.773、0.775、0.770、0.781）。
+
+第 5 组（速度头、匹配方法）留 **第 1 行 `use_velocity=true, matching=greedy`**。A 上 IDF1 领先比例最高是第 2 行的 64%，不到 90%。关掉速度头的两行 IDF1 只高 0.002，停着的车报成在动升到 484 次/小时。
+
+第 6 组（运动状态）留 **第 1 行 `motion_on_speed=0.7, motion_on_frames=3`**。false moving / h 更低的行，A 上 moving missed 都多于第 1 行的 2（第 3、9 行是 4，领先比例 96%，但不能选）。moving missed 不多于 2 的行里，false moving / h 最低仍是第 1 行的 86.891。
+
+最后的 BASE（没改的参数不写）：
+
+```text
+--set tracker.high_score=0.4 --set tracker.output_min_score=0.35 --set tracker.low_score=0.2 --set tracker.vehicle.max_age=1.5 --set tracker.vehicle.min_hits=3
+```
+
+`final_A` 用这个 BASE，和 T18 续 2 的 deploy（同一批标签，默认跟踪参数）并排：
+
+| metric | T18 deploy | T20 final_A |
+|---|---|---|
+| detections: recall within near range | 0.872 | 0.839 |
+| detections: precision within near range | 0.758 | 0.825 |
+| detections: F1 within near range | 0.811 | 0.832 |
+| detections: false per keyframe | 1.040 | 0.641 |
+| tracks: MOTA | 0.459 | 0.609 |
+| tracks: IDF1 | 0.726 | 0.786 |
+| tracks: ID switches / min | 2.483 | 1.862 |
+| tracks: false tracks / min | 58.134 | 27.102 |
+| tracks: confirm delay p90 [s] | 1.200 | 1.200 |
+| motion: relevant moving stretches missed | 2 | 2 |
+| motion: parked reported moving / h | 86.891 | 86.891 |
+| prediction: FDE 3 s, moving [m] | 2.897 | 2.795 |
+| prediction: miss rate 3 s, moving | 0.541 | 0.521 |
+
+`gate_A/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.gate=3 | 0.839 | 0.825 | 0.832 | 0.643 | 0.572 | 0.772 | 2.069 | 38.066 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.gate=2 | 0.839 | 0.825 | 0.832 | 0.643 | 0.557 | 0.740 | 4.551 | 38.894 | 1.200 | 2 | 49.652 | 2.783 | 0.517 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.gate=2.5 | 0.839 | 0.825 | 0.832 | 0.643 | 0.575 | 0.767 | 2.689 | 37.446 | 1.200 | 2 | 62.065 | 2.810 | 0.526 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.gate=4 | 0.839 | 0.825 | 0.832 | 0.643 | 0.573 | 0.775 | 2.069 | 37.446 | 1.200 | 2 | 124.130 | 2.824 | 0.534 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.016 (3%) | -0.032 (3%) | 2.483 (0%) | 0.828 (25%) | 0.000 (0%) | 0 (0%) | -37.239 (67%) | -0.012 (56%) | -0.004 (56%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.002 (97%) | -0.005 (24%) | 0.621 (0%) | -0.621 (80%) | 0.000 (0%) | 0 (0%) | -24.826 (67%) | 0.015 (0%) | 0.004 (0%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.001 (58%) | 0.003 (91%) | 0.000 (31%) | -0.621 (85%) | 0.000 (0%) | 0 (0%) | 37.239 (0%) | 0.029 (2%) | 0.013 (0%) |
+
+`gate_B/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.gate=3 | 0.808 | 0.808 | 0.808 | 0.499 | 0.618 | 0.757 | 3.983 | 32.029 | 0.501 | 0 | 34.143 | 3.139 | 0.645 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.gate=2 | 0.808 | 0.808 | 0.808 | 0.499 | 0.605 | 0.744 | 5.040 | 32.436 | 0.502 | 0 | 24.388 | 3.138 | 0.642 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.gate=2.5 | 0.808 | 0.808 | 0.808 | 0.499 | 0.613 | 0.753 | 4.227 | 32.355 | 0.502 | 0 | 29.265 | 3.139 | 0.647 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.gate=4 | 0.808 | 0.808 | 0.808 | 0.499 | 0.615 | 0.756 | 3.983 | 31.948 | 0.502 | 0 | 39.021 | 3.107 | 0.649 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.012 (4%) | -0.013 (1%) | 1.057 (0%) | 0.406 (21%) | 0.001 (0%) | 0 (0%) | -9.755 (89%) | -0.001 (51%) | -0.003 (56%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.004 (21%) | -0.004 (9%) | 0.244 (0%) | 0.325 (10%) | 0.001 (0%) | 0 (0%) | -4.878 (69%) | -0.000 (55%) | 0.002 (38%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.002 (13%) | -0.001 (31%) | 0.000 (37%) | -0.081 (41%) | 0.001 (0%) | 0 (0%) | 4.878 (0%) | -0.032 (93%) | 0.004 (32%) |
+
+`age_A/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.0 | 0.839 | 0.825 | 0.832 | 0.643 | 0.572 | 0.772 | 2.069 | 38.066 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=0.5 | 0.839 | 0.825 | 0.832 | 0.643 | 0.555 | 0.726 | 4.345 | 39.721 | 1.200 | 3 | 49.652 | 2.777 | 0.517 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.575 | 0.773 | 1.862 | 36.825 | 1.200 | 2 | 86.891 | 2.791 | 0.513 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=2.0 | 0.839 | 0.827 | 0.833 | 0.634 | 0.578 | 0.774 | 1.448 | 36.204 | 1.200 | 2 | 86.891 | 2.791 | 0.513 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=3.0 | 0.839 | 0.831 | 0.835 | 0.622 | 0.581 | 0.778 | 1.655 | 35.998 | 1.200 | 2 | 86.891 | 2.791 | 0.513 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.018 (0%) | -0.046 (0%) | 2.276 (0%) | 1.655 (1%) | 0.000 (0%) | 1 (0%) | -37.239 (67%) | -0.018 (67%) | -0.004 (67%) |
+| 3 | 0.000 (0%) | 0.001 (65%) | 0.000 (65%) | -0.002 (65%) | 0.003 (100%) | 0.001 (100%) | -0.207 (67%) | -1.241 (100%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.004 (90%) | -0.009 (67%) |
+| 4 | 0.000 (0%) | 0.002 (98%) | 0.001 (98%) | -0.009 (98%) | 0.006 (100%) | 0.002 (64%) | -0.621 (76%) | -1.862 (100%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.004 (90%) | -0.009 (67%) |
+| 5 | 0.000 (0%) | 0.006 (100%) | 0.003 (100%) | -0.021 (100%) | 0.009 (95%) | 0.006 (71%) | -0.414 (62%) | -2.069 (99%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.004 (90%) | -0.009 (67%) |
+
+`age_B/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.0 | 0.808 | 0.808 | 0.808 | 0.499 | 0.618 | 0.757 | 3.983 | 32.029 | 0.501 | 0 | 34.143 | 3.139 | 0.645 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=0.5 | 0.808 | 0.807 | 0.808 | 0.501 | 0.604 | 0.706 | 7.560 | 32.761 | 0.501 | 0 | 34.143 | 3.168 | 0.647 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.624 | 0.771 | 2.764 | 31.216 | 0.502 | 0 | 39.021 | 3.130 | 0.639 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=2.0 | 0.808 | 0.809 | 0.808 | 0.496 | 0.626 | 0.770 | 2.683 | 31.135 | 0.502 | 0 | 39.021 | 3.130 | 0.639 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=3.0 | 0.808 | 0.809 | 0.808 | 0.493 | 0.630 | 0.779 | 2.195 | 30.647 | 0.502 | 0 | 39.021 | 3.130 | 0.639 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | -0.001 (0%) | -0.001 (0%) | 0.003 (0%) | -0.014 (0%) | -0.051 (0%) | 3.577 (0%) | 0.732 (4%) | -0.000 (40%) | 0 (0%) | 0.000 (0%) | 0.029 (0%) | 0.002 (0%) |
+| 3 | 0.000 (0%) | 0.001 (91%) | 0.000 (91%) | -0.002 (98%) | 0.006 (100%) | 0.014 (100%) | -1.219 (100%) | -0.813 (100%) | 0.001 (0%) | 0 (0%) | 4.878 (0%) | -0.009 (62%) | -0.006 (62%) |
+| 4 | 0.000 (0%) | 0.001 (91%) | 0.000 (91%) | -0.003 (99%) | 0.008 (100%) | 0.013 (96%) | -1.301 (100%) | -0.894 (100%) | 0.001 (0%) | 0 (0%) | 4.878 (0%) | -0.009 (62%) | -0.006 (62%) |
+| 5 | 0.000 (0%) | 0.001 (91%) | 0.000 (91%) | -0.005 (100%) | 0.012 (100%) | 0.022 (99%) | -1.788 (100%) | -1.382 (100%) | 0.001 (0%) | 0 (0%) | 4.878 (0%) | -0.009 (62%) | -0.006 (62%) |
+
+`hits_A/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=2, tracker.tentative_max_age=0.15 | 0.839 | 0.825 | 0.832 | 0.641 | 0.575 | 0.773 | 1.862 | 36.825 | 1.200 | 2 | 86.891 | 2.791 | 0.513 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=2, tracker.tentative_max_age=0.25 | 0.839 | 0.825 | 0.832 | 0.641 | 0.573 | 0.772 | 1.862 | 36.825 | 1.200 | 2 | 86.891 | 2.789 | 0.513 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=1, tracker.tentative_max_age=0.15 | 0.839 | 0.825 | 0.832 | 0.641 | 0.519 | 0.754 | 2.689 | 57.100 | 1.200 | 2 | 86.891 | 2.955 | 0.544 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=1, tracker.tentative_max_age=0.25 | 0.839 | 0.825 | 0.832 | 0.641 | 0.519 | 0.754 | 2.689 | 57.100 | 1.200 | 2 | 86.891 | 2.955 | 0.544 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 6 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.25 | 0.839 | 0.825 | 0.832 | 0.641 | 0.607 | 0.785 | 2.069 | 27.515 | 1.200 | 2 | 86.891 | 2.789 | 0.513 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.002 (23%) | -0.001 (23%) | 0.000 (0%) | 0.000 (37%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.002 (92%) | 0.000 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.056 (0%) | -0.019 (0%) | 0.828 (0%) | 20.275 (0%) | 0.000 (59%) | 0 (0%) | 0.000 (0%) | 0.163 (0%) | 0.031 (0%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.056 (0%) | -0.019 (0%) | 0.828 (0%) | 20.275 (0%) | 0.000 (59%) | 0 (0%) | 0.000 (0%) | 0.163 (0%) | 0.031 (0%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.033 (100%) | 0.013 (100%) | 0.000 (0%) | -9.723 (100%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.004 (0%) | 0.009 (0%) |
+| 6 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.032 (100%) | 0.012 (100%) | 0.207 (0%) | -9.310 (100%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.002 (92%) | 0.000 (0%) |
+
+`hits_B/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=2, tracker.tentative_max_age=0.15 | 0.808 | 0.809 | 0.808 | 0.497 | 0.624 | 0.771 | 2.764 | 31.216 | 0.502 | 0 | 39.021 | 3.130 | 0.639 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=2, tracker.tentative_max_age=0.25 | 0.808 | 0.809 | 0.808 | 0.497 | 0.620 | 0.768 | 2.845 | 32.029 | 0.502 | 0 | 34.143 | 3.127 | 0.639 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=1, tracker.tentative_max_age=0.15 | 0.808 | 0.809 | 0.808 | 0.497 | 0.547 | 0.744 | 3.008 | 54.629 | 0.501 | 0 | 39.021 | 3.081 | 0.635 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=1, tracker.tentative_max_age=0.25 | 0.808 | 0.809 | 0.808 | 0.497 | 0.547 | 0.744 | 3.008 | 54.629 | 0.501 | 0 | 39.021 | 3.081 | 0.635 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 39.021 | 2.998 | 0.636 |
+| 6 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.25 | 0.808 | 0.809 | 0.808 | 0.497 | 0.654 | 0.781 | 2.601 | 23.250 | 1.002 | 0 | 34.143 | 3.022 | 0.637 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.004 (0%) | -0.003 (1%) | 0.081 (0%) | 0.813 (0%) | 0.000 (0%) | 0 (0%) | -4.878 (65%) | -0.003 (86%) | 0.000 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.077 (0%) | -0.028 (0%) | 0.244 (7%) | 23.412 (0%) | -0.001 (63%) | 0 (0%) | 0.000 (36%) | -0.049 (76%) | -0.004 (71%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.077 (0%) | -0.028 (0%) | 0.244 (7%) | 23.412 (0%) | -0.001 (63%) | 0 (0%) | 0.000 (36%) | -0.049 (76%) | -0.004 (71%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.035 (100%) | 0.014 (100%) | -0.325 (98%) | -9.024 (100%) | 0.550 (0%) | 0 (0%) | 0.000 (0%) | -0.132 (79%) | -0.003 (58%) |
+| 6 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.031 (100%) | 0.010 (100%) | -0.163 (81%) | -7.967 (100%) | 0.501 (0%) | 0 (0%) | -4.878 (65%) | -0.109 (92%) | -0.002 (69%) |
+
+`noise_A/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.3, tracker.vehicle.vel_std=0.8 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.3, tracker.vehicle.vel_std=0.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.570 | 0.747 | 2.896 | 28.964 | 1.200 | 2 | 49.652 | 3.492 | 0.589 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.3, tracker.vehicle.vel_std=1.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.625 | 0.793 | 1.862 | 25.860 | 1.200 | 2 | 86.891 | 1.962 | 0.407 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.2, tracker.vehicle.vel_std=0.8 | 0.839 | 0.825 | 0.832 | 0.641 | 0.623 | 0.795 | 1.448 | 26.688 | 1.501 | 2 | 86.891 | 2.462 | 0.483 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.2, tracker.vehicle.vel_std=0.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.604 | 0.770 | 2.276 | 27.515 | 1.200 | 2 | 62.065 | 3.250 | 0.564 |
+| 6 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.2, tracker.vehicle.vel_std=1.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.626 | 0.795 | 1.655 | 26.067 | 1.200 | 2 | 74.478 | 1.970 | 0.373 |
+| 7 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.5, tracker.vehicle.vel_std=0.8 | 0.839 | 0.825 | 0.832 | 0.641 | 0.566 | 0.747 | 2.689 | 29.170 | 1.200 | 2 | 37.239 | 3.197 | 0.562 |
+| 8 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.5, tracker.vehicle.vel_std=0.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.547 | 0.712 | 5.379 | 30.619 | 1.200 | 2 | 62.065 | 3.735 | 0.636 |
+| 9 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.5, tracker.vehicle.vel_std=1.5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.624 | 0.794 | 1.655 | 25.860 | 1.501 | 2 | 86.891 | 2.236 | 0.441 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.039 (0%) | -0.040 (0%) | 1.034 (0%) | 1.862 (0%) | 0.000 (0%) | 0 (0%) | -37.239 (90%) | 0.697 (0%) | 0.068 (8%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.016 (100%) | 0.007 (100%) | 0.000 (32%) | -1.241 (90%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.833 (100%) | -0.115 (98%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.014 (100%) | 0.009 (100%) | -0.414 (90%) | -0.414 (69%) | 0.300 (0%) | 0 (0%) | 0.000 (0%) | -0.334 (100%) | -0.038 (98%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.005 (0%) | -0.016 (0%) | 0.414 (0%) | 0.414 (0%) | 0.000 (0%) | 0 (0%) | -24.826 (67%) | 0.455 (0%) | 0.043 (0%) |
+| 6 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.017 (100%) | 0.009 (100%) | -0.207 (65%) | -1.034 (89%) | 0.000 (0%) | 0 (0%) | -12.413 (67%) | -0.825 (100%) | -0.148 (100%) |
+| 7 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.043 (0%) | -0.039 (0%) | 0.828 (0%) | 2.069 (0%) | 0.000 (0%) | 0 (0%) | -49.652 (90%) | 0.402 (0%) | 0.041 (11%) |
+| 8 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.062 (0%) | -0.074 (0%) | 3.517 (0%) | 3.517 (0%) | 0.000 (0%) | 0 (0%) | -24.826 (67%) | 0.940 (0%) | 0.114 (2%) |
+| 9 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.015 (99%) | 0.008 (99%) | -0.207 (65%) | -1.241 (99%) | 0.300 (0%) | 0 (0%) | 0.000 (0%) | -0.559 (100%) | -0.081 (99%) |
+
+`noise_B/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.3, tracker.vehicle.vel_std=0.8 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 39.021 | 2.998 | 0.636 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.3, tracker.vehicle.vel_std=0.5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.648 | 0.779 | 2.520 | 23.006 | 1.000 | 0 | 34.143 | 3.869 | 0.766 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.3, tracker.vehicle.vel_std=1.5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.655 | 0.773 | 2.845 | 22.437 | 1.052 | 0 | 34.143 | 2.359 | 0.457 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.2, tracker.vehicle.vel_std=0.8 | 0.808 | 0.809 | 0.808 | 0.497 | 0.656 | 0.775 | 2.764 | 22.843 | 1.052 | 0 | 34.143 | 2.658 | 0.543 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.2, tracker.vehicle.vel_std=0.5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.659 | 0.785 | 2.439 | 22.112 | 1.052 | 0 | 34.143 | 3.468 | 0.739 |
+| 6 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.2, tracker.vehicle.vel_std=1.5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.652 | 0.770 | 3.170 | 22.681 | 1.500 | 0 | 29.265 | 2.399 | 0.476 |
+| 7 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.5, tracker.vehicle.vel_std=0.8 | 0.808 | 0.809 | 0.808 | 0.497 | 0.650 | 0.782 | 2.439 | 23.006 | 1.000 | 0 | 34.143 | 3.568 | 0.713 |
+| 8 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.5, tracker.vehicle.vel_std=0.5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.637 | 0.764 | 3.170 | 23.738 | 1.000 | 0 | 34.143 | 4.289 | 0.781 |
+| 9 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.vehicle.pos_std=0.5, tracker.vehicle.vel_std=1.5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.657 | 0.781 | 2.683 | 22.274 | 1.052 | 0 | 34.143 | 2.522 | 0.527 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.010 (1%) | -0.006 (11%) | 0.081 (18%) | 0.813 (1%) | -0.052 (58%) | 0 (0%) | -4.878 (65%) | 0.871 (0%) | 0.129 (4%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.003 (2%) | -0.012 (1%) | 0.406 (0%) | 0.244 (12%) | 0.000 (0%) | 0 (0%) | -4.878 (65%) | -0.639 (100%) | -0.179 (99%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.003 (3%) | -0.010 (0%) | 0.325 (0%) | 0.650 (0%) | 0.000 (1%) | 0 (0%) | -4.878 (65%) | -0.340 (99%) | -0.094 (98%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (61%) | 0.000 (67%) | 0.000 (0%) | -0.081 (61%) | 0.000 (0%) | 0 (0%) | -4.878 (65%) | 0.470 (0%) | 0.103 (2%) |
+| 6 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.007 (0%) | -0.015 (0%) | 0.732 (0%) | 0.488 (3%) | 0.448 (0%) | 0 (0%) | -9.755 (89%) | -0.599 (96%) | -0.161 (95%) |
+| 7 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.008 (1%) | -0.003 (24%) | 0.000 (37%) | 0.813 (2%) | -0.052 (58%) | 0 (0%) | -4.878 (65%) | 0.570 (0%) | 0.076 (5%) |
+| 8 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.021 (0%) | -0.021 (0%) | 0.732 (0%) | 1.545 (0%) | -0.052 (58%) | 0 (0%) | -4.878 (65%) | 1.291 (0%) | 0.144 (10%) |
+| 9 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.002 (13%) | -0.004 (2%) | 0.244 (0%) | 0.081 (20%) | 0.000 (1%) | 0 (0%) | -4.878 (65%) | -0.476 (100%) | -0.109 (98%) |
+
+`assoc_A/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.use_velocity=True, tracker.matching=greedy | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.use_velocity=True, tracker.matching=hungarian | 0.839 | 0.825 | 0.832 | 0.641 | 0.610 | 0.787 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.use_velocity=False, tracker.matching=greedy | 0.839 | 0.825 | 0.832 | 0.641 | 0.623 | 0.788 | 1.862 | 26.274 | 1.250 | 1 | 484.105 | 1.773 | 0.331 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.use_velocity=False, tracker.matching=hungarian | 0.839 | 0.825 | 0.832 | 0.641 | 0.624 | 0.788 | 1.862 | 26.274 | 1.250 | 1 | 484.105 | 1.773 | 0.331 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.001 (64%) | 0.000 (64%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.014 (99%) | 0.002 (58%) | 0.000 (33%) | -0.828 (84%) | 0.050 (26%) | -1 (67%) | 397.215 (0%) | -1.022 (100%) | -0.191 (100%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.015 (100%) | 0.002 (60%) | 0.000 (33%) | -0.828 (84%) | 0.050 (26%) | -1 (67%) | 397.215 (0%) | -1.022 (100%) | -0.191 (100%) |
+
+`assoc_B/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.use_velocity=True, tracker.matching=greedy | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 39.021 | 2.998 | 0.636 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.use_velocity=True, tracker.matching=hungarian | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.274 | 1.052 | 0 | 39.021 | 2.998 | 0.636 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.use_velocity=False, tracker.matching=greedy | 0.808 | 0.809 | 0.808 | 0.497 | 0.649 | 0.768 | 3.821 | 22.843 | 1.500 | 0 | 614.574 | 2.737 | 0.539 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.use_velocity=False, tracker.matching=hungarian | 0.808 | 0.809 | 0.808 | 0.497 | 0.649 | 0.767 | 3.821 | 22.925 | 1.500 | 0 | 629.207 | 2.737 | 0.539 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.001 (0%) | -0.000 (0%) | 0.000 (0%) | 0.081 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.009 (2%) | -0.017 (1%) | 1.382 (0%) | 0.650 (9%) | 0.448 (0%) | 0 (0%) | 575.553 (0%) | -0.261 (74%) | -0.097 (85%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.010 (1%) | -0.017 (0%) | 1.382 (0%) | 0.732 (6%) | 0.448 (0%) | 0 (0%) | 590.186 (0%) | -0.261 (74%) | -0.097 (85%) |
+
+`motion_A/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.7, tracker.motion_on_frames=3 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.7, tracker.motion_on_frames=2 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 124.130 | 2.795 | 0.521 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.7, tracker.motion_on_frames=5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 4 | 24.826 | 2.795 | 0.521 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.5, tracker.motion_on_frames=3 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 124.130 | 2.795 | 0.521 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.5, tracker.motion_on_frames=2 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 1 | 198.607 | 2.795 | 0.521 |
+| 6 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.5, tracker.motion_on_frames=5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 3 | 49.652 | 2.795 | 0.521 |
+| 7 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=1.0, tracker.motion_on_frames=3 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 4 | 62.065 | 2.795 | 0.521 |
+| 8 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=1.0, tracker.motion_on_frames=2 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 3 | 99.304 | 2.795 | 0.521 |
+| 9 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=1.0, tracker.motion_on_frames=5 | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 4 | 24.826 | 2.795 | 0.521 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 37.239 (0%) | 0.000 (7%) | 0.000 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 2 (0%) | -62.065 (96%) | 0.000 (7%) | 0.000 (0%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 37.239 (0%) | 0.000 (7%) | 0.000 (0%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -1 (69%) | 111.717 (0%) | 0.000 (7%) | 0.000 (0%) |
+| 6 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 1 (0%) | -37.239 (89%) | 0.000 (7%) | 0.000 (0%) |
+| 7 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 2 (0%) | -24.826 (90%) | 0.000 (7%) | 0.000 (0%) |
+| 8 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 1 (0%) | 12.413 (0%) | 0.000 (7%) | 0.000 (0%) |
+| 9 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 2 (0%) | -62.065 (96%) | -0.000 (63%) | 0.000 (0%) |
+
+`motion_B/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.7, tracker.motion_on_frames=3 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 39.021 | 2.998 | 0.636 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.7, tracker.motion_on_frames=2 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 58.531 | 2.998 | 0.636 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.7, tracker.motion_on_frames=5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 4.878 | 2.998 | 0.636 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.5, tracker.motion_on_frames=3 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 58.531 | 2.998 | 0.636 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.5, tracker.motion_on_frames=2 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 92.674 | 2.998 | 0.636 |
+| 6 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=0.5, tracker.motion_on_frames=5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 9.755 | 2.998 | 0.636 |
+| 7 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=1.0, tracker.motion_on_frames=3 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 14.633 | 2.998 | 0.636 |
+| 8 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=1.0, tracker.motion_on_frames=2 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 39.021 | 2.998 | 0.636 |
+| 9 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15, tracker.motion_on_speed=1.0, tracker.motion_on_frames=5 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 4.878 | 2.998 | 0.636 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 19.510 (0%) | 0.000 (0%) | 0.000 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | -34.143 (100%) | 0.000 (0%) | 0.000 (0%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 19.510 (0%) | 0.000 (0%) | 0.000 (0%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 53.653 (0%) | 0.000 (0%) | 0.000 (0%) |
+| 6 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | -29.265 (100%) | 0.000 (0%) | 0.000 (0%) |
+| 7 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | -24.388 (99%) | 0.000 (0%) | 0.000 (0%) |
+| 8 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (50%) | 0.000 (0%) | 0.000 (0%) |
+| 9 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | -34.143 (100%) | 0.000 (0%) | 0.000 (0%) |
 
 ---
 

@@ -1,0 +1,26 @@
+# Parameter sweep
+
+- scenes: 0921_165659_s000, 0921_165659_s001, 0921_165659_s002, 0921_165659_s007, 0921_165659_s008, 0921_165659_s009, 0921_165659_s010, 0921_165659_s011, 0921_165659_s012, 0921_165659_s013, 0921_165659_s014, 0921_165659_s015, 0921_165659_s016, 0921_165659_s017, 0921_165659_s018, 0921_165659_s019, 0921_165659_s020, 0921_165659_s021, 0921_165659_s022, 0921_165659_s023, 0921_165659_s024, 0921_165659_s025, 0921_165659_s026, 0921_165659_s027, 0921_165659_s028
+- detections: `raw` from `data/tune/nusc_pp_train/{scene}/pillar/results.pkl`
+- every row against row 1; ahead: share of 500 paired resamples of the scenes in which the row is better
+
+Columns: det recall = detections: recall within near range; det precision = detections: precision within near range; det F1 = detections: F1 within near range; det FP / frame = detections: false per keyframe; MOTA = tracks: MOTA; IDF1 = tracks: IDF1; IDSW / min = tracks: ID switches / min; false tracks / min = tracks: false tracks / min; confirm p90 s = tracks: confirm delay p90 [s]; moving missed = motion: relevant moving stretches missed; false moving / h = motion: parked reported moving / h; FDE 3 s = prediction: FDE 3 s, moving [m]; MR 3 s = prediction: miss rate 3 s, moving.
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=2, tracker.tentative_max_age=0.15 | 0.808 | 0.809 | 0.808 | 0.497 | 0.624 | 0.771 | 2.764 | 31.216 | 0.502 | 0 | 39.021 | 3.130 | 0.639 |
+| 2 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=2, tracker.tentative_max_age=0.25 | 0.808 | 0.809 | 0.808 | 0.497 | 0.620 | 0.768 | 2.845 | 32.029 | 0.502 | 0 | 34.143 | 3.127 | 0.639 |
+| 3 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=1, tracker.tentative_max_age=0.15 | 0.808 | 0.809 | 0.808 | 0.497 | 0.547 | 0.744 | 3.008 | 54.629 | 0.501 | 0 | 39.021 | 3.081 | 0.635 |
+| 4 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=1, tracker.tentative_max_age=0.25 | 0.808 | 0.809 | 0.808 | 0.497 | 0.547 | 0.744 | 3.008 | 54.629 | 0.501 | 0 | 39.021 | 3.081 | 0.635 |
+| 5 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.15 | 0.808 | 0.809 | 0.808 | 0.497 | 0.658 | 0.785 | 2.439 | 22.193 | 1.052 | 0 | 39.021 | 2.998 | 0.636 |
+| 6 | tracker.high_score=0.4, tracker.output_min_score=0.35, tracker.low_score=0.2, tracker.vehicle.max_age=1.5, tracker.vehicle.min_hits=3, tracker.tentative_max_age=0.25 | 0.808 | 0.809 | 0.808 | 0.497 | 0.654 | 0.781 | 2.601 | 23.250 | 1.002 | 0 | 34.143 | 3.022 | 0.637 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.004 (0%) | -0.003 (1%) | 0.081 (0%) | 0.813 (0%) | 0.000 (0%) | 0 (0%) | -4.878 (65%) | -0.003 (86%) | 0.000 (0%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.077 (0%) | -0.028 (0%) | 0.244 (7%) | 23.412 (0%) | -0.001 (63%) | 0 (0%) | 0.000 (36%) | -0.049 (76%) | -0.004 (71%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | -0.077 (0%) | -0.028 (0%) | 0.244 (7%) | 23.412 (0%) | -0.001 (63%) | 0 (0%) | 0.000 (36%) | -0.049 (76%) | -0.004 (71%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.035 (100%) | 0.014 (100%) | -0.325 (98%) | -9.024 (100%) | 0.550 (0%) | 0 (0%) | 0.000 (0%) | -0.132 (79%) | -0.003 (58%) |
+| 6 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.031 (100%) | 0.010 (100%) | -0.163 (81%) | -7.967 (100%) | 0.501 (0%) | 0 (0%) | -4.878 (65%) | -0.109 (92%) | -0.002 (69%) |
