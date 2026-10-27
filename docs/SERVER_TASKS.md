@@ -95,7 +95,7 @@
 | T19 | 后处理扫参（上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉）；第 1b 步三个 Pillar 各用最合适的阈值比，可能要人重新定上线模型 | Agent | T18 | 30 分钟 | 完成（人定仍用 nuScenes Pillar）。上报阈值 0.40，轨迹输出分数 0.35，低分门槛 0.2；最少点数、离地、下沉留默认 |
 | T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 完成。coast 1.5 s，确认 3 帧；关联半径、观测噪声、速度头、匹配、运动状态留默认 |
 | T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 完成。运动模型、合并距离留默认（cv:1.5+ct:1.5:0.25，merge_dist 0.25）；训练 oracle 上 CV 比 IMM 差 |
-| T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 待做（等我改代码） |
+| T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 停在第 0 步。代码默认值还是旧的，`docs/pipeline_tuning/T22_configs.json` 还没有 |
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
@@ -3439,7 +3439,20 @@ GPU：第 1 步，Pillar 一个进程约 3 GB。
 
 ### T22 结果
 
-（待填）
+停在第 0 步，没有跑推理。远程仍是 T21 的 `3e13bdf`，没有代码改动，没有跑测试。
+
+`docs/pipeline_tuning/` 不存在，本节要的 `T22_configs.json` 还没有。代码里的默认值还是改之前的：
+
+| 参数 | 现在的默认值 | T19–T21 选定 |
+|---|---|---|
+| `DEFAULT_SCORE_THRESHOLDS` vehicle | 0.35 | 0.40 |
+| `TrackerConfig.output_min_score` vehicle | 0.3 | 0.35 |
+| `TrackerConfig.low_score` | 0.1 | 0.2 |
+| `ClassParams` vehicle `max_age` | 1.0 | 1.5 |
+| `ClassParams` vehicle `min_hits` | 2 | 3 |
+| 运动模型、`merge_dist` | `cv:1.5+ct:1.5:0.25`、0.25 | 相同，不用改 |
+
+这五项改成选定值、旧默认值写进 `docs/pipeline_tuning/T22_configs.json` 并推送之后，再从第 1 步跑。
 
 ---
 
