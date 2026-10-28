@@ -1,0 +1,28 @@
+windows: train 5830 (416 moving), val 3523 (351 moving)
+kept 2031 training windows (all 416 moving, 30 % of the rest)
+mirrored: 4062 training windows
+epoch 4 loss 1.243 | val minADE 0.479 minFDE 0.692 FDE1 0.712 MR 0.070
+epoch 9 loss 0.211 | val minADE 0.365 minFDE 0.566 FDE1 0.784 MR 0.060
+epoch 14 loss -0.258 | val minADE 0.227 minFDE 0.300 FDE1 0.599 MR 0.030
+epoch 19 loss -0.465 | val minADE 0.206 minFDE 0.266 FDE1 0.647 MR 0.017
+epoch 24 loss -0.527 | val minADE 0.191 minFDE 0.239 FDE1 0.564 MR 0.012
+epoch 29 loss -0.710 | val minADE 0.186 minFDE 0.238 FDE1 0.532 MR 0.017
+epoch 34 loss -0.814 | val minADE 0.178 minFDE 0.235 FDE1 0.527 MR 0.011
+epoch 39 loss -0.937 | val minADE 0.181 minFDE 0.238 FDE1 0.556 MR 0.014
+epoch 44 loss -1.067 | val minADE 0.177 minFDE 0.229 FDE1 0.535 MR 0.015
+epoch 49 loss -1.202 | val minADE 0.184 minFDE 0.242 FDE1 0.560 MR 0.018
+epoch 54 loss -1.289 | val minADE 0.185 minFDE 0.241 FDE1 0.561 MR 0.018
+epoch 59 loss -1.315 | val minADE 0.184 minFDE 0.240 FDE1 0.559 MR 0.018
+
+| windows | predictor | minADE | minFDE | ADE1 | FDE1 | MR@2m | n |
+|---|---|---|---|---|---|---|---|
+| all | cv | 0.536 | 0.829 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | imm | 0.536 | 0.828 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | learned | 0.184 | 0.240 | 0.387 | 0.559 | 0.018 | 3523 |
+| moving | cv | 1.858 | 2.907 | 1.858 | 2.907 | 0.556 | 351 |
+| moving | imm | 1.856 | 2.903 | 1.857 | 2.907 | 0.556 | 351 |
+| moving | learned | 0.813 | 1.208 | 1.879 | 2.948 | 0.174 | 351 |
+| static | cv | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | imm | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | learned | 0.115 | 0.133 | 0.221 | 0.294 | 0.001 | 3172 |
+saved data/train/pred_v1/transformer.pt

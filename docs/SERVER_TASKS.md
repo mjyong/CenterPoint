@@ -97,7 +97,7 @@
 | T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 完成。运动模型、合并距离留默认（cv:1.5+ct:1.5:0.25，merge_dist 0.25）；训练 oracle 上 CV 比 IMM 差 |
 | T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 完成。从原始扫描完整跑，IDF1 0.786，和 T20 final_A 相同；新默认值相对旧默认值 IDF1 +0.060。MCAP 在 data/tune/T22_mcap（872 MB） |
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
-| T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 待做 |
+| T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成。线上继续用 IMM。GRU、Transformer 的 3 s FDE 都更高，predict_ms 为 2746 / 4322 ms；训练目标用 measured |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -3821,5 +3821,252 @@ MCAP：`data/tune/T22_mcap/`，10 个场景，共 872 MB。
 
 ### T23 结果
 
-（待填）
+拉到 `b299f17`，本地未推送的 `Make the review overlays easier to read` 接到了它上面。`dog_perception/`、`tools/` 有改动，快速测试 157 passed（`CUDA_VISIBLE_DEVICES=3`，22 s）。
+
+跟踪日志 35 个，`rows` 是 15 列。耗时：logs_val 7 s，logs_train 13 s。训练在物理 GPU 1 上（空闲 2755 MiB，利用率 0%，进程里是 `cuda:0`），目标是 measured。GRU 44 s，Transformer 56 s。loss 没有 nan。对比（CPU）：pred_gru 1418 s，pred_gru_oracle 987 s，pred_transformer 1839 s，pred_transformer_oracle 1583 s。
+
+第 1 步选 **measured**。moving、3 s 的 mean 在两份报告里都低于 filtered，> 1 m 的比例也更低：验证 0.22 对 0.66、0.047 对 0.259；训练 0.18 对 0.47、0.008 对 0.068。
+
+误差拆分（IMM，moving，3 s）：验证集纵向 2.72 m、bias −0.07、横向 0.58 m；训练集纵向 2.50 m、bias +1.01、横向 1.09 m。验证集上横向比纵向小很多，误差主要在沿路径的速度上；训练集转弯（42 个样本）横向升到 1.84 m。
+
+**线上继续用 IMM。** GRU 和 Transformer 都不满足替换条件，模型留在 `data/train/pred_v1/`（不提交），新数据来了再训。
+
+- 端到端 FDE 3 s 要低于 IMM 且领先 ≥ 90%：GRU 3.034 对 2.795（领先 31%），Transformer 3.517 对 2.795（领先 14%）。两边的 MR 3 s 都更低（0.188、0.239 对 0.521），但 FDE 不合格。minFDE 更低（GRU 1.251、Transformer 1.495 对 2.793），最好的那条模式更近，概率最高的那条更差。
+- 标签当检测时 FDE 3 s 不能更高：GRU 2.390 对 1.388，Transformer 3.046 对 1.388，都更高。
+- 误报不能更多：端到端 false_alarms_per_h 都是 24.826，IMM 是 12.413。hazard_reported 两边都是 3，和 IMM 一样。标签当检测时误报都是 0，hazard_reported 都是 5。
+- 静止窗口的 FDE1：GRU 0.291、Transformer 0.294，IMM 是 0.599，没有把停着的车预测成要开走。
+- predict_ms（中位数，CPU）：GRU 端到端 2745.9 ms、oracle 1356.9 ms；Transformer 4322.1 ms、3565.6 ms。IMM 约 1.1 ms。都超过 10 ms。
+
+端到端 moving 3 s 的拆分（第 2 行相对 IMM）：GRU along 3.005、bias −1.770、across 0.382（IMM 2.722、−0.074、0.582）；Transformer along 3.488、bias −2.532、across 0.347。概率最高的路线偏慢，横向比 IMM 小。
+
+窗口数（两份相同）：
+
+```text
+windows: train 5830 (416 moving), val 3523 (351 moving)
+kept 2031 training windows (all 416 moving, 30 % of the rest)
+mirrored: 4062 training windows
+```
+
+`train_gru.txt` 最后的表：
+
+| windows | predictor | minADE | minFDE | ADE1 | FDE1 | MR@2m | n |
+|---|---|---|---|---|---|---|---|
+| all | cv | 0.536 | 0.829 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | imm | 0.536 | 0.828 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | learned | 0.180 | 0.226 | 0.376 | 0.535 | 0.013 | 3523 |
+| moving | cv | 1.858 | 2.907 | 1.858 | 2.907 | 0.556 | 351 |
+| moving | imm | 1.856 | 2.903 | 1.857 | 2.907 | 0.556 | 351 |
+| moving | learned | 0.727 | 1.044 | 1.777 | 2.738 | 0.114 | 351 |
+| static | cv | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | imm | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | learned | 0.119 | 0.135 | 0.221 | 0.291 | 0.002 | 3172 |
+
+`train_transformer.txt` 最后的表：
+
+| windows | predictor | minADE | minFDE | ADE1 | FDE1 | MR@2m | n |
+|---|---|---|---|---|---|---|---|
+| all | cv | 0.536 | 0.829 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | imm | 0.536 | 0.828 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | learned | 0.184 | 0.240 | 0.387 | 0.559 | 0.018 | 3523 |
+| moving | cv | 1.858 | 2.907 | 1.858 | 2.907 | 0.556 | 351 |
+| moving | imm | 1.856 | 2.903 | 1.857 | 2.907 | 0.556 | 351 |
+| moving | learned | 0.813 | 1.208 | 1.879 | 2.948 | 0.174 | 351 |
+| static | cv | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | imm | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | learned | 0.115 | 0.133 | 0.221 | 0.294 | 0.001 | 3172 |
+
+第 1 步 Prediction（moving、moving straight、moving turning）：
+
+验证（`logs_val/report.md`）：
+
+**moving** (117 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m | along | bias | across |
+|---|---|---|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.94 | 1.13 | 0.94 | 1.13 | 0.188 | 1.07 | 0.19 | 0.23 |
+| IMM | 2 s | 1.35 | 1.98 | 1.35 | 1.98 | 0.368 | 1.92 | 0.03 | 0.40 |
+| IMM | 3 s | 1.77 | 2.80 | 1.77 | 2.79 | 0.521 | 2.72 | -0.07 | 0.58 |
+| CV | 1 s | 0.94 | 1.13 | 0.94 | 1.13 | 0.188 | 1.07 | 0.19 | 0.24 |
+| CV | 2 s | 1.35 | 1.99 | 1.35 | 1.99 | 0.368 | 1.92 | 0.03 | 0.42 |
+| CV | 3 s | 1.77 | 2.80 | 1.77 | 2.80 | 0.521 | 2.72 | -0.07 | 0.60 |
+
+**moving, straight** (101 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m | along | bias | across |
+|---|---|---|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.94 | 1.12 | 0.94 | 1.12 | 0.198 | 1.07 | 0.24 | 0.21 |
+| IMM | 2 s | 1.34 | 1.96 | 1.34 | 1.96 | 0.376 | 1.89 | 0.17 | 0.36 |
+| IMM | 3 s | 1.75 | 2.76 | 1.75 | 2.76 | 0.525 | 2.64 | 0.15 | 0.51 |
+| CV | 1 s | 0.94 | 1.12 | 0.94 | 1.12 | 0.198 | 1.07 | 0.24 | 0.22 |
+| CV | 2 s | 1.34 | 1.96 | 1.34 | 1.96 | 0.376 | 1.89 | 0.17 | 0.37 |
+| CV | 3 s | 1.75 | 2.76 | 1.75 | 2.76 | 0.525 | 2.64 | 0.15 | 0.53 |
+
+**moving, turning** (16 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m | along | bias | across |
+|---|---|---|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.94 | 1.17 | 0.94 | 1.17 | 0.125 | 1.07 | -0.10 | 0.36 |
+| IMM | 2 s | 1.42 | 2.13 | 1.42 | 2.13 | 0.312 | 2.16 | -0.80 | 0.71 |
+| IMM | 3 s | 1.89 | 3.02 | 1.89 | 3.02 | 0.500 | 3.25 | -1.47 | 1.06 |
+| CV | 1 s | 0.94 | 1.17 | 0.94 | 1.17 | 0.125 | 1.07 | -0.10 | 0.36 |
+| CV | 2 s | 1.42 | 2.13 | 1.42 | 2.13 | 0.312 | 2.16 | -0.80 | 0.71 |
+| CV | 3 s | 1.89 | 3.02 | 1.89 | 3.02 | 0.500 | 3.25 | -1.47 | 1.06 |
+
+训练（`logs_train/report.md`）：
+
+**moving** (165 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m | along | bias | across |
+|---|---|---|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.95 | 1.14 | 0.95 | 1.13 | 0.145 | 1.06 | 0.64 | 0.29 |
+| IMM | 2 s | 1.37 | 2.00 | 1.35 | 1.96 | 0.376 | 1.74 | 0.86 | 0.66 |
+| IMM | 3 s | 1.83 | 3.00 | 1.79 | 2.91 | 0.636 | 2.50 | 1.01 | 1.09 |
+| CV | 1 s | 0.96 | 1.14 | 0.96 | 1.14 | 0.145 | 1.05 | 0.63 | 0.30 |
+| CV | 2 s | 1.37 | 2.02 | 1.37 | 2.02 | 0.412 | 1.72 | 0.84 | 0.70 |
+| CV | 3 s | 1.84 | 3.03 | 1.84 | 3.03 | 0.661 | 2.46 | 0.96 | 1.18 |
+
+**moving, straight** (123 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m | along | bias | across |
+|---|---|---|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.99 | 1.16 | 0.99 | 1.16 | 0.171 | 1.13 | 0.81 | 0.24 |
+| IMM | 2 s | 1.37 | 1.95 | 1.36 | 1.93 | 0.341 | 1.78 | 1.21 | 0.52 |
+| IMM | 3 s | 1.78 | 2.84 | 1.77 | 2.80 | 0.569 | 2.51 | 1.55 | 0.84 |
+| CV | 1 s | 0.99 | 1.16 | 0.99 | 1.16 | 0.171 | 1.13 | 0.81 | 0.25 |
+| CV | 2 s | 1.37 | 1.95 | 1.37 | 1.95 | 0.358 | 1.77 | 1.20 | 0.53 |
+| CV | 3 s | 1.78 | 2.85 | 1.78 | 2.85 | 0.577 | 2.50 | 1.55 | 0.87 |
+
+**moving, turning** (42 samples)
+
+| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m | along | bias | across |
+|---|---|---|---|---|---|---|---|---|---|
+| IMM | 1 s | 0.85 | 1.07 | 0.83 | 1.03 | 0.071 | 0.83 | 0.14 | 0.45 |
+| IMM | 2 s | 1.36 | 2.16 | 1.31 | 2.06 | 0.476 | 1.63 | -0.17 | 1.09 |
+| IMM | 3 s | 1.95 | 3.46 | 1.85 | 3.21 | 0.833 | 2.48 | -0.60 | 1.84 |
+| CV | 1 s | 0.86 | 1.08 | 0.86 | 1.08 | 0.071 | 0.82 | 0.12 | 0.48 |
+| CV | 2 s | 1.38 | 2.21 | 1.38 | 2.21 | 0.571 | 1.56 | -0.24 | 1.20 |
+| CV | 3 s | 2.00 | 3.55 | 2.00 | 3.55 | 0.905 | 2.33 | -0.75 | 2.09 |
+
+第 1 步 Training targets：
+
+验证（`logs_val/report.md`）：
+
+## Training targets
+
+The tier-2 training targets (prediction/dataset.py) of the same samples, cut from this run's track log the way train_predictor.py cuts them, against the labelled future: a pseudo ground truth, smoothed afterwards from the tracker's positions (filtered) or from the matched detections' centers (measured). windows: samples whose track has a training window there. Errors in m; > 1 m: share; along / bias / across as above (moving).
+
+| targets | samples | windows | horizon | mean | p90 | > 1 m | along | bias | across |
+|---|---|---|---|---|---|---|---|---|---|
+| filtered | all matched | 970 / 1123 | 1 s | 0.23 | 0.62 | 0.049 | - | - | - |
+| filtered | all matched | 970 / 1123 | 2 s | 0.24 | 0.62 | 0.048 | - | - | - |
+| filtered | all matched | 970 / 1123 | 3 s | 0.26 | 0.69 | 0.057 | - | - | - |
+| filtered | moving | 85 / 117 | 1 s | 0.52 | 1.17 | 0.165 | 0.50 | 0.22 | 0.10 |
+| filtered | moving | 85 / 117 | 2 s | 0.62 | 1.40 | 0.259 | 0.60 | 0.16 | 0.12 |
+| filtered | moving | 85 / 117 | 3 s | 0.66 | 1.46 | 0.259 | 0.65 | 0.14 | 0.11 |
+| filtered | static | 885 / 1006 | 1 s | 0.21 | 0.51 | 0.038 | - | - | - |
+| filtered | static | 885 / 1006 | 2 s | 0.20 | 0.51 | 0.028 | - | - | - |
+| filtered | static | 885 / 1006 | 3 s | 0.22 | 0.58 | 0.037 | - | - | - |
+| measured | all matched | 970 / 1123 | 1 s | 0.16 | 0.32 | 0.012 | - | - | - |
+| measured | all matched | 970 / 1123 | 2 s | 0.15 | 0.32 | 0.008 | - | - | - |
+| measured | all matched | 970 / 1123 | 3 s | 0.17 | 0.35 | 0.016 | - | - | - |
+| measured | moving | 85 / 117 | 1 s | 0.18 | 0.38 | 0.012 | 0.16 | 0.03 | 0.04 |
+| measured | moving | 85 / 117 | 2 s | 0.21 | 0.53 | 0.035 | 0.20 | -0.04 | 0.04 |
+| measured | moving | 85 / 117 | 3 s | 0.22 | 0.64 | 0.047 | 0.21 | -0.04 | 0.04 |
+| measured | static | 885 / 1006 | 1 s | 0.15 | 0.32 | 0.012 | - | - | - |
+| measured | static | 885 / 1006 | 2 s | 0.15 | 0.31 | 0.006 | - | - | - |
+| measured | static | 885 / 1006 | 3 s | 0.16 | 0.34 | 0.014 | - | - | - |
+
+训练（`logs_train/report.md`）：
+
+## Training targets
+
+The tier-2 training targets (prediction/dataset.py) of the same samples, cut from this run's track log the way train_predictor.py cuts them, against the labelled future: a pseudo ground truth, smoothed afterwards from the tracker's positions (filtered) or from the matched detections' centers (measured). windows: samples whose track has a training window there. Errors in m; > 1 m: share; along / bias / across as above (moving).
+
+| targets | samples | windows | horizon | mean | p90 | > 1 m | along | bias | across |
+|---|---|---|---|---|---|---|---|---|---|
+| filtered | all matched | 1847 / 2212 | 1 s | 0.17 | 0.40 | 0.010 | - | - | - |
+| filtered | all matched | 1847 / 2212 | 2 s | 0.17 | 0.41 | 0.011 | - | - | - |
+| filtered | all matched | 1847 / 2212 | 3 s | 0.18 | 0.43 | 0.012 | - | - | - |
+| filtered | moving | 132 / 165 | 1 s | 0.41 | 0.83 | 0.038 | 0.39 | 0.27 | 0.09 |
+| filtered | moving | 132 / 165 | 2 s | 0.43 | 0.83 | 0.030 | 0.40 | 0.27 | 0.10 |
+| filtered | moving | 132 / 165 | 3 s | 0.47 | 0.89 | 0.068 | 0.44 | 0.31 | 0.11 |
+| filtered | static | 1715 / 2047 | 1 s | 0.15 | 0.33 | 0.008 | - | - | - |
+| filtered | static | 1715 / 2047 | 2 s | 0.15 | 0.32 | 0.009 | - | - | - |
+| filtered | static | 1715 / 2047 | 3 s | 0.16 | 0.35 | 0.008 | - | - | - |
+| measured | all matched | 1847 / 2212 | 1 s | 0.13 | 0.28 | 0.006 | - | - | - |
+| measured | all matched | 1847 / 2212 | 2 s | 0.13 | 0.28 | 0.005 | - | - | - |
+| measured | all matched | 1847 / 2212 | 3 s | 0.15 | 0.33 | 0.008 | - | - | - |
+| measured | moving | 132 / 165 | 1 s | 0.16 | 0.34 | 0.008 | 0.15 | -0.04 | 0.03 |
+| measured | moving | 132 / 165 | 2 s | 0.16 | 0.37 | 0.000 | 0.15 | -0.04 | 0.04 |
+| measured | moving | 132 / 165 | 3 s | 0.18 | 0.40 | 0.008 | 0.17 | -0.03 | 0.05 |
+| measured | static | 1715 / 2047 | 1 s | 0.13 | 0.27 | 0.006 | - | - | - |
+| measured | static | 1715 / 2047 | 2 s | 0.13 | 0.26 | 0.006 | - | - | - |
+| measured | static | 1715 / 2047 | 3 s | 0.14 | 0.32 | 0.008 | - | - | - |
+
+第 3 步 sweep.md：
+
+`pred_gru/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | eval.learned_model= | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | eval.learned_model=data/train/pred_v1/gru.pt | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 3.034 | 0.188 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.239 (31%) | -0.333 (100%) |
+
+`pred_gru_oracle/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | eval.learned_model= | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.388 | 0.286 |
+| 2 | eval.learned_model=data/train/pred_v1/gru.pt | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 2.390 | 0.068 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 1.002 (0%) | -0.217 (100%) |
+
+`pred_transformer/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | eval.learned_model= | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | eval.learned_model=data/train/pred_v1/transformer.pt | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 3.517 | 0.239 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.722 (14%) | -0.282 (100%) |
+
+`pred_transformer_oracle/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | eval.learned_model= | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.388 | 0.286 |
+| 2 | eval.learned_model=data/train/pred_v1/transformer.pt | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 3.046 | 0.099 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 1.658 (0%) | -0.186 (100%) |
+
+sweep.csv 里两行（第 1 行 IMM，第 2 行第二档）：
+
+| 报告 | 行 | predict_ms | false_alarms_per_h | hazard_reported | pred_minFDE3_moving | pred_along3_moving | pred_along_bias3_moving | pred_across3_moving |
+|---|---|---|---|---|---|---|---|---|
+| pred_gru | IMM | 1.115 | 12.413 | 3 | 2.793 | 2.722 | −0.074 | 0.582 |
+| pred_gru | GRU | 2745.858 | 24.826 | 3 | 1.251 | 3.005 | −1.770 | 0.382 |
+| pred_gru_oracle | IMM | 0.714 | 0 | 5 | 1.383 | 1.416 | −1.006 | 0.219 |
+| pred_gru_oracle | GRU | 1356.933 | 0 | 5 | 0.826 | 2.441 | −2.324 | 0.130 |
+| pred_transformer | IMM | 1.123 | 12.413 | 3 | 2.793 | 2.722 | −0.074 | 0.582 |
+| pred_transformer | Transformer | 4322.116 | 24.826 | 3 | 1.495 | 3.488 | −2.532 | 0.347 |
+| pred_transformer_oracle | IMM | 0.718 | 0 | 5 | 1.383 | 1.416 | −1.006 | 0.219 |
+| pred_transformer_oracle | Transformer | 3565.584 | 0 | 5 | 1.174 | 3.111 | −3.078 | 0.146 |
 
