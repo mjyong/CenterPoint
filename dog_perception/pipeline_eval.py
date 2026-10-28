@@ -72,6 +72,11 @@ class EvalConfig:
     # tier-2 model (.pt, tools/dog/train_predictor.py) instead of the IMM rollout; "" = IMM. A sweep
     # --set eval.learned_model=,model.pt compares the two on the same tracks (paired)
     learned_model: str = ""
+    # with a model: what predicts ("trajectory": its modes, "velocity": constant velocity from its state
+    # head, "imm": the IMM; prediction.learned.LearnedPredictor), and whether its state head decides the
+    # tracks' motion state instead of the tracker's rule (TRACKING_PREDICTION.md 3.3.8)
+    learned_mode: str = "trajectory"
+    learned_motion: bool = False
     max_range: float = 40.0          # [m] scored range, from the robot
     near_range: float = 30.0         # [m] where a vehicle matters to the robot (DATA_COLLECTION_PLAN.md 4)
     match_dist: float = 2.0          # [m] center distance of a match
@@ -357,7 +362,7 @@ def _bin(value, bins):
 class SceneResult:
     name: str
     t0: float
-    predictor: str = "IMM"        # what made the predictions: "IMM" (tier 1) or "learned" (tier 2)
+    predictor: str = "IMM"        # what made the predictions: "IMM" (tier 1), "learned", "learned-velocity" (tier 2)
     frames: int = 0
     keyframes: int = 0
     keyframe_s: float = 0.0
@@ -429,7 +434,13 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
     res = SceneResult(sd.name, sd.rows[0]["stamp"] if sd.rows else 0.0, merges=sd.merges)
     tracker = MultiObjectTracker(cfg.tracker)
     learned = _learned_predictor(cfg.learned_model) if cfg.predict and cfg.learned_model else None
-    res.predictor = "learned" if learned is not None else "IMM"
+    if learned is not None:
+        learned.reset()
+        learned.mode = cfg.learned_mode
+        if cfg.learned_motion and not learned.has_state:
+            raise ValueError("eval.learned_motion needs a model with a state head (train_predictor.py --state-head)")
+    res.predictor = {"trajectory": "learned", "velocity": "learned-velocity"}.get(cfg.learned_mode, "IMM") \
+        if learned is not None else "IMM"
     predictor = learned or (IMMPredictor(**cfg.predictor) if cfg.predict else None)
     if learned is not None:
         times = learned.fc.fut_dt * np.arange(1, learned.fc.fut_len + 1)
@@ -481,6 +492,8 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
             preds = predictor(tracker) if predictor else []
         t4 = time.perf_counter()
         log.add(stamp, tracks, T_body, preds if logger is not None else None)
+        if learned is not None and cfg.learned_motion:      # scored, drawn and alarmed on from here
+            tracks = learned.apply_motion(tracks)
         res.timings["filter_ms"].append(1e3 * (t2 - t1))
         res.timings["track_ms"].append(1e3 * (t3 - t2))
         res.timings["predict_ms"].append(1e3 * (t4 - t3))

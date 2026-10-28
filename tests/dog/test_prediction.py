@@ -4,11 +4,11 @@ import torch
 
 from dog_perception.demo import oracle_tracking_log
 from dog_perception.prediction import (FeatureConfig, SampleConfig, TrackLogger, build_inputs, build_samples,
-                                       merge_modes, rts_smooth)
+                                       merge_modes, mirror_samples, rts_smooth)
 from dog_perception.prediction.dataset import ROW
 from dog_perception.prediction.metrics import along_across
 from dog_perception.prediction.learned import (LearnedPredictor, evaluate_kinematic, evaluate_learned,
-                                               train_predictor)
+                                               evaluate_state, train_predictor)
 from dog_perception.prediction.model import ModelConfig, TrajectoryPredictor, load_model, predictor_loss, save_model
 from dog_perception.detection.boxes import Detections
 from dog_perception.tracking import MultiObjectTracker, TrackerConfig
@@ -96,18 +96,21 @@ def test_training_converges_and_runtime_wrapper(logs, tmp_path):
     m2, fc = load_model(path)
     assert fc["hist_len"] == 20
 
-    # runtime wrapper on a live tracker, with IMM fallback for young tracks
+    # runtime wrapper on a live tracker, called every frame (it keeps the histories itself), with IMM
+    # fallback for young tracks
     trk = MultiObjectTracker(TrackerConfig(classes=("pedestrian",)))
+    lp = LearnedPredictor(path)
     for k in range(15):
         t = 0.1 * (k + 1)
         d = Detections(np.array([[k * 0.1, 0.0, 0.9, 0.6, 0.6, 1.7, 0.0], [5.0, 5.0 - k * 0.1, 0.9, 0.6, 0.6, 1.7, 0.0]]),
                        np.array([[1.0, 0.0], [0.0, -1.0]]), np.array([0.9, 0.9]), np.array([1, 1]), "world")
         trk.step(d, t)
+        lp(trk)
     trk.step(Detections(np.array([[20.0, 0.0, 0.9, 0.6, 0.6, 1.7, 0.0]]), np.zeros((1, 2)), np.array([0.9]),
                         np.array([1]), "world"), 1.6)
+    lp(trk)
     trk.step(Detections(np.array([[20.0, 0.0, 0.9, 0.6, 0.6, 1.7, 0.0]]), np.zeros((1, 2)), np.array([0.9]),
                         np.array([1]), "world"), 1.7)
-    lp = LearnedPredictor(path)
     preds = lp(trk)
     src = sorted(p.source for p in preds)
     assert "learned" in src and "imm" in src
@@ -137,10 +140,11 @@ def test_train_predictor_tool_reports_moving_and_static(tmp_path):
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     out = tmp_path / "pred" / "gru.pt"
     subprocess.run([sys.executable, os.path.join(root, "tools", "dog", "train_predictor.py"), "--sim", "2",
-                    "--epochs", "1", "--static-keep", "0.3", "--mirror", "--out", str(out)], check=True,
-                   env=dict(os.environ, PYTHONPATH=root), capture_output=True)
+                    "--epochs", "1", "--static-keep", "0.3", "--mirror", "--state-head", "--det-inputs",
+                    "--out", str(out)], check=True, env=dict(os.environ, PYTHONPATH=root), capture_output=True)
     res = json.load(open(tmp_path / "pred" / "gru_eval.json"))
     assert {"all", "moving", "static"} <= set(res["eval"]) and "learned" in res["eval"]["moving"]
+    assert {"tracker", "learned"} <= set(res["eval"]["moving"]["state"])
     assert out.exists()
 
 
@@ -170,9 +174,9 @@ def test_logged_detections_and_measured_targets():
         log.add(t, trk.step(dets, t))
     d = log.to_dict()
     rows = d["rows"]
-    assert rows.shape[1] == len(ROW) == 15
+    assert rows.shape[1] == len(ROW) == 16
     coast = rows[:, 8] < 0.5
-    assert coast.sum() == 3 and np.isnan(rows[coast, 9:]).all()
+    assert coast.sum() == 3 and np.isnan(rows[coast, 9:15]).all() and set(rows[:, 15]) <= {0, 1, 2}
     assert all(np.allclose(r[9:11], fed[round(r[0], 6)]) for r in rows[~coast])   # the detections themselves
     assert np.allclose(rows[~coast, 12], 2.0) and np.allclose(rows[~coast, 14], 0.9)
     filtered, measured = build_samples(d, SampleConfig(targets="filtered")), build_samples(d, SampleConfig())
@@ -182,3 +186,95 @@ def test_logged_detections_and_measured_targets():
     assert np.allclose(build_samples(old, SampleConfig(targets="filtered"))["future"], filtered["future"])
     with pytest.raises(ValueError):
         build_samples(old)                                     # measured, the default
+
+
+def _start_stop_log(seed=0, start=4.0, speed=3.0, n=120):
+    """A car parked at (5, 0) that drives off along +x at ``start`` s, through the tracker."""
+    rng = np.random.default_rng(seed)
+    trk, log = MultiObjectTracker(TrackerConfig()), TrackLogger()
+    for k in range(n):
+        t = 0.1 * k
+        v = speed if t >= start else 0.0
+        box = np.array([[5.0 + speed * max(0.0, t - start) + rng.normal(0, 0.05), rng.normal(0, 0.05), 0.8,
+                         4.5, 1.9, 1.6, 0.0]])
+        dets = Detections(box, np.array([[v, 0.0]]), np.array([0.9]), np.zeros(1, np.int64), "world", t)
+        log.add(t, trk.step(dets, t), np.eye(4))
+    return log.to_dict()
+
+
+def test_state_targets_and_detection_inputs():
+    """The state now is a target (the auto-label's moving rule on the pseudo ground truth), the matched
+    detections an input, and the tracker's own motion state is kept for comparison."""
+    d = _start_stop_log()
+    fc = FeatureConfig(use_detections=True)
+    s = build_samples(d, SampleConfig(features=fc, frame_stride=1))
+    t = s["t"]
+    assert s["agent_det"].shape == (len(t), 20, 6) and (s["agent_det"][:, -1, 5] == 1).all()   # observed now
+    parked, driving = t < 3.0, t > 6.0
+    assert parked.sum() > 5 and driving.sum() > 5 and (s["state_valid"] == 1).all()
+    assert (s["moving_now"][parked] == 0).all() and (s["moving_now"][driving] == 1).all()
+    assert np.allclose(s["vel_now"][parked], 0.0)
+    assert np.allclose(s["vel_now"][driving], [3.0, 0.0], atol=0.3)            # agent frame: +x is the heading
+    assert (s["tracker_motion"][parked] == 0).all() and (s["tracker_motion"][driving] == 1).all()
+    m = mirror_samples(s)
+    assert np.allclose(m["agent_det"][..., 1], -s["agent_det"][..., 1]) and np.allclose(m["vel_now"][:, 1], -s["vel_now"][:, 1])
+    old = build_samples(dict(d, rows=d["rows"][:, :15]), SampleConfig(features=fc, frame_stride=1))   # T23's logs
+    assert len(old["t"]) == len(t) and (old["tracker_motion"] == -1).all()
+    with pytest.raises(ValueError):
+        build_samples(dict(d, rows=d["rows"][:, :9]), SampleConfig(features=fc, targets="filtered"))
+
+
+def test_model_with_detections_and_state_head():
+    m = TrajectoryPredictor(ModelConfig(det_feats=6, state_head=True))
+    B = 4
+    batch = dict(agent_hist=torch.randn(B, 20, 6), agent_det=torch.randn(B, 20, 6), agent_class=torch.eye(3)[[0, 1, 2, 1]],
+                 nbr_hist=torch.randn(B, 16, 20, 6), nbr_static=torch.zeros(B, 16, 4), nbr_mask=torch.zeros(B, 16))
+    batch["agent_hist"][..., 5] = 1.0
+    out = m(batch)
+    assert out["vel"].shape == (B, 2) and out["moving_logit"].shape == (B,)
+    loss, parts = predictor_loss(out, torch.randn(B, 6, 2), torch.ones(B, 6), vel=torch.randn(B, 2),
+                                 moving=torch.tensor([0.0, 1.0, 1.0, 0.0]), state_valid=torch.tensor([1.0, 1.0, 0.0, 1.0]))
+    loss.backward()
+    assert torch.isfinite(loss) and {"vel", "moving"} <= set(parts) and m.state[0].weight.grad is not None
+
+
+def test_state_head_runtime_modes_and_motion(tmp_path):
+    from dataclasses import replace
+    d = _start_stop_log()
+    fc = FeatureConfig(use_detections=True)
+    s = build_samples(d, SampleConfig(features=fc))
+    model, hist = train_predictor(s, s, ModelConfig(det_feats=6, state_head=True), epochs=3, batch_size=64,
+                                  log_every=3, verbose=False)
+    assert "state_vel_err" in hist[-1]
+    ev = evaluate_state(model, s)
+    assert {"learned", "tracker"} == set(ev) and ev["tracker"]["vel_err"] < 1.0 and ev["tracker"]["moving_recall"] > 0.5
+    path = str(tmp_path / "state.pt")
+    save_model(model, path, fc)
+    lp = LearnedPredictor(path, mode="velocity")
+    trk = MultiObjectTracker(TrackerConfig())
+
+    def step(k):
+        t = 0.1 * k
+        box = np.array([[5.0 + 3.0 * t, 0.0, 0.8, 4.5, 1.9, 1.6, 0.0]])
+        trk.step(Detections(box, np.array([[3.0, 0.0]]), np.array([0.9]), np.zeros(1, np.int64), "world", t), t)
+        return lp(trk)
+
+    for k in range(30):
+        preds = step(k)
+    p = preds[0]
+    v, p_moving = lp.state[p.track_id]
+    assert p.source == "learned-velocity" and p.modes.shape == (1, 6, 2) and 0.0 <= p_moving <= 1.0
+    assert np.allclose(p.modes[0], trk.outputs()[0].position[:2] + np.outer(p.times, v))
+    lp.mode = "imm"
+    assert step(30)[0].source == "imm" and p.track_id in lp.state     # the network still estimates the state
+    # motion state from P(moving), with hysteresis
+    s0 = trk.outputs()[0]
+    lp._motion = {}
+    for p_m, want in ((0.7, "moving"), (0.5, "moving"), (0.2, "stopped")):
+        lp.state = {s0.track_id: (np.zeros(2), p_m)}
+        assert lp.apply_motion([s0])[0].motion == want
+    assert lp.apply_motion([replace(s0, stamp=s0.stamp + 11.0)])[0].motion == "static"   # stop_memory
+    lp.state, lp._motion = {}, {}
+    assert lp.apply_motion([s0])[0].motion == s0.motion                    # never estimated: the tracker's
+    with pytest.raises(ValueError):
+        LearnedPredictor(TrajectoryPredictor(ModelConfig()), mode="velocity")(trk)

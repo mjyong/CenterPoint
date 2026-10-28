@@ -98,6 +98,7 @@
 | T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 完成。从原始扫描完整跑，IDF1 0.786，和 T20 final_A 相同；新默认值相对旧默认值 IDF1 +0.060。MCAP 在 data/tune/T22_mcap（872 MB） |
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
 | T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成，已复核。线上继续用 IMM：GRU、Transformer 概率最高的路线偏慢，3 s FDE 都更高（MR 低得多）。predict_ms 2746 / 4322 ms 是并行进程抢 CPU 测出来的，单线程约 16–40 ms，仍超 10 ms。伪真值用 measured，离标签 0.2 m，改为默认。误差主要在纵向，地图暂不做 |
+| T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -4111,3 +4112,94 @@ sweep.csv 里两行（第 1 行 IMM，第 2 行第二档）：
 5. **误报** 12.4 → 24.8 次 / 小时，其实是 1 次变 2 次（验证集关键帧时长约 4.8 分钟）。样本太少，不单独下结论。
 
 模型 `data/train/pred_v1/` 留作基线，厂区新数据来了用同样的流程再训（训练目标默认 measured）。
+
+## T24 第二档第二版：跟踪的部分合并（状态估计交给网络）
+
+T23 复核的结论：
+- IMM 的误差主要在纵向，也就是速度：端到端 2.72 m，标签当检测时 1.42 m，差出来的主要是检测带来的速度噪声；
+- 停着的车被报成在动，每小时 87 次（T22），是跟踪层最大的问题；
+- 第一版概率最高的那条路线偏慢：未来怎么走要靠场景间的行为先验，数据太少学不好。"现在的状态"不依赖未来，数据也够。
+
+这一版跟踪器不变，继续负责关联、ID、轨迹的产生和结束、遮挡外推。网络多两样（TRACKING_PREDICTION.md 3.3.8）：
+- 输入加上每帧匹配到的原始检测：中心、速度头、分数（`--det-inputs`）；
+- 输出加"现在的状态"：当前速度、在动的概率（`--state-head`）。
+  - 速度的目标：伪真值（measured）在 ±0.5 s 上的速度；
+  - 在动的目标：和自动标注同一条规则。
+
+评估三种用法，和 IMM、跟踪器的规则配对比：
+- 用网络的速度匀速外推，替换 IMM 的预测（`eval.learned_mode=velocity`）；
+- 用网络的在动概率加滞回，替换跟踪器的运动状态规则（`eval.learned_motion=true`）：≥ 0.6 进入在动，< 0.4 退出；
+- 两者一起。
+
+```text
+任务 T24：重新生成 35 个场景的跟踪日志（多一列跟踪器的运动状态），训练两个带状态输出的 GRU
+（state：只加状态输出；det：再加原始检测输入），在验证集上和 IMM、跟踪器的运动状态规则配对比较。
+先按通用约定做（拉到了代码改动，跑快速测试）。前置：T23 完成。CPU 就能训，有空闲 GPU 就加 --device cuda:0。
+
+0. mkdir -p data/reports/T24 data/train/pred_v2; TASK=T24；VAL、TRAIN、ev 同 T18 第 0、3 步。
+1. 跟踪日志（覆盖 T23 的）：
+     ev logs_val "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections raw --no-mcap --bootstrap 0 \
+         --track-logs data/tune/track_logs
+     ev logs_train "$TRAIN" "data/tune/nusc_pp_train/{scene}/pillar/results.pkl" --detections raw --no-mcap --bootstrap 0 \
+         --track-logs data/tune/track_logs
+     ls data/tune/track_logs/*.npz | wc -l        # 应是 35
+     python -c "import numpy as np; print(np.load('data/tune/track_logs/$(echo $VAL | cut -d' ' -f1).npz')['rows'].shape[1])"   # 应是 16
+2. 训练（训练目标默认 measured）：
+     LT=$(for r in $TRAIN; do echo data/tune/track_logs/$r.npz; done); LV=$(for r in $VAL; do echo data/tune/track_logs/$r.npz; done)
+     for v in state det; do
+       extra="--state-head"; [ $v = det ] && extra="--state-head --det-inputs"
+       python tools/dog/train_predictor.py --logs $LT --val-logs $LV --encoder gru --modes 6 --epochs 60 \
+           --static-keep 0.3 --mirror $extra --out data/train/pred_v2/$v.pt 2>&1 | tee data/reports/T24/train_$v.txt
+     done
+   train_*.txt 最后有两张表：
+   - 轨迹：同 T23；
+   - "State now"：跟踪器（它的速度、记下的运动状态）和网络在同一批验证窗口上的速度误差、在动的召回率、静止窗口被判在动的比例。
+   这里的"真值"是伪真值；能不能替换只看第 3 步（对标签）。
+3. 和标签比，每个模型 5 行配对（第 1 行是现在的 IMM 加跟踪器规则）；端到端和标签当检测各一次：
+     for v in state det; do
+       M=data/train/pred_v2/$v.pt
+       python -c 'import json, sys; m = sys.argv[1]; json.dump([{},
+           {"eval.learned_model": m, "eval.learned_mode": "trajectory"},
+           {"eval.learned_model": m, "eval.learned_mode": "velocity"},
+           {"eval.learned_model": m, "eval.learned_mode": "imm", "eval.learned_motion": True},
+           {"eval.learned_model": m, "eval.learned_mode": "velocity", "eval.learned_motion": True}],
+           open(sys.argv[2], "w"), indent=1)' $M data/reports/T24/rows_$v.json
+       ev pred_$v "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections raw --no-mcap \
+           --configs data/reports/T24/rows_$v.json
+       ev pred_${v}_oracle "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections labels \
+           --dense-labels "data/labels/{scene}/labels_full2.pkl" --no-mcap --configs data/reports/T24/rows_$v.json
+     done
+   每份的 sweep.md 看 false moving / h、moving missed、FDE 3 s、MR 3 s 和领先比例；sweep.csv 里还要看：
+   - 运动状态：motion_relevant_latency_p90、motion_moving_recall、motion_false_moving；
+   - 预测：pred_along3_moving、pred_along_bias3_moving、pred_across3_moving；
+   - 预警：false_alarms_per_h、hazard_reported；
+   - 耗时：predict_ms。
+
+怎么选（每个模型分别看；都满足的，选端到端更好的那个）：
+- 运动状态能不能替换跟踪器的规则，看端到端第 4 行对第 1 行，同时满足：
+  - false moving / h 更低，领先 ≥ 90%；
+  - moving missed 不增加；
+  - motion_relevant_latency_p90 不比第 1 行晚 0.5 s 以上；
+  - false_alarms_per_h 不高于第 1 行，hazard_reported 不少于第 1 行。
+- 速度预测能不能替换 IMM，看第 3 行对第 1 行，同时满足：
+  - 端到端 FDE 3 s 更低，领先 ≥ 90%，MR 3 s 不高于第 1 行；
+  - 标签当检测的 FDE 3 s 不高于第 1 行；
+  - false_alarms_per_h 不高于第 1 行，hazard_reported 不少于第 1 行。
+- 两项都满足时，再看第 5 行（两者一起）是否仍都满足。
+- det 对 state：det 不比 state 好，说明原始检测输入没用，就选 state。
+- predict_ms（中位数，单线程）只记录，本轮不作为门槛。过了上面的门槛，下一步再提速：只对在动的轨迹跑网络、邻居历史每帧只编码一次、Orin 上用 TensorRT。
+都不满足：保持现状，模型留作基线。满足了写清是哪个模型、哪种用法，由人决定是否上线。
+
+停止条件：任何报错；第 1 步日志不是 35 个，或 rows 不是 16 列（代码没拉到）；训练 loss 出现 nan。
+提交：data/reports/T24/、本文档。不提交 .pt 和跟踪日志。
+报告（写进"T24 结果"）：
+- 两个 train_*.txt 开头的窗口数行和最后两张表；
+- 四份 sweep.md 的两张表；
+- sweep.csv 里每行的 motion_relevant_latency_p90、motion_moving_recall、motion_false_moving、pred_along3_moving、
+  pred_along_bias3_moving、pred_across3_moving、false_alarms_per_h、hazard_reported、predict_ms；
+- 按"怎么选"给出的结论；每个训练和评估的耗时。
+```
+
+### T24 结果
+
+（待填）

@@ -20,6 +20,12 @@ the measured ones are 3x closer to the labels (T23). The validation windows use 
 the numbers printed here are against that pseudo ground truth. ``pipeline_eval.py`` scores against the
 reviewed labels, and its "Training targets" table says how close each source is.
 
+Part of the tracker merged into the network (TRACKING_PREDICTION.md 3.3.8): ``--state-head`` also
+trains an estimate of the state now (velocity, moving: the auto-label's rule on the targets), and
+``--det-inputs`` feeds the agent encoder the detections the tracker matched, not only its filtered
+estimates (logs written since 2026-10-28). The state is then compared with the tracker's (its velocity
+and logged motion state) on the validation windows.
+
 Without data yet, ``--sim N`` generates N simulated one-minute logs.
 """
 import argparse
@@ -34,7 +40,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from dog_perception.prediction import (FeatureConfig, SampleConfig, build_samples, concat_samples,  # noqa: E402
                                        mirror_samples, moving_mask, select_samples)
-from dog_perception.prediction.learned import evaluate_kinematic, evaluate_learned, train_predictor  # noqa: E402
+from dog_perception.prediction.learned import (evaluate_kinematic, evaluate_learned, evaluate_state,  # noqa: E402
+                                               train_predictor)
 from dog_perception.prediction.model import ModelConfig, save_model  # noqa: E402
 
 
@@ -60,11 +67,13 @@ def main():
     ap.add_argument("--mirror", action="store_true", help="add every training window mirrored left / right")
     ap.add_argument("--targets", default="measured", choices=["measured", "filtered"],
                     help="smooth the targets from the matched detections or the tracker's positions (old logs)")
+    ap.add_argument("--state-head", action="store_true", help="also estimate the velocity and moving now")
+    ap.add_argument("--det-inputs", action="store_true", help="the agent encoder also reads the matched detections")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="work_dirs/pred/model.pt")
     args = ap.parse_args()
 
-    fc = FeatureConfig()
+    fc = FeatureConfig(use_detections=args.det_inputs)
     sc = SampleConfig(features=fc, targets=args.targets)
     if args.sim:
         from dog_perception.demo import oracle_tracking_log
@@ -89,7 +98,8 @@ def main():
         train = concat_samples([train, mirror_samples(train)])
         print("mirrored: %d training windows" % len(train["future"]))
 
-    mc = ModelConfig(hist_len=fc.hist_len, fut_len=fc.fut_len, num_modes=args.modes, encoder=args.encoder)
+    mc = ModelConfig(hist_len=fc.hist_len, fut_len=fc.fut_len, num_modes=args.modes, encoder=args.encoder,
+                     det_feats=6 if args.det_inputs else 0, state_head=args.state_head)
     model, _ = train_predictor(train, val, mc, epochs=args.epochs, batch_size=args.batch_size, lr=args.lr,
                                device=args.device, seed=args.seed)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
@@ -110,6 +120,20 @@ def main():
             m = r[name]
             print("| %s | %s | %.3f | %.3f | %.3f | %.3f | %.3f | %d |" % (subset, name, m["minADE"], m["minFDE"],
                                                                             m["ADE1"], m["FDE1"], m["MR"], m["num"]))
+    if args.state_head:
+        print("\nState now (targets: velocity over +-0.5 s and the auto-label's moving rule on the pseudo ground "
+              "truth; tracker: its velocity and logged motion state, moving = 'moving'; learned: P(moving) >= 0.5)")
+        print("\n| windows | estimator | vel err m/s | moving recall | false moving | n |")
+        print("|---|---|---|---|---|---|")
+        for subset, mask in (("all", np.ones(len(vmov), bool)), ("moving", vmov), ("static", ~vmov)):
+            if not mask.any():
+                continue
+            r = evaluate_state(model, select_samples(val, mask), args.device)
+            res[subset]["state"] = r
+            for name in ("tracker", "learned"):
+                m = r[name]
+                print("| %s | %s | %.3f | %.3f | %.4f | %d |" % (subset, name, m["vel_err"], m["moving_recall"],
+                                                                 m["false_moving"], m["num"]))
     with open(os.path.splitext(args.out)[0] + "_eval.json", "w") as f:
         json.dump(dict(args={k: v for k, v in vars(args).items()}, eval=res), f, indent=2)
     print("saved", args.out)

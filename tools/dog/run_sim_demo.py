@@ -152,6 +152,8 @@ def run(kind, args, sim, learned=None):
     oracle = OracleDetector(OracleNoise(), seed=args.seed + 7)
     feeder = SimPoseFeeder(sim, pipe, args.frames * 0.1 + 0.5)
     objs = {o.id: o for o in sim.objects if not o.static}
+    if learned is not None:
+        learned.reset()                      # it keeps the track histories itself
 
     pre_rep = {k: [] for k in ("wall_rms_deskew", "wall_rms_raw", "ground_z_std_det", "ground_z_std_body",
                                "self_hits_raw", "self_hits_kept")}

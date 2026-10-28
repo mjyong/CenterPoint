@@ -28,6 +28,8 @@ Parameters (``--set KEY=V1,V2``, repeatable; every combination is one row, the f
     --set predict.merge_dist=0.25,0.5              IMMPredictor
     --set eval.hazard_radius=5,8                   EvalConfig
     --set eval.learned_model=,work_dirs/pred/gru.pt  IMM (empty) against a tier-2 model, paired
+    --configs rows.json with eval.learned_mode=velocity / imm, eval.learned_motion=true: the state
+                                                   head's velocity / motion state (TRACKING_PREDICTION 3.3.8)
 
 ``--configs rows.json`` compares given rows instead (a list of {key: value}; e.g. the old defaults
 against the new ones, ``[{"tracker.high_score": 0.35}, {}]``).

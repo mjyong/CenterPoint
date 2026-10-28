@@ -90,6 +90,8 @@ def run_scene(scene, si, det, tracker, predictor, acc, store, args, timer):
     from dog_perception import clip_viz
 
     tracker.reset()
+    if hasattr(predictor, "reset"):          # the learned predictor keeps the track histories itself
+        predictor.reset()
     off = si * ID_STRIDE
     writer = viz = None
     if not args.no_mcap:

@@ -14,10 +14,15 @@ The tracker output *is* the label source: cut every confirmed track into
   labels at 3 s, the filtered ones 0.5-0.7 m (filtered twice, they overshoot
   when a vehicle slows down).
 
+The state now (velocity, moving) is a target too, for the state head (model.py): the targets'
+velocity over +-0.5 s, and moving by the auto-label's rule (autolabel.py: trajectory faster than
+0.4 m/s and velocity head faster than 0.15 m/s, short bursts and stops cleaned), applied to the
+matched detections. So the network learns what the labels call moving, from the past only.
+
 Windows whose future is mostly coasting (occluded) are dropped, and the split
 into train/val should be by recording, not by window (windows overlap).
 """
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -27,8 +32,18 @@ from .features import FeatureConfig, build_inputs, future_to_agent_frame
 
 ROW = ("t", "id", "label", "x", "y", "vx", "vy", "yaw", "observed",
        # the matched detection (NaN when coasting): center, yaw, velocity head, score
-       "det_x", "det_y", "det_yaw", "det_vx", "det_vy", "det_score")
+       "det_x", "det_y", "det_yaw", "det_vx", "det_vy", "det_score",
+       "motion")     # the tracker's motion state, MOTION_CODE
 OLD_ROW = 9          # logs written before 2026-10-28 stop after "observed"
+MEASURED_ROW = 15    # T23's logs stop after "det_score"
+MOTION_CODE = {"static": 0, "moving": 1, "stopped": 2}
+
+
+def log_row(stamp, s):
+    """One ``ROW`` of a TrackState (also the runtime buffer of ``learned.LearnedPredictor``)."""
+    m = s.measurement if s.measurement is not None else np.full(6, np.nan)
+    return (stamp, s.track_id, s.label, s.position[0], s.position[1], s.velocity[0], s.velocity[1], s.yaw,
+            0.0 if s.coasting else 1.0, *m, MOTION_CODE.get(s.motion, 0))
 
 
 class TrackLogger:
@@ -45,10 +60,7 @@ class TrackLogger:
         self.pred_index, self.pred_modes, self.pred_probs = [], [], []
 
     def add(self, stamp, track_states, T_world_body=None, predictions=None):
-        for s in track_states:
-            m = s.measurement if s.measurement is not None else np.full(6, np.nan)
-            self.rows.append((stamp, s.track_id, s.label, s.position[0], s.position[1],
-                              s.velocity[0], s.velocity[1], s.yaw, 0.0 if s.coasting else 1.0, *m))
+        self.rows.extend(log_row(stamp, s) for s in track_states)
         if T_world_body is not None:
             self.ego.append((stamp, T_world_body[0, 3], T_world_body[1, 3], yaw_of(T_world_body[:3, :3])))
         for p in predictions or ():
@@ -137,11 +149,18 @@ def split_tracks(rows):
     return {k: np.asarray(sorted(v, key=lambda r: r[0])) for k, v in tracks.items()}
 
 
+Target = namedtuple("Target", "t xy vel moving")      # over the observed frames: (N,), (N, 2), (N, 2), (N,)
+
+
 def track_targets(tracks, source="measured", smooth=True):
-    """{track id: (times, (N, 2) smoothed positions)} over the frames each track was observed.
+    """{track id: Target} over the frames each track was observed: smoothed positions, and the
+    velocity and moving flags as the auto-label decides them (module docstring).
     ``source``: "filtered" (the tracker's positions) or "measured" (the matched detections' centers)."""
+    from ..autolabel import AutoLabelConfig, _clean_moving, _running_median, _window_velocity
+
     if source not in ("filtered", "measured"):
         raise ValueError("targets: 'filtered' or 'measured', not %r" % source)
+    al = AutoLabelConfig()
     out = {}
     for tid, tr in tracks.items():
         if source == "measured" and tr.shape[1] <= OLD_ROW:
@@ -152,9 +171,27 @@ def track_targets(tracks, source="measured", smooth=True):
             obs &= np.isfinite(tr[:, 9])
         if obs.sum() < 3:
             continue
+        t = tr[obs][:, 0]
         xy = tr[obs][:, 3:5] if source == "filtered" else tr[obs][:, 9:11]
-        out[tid] = (tr[obs][:, 0], rts_smooth(tr[obs][:, 0], xy) if smooth else xy)
+        xy = rts_smooth(t, xy) if smooth else xy
+        v = _window_velocity(t, xy[:, 0], xy[:, 1], al.velocity_window)
+        head = tr[obs][:, 12:14] if tr.shape[1] > OLD_ROW else tr[obs][:, 5:7]
+        head = _running_median(np.hypot(head[:, 0], head[:, 1]), 2)
+        moving = (np.hypot(v[:, 0], v[:, 1]) > al.static_speed) & ~(head <= al.teacher_speed)   # NaN: no head
+        moving = _clean_moving(t, moving, al)
+        out[tid] = Target(t, xy, np.where(moving[:, None], v, 0.0), moving)
     return out
+
+
+def state_at(target, t_now, tol=0.15):
+    """(velocity (2,), moving) of ``target`` at its observation closest to ``t_now``; None when that
+    is more than ``tol`` s away (the track coasts)."""
+    if target is None:
+        return None
+    k = int(np.argmin(np.abs(target.t - t_now)))
+    if abs(target.t[k] - t_now) > tol:
+        return None
+    return target.vel[k], bool(target.moving[k])
 
 
 def window_target(target, t_now, fut_t, stamps, min_future_observed=0.8):
@@ -163,7 +200,7 @@ def window_target(target, t_now, fut_t, stamps, min_future_observed=0.8):
     the track is observed in fewer than ``min_future_observed`` of the logged frames (``stamps``) of it."""
     if target is None:
         return None
-    tt, sm = target
+    tt, sm = target.t, target.xy
     q = t_now + fut_t
     if q[-1] > tt[-1] + 1e-6:
         return None
@@ -183,6 +220,9 @@ def build_samples(log, cfg=None):
         return {}
     tracks = split_tracks(rows)
     targets = track_targets(tracks, cfg.targets, cfg.smooth_targets)
+    if fc.use_detections and rows.shape[1] < MEASURED_ROW:
+        raise ValueError("use_detections needs a log with the matched detections (written since 2026-10-28)")
+    has_motion = rows.shape[1] > MEASURED_ROW
 
     online = {}
     if "pred_index" in log:
@@ -194,14 +234,17 @@ def build_samples(log, cfg=None):
     horizon = fc.hist_dt * (fc.hist_len - 1)
     out = defaultdict(list)
     for t_now in stamps[::cfg.frame_stride]:
-        hist, labels, yaws = {}, {}, {}
+        hist, dets, labels, yaws, motion = {}, {}, {}, {}, {}
         for tid, tr in tracks.items():
             m = (tr[:, 0] <= t_now + 1e-6) & (tr[:, 0] >= t_now - horizon - 1e-6)
             if m.sum() == 0 or abs(tr[m][-1, 0] - t_now) > 1e-6:
                 continue
             h = tr[m]
             hist[tid] = np.column_stack([h[:, 0], h[:, 3:7], h[:, 8]])
+            if fc.use_detections:
+                dets[tid] = detection_history(h)
             labels[tid], yaws[tid] = int(h[-1, 2]), float(h[-1, 7])
+            motion[tid] = int(h[-1, 15]) if has_motion else -1
         focal, futs, fvalid = [], [], []
         for tid, h in hist.items():
             if h[-1, 0] - h[0, 0] < cfg.min_history - 1e-6:
@@ -215,11 +258,18 @@ def build_samples(log, cfg=None):
         if not focal:
             continue
         eh = ego_history(ego, t_now, horizon) if ego is not None and len(ego) else None
-        inp, meta = build_inputs(hist, labels, yaws, focal, t_now, fc, ego_hist=eh)
+        inp, meta = build_inputs(hist, labels, yaws, focal, t_now, fc, ego_hist=eh, detections=dets)
         for b, tid in enumerate(focal):
             for k, v in inp.items():
                 out[k].append(v[b])
             out["future"].append(future_to_agent_frame(futs[b], meta["origins"][b], meta["thetas"][b]).astype(np.float32))
+            st = state_at(targets.get(tid), t_now)
+            c, s = np.cos(meta["thetas"][b]), np.sin(meta["thetas"][b])
+            v = np.zeros(2) if st is None else st[0]
+            out["vel_now"].append(np.array([c * v[0] + s * v[1], -s * v[0] + c * v[1]], np.float32))
+            out["moving_now"].append(np.float32(st is not None and st[1]))
+            out["state_valid"].append(np.float32(st is not None))
+            out["tracker_motion"].append(motion[tid])            # -1: not logged
             out["future_valid"].append(fvalid[b])
             out["origin"].append(meta["origins"][b])
             out["theta"].append(meta["thetas"][b])
@@ -234,6 +284,11 @@ def build_samples(log, cfg=None):
                 out["imm_modes"].append(future_to_agent_frame(m, meta["origins"][b], meta["thetas"][b]))
                 out["imm_probs"].append(p)
     return {k: np.asarray(v) for k, v in out.items()}
+
+
+def detection_history(rows):
+    """(K, 6) [t, x, y, vx, vy, score] of the matched detections in a track's log rows (NaN when coasting)."""
+    return np.column_stack([rows[:, 0], rows[:, 9:11], rows[:, 12:15]])
 
 
 def concat_samples(list_of_samples):
@@ -260,11 +315,11 @@ def mirror_samples(samples):
     future and the raster): a vehicle turning left becomes one turning right, twice the motions to learn
     from. World-frame fields are copied unchanged; they only serve evaluation."""
     out = {k: v.copy() for k, v in samples.items()}
-    for k in ("agent_hist", "nbr_hist"):
+    for k in ("agent_hist", "nbr_hist", "agent_det"):
         if k in out:
             out[k][..., 1] *= -1        # y
             out[k][..., 3] *= -1        # vy
-    for k in ("future", "imm_modes"):
+    for k in ("future", "imm_modes", "vel_now"):
         if k in out:
             out[k][..., 1] *= -1
     if "raster" in out:

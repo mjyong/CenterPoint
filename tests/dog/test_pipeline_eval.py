@@ -236,5 +236,16 @@ def test_learned_predictor_and_track_logs(scene, tmp_path):
     samples = build_samples(imm_log.to_dict(), SampleConfig())
     assert len(samples["future"]) > 50 and "imm_modes" in samples   # the online IMM is logged for comparison
     assert len(build_samples(imm_log.to_dict(), SampleConfig(targets="filtered"))["future"]) == len(samples["future"])
+    # a model with a state head: constant velocity from its velocity, its motion state for the tracks
+    from dog_perception.prediction import FeatureConfig
+    st_path = str(tmp_path / "state.pt")
+    save_model(TrajectoryPredictor(ModelConfig(det_feats=6, state_head=True)), st_path, FeatureConfig(use_detections=True))
+    r = pe.run_scene(scene, pe.apply_overrides(pe.EvalConfig(), {"eval.learned_model": st_path, "eval.learned_mode": "velocity",
+                                                                  "eval.learned_motion": True}))
+    m = pe.summarize([r])
+    assert r.predictor == "learned-velocity" and len(r.pred) == len(imm.pred)
+    assert np.isfinite(m["pred_FDE3_moving"]) and np.isfinite(m["motion_false_episodes_per_h"])
+    with pytest.raises(ValueError):
+        pe.run_scene(scene, pe.apply_overrides(pe.EvalConfig(), {"eval.learned_model": path, "eval.learned_motion": True}))
     grid = pe.parse_grid(["eval.learned_model=," + path])
     assert grid == [{"eval.learned_model": ""}, {"eval.learned_model": path}]

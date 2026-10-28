@@ -549,7 +549,11 @@ __call__(tracker, ego_hist)                                  learned.py:37
 
 **记录**：`TrackLogger`（`:31`）每帧记录三样东西，由 `run_sequence.py` 保存为 `track_log.npz`：
 
-- 每条上报轨迹一行 `rows: [t, id, label, x, y, vx, vy, yaw, observed, det_x, det_y, det_yaw, det_vx, det_vy, det_score]`：前 9 列是跟踪器的估计，后 6 列是这一帧匹配到的检测（`TrackState.measurement`，coasting 时为 NaN；2026-10-28 之前的日志只有前 9 列）；
+- 每条上报轨迹一行 `rows: [t, id, label, x, y, vx, vy, yaw, observed, det_x, det_y, det_yaw, det_vx, det_vy, det_score, motion]`：
+  - 前 9 列是跟踪器的估计；
+  - 接着 6 列是这一帧匹配到的检测（`TrackState.measurement`，coasting 时为 NaN）；
+  - 最后一列是跟踪器的运动状态（0 静止、1 在动、2 刚停），用来和第二版的状态估计比（3.3.8 节）。
+  - 2026-10-28 之前的日志只有前 9 列，T23 的日志有前 15 列；
 - 机器狗位姿 `ego: [t, x, y, yaw]`；
 - 第一档线上实际输出的预测（概率最高的 2 个模态），用于在同一批样本上公平对比两档。
 
@@ -618,6 +622,43 @@ python tools/dog/train_predictor.py --sim 10 --encoder transformer      # 没有
 - 模式覆盖得好：minFDE 1.25 对 2.79，MR 0.19 对 0.52。停着的车不会被往外推。
 - 耗时：单线程 10 条轨迹约 16 ms、30 条约 40 ms（GRU），超过 10 ms 的门槛。上线前要只对在动的轨迹跑网络，邻居历史每帧只编码一次，Orin 上用 TensorRT。
 - IMM 的误差主要在纵向（验证 2.72 m，横向 0.58 m），也就是速度估计；道路地图暂不做（[DRIVABLE_AREA_PLAN.md](DRIVABLE_AREA_PLAN.md)）。
+
+#### 3.3.8 第二版：跟踪的部分合并（2026-10-28 起，服务器任务 T24）
+
+**为什么**（T23 复核）：
+- IMM 的误差主要在纵向，也就是速度。端到端 2.72 m，标签当检测时 1.42 m，差出来的主要是检测带来的速度噪声。
+- 停着的车被报成在动，每小时 87 次（T22），是跟踪层最大的问题。
+- 第一版概率最高的那条路线偏慢：未来怎么走，要靠场景间的行为先验，41 辆运动车学不好。"现在的状态"不依赖未来，数据也够，停着的窗口占多数。
+
+**结构**：跟踪器不变，继续负责关联、ID、轨迹的产生和结束、遮挡外推；网络多看一样、多出一样。
+
+```text
+跟踪器（不变）：关联、ID、轨迹产生 / 结束、遮挡外推
+      │ 每帧上报的轨迹：滤波后的状态，加这一帧匹配到的检测
+      ▼
+网络，过去 2 s：agent_hist（跟踪器的估计）+ agent_det（匹配到的检测：中心、速度头、分数）   --det-inputs
+      ├─ 未来 3 s 的 6 个模式（同第一版）
+      └─ 现在的状态：速度、P(在动)                                                         --state-head
+```
+
+**训练目标**（`build_samples`）：
+- `vel_now`：伪真值（measured）在 ±0.5 s 上的速度，不在动时为 0；
+- `moving_now`：和自动标注同一条规则（`autolabel.py`：轨迹速度 > 0.4 m/s 且速度头 > 0.15 m/s，去掉短的跳变和短停），用在匹配到的检测上。所以网络学的是标签所说的"在动"，但只能看过去；
+- `state_valid`：当前时刻附近 0.15 s 内有观测才算；
+- 同时记下跟踪器自己的速度和运动状态（`tracker_motion`），`train_predictor.py` 在同一批验证窗口上打印两者的对比表。
+
+**线上**（`LearnedPredictor`）：
+- `mode`：
+  - `trajectory`：网络的 6 个模式（第一版）；
+  - `velocity`：用网络估的速度匀速外推，一个模式；
+  - `imm`：仍用 IMM，网络只估状态。
+- `apply_motion`：P(在动) ≥ 0.6 进入在动，< 0.4 退为刚停，刚停 10 s 后为静止。没估过的轨迹（历史不足 0.5 s）用跟踪器的状态；coasting 时保持上一个状态，和跟踪器一样。
+- 它自己按 `TrackLogger` 的行格式记每条上报轨迹的历史，和训练窗口完全一致。所以**每帧都要调用**，换录制时调 `reset()`。之前用的是跟踪器内部的历史，里面还有上报之前的帧，和训练不一致。
+- 耗时和第一版一样：单线程 10 条轨迹约 15 ms、30 条约 43 ms。
+
+**评估**：`pipeline_eval.py` 的 `eval.learned_mode`、`eval.learned_motion`，用 `--configs` 一次配对比几种用法（SERVER_TASKS.md T24）。
+
+**上线**（过了门槛再做）：ROS 2 节点现在只接 `predictor_model`，也就是 `trajectory` 模式。`velocity` 模式和运动状态替换，要在 `pipeline.py`、`ros2_node.py` 里加参数。
 
 ### 3.4 给下游
 

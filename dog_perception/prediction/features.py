@@ -11,6 +11,9 @@ Per focal agent (origin = its current position, +x = its heading):
   nbr_static   (Nn, C + 1)  one-hot class + is_robot flag
   nbr_mask     (Nn,)        1 = neighbour slot used
   raster       (1, S, S)    optional static-obstacle occupancy around the agent
+  agent_det    (Tp, 6)      optional (``use_detections``): the detection the tracker matched at
+                            each step, [x, y, vx (velocity head), vy, score, valid]; what the
+                            tracker filtered, so the network can estimate the state itself
 """
 from dataclasses import dataclass
 
@@ -19,6 +22,7 @@ import numpy as np
 from ..detection.boxes import CLASSES
 
 HIST_FEATS = 6
+DET_FEATS = 6
 
 
 @dataclass
@@ -33,6 +37,7 @@ class FeatureConfig:
     use_raster: bool = False
     raster_size: int = 64
     raster_res: float = 0.5
+    use_detections: bool = False
 
 
 def resample_history(hist, t_now, cfg):
@@ -49,6 +54,39 @@ def resample_history(hist, t_now, cfg):
     out[:, 4] = np.interp(grid, t, hist[:, 5]) > 0.5
     out[:, 5] = valid
     out[~valid] = 0.0
+    return out
+
+
+def resample_detections(det, t_now, cfg):
+    """det: (K, 6) [t, x, y, vx, vy, score] world frame, sorted by t, NaN where the track was not
+    observed. Returns (Tp, 6) world-frame [x, y, vx, vy, score, valid] on the history grid: the
+    detection of the frame within half a step of each grid time (not interpolated), zeros where none."""
+    grid = t_now - cfg.hist_dt * np.arange(cfg.hist_len - 1, -1, -1)
+    out = np.zeros((cfg.hist_len, DET_FEATS), dtype=np.float32)
+    if det is None or len(det) == 0:
+        return out
+    t = det[:, 0]
+    if len(t) > 1:
+        j = np.clip(np.searchsorted(t, grid), 1, len(t) - 1)
+        j = np.where(np.abs(t[j - 1] - grid) < np.abs(t[j] - grid), j - 1, j)
+    else:
+        j = np.zeros(len(grid), dtype=np.int64)
+    ok = (np.abs(t[j] - grid) <= cfg.hist_dt / 2 + 1e-6) & np.isfinite(det[j, 1])
+    out[ok, :5] = np.nan_to_num(det[j[ok], 1:6])           # no velocity head: zeros
+    out[ok, 5] = 1.0
+    return out
+
+
+def det_to_agent_frame(d, origin, theta):
+    """(..., 6) world-frame resampled detections -> agent frame."""
+    c, s = np.cos(theta), np.sin(theta)
+    out = d.copy()
+    x, y = d[..., 0] - origin[0], d[..., 1] - origin[1]
+    out[..., 0] = c * x + s * y
+    out[..., 1] = -s * x + c * y
+    out[..., 2] = c * d[..., 2] + s * d[..., 3]
+    out[..., 3] = -s * d[..., 2] + c * d[..., 3]
+    out[..., :5] *= d[..., 5:6]
     return out
 
 
@@ -84,12 +122,15 @@ def rasterize(points_xy, origin, theta, cfg):
     return img
 
 
-def build_inputs(histories, labels, yaws, focal_ids, t_now, cfg, ego_hist=None, obstacles_xy=None):
+def build_inputs(histories, labels, yaws, focal_ids, t_now, cfg, ego_hist=None, obstacles_xy=None,
+                 detections=None):
     """Batch the inputs for ``focal_ids``.
 
     histories: {id: (K, 6) [t, x, y, vx, vy, observed]} world frame, causal
     labels / yaws: {id: int / float}
     ego_hist: optional (K, 6) robot history (added as a neighbour with is_robot=1)
+    detections: {id: (K, 6) [t, x, y, vx, vy, score]} the matched detections (NaN when coasting),
+    for ``cfg.use_detections``
     Returns (inputs dict of stacked arrays, meta dict with origins / thetas).
     """
     C = len(CLASSES)
@@ -108,6 +149,8 @@ def build_inputs(histories, labels, yaws, focal_ids, t_now, cfg, ego_hist=None, 
     )
     if cfg.use_raster:
         out["raster"] = np.zeros((B, 1, cfg.raster_size, cfg.raster_size), np.float32)
+    if cfg.use_detections:
+        out["agent_det"] = np.zeros((B, Tp, DET_FEATS), np.float32)
     origins, thetas = np.zeros((B, 2)), np.zeros(B)
 
     for b, fid in enumerate(focal_ids):
@@ -137,6 +180,9 @@ def build_inputs(histories, labels, yaws, focal_ids, t_now, cfg, ego_hist=None, 
             out["nbr_mask"][b, n] = 1.0
         if cfg.use_raster:
             out["raster"][b] = rasterize(obstacles_xy, origin, theta, cfg)
+        if cfg.use_detections:
+            d = resample_detections((detections or {}).get(fid), t_now, cfg)
+            out["agent_det"][b] = det_to_agent_frame(d, origin, theta)
     return out, dict(origins=origins, thetas=thetas, ids=list(focal_ids))
 
 
