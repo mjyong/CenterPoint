@@ -1,0 +1,10 @@
+data/tune/final/0921_164127_s000/pillar/results.pkl network 103.1 ms, preprocess + detector 219.0 ms
+data/tune/final/0921_164127_s001/pillar/results.pkl network 103.4 ms, preprocess + detector 224.5 ms
+data/tune/final/0921_164127_s002/pillar/results.pkl network 108.8 ms, preprocess + detector 223.8 ms
+data/tune/final/0921_164127_s003/pillar/results.pkl network 106.7 ms, preprocess + detector 220.6 ms
+data/tune/final/0921_164127_s004/pillar/results.pkl network 103.4 ms, preprocess + detector 228.7 ms
+data/tune/final/0921_164127_s005/pillar/results.pkl network 101.3 ms, preprocess + detector 234.6 ms
+data/tune/final/0921_165659_s003/pillar/results.pkl network 100.6 ms, preprocess + detector 219.3 ms
+data/tune/final/0921_165659_s004/pillar/results.pkl network 107.8 ms, preprocess + detector 228.9 ms
+data/tune/final/0921_165659_s005/pillar/results.pkl network 91.3 ms, preprocess + detector 195.6 ms
+data/tune/final/0921_165659_s006/pillar/results.pkl network 91.1 ms, preprocess + detector 200.0 ms
