@@ -91,12 +91,13 @@
 | T14 | 双教师（nuScenes Voxel + TTA、nuScenes Pillar + TTA）重新自动标注 0921，补进审过的训练标签（不丢 H1） | Agent | T7 | 1 小时 | 完成（双教师标注 T16 接着用；labels_merged.pkl 不再用） |
 | T15 | 用 v2 数据集训练 v2；定上线用哪个 Pillar、教师换不换 | Agent | T17 | 3.5 小时 | 完成。上线用 nuScenes Pillar（人定：v1、v2 都不如它，见复核）；教师不换 |
 | T18 | 后处理、跟踪、预测的基线：上线 Pillar 在验证场景上的指标、Foxglove MCAP、问题清单；六份对照 | Agent | T15 | 30 分钟 | 完成（修正后重跑；oracle 假轨迹 0 / 分钟；跟踪只计车辆）。续 2 完成：叉车忽略后验证车框 1721，oracle 假轨迹仍是 0；v2_pp − nusc_pp 的 ΔmAP 从 −0.041 收到 0.000 |
-| H4 | 在 Foxglove 里看定版结果（T22_mcap），按 T22 复核的表看 5 处问题 | 人 | T22 | 1 小时 | 待做 |
+| H4 | 在 Foxglove 里看定版结果（T22_mcap），按 T22 复核的表看 5 处问题 | 人 | T22 | 1 小时 | 暂缓（2026-10-28 人定：新数据来了模型还会改，到时再看） |
 | T19 | 后处理扫参（上报阈值、轨迹输出分数、低分门槛、最少点数、离地 / 下沉）；第 1b 步三个 Pillar 各用最合适的阈值比，可能要人重新定上线模型 | Agent | T18 | 30 分钟 | 完成（人定仍用 nuScenes Pillar）。上报阈值 0.40，轨迹输出分数 0.35，低分门槛 0.2；最少点数、离地、下沉留默认 |
 | T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 完成。coast 1.5 s，确认 3 帧；关联半径、观测噪声、速度头、匹配、运动状态留默认 |
 | T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 完成。运动模型、合并距离留默认（cv:1.5+ct:1.5:0.25，merge_dist 0.25）；训练 oracle 上 CV 比 IMM 差 |
 | T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 完成。从原始扫描完整跑，IDF1 0.786，和 T20 final_A 相同；新默认值相对旧默认值 IDF1 +0.060。MCAP 在 data/tune/T22_mcap（872 MB） |
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
+| T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -3735,3 +3736,70 @@ MCAP：`data/tune/T22_mcap/`，10 个场景，共 872 MB。
 ### H5 结果
 
 （待填）
+
+---
+
+## T23 第二档预测（学习模型）第一版
+
+第一档（IMM）在 0921 上和匀速外推一样：
+- 运动的车 3 s 的 FDE 2.8 m（T18、T21）；
+- 标签当检测时是 1.4 m，所以一半误差来自跟踪估出的速度。
+
+第二档拿过去 2 s 的轨迹（以及周围的车、狗自己）预测 3 s，给 6 个模式和概率（TRACKING_PREDICTION.md 3.3 节）。
+- 训练数据不用标注：跟踪器自己的轨迹当输入，事后平滑过的观测位置当目标；
+- 评估用审过的标签。
+
+**预期要放低**：0921 上运动的车只有约 70 辆（训练场景 41、验证场景 27），窗口大多来自停着的车。
+这一版主要是把流程跑通、留一个基线，新数据（DATA_COLLECTION_PLAN.md 3.2、3.3）到了再训。
+
+```text
+任务 T23：用上线的检测器和定版的跟踪参数生成 35 个场景的跟踪日志，训练第二档预测的第一版（GRU、Transformer 各一个），
+在验证集上和 IMM 配对比较，判断能不能替换第一档。
+先按通用约定做（拉到了代码改动，跑快速测试）。前置：T22 完成。
+模型小（约 16–25 万参数），CPU 就能训；有空闲 GPU 就加 --device cuda:0（约 1 GB）。
+
+0. mkdir -p data/reports/T23 data/tune/track_logs data/train/pred_v1; TASK=T23；VAL、TRAIN、ev 同 T18 第 0、3 步。
+1. 跟踪日志（CPU，各约 1 分钟）。用默认参数，也就是定版的跟踪参数，预测是 IMM，日志里同时记下 IMM 的预测，用来对比：
+     ev logs_val "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections raw --no-mcap --bootstrap 0 \
+         --track-logs data/tune/track_logs
+     ev logs_train "$TRAIN" "data/tune/nusc_pp_train/{scene}/pillar/results.pkl" --detections raw --no-mcap --bootstrap 0 \
+         --track-logs data/tune/track_logs
+     ls data/tune/track_logs/*.npz | wc -l        # 应是 35
+2. 训练：训练场景训，验证场景验，GRU、Transformer 各一个：
+     LT=$(for r in $TRAIN; do echo data/tune/track_logs/$r.npz; done); LV=$(for r in $VAL; do echo data/tune/track_logs/$r.npz; done)
+     for enc in gru transformer; do
+       python tools/dog/train_predictor.py --logs $LT --val-logs $LV --encoder $enc --modes 6 --epochs 60 \
+           --static-keep 0.3 --mirror --out data/train/pred_v1/$enc.pt 2>&1 | tee data/reports/T23/train_$enc.txt
+     done
+   train_*.txt 开头打印窗口数（其中运动的），最后一张表是验证窗口上的 cv / imm / learned，分全部、运动、静止。
+3. 和标签比（配对：第 1 行 IMM，第 2 行第二档；端到端和标签当检测各一次）：
+     for enc in gru transformer; do
+       ev pred_$enc "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections raw --no-mcap \
+           --set "eval.learned_model=,data/train/pred_v1/$enc.pt"
+       ev pred_${enc}_oracle "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections labels \
+           --dense-labels "data/labels/{scene}/labels_full2.pkl" --no-mcap --set "eval.learned_model=,data/train/pred_v1/$enc.pt"
+     done
+   每份的 sweep.md 看 FDE 3 s、MR 3 s；sweep.csv 里还有 pred_minFDE3_moving、false_alarms_per_h、hazard_reported、predict_ms。
+
+怎么选（能不能替换第一档；都满足的 encoder 里选端到端 FDE 3 s 低的）：
+- 端到端（pred_*）：FDE 3 s 比第 1 行（IMM）低，领先比例 ≥ 90%；MR 3 s 不高于第 1 行；
+- 标签当检测（pred_*_oracle）：FDE 3 s 不高于第 1 行；
+- 不能让狗多误停：sweep.csv 里 false_alarms_per_h 不高于第 1 行，hazard_reported 不少于第 1 行；
+  train_*.txt 静止那组，learned 的 FDE1 不比 imm 高 0.1 m 以上（停着的车不能被预测成要开走）；
+- 耗时：sweep.csv 里第 2 行的 predict_ms（中位数，服务器 CPU）不超过 10 ms。
+都不满足：线上继续用 IMM，模型留作基线，新数据来了再训。满足了写清是哪个 encoder，由人决定是否上线
+（ROS 2 节点参数 predictor_model）。
+
+停止条件：任何报错；第 1 步日志不是 35 个；训练 loss 出现 nan。
+提交：data/reports/T23/、本文档。不提交 .pt 和跟踪日志。
+报告（写进"T23 结果"）：
+- 两个 train_*.txt 开头的窗口数行、最后的表；
+- 四份 sweep.md 的两张表；
+- sweep.csv 里两行的 predict_ms、false_alarms_per_h、hazard_reported、pred_minFDE3_moving；
+- 按"怎么选"给出的结论；每个训练的耗时。
+```
+
+### T23 结果
+
+（待填）
+

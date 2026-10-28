@@ -141,7 +141,7 @@ def test_scene_metrics(scene):
     key = "fp_cause|coasting after the vehicle was lost"
     assert strict.counts[key] >= res.counts[key] + 2 and strict.fp_episodes > res.fp_episodes
     assert m["motion_relevant_segments"] >= 1 and m["motion_relevant_missed"] == 0
-    assert m["pred_samples_moving"] > 10 and m["IMM_FDE3_moving"] < 3.0
+    assert m["pred_samples_moving"] > 10 and m["pred_FDE3_moving"] < 3.0
     assert m["CV_FDE3_moving"] < 3.0
     hz = m["tables"]["hazard"]
     assert len(hz) == 1 and hz[0]["gt"] == 3 and hz[0]["reported"] and hz[0]["lead"] > 0
@@ -207,3 +207,22 @@ def test_tool_writes_report_mcap_and_sweep(tmp_path):
                    capture_output=True)
     text = (tmp_path / "pair" / "sweep.md").read_text()
     assert "tracker.vehicle.gate=2.5, tracker.high_score=0.9" in text and "| 2 | tracker.vehicle.gate=2.5 |" in text
+
+
+def test_learned_predictor_and_track_logs(scene, tmp_path):
+    """A tier-2 model (untrained here) predicts instead of the IMM; the track logs feed the trainer."""
+    from dog_perception.prediction import SampleConfig, TrackLogger, build_samples
+    from dog_perception.prediction.model import ModelConfig, TrajectoryPredictor, save_model
+    path = str(tmp_path / "gru.pt")
+    save_model(TrajectoryPredictor(ModelConfig()), path)
+    imm_log = TrackLogger()
+    imm = pe.run_scene(scene, pe.EvalConfig(), logger=imm_log)
+    learned = pe.run_scene(scene, pe.apply_overrides(pe.EvalConfig(), {"eval.learned_model": path}))
+    assert imm.predictor == "IMM" and learned.predictor == "learned"
+    assert len(learned.pred) == len(imm.pred) > 10              # the same matched tracks get predictions
+    m = pe.summarize([learned])
+    assert np.isfinite(m["pred_FDE3_moving"]) and "learned" in m["tables"]["prediction"]["moving"]
+    samples = build_samples(imm_log.to_dict(), SampleConfig())
+    assert len(samples["future"]) > 50 and "imm_modes" in samples   # the online IMM is logged for comparison
+    grid = pe.parse_grid(["eval.learned_model=," + path])
+    assert grid == [{"eval.learned_model": ""}, {"eval.learned_model": path}]

@@ -27,6 +27,7 @@ Parameters (``--set KEY=V1,V2``, repeatable; every combination is one row, the f
     --set filter.min_points.vehicle=3,5,8          DetectionFilterConfig (with --detections raw)
     --set predict.merge_dist=0.25,0.5              IMMPredictor
     --set eval.hazard_radius=5,8                   EvalConfig
+    --set eval.learned_model=,work_dirs/pred/gru.pt  IMM (empty) against a tier-2 model, paired
 
 ``--configs rows.json`` compares given rows instead (a list of {key: value}; e.g. the old defaults
 against the new ones, ``[{"tracker.high_score": 0.35}, {}]``).
@@ -58,14 +59,14 @@ METRIC_NAMES = {
     "det_fp_per_frame": "detections: false per keyframe", "MOTA": "tracks: MOTA", "IDF1": "tracks: IDF1",
     "IDSW_per_min": "tracks: ID switches / min", "false_tracks_per_min": "tracks: false tracks / min",
     "confirm_p90": "tracks: confirm delay p90 [s]", "motion_relevant_missed": "motion: relevant moving stretches missed",
-    "motion_false_episodes_per_h": "motion: parked reported moving / h", "IMM_FDE3_moving": "prediction: FDE 3 s, moving [m]",
-    "IMM_MR3_moving": "prediction: miss rate 3 s, moving",
+    "motion_false_episodes_per_h": "motion: parked reported moving / h", "pred_FDE3_moving": "prediction: FDE 3 s, moving [m]",
+    "pred_MR3_moving": "prediction: miss rate 3 s, moving",
 }
 SHORT = {"det_recall_near": "det recall", "det_precision_near": "det precision", "det_f1_near": "det F1",
          "det_fp_per_frame": "det FP / frame",
          "MOTA": "MOTA", "IDF1": "IDF1", "IDSW_per_min": "IDSW / min", "false_tracks_per_min": "false tracks / min",
          "confirm_p90": "confirm p90 s", "motion_relevant_missed": "moving missed",
-         "motion_false_episodes_per_h": "false moving / h", "IMM_FDE3_moving": "FDE 3 s", "IMM_MR3_moving": "MR 3 s"}
+         "motion_false_episodes_per_h": "false moving / h", "pred_FDE3_moving": "FDE 3 s", "pred_MR3_moving": "MR 3 s"}
 
 _W = {}
 
@@ -114,7 +115,13 @@ def _work(job):
         from dog_perception.foxglove import McapWriter
         writer = McapWriter(os.path.join(a.mcap_dir or a.out, "%s.mcap" % name))
         viz = clip_viz.ClipVisualizer(writer, frame_period=0.1, keyframe_period=0.5)
-    res = pe.run_scene(sd, cfg, a.detections, viz, _cloud_of(name), a.lidar_stride)
+    logger = None
+    if a.track_logs:
+        from dog_perception.prediction import TrackLogger
+        logger = TrackLogger()
+    res = pe.run_scene(sd, cfg, a.detections, viz, _cloud_of(name), a.lidar_stride, logger)
+    if logger is not None:
+        logger.save(os.path.join(a.track_logs, "%s.npz" % name))
     if writer is not None:
         from dog_perception import foxglove as fx
         for i in sorted(res.issues, key=lambda i: i["stamp"]):      # the issues in the Log panel, at their time
@@ -232,10 +239,10 @@ def write_report(args, cfg, overrides, m, boot, results, issue_counts, figures):
               _f(ms["relevant_latency_median"], 2), _f(ms["relevant_latency_p90"], 2)), ""]
     L += ["## Prediction", "", "Tracks matched to a vehicle with 3 s of labelled future (keyframes every 0.5 s). Moving: "
           ">= %.1f m in 3 s; turning: heading changes > %.0f deg. ADE1 / FDE1: the most likely mode; minADE / minFDE: "
-          "the best; MR: no mode ends within 2 m. IMM is what runs online, CV keeps the track's velocity." % (
-              cfg.moving_disp, cfg.turn_deg), ""]
+          "the best; MR: no mode ends within 2 m. %s is what runs online (IMM: tier 1, learned: tier 2), CV keeps the "
+          "track's velocity." % (cfg.moving_disp, cfg.turn_deg, results[0].predictor if results else "IMM"), ""]
     for subset, res in t["prediction"].items():
-        n = next(iter(res.get("IMM", {}).values()), {}).get("num", 0)
+        n = next(iter(next(iter(res.values()), {}).values()), {}).get("num", 0)
         L += ["**%s** (%d samples)" % (subset, n), "", "| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |",
               "|---|---|---|---|---|---|---|"]
         for name, by_h in res.items():
@@ -341,6 +348,9 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--no-mcap", action="store_true")
     ap.add_argument("--mcap-dir", default=None, help="where the MCAP files go (default --out); they are large")
+    ap.add_argument("--track-logs", default=None, metavar="DIR",
+                    help="also write each scene's tracks, robot poses and predictions to DIR/<scene>.npz: "
+                         "the training data of tools/dog/train_predictor.py (one parameter set only)")
     ap.add_argument("--lidar-stride", type=int, default=2, help="keep every n-th point of /lidar")
     ap.add_argument("--bootstrap", type=int, default=500, help="resamples of the scenes for the intervals")
     ap.add_argument("--issues", type=int, default=30, help="issues listed per kind")
@@ -350,6 +360,8 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     if args.mcap_dir:
         os.makedirs(args.mcap_dir, exist_ok=True)
+    if args.track_logs:
+        os.makedirs(args.track_logs, exist_ok=True)
 
     grid = pe.parse_grid(args.set)
     if args.configs:
@@ -361,6 +373,8 @@ def main():
     cfgs = [pe.apply_overrides(pe.EvalConfig(), o) for o in grid]       # fails early on a wrong key
     if args.detections == "labels" and not args.dense_labels:
         raise SystemExit("--detections labels needs --dense-labels")
+    if args.track_logs and len(grid) > 1:
+        raise SystemExit("--track-logs writes one set of logs: give one parameter set")
     if any(pe.needs_clouds(c) for c in cfgs) and not args.frames:
         raise SystemExit("box_margin / ground settings change what the filters measure: pass --frames")
     draw = len(grid) == 1 and not args.no_mcap

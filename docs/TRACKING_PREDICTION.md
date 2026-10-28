@@ -594,6 +594,21 @@ python tools/dog/train_predictor.py --sim 10 --encoder transformer      # 没有
 
 仿真结果见 [DOG_PIPELINE.md](DOG_PIPELINE.md) 第 4 节：第二档在 minFDE 和 MR 上大幅领先；分布外场景下 FDE1 不如 IMM。所以规划侧应使用全部模态及其概率，不要只取 `best`。
 
+#### 3.3.7 在狗的数据上训练（2026-10-28 起，服务器任务 T23）
+
+1. **训练数据：跟踪日志，不用标注。**
+   - `tools/dog/pipeline_eval.py --track-logs DIR` 从存好的检测重跑跟踪（定版参数，CPU），每个场景写一个 `DIR/<场景>.npz`；
+   - 日志里同时记下线上 IMM 的预测，评估时和第二档在同一批窗口上比；
+   - 生成日志时预测要用 IMM（默认），不要加 `eval.learned_model`。
+2. **样本不均衡。** 窗口大多来自停着的车。`train_predictor.py` 的两个选项：
+   - `--static-keep 0.3`：3 s 内移动不到 `--moving-disp`（1.5 m）的窗口只留 30%，运动的全留；
+   - `--mirror`：每个训练窗口再加一份左右镜像。
+   - 验证窗口不抽、不镜像。结果按全部、运动、静止三组分别打印：静止的车被预测成要开走，会让狗误停。
+3. **和标签比（端到端）。**
+   - `pipeline_eval.py --set "eval.learned_model=,<model.pt>"`：第 1 行 IMM，第 2 行第二档，同一批轨迹配对重抽；
+   - 指标名是 `pred_*`，指线上实际在用的预测器；`CV_*` 是匀速。
+4. **上线**：ROS 2 节点参数 `predictor_model:=<model.pt>`。历史不足 0.5 s 的轨迹自动回退 IMM（3.3.4 节）。
+
 ### 3.4 给下游
 
 - `PerceptionPipeline.to_local(out)`（`pipeline.py:91`）把轨迹和预测从世界系转到当前帧的检测系 D（重力对齐、航向跟随机身、原点在地面），这是 2D 局部规划器习惯的坐标系。
@@ -610,6 +625,6 @@ python tools/dog/train_predictor.py --sim 10 --encoder transformer      # 没有
 | 第一档的模态概率在 3 s 内固定不变 | 直行车辆的"略弯"分支始终约占 0.4 | 规划侧按概率加权使用；或对 ω 很小的 CT 模态直接并入 CV |
 | 行人两个模态大多不合并（3.2 节） | 行人通常输出 2 条很接近的轨迹 | 合并判据改为马氏距离 |
 | coasting 轨迹的预测从纯预测状态出发 | 遮挡越久，预测越不可靠 | 规划侧结合 `coasting` 标志和协方差使用 |
-| 第二档只在仿真上验证过，障碍物栅格未接入线上 | 真实交互效果未知 | 用实车日志训练和评估，过门槛再切换（DOG_PIPELINE 1.5 节） |
+| 第二档只在仿真上验证过，障碍物栅格未接入线上 | 真实交互效果未知 | 用实车日志训练和评估，过门槛再切换（DOG_PIPELINE 1.5 节）；0921 上的第一版见 SERVER_TASKS.md T23 |
 | 运动状态只看最近 1 s 的位移和速度头 | 位姿跳变时，几个静止物体会一起被报成运动（运动样例 bag 1.8–2.3 s）；线上用 INS 位姿，跳变比离线修正的多 | 线上位姿质量差时（INS 跳变）暂停进入 `moving`；用线上位姿在验证场景上再评一次 |
 | 全部为 Python 实现 | x86 上跟踪约 6 ms；第一档预测在本次修改后每条轨迹约 0.85 ms | 部署到 Orin 时移植 C++（DOG_PIPELINE 8.3 节） |

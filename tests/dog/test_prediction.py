@@ -111,3 +111,32 @@ def test_training_converges_and_runtime_wrapper(logs, tmp_path):
     assert "learned" in src and "imm" in src
     for p in preds:
         assert p.modes.shape[1:] == (6, 2) and np.isclose(p.probs.sum(), 1.0)
+
+
+def test_mirror_and_moving_windows(logs):
+    from dog_perception.prediction import mirror_samples, moving_mask, select_samples
+    s = build_samples(logs[0], SampleConfig())
+    m = mirror_samples(s)
+    assert np.allclose(m["future"][..., 1], -s["future"][..., 1]) and np.allclose(m["future"][..., 0], s["future"][..., 0])
+    assert np.allclose(m["agent_hist"][..., 3], -s["agent_hist"][..., 3])
+    assert np.allclose(m["nbr_hist"][..., 1], -s["nbr_hist"][..., 1])
+    mov = moving_mask(s, 1.5)
+    assert 0 < mov.sum() < len(mov)
+    part = select_samples(s, mov)
+    assert len(part["future"]) == mov.sum() and (np.hypot(*part["future"][:, -1].T) >= 1.5).all()
+
+
+@pytest.mark.slow
+def test_train_predictor_tool_reports_moving_and_static(tmp_path):
+    import json
+    import os
+    import subprocess
+    import sys
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    out = tmp_path / "pred" / "gru.pt"
+    subprocess.run([sys.executable, os.path.join(root, "tools", "dog", "train_predictor.py"), "--sim", "2",
+                    "--epochs", "1", "--static-keep", "0.3", "--mirror", "--out", str(out)], check=True,
+                   env=dict(os.environ, PYTHONPATH=root), capture_output=True)
+    res = json.load(open(tmp_path / "pred" / "gru_eval.json"))
+    assert {"all", "moving", "static"} <= set(res["eval"]) and "learned" in res["eval"]["moving"]
+    assert out.exists()

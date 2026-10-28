@@ -29,7 +29,7 @@ perfect detections: what the tracker and the predictor do with a perfect detecto
 """
 import copy
 import time
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field, fields, replace
 from itertools import product
 
@@ -64,6 +64,9 @@ class EvalConfig:
     filters: DetectionFilterConfig = field(default_factory=DetectionFilterConfig)
     predictor: dict = field(default_factory=lambda: dict(horizon=3.0, step=0.5, merge_dist=0.25))
     predict: bool = True
+    # tier-2 model (.pt, tools/dog/train_predictor.py) instead of the IMM rollout; "" = IMM. A sweep
+    # --set eval.learned_model=,model.pt compares the two on the same tracks (paired)
+    learned_model: str = ""
     max_range: float = 40.0          # [m] scored range, from the robot
     near_range: float = 30.0         # [m] where a vehicle matters to the robot (DATA_COLLECTION_PLAN.md 4)
     match_dist: float = 2.0          # [m] center distance of a match
@@ -349,6 +352,7 @@ def _bin(value, bins):
 class SceneResult:
     name: str
     t0: float
+    predictor: str = "IMM"        # what made the predictions: "IMM" (tier 1) or "learned" (tier 2)
     frames: int = 0
     keyframes: int = 0
     keyframe_s: float = 0.0
@@ -393,16 +397,36 @@ def _detections(sd, row, cfg, source, cloud_of):
     return row["detections"], None, None
 
 
-def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_stride=2):
+_LEARNED = {}
+
+
+def _learned_predictor(path):
+    """One LearnedPredictor per model file and process (loading costs more than a scene)."""
+    if path not in _LEARNED:
+        from .prediction.learned import LearnedPredictor
+        _LEARNED[path] = LearnedPredictor(path)
+    return _LEARNED[path]
+
+
+def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_stride=2, logger=None):
     """Re-run filters, tracker and predictor on one scene and score it. ``viz``: a ClipVisualizer to
     draw every frame into; ``cloud_of(stamp)``: the saved detector input (N, 5, det frame) or None,
-    for the lidar in ``viz`` and the snapshot, and for ``raw`` with changed measuring settings."""
+    for the lidar in ``viz`` and the snapshot, and for ``raw`` with changed measuring settings.
+    ``logger``: a ``prediction.TrackLogger`` that records the tracks, robot poses and predictions
+    (the tier-2 training data, tools/dog/train_predictor.py)."""
     cfg = cfg or EvalConfig()
     res = SceneResult(sd.name, sd.rows[0]["stamp"] if sd.rows else 0.0, merges=sd.merges)
     tracker = MultiObjectTracker(cfg.tracker)
-    predictor = IMMPredictor(**cfg.predictor) if cfg.predict else None
-    times = predictor.step * np.arange(1, int(round(predictor.horizon / predictor.step)) + 1) if predictor else \
-        np.arange(1, 7) * 0.5
+    learned = _learned_predictor(cfg.learned_model) if cfg.predict and cfg.learned_model else None
+    res.predictor = "learned" if learned is not None else "IMM"
+    predictor = learned or (IMMPredictor(**cfg.predictor) if cfg.predict else None)
+    if learned is not None:
+        times = learned.fc.fut_dt * np.arange(1, learned.fc.fut_len + 1)
+    elif predictor is not None:
+        times = predictor.step * np.arange(1, int(round(predictor.horizon / predictor.step)) + 1)
+    else:
+        times = np.arange(1, 7) * 0.5
+    ego = deque(maxlen=64)              # the robot's own history, a neighbour of every agent for tier 2
     mot = MotAccumulator(["vehicle"], cfg.match_dist)
     motion = MotionStateAccumulator(("vehicle",), cfg.match_dist, relevant_speed=1.0, relevant_range=cfg.near_range)
     good = [r for r in sd.rows if not r.get("pose_bad")]
@@ -436,8 +460,16 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
         t2 = time.perf_counter()
         tracks = tracker.step(dets.transform(T, "world"), stamp)
         t3 = time.perf_counter()
-        preds = predictor(tracker) if predictor else []
+        T_body = np.asarray(row.get("T_world_body", T), float)
+        v = (T_body[:2, 3] - ego[-1][1:3]) / (stamp - ego[-1][0]) if ego and stamp > ego[-1][0] else np.zeros(2)
+        ego.append(np.array([stamp, T_body[0, 3], T_body[1, 3], v[0], v[1], 1.0]))
+        if learned is not None:
+            preds = learned(tracker, np.asarray(ego))
+        else:
+            preds = predictor(tracker) if predictor else []
         t4 = time.perf_counter()
+        if logger is not None:
+            logger.add(stamp, tracks, T_body, preds)
         res.timings["filter_ms"].append(1e3 * (t2 - t1))
         res.timings["track_ms"].append(1e3 * (t3 - t2))
         res.timings["predict_ms"].append(1e3 * (t4 - t3))
@@ -773,13 +805,14 @@ def _pad(samples, kind):
     return M, P
 
 
-def prediction_metrics(samples, step=0.5):
-    """{predictor: {horizon: displacement metrics}} for IMM (all modes) and constant velocity."""
+def prediction_metrics(samples, step=0.5, name="IMM"):
+    """{predictor: {horizon: displacement metrics}} for the online predictor (all its modes; ``name``:
+    "IMM" or "learned") and constant velocity."""
     if not samples:
         return {}
     gt = np.stack([s["gt"] for s in samples])
     out = {}
-    for kind, name in (("imm", "IMM"), ("cv", "CV")):
+    for kind, name in (("imm", name), ("cv", "CV")):
         M, P = _pad(samples, kind)
         out[name] = {}
         for h in HORIZONS:
@@ -846,14 +879,15 @@ def summarize(results, step=0.5, tables=True):
         m["motion_" + key] = ms[key]
     samples = [s for r in results for s in r.pred]
     mov = [s for s in samples if s["moving"]]
-    pm = prediction_metrics(mov, step)
-    for name in ("IMM", "CV"):
+    online = results[0].predictor if results else "IMM"
+    pm = prediction_metrics(mov, step, online)
+    for name, key in ((online, "pred"), ("CV", "CV")):     # pred_*: whatever predicts online
         for h in HORIZONS:
             r3 = pm.get(name, {}).get(h)
-            m["%s_FDE%d_moving" % (name, h)] = r3["FDE1"] if r3 else float("nan")
+            m["%s_FDE%d_moving" % (key, h)] = r3["FDE1"] if r3 else float("nan")
         r3 = pm.get(name, {}).get(HORIZONS[-1])
-        m["%s_minFDE3_moving" % name] = r3["minFDE"] if r3 else float("nan")
-        m["%s_MR3_moving" % name] = r3["MR"] if r3 else float("nan")
+        m["%s_minFDE3_moving" % key] = r3["minFDE"] if r3 else float("nan")
+        m["%s_MR3_moving" % key] = r3["MR"] if r3 else float("nan")
     m["pred_samples_moving"] = len(mov)
     hz = [h for r in results for h in r.hazard]
     m["hazard_events"] = len(hz)
@@ -872,7 +906,7 @@ def summarize(results, step=0.5, tables=True):
     m["AP@2.0"], m["AP@4.0"] = det.get("AP@2.0", float("nan")), det.get("AP@4.0", float("nan"))
     t = dict(counts=c, mot=dict(k), minutes=minutes, keyframes=kf, frames=sum(r.frames for r in results),
              merges=sum(r.merges for r in results), detection=det, motion=ms,
-             prediction={name: prediction_metrics(v, step) for name, v in prediction_subsets(samples).items()},
+             prediction={name: prediction_metrics(v, step, online) for name, v in prediction_subsets(samples).items()},
              latency_n=len(lat), hazard=hz, timing={key: (_q(v, 50), _q(v, 90)) for key, v in timing.items()})
     m["tables"] = t
     return m
@@ -897,5 +931,5 @@ def bootstrap(results_by_config, n=500, seed=0, step=0.5):
 MAIN_METRICS = (("det_recall_near", +1), ("det_precision_near", +1), ("det_f1_near", +1), ("det_fp_per_frame", -1),
                 ("MOTA", +1),
                 ("IDF1", +1), ("IDSW_per_min", -1), ("false_tracks_per_min", -1), ("confirm_p90", -1),
-                ("motion_relevant_missed", -1), ("motion_false_episodes_per_h", -1), ("IMM_FDE3_moving", -1),
-                ("IMM_MR3_moving", -1))
+                ("motion_relevant_missed", -1), ("motion_false_episodes_per_h", -1), ("pred_FDE3_moving", -1),
+                ("pred_MR3_moving", -1))

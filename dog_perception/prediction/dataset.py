@@ -201,3 +201,32 @@ def concat_samples(list_of_samples):
     if not list_of_samples:
         return {}
     return {k: np.concatenate([s[k] for s in list_of_samples]) for k in list_of_samples[0]}
+
+
+def select_samples(samples, idx):
+    """The windows ``idx`` (index array or bool mask) of a sample dict."""
+    return {k: v[idx] for k, v in samples.items()} if samples else {}
+
+
+def moving_mask(samples, disp=1.5):
+    """Windows whose agent ends ``disp`` m or more from where it is now (agent frame: from the origin)."""
+    if not samples:
+        return np.zeros(0, bool)
+    return np.hypot(samples["future"][:, -1, 0], samples["future"][:, -1, 1]) >= disp
+
+
+def mirror_samples(samples):
+    """The windows mirrored left / right in the agent frame (y -> -y, for the agent, its neighbours, the
+    future and the raster): a vehicle turning left becomes one turning right, twice the motions to learn
+    from. World-frame fields are copied unchanged; they only serve evaluation."""
+    out = {k: v.copy() for k, v in samples.items()}
+    for k in ("agent_hist", "nbr_hist"):
+        if k in out:
+            out[k][..., 1] *= -1        # y
+            out[k][..., 3] *= -1        # vy
+    for k in ("future", "imm_modes"):
+        if k in out:
+            out[k][..., 1] *= -1
+    if "raster" in out:
+        out["raster"] = out["raster"][..., ::-1, :].copy()   # rows are agent-frame y
+    return out
