@@ -14,10 +14,11 @@ left / right. The validation windows are never subsampled or mirrored, and the c
 (the logged online IMM predictions, and constant velocity) is printed for all, moving and static
 windows: a parked vehicle predicted to drive off would raise false alarms.
 
-The targets are smoothed from the tracker's positions (``--targets filtered``) or from the matched
-detections' centers (``measured``, logs written since 2026-10-28); the validation windows use the same
-targets, so the numbers printed here are against that pseudo ground truth. ``pipeline_eval.py``
-scores against the reviewed labels, and its "Training targets" table says which source is closer.
+The targets are smoothed from the matched detections' centers (``--targets measured``, the default;
+logs written since 2026-10-28) or from the tracker's positions (``filtered``, for older logs); on 0921
+the measured ones are 3x closer to the labels (T23). The validation windows use the same targets, so
+the numbers printed here are against that pseudo ground truth. ``pipeline_eval.py`` scores against the
+reviewed labels, and its "Training targets" table says how close each source is.
 
 Without data yet, ``--sim N`` generates N simulated one-minute logs.
 """
@@ -57,8 +58,8 @@ def main():
                     help="share of the training windows moving less than --moving-disp to keep")
     ap.add_argument("--moving-disp", type=float, default=1.5, help="[m] in the 3 s future: a moving window")
     ap.add_argument("--mirror", action="store_true", help="add every training window mirrored left / right")
-    ap.add_argument("--targets", default="filtered", choices=["filtered", "measured"],
-                    help="smooth the targets from the tracker's positions or the matched detections")
+    ap.add_argument("--targets", default="measured", choices=["measured", "filtered"],
+                    help="smooth the targets from the matched detections or the tracker's positions (old logs)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="work_dirs/pred/model.pt")
     args = ap.parse_args()

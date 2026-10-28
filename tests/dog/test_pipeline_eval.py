@@ -235,6 +235,6 @@ def test_learned_predictor_and_track_logs(scene, tmp_path):
     assert np.isfinite(m["pred_FDE3_moving"]) and "learned" in m["tables"]["prediction"]["moving"]
     samples = build_samples(imm_log.to_dict(), SampleConfig())
     assert len(samples["future"]) > 50 and "imm_modes" in samples   # the online IMM is logged for comparison
-    assert len(build_samples(imm_log.to_dict(), SampleConfig(targets="measured"))["future"]) == len(samples["future"])
+    assert len(build_samples(imm_log.to_dict(), SampleConfig(targets="filtered"))["future"]) == len(samples["future"])
     grid = pe.parse_grid(["eval.learned_model=," + path])
     assert grid == [{"eval.learned_model": ""}, {"eval.learned_model": path}]

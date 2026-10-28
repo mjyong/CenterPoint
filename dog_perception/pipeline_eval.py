@@ -406,9 +406,14 @@ _LEARNED = {}
 
 
 def _learned_predictor(path):
-    """One LearnedPredictor per model file and process (loading costs more than a scene)."""
+    """One LearnedPredictor per model file and process (loading costs more than a scene). On one
+    thread: the scenes run in parallel processes (``--jobs``), and torch's default of a thread per
+    core in every one of them oversubscribed the CPU in T23 (2.7 s per frame instead of ~20 ms);
+    ``predict_ms`` is then the time on one core."""
     if path not in _LEARNED:
+        import torch
         from .prediction.learned import LearnedPredictor
+        torch.set_num_threads(1)
         _LEARNED[path] = LearnedPredictor(path)
     return _LEARNED[path]
 

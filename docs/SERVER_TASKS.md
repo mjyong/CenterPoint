@@ -97,7 +97,7 @@
 | T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 完成。运动模型、合并距离留默认（cv:1.5+ct:1.5:0.25，merge_dist 0.25）；训练 oracle 上 CV 比 IMM 差 |
 | T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 完成。从原始扫描完整跑，IDF1 0.786，和 T20 final_A 相同；新默认值相对旧默认值 IDF1 +0.060。MCAP 在 data/tune/T22_mcap（872 MB） |
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
-| T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成。线上继续用 IMM。GRU、Transformer 的 3 s FDE 都更高，predict_ms 为 2746 / 4322 ms；训练目标用 measured |
+| T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成，已复核。线上继续用 IMM：GRU、Transformer 概率最高的路线偏慢，3 s FDE 都更高（MR 低得多）。predict_ms 2746 / 4322 ms 是并行进程抢 CPU 测出来的，单线程约 16–40 ms，仍超 10 ms。伪真值用 measured，离标签 0.2 m，改为默认。误差主要在纵向，地图暂不做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -3951,7 +3951,7 @@ mirrored: 4062 training windows
 
 验证（`logs_val/report.md`）：
 
-## Training targets
+**Training targets**
 
 The tier-2 training targets (prediction/dataset.py) of the same samples, cut from this run's track log the way train_predictor.py cuts them, against the labelled future: a pseudo ground truth, smoothed afterwards from the tracker's positions (filtered) or from the matched detections' centers (measured). windows: samples whose track has a training window there. Errors in m; > 1 m: share; along / bias / across as above (moving).
 
@@ -3978,7 +3978,7 @@ The tier-2 training targets (prediction/dataset.py) of the same samples, cut fro
 
 训练（`logs_train/report.md`）：
 
-## Training targets
+**Training targets**
 
 The tier-2 training targets (prediction/dataset.py) of the same samples, cut from this run's track log the way train_predictor.py cuts them, against the labelled future: a pseudo ground truth, smoothed afterwards from the tracker's positions (filtered) or from the matched detections' centers (measured). windows: samples whose track has a training window there. Errors in m; > 1 m: share; along / bias / across as above (moving).
 
@@ -4070,3 +4070,44 @@ sweep.csv 里两行（第 1 行 IMM，第 2 行第二档）：
 | pred_transformer_oracle | IMM | 0.718 | 0 | 5 | 1.383 | 1.416 | −1.006 | 0.219 |
 | pred_transformer_oracle | Transformer | 3565.584 | 0 | 5 | 1.174 | 3.111 | −3.078 | 0.146 |
 
+
+### T23 复核（2026-10-28）
+
+结论同意：**线上继续用 IMM**。补充五点，其中第 4 点的耗时测量无效，已修。
+
+1. **伪真值够准，以后默认用 measured。**
+   - 运动车 3 s：measured 离标签平均 0.22 m（验证）/ 0.18 m（训练），> 1 m 的 4.7% / 0.8%。
+   - filtered 是 0.66 / 0.47 m，纵向 bias 为正（+0.14 / +0.31 m）：滤过两次的位置，在车减速时会冲到前面。
+   - measured 的误差约是预测误差（2.8 m）的 8%，不用改成拿标签当训练目标。
+   - 代码默认改成 measured（`SampleConfig.targets`、`train_predictor.py --targets`）；旧日志（9 列）要显式加 `--targets filtered`。
+   - 运动样本里有一部分没有训练窗口（验证 32/117、训练 33/165），多是未来被遮挡或轨迹断了。这部分运动，模型学不到。
+2. **误差在纵向，不在路线形状；道路地图 / 占据栅格暂不做。**
+   - 验证 IMM：纵向 2.72 m、横向 0.58 m，横向只占平方误差的约 4%。训练：2.50 m、1.09 m，约 16%。
+   - 横向大的只有转弯的车：验证 16 个样本 1.06 m，训练 42 个 1.84 m。
+   - 方案写在 [DRIVABLE_AREA_PLAN.md](DRIVABLE_AREA_PLAN.md)，暂不做。
+   - 纵向误差的来源：
+     - 标签当检测：纵向 1.42 m、bias −1.01，预测慢了。车在加速、起步，跟踪的速度跟不上。
+     - 端到端：纵向 2.72 m、bias ≈ 0，快慢都有，多出来的是检测带来的速度噪声。
+   - 所以下一步的抓手是跟踪器的速度估计（H4 / D2 的范围，人定暂缓）。
+3. **第二档为什么输：概率最高的那条偏慢。**
+   - 端到端 bias：GRU −1.77 m、Transformer −2.53 m（IMM −0.07）；标签当检测更明显，−2.32 / −3.08（IMM −1.01）。
+   - 原因多半是训练、验证场景里车的行为不同：
+     - 训练场景的车多在减速：IMM 在训练场景 bias +1.01，也就是预测快了；
+     - 验证场景不是：bias −0.07。
+     - 41 辆运动车学到的"会减速"，换到验证场景就不对了。数据太少，场景之间的差别被学成了先验。
+   - 但它的几条模式覆盖得好：minFDE 1.25 对 2.79，MR 0.19 对 0.52。停着的车在伪真值上 FDE1 0.29 对 0.60，不会把停着的车往外推。新数据多了值得再训；规划如果用全部模式和概率，收益会先体现在 MR 上。
+   - train_*.txt 的伪真值验证窗口上，GRU 的 FDE1 比 IMM 低（2.74 对 2.91），对标签反而高。两边样本不同：
+     - 伪真值只算有训练窗口的；
+     - 对标签算的是全部关键帧样本，含约四分之一没有窗口的。
+     - 端到端领先 31%，说明这个差别在场景之间的波动范围内；标签当检测时的差（领先 0%）是稳的。
+4. **耗时那条测量无效，结论不变。**
+   - 2746 / 4322 ms 是 `--jobs 8` 的 8 个进程各自开满 torch 线程、互相抢 CPU 测出来的。评估也因此跑了 1418–1839 s；只用 IMM 的同样评估只要几秒（第 1 步 logs_val 7 s）。
+   - 已改：评估工具里学习模型单线程跑（`pipeline_eval._learned_predictor`），predict_ms 是单核时间。
+   - 我这边单线程实测（同结构未训练的模型，容器 CPU）：
+     - GRU：10 条轨迹约 16 ms；30 条约 40 ms，其中输入构造 13 ms、网络 27 ms；
+     - Transformer：30 条约 75 ms。
+     - 仍超过 10 ms。
+   - 真要上线得先优化：只对在动的轨迹跑网络（停着的走 IMM）；邻居的历史每帧只编码一次，不按每个目标重复编码；Orin 上导出 TensorRT。
+5. **误报** 12.4 → 24.8 次 / 小时，其实是 1 次变 2 次（验证集关键帧时长约 4.8 分钟）。样本太少，不单独下结论。
+
+模型 `data/train/pred_v1/` 留作基线，厂区新数据来了用同样的流程再训（训练目标默认 measured）。

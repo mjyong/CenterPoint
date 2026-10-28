@@ -555,7 +555,7 @@ __call__(tracker, ego_hist)                                  learned.py:37
 
 **切窗**：`build_samples`（`:173`）：
 
-1. **真值**：每条轨迹只取实际观测到的帧，用 RTS 平滑器（`rts_smooth`，CV 模型，前向卡尔曼加后向平滑）得到非因果的平滑轨迹，作为真值来源（`track_targets`）。平滑什么由 `SampleConfig.targets` 定：`filtered`（默认）是跟踪器在这些帧更新后的位置，已经滤波过一次，起步、停车时会留一点滞后；`measured` 是匹配到的检测框中心本身，没有滞后，但带检测的抖动。两种都是**伪真值**，不是车的真实轨迹：ID 切换会把别的车的未来当成目标，假轨迹会混进窗口，未来被遮挡的窗口被丢掉。它们离审过的标签有多远，`pipeline_eval.py` 的 "Training targets" 表会量（3.3.7 节）；
+1. **真值**：每条轨迹只取实际观测到的帧，用 RTS 平滑器（`rts_smooth`，CV 模型，前向卡尔曼加后向平滑）得到非因果的平滑轨迹，作为真值来源（`track_targets`）。平滑什么由 `SampleConfig.targets` 定：`measured`（默认）是匹配到的检测框中心本身，带检测的抖动，但没有滞后；`filtered` 是跟踪器在这些帧更新后的位置，已经滤波过一次，车减速时会冲到前面（2026-10-28 之前的日志只能用这个）。T23 在 0921 上量过：运动车 3 s 处 measured 离标签 0.2 m，filtered 0.5–0.7 m。两种都是**伪真值**，不是车的真实轨迹：ID 切换会把别的车的未来当成目标，假轨迹会混进窗口，未来被遮挡的窗口被丢掉。它们离审过的标签有多远，`pipeline_eval.py` 的 "Training targets" 表会量（3.3.7 节）；
 2. 每 2 帧取一个当前时刻 `t_now`；
 3. 对 `t_now` 时存在、且已有 ≥ 0.5 s 历史的轨迹：
    - 未来 3 s 必须都在轨迹寿命内；
@@ -604,7 +604,7 @@ python tools/dog/train_predictor.py --sim 10 --encoder transformer      # 没有
    - `--static-keep 0.3`：3 s 内移动不到 `--moving-disp`（1.5 m）的窗口只留 30%，运动的全留；
    - `--mirror`：每个训练窗口再加一份左右镜像。
    - 验证窗口不抽、不镜像。结果按全部、运动、静止三组分别打印：静止的车被预测成要开走，会让狗误停。
-3. **训练目标选哪种。** `train_predictor.py --targets filtered|measured`（3.3.5 节）。
+3. **训练目标选哪种。** `train_predictor.py --targets measured|filtered`（3.3.5 节，默认 measured）。
    - 评估工具每次都把每个预测样本的训练目标（按同样规则从本次跟踪日志切出）和标注的未来比，报告里是 "Training targets" 表，`report.json` 里是 `target_<filtered|measured>_err3_moving`；
    - 哪种离标签近就用哪种。`train_predictor.py` 打印的验证表用的也是这种伪真值，能不能替换 IMM 只看下一步对标签的比较。
 4. **和标签比（端到端）。**
@@ -612,6 +612,12 @@ python tools/dog/train_predictor.py --sim 10 --encoder transformer      # 没有
    - 指标名是 `pred_*`，指线上实际在用的预测器；`CV_*` 是匀速；
    - 运动车的误差还拆成沿标注路径的纵向（`pred_along3_moving`，`pred_along_bias3_moving` 为带符号的均值，正 = 预测快了）和离开路径的横向（`pred_across3_moving`，`prediction/metrics.py` 的 `along_across`）。横向占比小，说明误差在速度和起停上，道路地图 / 占据栅格帮不上。
 5. **上线**：ROS 2 节点参数 `predictor_model:=<model.pt>`。历史不足 0.5 s 的轨迹自动回退 IMM（3.3.4 节）。
+
+**0921 上的第一版（T23，2026-10-28）：没有替换 IMM。** 详见 SERVER_TASKS.md T23 复核：
+- 概率最高的那条路线偏慢：端到端 3 s 的纵向 bias，GRU −1.8 m、Transformer −2.5 m，FDE 3 s 比 IMM 高（3.03、3.52 对 2.80）。训练场景的车多在减速，验证场景不是，41 辆运动车学到的先验换了场景就不对。
+- 模式覆盖得好：minFDE 1.25 对 2.79，MR 0.19 对 0.52。停着的车不会被往外推。
+- 耗时：单线程 10 条轨迹约 16 ms、30 条约 40 ms（GRU），超过 10 ms 的门槛。上线前要只对在动的轨迹跑网络，邻居历史每帧只编码一次，Orin 上用 TensorRT。
+- IMM 的误差主要在纵向（验证 2.72 m，横向 0.58 m），也就是速度估计；道路地图暂不做（[DRIVABLE_AREA_PLAN.md](DRIVABLE_AREA_PLAN.md)）。
 
 ### 3.4 给下游
 
@@ -629,6 +635,6 @@ python tools/dog/train_predictor.py --sim 10 --encoder transformer      # 没有
 | 第一档的模态概率在 3 s 内固定不变 | 直行车辆的"略弯"分支始终约占 0.4 | 规划侧按概率加权使用；或对 ω 很小的 CT 模态直接并入 CV |
 | 行人两个模态大多不合并（3.2 节） | 行人通常输出 2 条很接近的轨迹 | 合并判据改为马氏距离 |
 | coasting 轨迹的预测从纯预测状态出发 | 遮挡越久，预测越不可靠 | 规划侧结合 `coasting` 标志和协方差使用 |
-| 第二档只在仿真上验证过，障碍物栅格未接入线上 | 真实交互效果未知 | 用实车日志训练和评估，过门槛再切换（DOG_PIPELINE 1.5 节）；0921 上的第一版见 SERVER_TASKS.md T23 |
+| 第二档在 0921 上没过门槛，障碍物栅格未接入线上 | 线上仍是 IMM；第二档概率最高的路线偏慢，单线程 16–40 ms | 厂区新数据来了再训（3.3.7 节）；栅格 / 可行驶区域的方案见 [DRIVABLE_AREA_PLAN.md](DRIVABLE_AREA_PLAN.md)，暂不做 |
 | 运动状态只看最近 1 s 的位移和速度头 | 位姿跳变时，几个静止物体会一起被报成运动（运动样例 bag 1.8–2.3 s）；线上用 INS 位姿，跳变比离线修正的多 | 线上位姿质量差时（INS 跳变）暂停进入 `moving`；用线上位姿在验证场景上再评一次 |
 | 全部为 Python 实现 | x86 上跟踪约 6 ms；第一档预测在本次修改后每条轨迹约 0.85 ms | 部署到 Orin 时移植 C++（DOG_PIPELINE 8.3 节） |

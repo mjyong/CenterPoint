@@ -175,10 +175,10 @@ def test_logged_detections_and_measured_targets():
     assert coast.sum() == 3 and np.isnan(rows[coast, 9:]).all()
     assert all(np.allclose(r[9:11], fed[round(r[0], 6)]) for r in rows[~coast])   # the detections themselves
     assert np.allclose(rows[~coast, 12], 2.0) and np.allclose(rows[~coast, 14], 0.9)
-    filtered, measured = build_samples(d, SampleConfig()), build_samples(d, SampleConfig(targets="measured"))
+    filtered, measured = build_samples(d, SampleConfig(targets="filtered")), build_samples(d, SampleConfig())
     assert len(measured["future"]) == len(filtered["future"]) > 10
     assert not np.allclose(measured["future"], filtered["future"])
     old = dict(d, rows=rows[:, :9])
-    assert np.allclose(build_samples(old)["future"], filtered["future"])
+    assert np.allclose(build_samples(old, SampleConfig(targets="filtered"))["future"], filtered["future"])
     with pytest.raises(ValueError):
-        build_samples(old, SampleConfig(targets="measured"))
+        build_samples(old)                                     # measured, the default

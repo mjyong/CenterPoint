@@ -6,10 +6,13 @@ The tracker output *is* the label source: cut every confirmed track into
 * inputs = the causal tracker estimates (what the network sees online);
 * targets = an RTS-smoothed (non-causal) version of the observed positions,
   which removes most tracker lag/noise from the supervision. "Observed": the
-  tracker's updated positions in the frames it matched a detection
-  (``targets="filtered"``), or the matched detections' centers themselves
-  (``"measured"``, logs written since 2026-10-28). Either is a pseudo ground
-  truth; pipeline_eval measures both against the reviewed labels.
+  matched detections' centers themselves (``targets="measured"``, the default;
+  logs written since 2026-10-28), or the tracker's updated positions in the
+  frames it matched a detection (``"filtered"``, older logs). Either is a
+  pseudo ground truth; pipeline_eval measures both against the reviewed labels.
+  On 0921 (T23) the measured targets of moving vehicles lie 0.2 m from the
+  labels at 3 s, the filtered ones 0.5-0.7 m (filtered twice, they overshoot
+  when a vehicle slows down).
 
 Windows whose future is mostly coasting (occluded) are dropped, and the split
 into train/val should be by recording, not by window (windows overlap).
@@ -123,7 +126,7 @@ class SampleConfig:
     min_future_observed: float = 0.8
     frame_stride: int = 2
     smooth_targets: bool = True
-    targets: str = "filtered"      # what is smoothed into the targets: "filtered" / "measured" (module docstring)
+    targets: str = "measured"      # what is smoothed into the targets: "measured" / "filtered" (module docstring)
 
 
 def split_tracks(rows):
@@ -134,7 +137,7 @@ def split_tracks(rows):
     return {k: np.asarray(sorted(v, key=lambda r: r[0])) for k, v in tracks.items()}
 
 
-def track_targets(tracks, source="filtered", smooth=True):
+def track_targets(tracks, source="measured", smooth=True):
     """{track id: (times, (N, 2) smoothed positions)} over the frames each track was observed.
     ``source``: "filtered" (the tracker's positions) or "measured" (the matched detections' centers)."""
     if source not in ("filtered", "measured"):
@@ -142,7 +145,8 @@ def track_targets(tracks, source="filtered", smooth=True):
     out = {}
     for tid, tr in tracks.items():
         if source == "measured" and tr.shape[1] <= OLD_ROW:
-            raise ValueError("targets='measured' needs a log with the matched detections (written since 2026-10-28)")
+            raise ValueError("targets='measured' needs a log with the matched detections (written since "
+                             "2026-10-28); for an older log use targets='filtered' (train_predictor.py --targets)")
         obs = tr[:, 8] > 0.5
         if source == "measured":
             obs &= np.isfinite(tr[:, 9])
