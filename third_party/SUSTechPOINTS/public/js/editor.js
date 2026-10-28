@@ -329,9 +329,48 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         }));
         trainRange.computeLineDistances();
 
+        // Horizontal FOV of the four fisheyes (datasheet 196 deg, ±98). Positions are in the det
+        // frame, x right and y forward (dog_perception/cameras.py T_body_camera). Aim is the nominal
+        // level heading; the real rotations are not calibrated yet. The rear camera is not recorded.
+        var fovCams = [
+            {x: 0.043, y: 0.129, yaw: 0, color: 0x7dcea0},
+            {x: -0.074, y: -0.319, yaw: -90, color: 0x85c1e9},
+            {x: 0.159, y: -0.319, yaw: 90, color: 0xf0c48a},
+            {x: 0.043, y: -0.766, yaw: 180, color: 0xd2b4de},
+        ];
+        var halfFov = 98, reach = 48, arcR = 12;
+        function fovDir(deg){
+            var a = deg * Math.PI / 180;
+            return [Math.sin(a), Math.cos(a)];
+        }
+        var fovLines = [];
+        fovCams.forEach(function(cam){
+            var mat = new THREE.LineDashedMaterial({
+                color: cam.color, dashSize: 0.7, gapSize: 0.5, opacity: 0.45, transparent: true,
+            });
+            function addLine(pts){
+                var g = new THREE.BufferGeometry();
+                g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+                var line = new THREE.Line(g, mat);
+                line.computeLineDistances();
+                fovLines.push(line);
+            }
+            [-halfFov, halfFov].forEach(function(edge){
+                var d = fovDir(cam.yaw + edge);
+                addLine([cam.x, cam.y, zh, cam.x + d[0] * reach, cam.y + d[1] * reach, zh]);
+            });
+            var arc = [];
+            for (var i = 0; i <= 32; i++){
+                var d = fovDir(cam.yaw - halfFov + (2 * halfFov) * i / 32);
+                arc.push(cam.x + d[0] * arcR, cam.y + d[1] * arcR, zh);
+            }
+            addLine(arc);
+        });
+
         var group = new THREE.Group();
         group.add(box);
         group.add(trainRange);
+        fovLines.forEach(function(line){ group.add(line); });
         this.rangeCircle = group;
         this.scene.add(group);
     };

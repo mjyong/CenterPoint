@@ -86,31 +86,36 @@
      "value": "/metrics/frame.mota_cum",
      "enabled": true,
      "timestampMethod": "receiveTime",
-     "label": "MOTA (cumulative)"
+     "label": "MOTA (cumulative)",
+     "color": "#4E98E2"
     },
     {
      "value": "/metrics/frame.trk_fp",
      "enabled": true,
      "timestampMethod": "receiveTime",
-     "label": "false tracks"
+     "label": "false tracks",
+     "color": "#F07A3D"
     },
     {
      "value": "/metrics/frame.trk_fn",
      "enabled": true,
      "timestampMethod": "receiveTime",
-     "label": "missed vehicles"
+     "label": "missed vehicles",
+     "color": "#F2C14E"
     },
     {
      "value": "/metrics/frame.idsw",
      "enabled": true,
      "timestampMethod": "receiveTime",
-     "label": "ID switches"
+     "label": "ID switches",
+     "color": "#3DDC97"
     },
     {
      "value": "/metrics/frame.fde_top_mean",
      "enabled": true,
      "timestampMethod": "receiveTime",
-     "label": "FDE 3 s (m)"
+     "label": "FDE 3 s (m)",
+     "color": "#E040FB"
     }
    ],
    "showXAxisLabels": true,

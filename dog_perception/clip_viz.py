@@ -39,6 +39,7 @@ TRACK_RGB = [fx.hex_rgba(h) for h in ("#14b8a6", "#db2777", "#7c3aed", "#22d3ee"
 GT_RGB = {"tracked": fx.hex_rgba("#0ca30c"), "missed": fx.hex_rgba("#d03b3b"), "ignored": fx.hex_rgba("#898781"),
           "interp": fx.hex_rgba("#0ca30c", 0.5)}
 WHITE, RED, GREY = (1, 1, 1, 1), fx.hex_rgba("#d03b3b"), fx.hex_rgba("#898781")
+EVENT_PX = 24          # /events labels, screen pixels; one size for ID SWITCH, MISSED, FALSE TRACK
 SHORT = {"vehicle": "veh", "pedestrian": "ped", "cyclist": "cyc"}
 
 
@@ -244,19 +245,19 @@ class ClipVisualizer:
             if p is None:
                 continue
             ents.append(fx.entity("idsw-%d" % g, t, lifetime=self.key_life,
-                                  texts=[fx.text(p + [0, 0, 3.0], "ID SWITCH T%d->T%d" % (old, new), WHITE, 15)],
+                                  texts=[fx.text(p + [0, 0, 3.0], "ID SWITCH T%d->T%d" % (old, new), WHITE, EVENT_PX)],
                                   lines=[fx.line([p, p + [0, 0, 2.7]], RED, 0.12)]))
             logs.append("ID switch: GT #%d moved from track T%d to T%d" % (g, old, new))
         for g in ev["fn"]:
             p = gt_pos.get(g)
             if p is not None:
                 ents.append(fx.entity("fn-%d" % g, t, lifetime=self.key_life,
-                                      texts=[fx.text(p + [0, 0, 2.2], "MISSED", RED, 12)]))
+                                      texts=[fx.text(p + [0, 0, 2.2], "MISSED", RED, EVENT_PX)]))
         for tid in ev["fp"]:
             p = trk_pos.get(tid)
             if p is not None:
                 ents.append(fx.entity("fp-%d" % tid, t, lifetime=self.key_life,
-                                      texts=[fx.text(p + [0, 0, 2.2], "FALSE TRACK", RED, 12)]))
+                                      texts=[fx.text(p + [0, 0, 2.2], "FALSE TRACK", RED, EVENT_PX)]))
         self.w.write("/events", "foxglove.SceneUpdate", t, fx.scene_update(ents))
         for m in logs:
             self.w.write("/log", "foxglove.Log", t, fx.log(t, m, level=3))
