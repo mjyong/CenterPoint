@@ -31,12 +31,24 @@ Python 流水线是唯一的参考实现。每换一样东西（运行时、精�
 | 本机 | 插着板子，网卡 `enx4ce17347042b`，192.168.123.55/24 | 只负责反向隧道 |
 | Orin | 192.168.123.100（网卡 eno1），SSH 端口 22，用户 seres，密钥登录 | 建 Orin 引擎、测延迟、终验 |
 
-**Orin 的配置**：
+**Orin 的配置**（T25 实测，`data/reports/T25/orin_env.txt`）：
 - NVIDIA Jetson AGX Orin Developer Kit，12 核 Cortex-A78AE，内存 61 GiB；
 - Ubuntu 22.04.5，L4T R36.4.4；
 - CUDA 12.6、cuDNN 9.3.0、TensorRT 10.3.0、OpenCV 4.10.0、ROS 2 Humble；
+- Python 3.10：tensorrt 10.3.0（`~/.local`）、numpy 1.26.4、scipy 1.8.0、torch 2.5（NVIDIA 的版本）；没有 onnxruntime；
+- gcc 11.4、cmake 3.22、eigen 3.4、yaml-cpp 0.7、gtest 1.11、colcon 0.3；
+- `trtexec`：板上原来的 apt 源没有，T25 从 NVIDIA r36.4 仓库装了 `libnvinfer-bin` 10.3.0.30，在 `/usr/src/tensorrt/bin/trtexec`；
+- 功耗模式已是 MAXN；
 - 根分区剩余约 5.5 GB；
 - `l4tbr0` 上的 192.168.55.1 是 down 的，不要用。
+
+**服务器的配置**（T25 实测，`data/reports/T25/server_*.txt`）：
+- 8× RTX 4090，驱动 580.126；系统 CUDA 13.0（另有 11.1），**没有 CUDA 12 工具链**；cuDNN 9.11；
+- gcc 10.5、cmake 3.22；没有 eigen、yaml-cpp、gtest、ROS；**没有 sudo**；Docker 27.3.1；
+- 根分区剩余约 35 GB；
+- 项目环境 `/home/engineers/junyongmou/robot/ultralytics/.venv`：torch 2.13（cu130）、spconv 2.3.8，T25 加了
+  tensorrt 10.3.0（pip 的 cu12 版，和板上同版本）、polygraphy 0.53.6、nvidia-modelopt 0.47.0、onnxruntime-gpu 1.22；
+- 0921 原始 bag：`/zjst/robot/rosbag0921`（两个 rosbag2，共 35 GB），P6 回放用。
 
 **反向隧道**：在本机执行，断线自动重连：
 
@@ -69,20 +81,29 @@ Host orin
 
 ## 3. 环境
 
-**Orin**：`deploy/scripts/orin_check.sh > orin_env.txt` 记录版本、功耗模式、内存和磁盘、编译工具。标 `MISSING` 的装上：
+**Orin**：`deploy/scripts/orin_check.sh > orin_env.txt` 记录版本、功耗模式、内存和磁盘、编译工具。T25 时需要的都已经有，没有装任何包。以后标 `MISSING` 的再装：
 
 ```bash
 sudo apt install libeigen3-dev libyaml-cpp-dev libgtest-dev python3-colcon-common-extensions
 sudo apt install python3-libnvinfer        # 若没有 TensorRT 的 Python 绑定；用来跑 build_engines.py 和 compare_backends.py
 ```
 
-- 板上不装 PyTorch、det3d：导出的检测器（`dog_perception/detection/exported.py`）只要 numpy、scipy 和 TensorRT。
-- 测性能前：`sudo nvpmodel -m 0`（MAXN）、`sudo jetson_clocks`，记下 `nvpmodel -q`。
+- 板上没有 det3d：导出的检测器（`dog_perception/detection/exported.py`）只要 numpy、scipy 和 TensorRT。
+- 测性能前：功耗模式确认是 MAXN（`nvpmodel -q`）；`sudo jetson_clocks` 锁频，重启后失效，由人在板上执行。
 
 **服务器**：
 - 在项目环境里加 `tensorrt==10.3.*`，和板上同一个大版本、小版本，保证数值可比；
 - 再加 `onnx`、`onnxruntime-gpu`（或 `onnxruntime`）、`polygraphy`、`nvidia-modelopt`；
 - 装不进项目环境就另建一个，`torch` 后端那一步回项目环境跑。
+- 以上 T25 已装好。`orin_check.sh` 在服务器上要指定项目环境：`PYTHON=<venv>/bin/python deploy/scripts/orin_check.sh`。
+- pip 的 TensorRT 是 CUDA 12 编的，`exported.py` 先加载 `libcudart.so.12`（`import tensorrt` 已带进来），找不到再用系统的。
+
+**服务器上的 C++ 开发环境**：服务器没有 CUDA 12 工具链，也没有 sudo。T26 第 0 步检查 Docker 能不能免 sudo 用 GPU，再定：
+- **能用**：用 `nvcr.io/nvidia/tensorrt:24.08-py3`（TensorRT 10.3.0、CUDA 12.6，Ubuntu 22.04，和板子一致，约 9 GB），
+  在里面装 Eigen、yaml-cpp、GoogleTest 和 ROS 2 Humble。C++ 全部（含 CUDA、TensorRT）先在服务器的 4090 上开发、测试，再到板上原生编译、终验。
+- **不能用**：服务器只编 C++ 的 CPU 部分（Eigen、yaml-cpp、GoogleTest 用 CMake FetchContent 拉，不要 sudo）；
+  CUDA 和 TensorRT 部分直接在板上编、测，板上依赖都齐。
+- 两种情况下，Python 参考、golden 数据和全量评估都在服务器上做。
 
 ## 4. 模型转换（P1）
 
@@ -128,7 +149,11 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 - 拷模型目录和 2–3 个场景的帧，在板上建 FP16 引擎；
 - 服务器先用 `compare_backends.py --backends torch --dump <dir>` 存下这些帧上 PyTorch 的检测，拷到板上；
 - 板上用 `--backends dump:<dir>/torch,trt:fp16` 对比；
-- 延迟用 `trtexec --loadEngine=<引擎> --iterations=200`，看 GPU Compute Time 的中位数和 p99。
+- 延迟用 `trtexec --loadEngine=<引擎> --iterations=200`，看 GPU Compute Time 的中位数和 p99；
+- 或 `tools/deploy/bench_engines.py --model-dir <目录> --engines pfn.fp16 rpn_head.fp16 --runs 200`：
+  - 输入只拷一次，CUDA event 计每次执行的 GPU 时间，给中位数和 p99，和 trtexec 的 GPU Compute Time 是同一个量；
+  - 服务器的 pip TensorRT 没有 trtexec，就用它；
+  - `build_engines.py --benchmark N` 建完引擎顺手测的也是这个。
 
 ## 5. INT8 量化（P2）
 
@@ -182,6 +207,7 @@ deploy/
 | `dog_perception/detection/voxelize.py` | numpy 体素化，和 det3d 一致 |
 | `dog_perception/detection/exported.py` | `ExportedPillarDetector`：ONNX Runtime 或 TensorRT 引擎，接口同 `CenterPointDetector` |
 | `tools/deploy/build_engines.py` | 建 FP32 / FP16 / INT8（Q/DQ）/ DLA 引擎，写 `engines.json` |
+| `tools/deploy/bench_engines.py` | 已建引擎的 GPU 时间（中位数、p99），没有 trtexec 的机器用它 |
 | `tools/deploy/quantize_int8.py` | ModelOpt INT8 PTQ，写 `<graph>.int8*.onnx` |
 | `tools/deploy/compare_backends.py` | 多个后端逐段、逐框比较，查门槛；`--dump` / `dump:` 跨机器比较 |
 | `tools/deploy/pillar_stats.py` | 柱数分布，定 P_max |

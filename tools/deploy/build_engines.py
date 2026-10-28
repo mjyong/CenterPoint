@@ -12,9 +12,13 @@ checks) and Orin engines on the Orin (latency, the deployed ones). Output names 
     # the RPN on a DLA core (Orin), layers DLA cannot run fall back to the GPU
     python tools/deploy/build_engines.py --model-dir data/deploy/nusc_pp --precision fp16 --graphs rpn_head --dla 0
 
-``--benchmark N`` runs every new engine N times on random inputs and prints the median time (a
-first number; ``trtexec --loadEngine=...`` gives the detailed profile). Each build appends to
+``--benchmark N`` times every new engine N times on random inputs (GPU time from CUDA events, median
+and p99: ``TrtRunner.benchmark``; ``tools/deploy/bench_engines.py`` times engines already built, the
+same number as trtexec's GPU Compute Time, also where there is no trtexec). Each build appends to
 ``<model-dir>/engines.json``: TensorRT version, machine, graph, precision, build time, size.
+
+Graphs are parsed from their file, so ONNX weights stored in an external file next to the graph
+(torch's dynamo exporter writes ``<name>.onnx.data``) are found whatever the working directory.
 """
 import argparse
 import json
@@ -23,8 +27,6 @@ import platform
 import socket
 import sys
 import time
-
-import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
@@ -49,10 +51,9 @@ def build(onnx_path, engine_path, precision, workspace_mb=4096, dla=None, timing
     builder = trt.Builder(logger)
     network = builder.create_network(0)            # TensorRT 10: explicit batch is the only mode
     parser = trt.OnnxParser(network, logger)
-    with open(onnx_path, "rb") as f:
-        if not parser.parse(f.read()):
-            errors = [str(parser.get_error(i)) for i in range(parser.num_errors)]
-            raise RuntimeError("%s: ONNX parse failed:\n  %s" % (onnx_path, "\n  ".join(errors)))
+    if not parser.parse_from_file(os.path.abspath(onnx_path)):     # external weights: next to the graph
+        errors = [str(parser.get_error(i)) for i in range(parser.num_errors)]
+        raise RuntimeError("%s: ONNX parse failed:\n  %s" % (onnx_path, "\n  ".join(errors)))
     config = builder.create_builder_config()
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_mb << 20)
     if precision == "fp16" or is_int8(precision):
@@ -80,18 +81,9 @@ def build(onnx_path, engine_path, precision, workspace_mb=4096, dla=None, timing
     return dict(trt=trt.__version__, seconds=round(time.time() - t0, 1), bytes=os.path.getsize(engine_path))
 
 
-def benchmark(engine_path, runs):
+def benchmark(engine_path, runs, warmup_ms=500.0):
     from dog_perception.detection.exported import TrtRunner
-    r = TrtRunner(engine_path)
-    rng = np.random.default_rng(0)
-    feeds = {n: rng.standard_normal(r.host[n].shape).astype(r.host[n].dtype) for n in r.inputs}
-    r(feeds)                                         # warm-up
-    times = []
-    for _ in range(runs):
-        t = time.perf_counter()
-        r(feeds)
-        times.append(1e3 * (time.perf_counter() - t))
-    return float(np.median(times))
+    return TrtRunner(engine_path).benchmark(runs, warmup_ms)
 
 
 def machine():
@@ -111,6 +103,7 @@ def main():
     ap.add_argument("--dla", type=int, default=None, help="DLA core (Orin); the engine name gets .dla<k>")
     ap.add_argument("--timing-cache", default=None, help="file to reuse tactic timings between builds")
     ap.add_argument("--benchmark", type=int, default=0, help="time every new engine N times (random inputs)")
+    ap.add_argument("--warmup-ms", type=float, default=500.0, help="warm-up before --benchmark timing")
     args = ap.parse_args()
 
     log_path = os.path.join(args.model_dir, "engines.json")
@@ -127,7 +120,7 @@ def main():
             info.update(graph=graph, precision=prec, engine=name, onnx=os.path.basename(onnx_path), dla=args.dla,
                         built=time.strftime("%Y-%m-%d %H:%M:%S"), **machine())
             if args.benchmark:
-                info["median_ms"] = round(benchmark(engine_path, args.benchmark), 3)
+                info.update(benchmark(engine_path, args.benchmark, args.warmup_ms))
             log.append(info)
             print("  %s" % json.dumps(info), flush=True)
             with open(log_path, "w") as f:

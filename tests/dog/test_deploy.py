@@ -1,6 +1,7 @@
 """Deployment tools (docs/DEPLOY_ORIN.md): the det3d-free voxelization, the model metadata, the exported
 detector against the PyTorch one, the backend comparison and the engine / run_sequence plumbing.
 TensorRT itself is only exercised where it is installed (the server, the Orin)."""
+import inspect
 import json
 import os
 import subprocess
@@ -119,6 +120,7 @@ def test_compare_backends_and_pillar_stats_tools(exported, sim_frames, tmp_path)
 def test_engine_names_and_run_sequence_specs(tmp_path):
     sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
     sys.path.insert(0, os.path.join(ROOT, "tools", "dog"))
+    from bench_engines import engine_paths
     from build_engines import onnx_for
     from run_sequence import parse_exported
     from dog_perception.detection.exported import graph_file
@@ -132,14 +134,21 @@ def test_engine_names_and_run_sequence_specs(tmp_path):
     assert parse_exported("c=x:trt:int8") == ("c", "x", "trt", "int8")
     with pytest.raises(ValueError):
         parse_exported("nodir")
+    for name in ("pfn.fp16.engine", "rpn_head.int8.engine", "notes.txt"):
+        (tmp_path / name).write_bytes(b"")
+    found = engine_paths(str(tmp_path), None)
+    assert found == [str(tmp_path / "pfn.fp16.engine"), str(tmp_path / "rpn_head.int8.engine")]
+    named = engine_paths("d", ["pfn.fp16", "rpn_head.fp16.engine"])
+    assert named == [os.path.join("d", "pfn.fp16.engine"), os.path.join("d", "rpn_head.fp16.engine")]
 
 
-def test_trt_runner_on_a_tiny_engine(tmp_path):
+def test_trt_runner_on_a_tiny_engine(tmp_path, monkeypatch):
     """Only where TensorRT and a GPU are installed (the server, the Orin)."""
     trt = pytest.importorskip("tensorrt")
     torch = pytest.importorskip("torch")
+    onnx = pytest.importorskip("onnx")
     sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
-    from build_engines import build
+    from build_engines import benchmark, build
     from dog_perception.detection.exported import TrtRunner
     try:
         from dog_perception.detection.exported import _CudaRuntime
@@ -148,8 +157,29 @@ def test_trt_runner_on_a_tiny_engine(tmp_path):
         pytest.skip("no CUDA runtime")
     net = torch.nn.Sequential(torch.nn.Conv2d(3, 4, 3, padding=1), torch.nn.ReLU()).eval()
     x = torch.randn(1, 3, 8, 8)
+    ref = net(x).detach().numpy()
     onnx_path = str(tmp_path / "tiny.onnx")
-    torch.onnx.export(net, x, onnx_path, input_names=["x"], output_names=["y"], opset_version=17)
-    build(onnx_path, str(tmp_path / "tiny.fp32.engine"), "fp32", workspace_mb=256)
-    y = TrtRunner(str(tmp_path / "tiny.fp32.engine"))({"x": x.numpy()})["y"]
-    assert trt.__version__ and np.abs(y - net(x).detach().numpy()).max() < 1e-4
+    kw = dict(dynamo=False) if "dynamo" in inspect.signature(torch.onnx.export).parameters else {}
+    torch.onnx.export(net, x, onnx_path, input_names=["x"], output_names=["y"], opset_version=17, **kw)
+    # the same graph with its weights in a side file (torch >= 2.9's default exporter does this),
+    # built from another working directory: the parser must look next to the graph
+    ext_path = str(tmp_path / "tiny_ext.onnx")
+    onnx.save_model(onnx.load(onnx_path), ext_path, save_as_external_data=True, all_tensors_to_one_file=True,
+                    location="tiny_ext.onnx.data", size_threshold=0)
+    assert os.path.exists(ext_path + ".data")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    for src, eng in ((onnx_path, "tiny.fp32.engine"), (ext_path, "tiny_ext.fp32.engine")):
+        build(src, str(tmp_path / eng), "fp32", workspace_mb=256)
+        y = TrtRunner(str(tmp_path / eng))({"x": x.numpy()})["y"]
+        assert trt.__version__ and np.abs(y - ref).max() < 1e-4
+    b = benchmark(str(tmp_path / "tiny.fp32.engine"), 20, warmup_ms=50)
+    assert b["runs"] == 20 and 0 < b["gpu_min_ms"] <= b["gpu_median_ms"] <= b["gpu_p99_ms"] <= b["gpu_max_ms"]
+    assert b["host_median_ms"] > 0
+    report = tmp_path / "bench.json"
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "bench_engines.py"), "--model-dir",
+                    str(tmp_path), "--engines", "tiny.fp32", "--runs", "10", "--warmup-ms", "20", "--out", str(report)],
+                   check=True, env=dict(os.environ, PYTHONPATH=ROOT), capture_output=True)
+    r = json.load(open(report))
+    assert [e["engine"] for e in r["engines"]] == ["tiny.fp32.engine"] and r["trt"] == trt.__version__

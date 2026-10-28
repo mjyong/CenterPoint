@@ -63,18 +63,23 @@ class _CudaRuntime:
 
     @staticmethod
     def _candidates():
+        # TensorRT 10.3 is built on CUDA 12: its runtime first (already loaded by `import tensorrt` when it
+        # comes from pip), then whatever libcudart.so is (CUDA 13 on the server)
         if os.environ.get("DOGPERC_CUDART"):
             yield os.environ["DOGPERC_CUDART"]
-        for name in ("libcudart.so", "libcudart.so.12", ctypes.util.find_library("cudart")):
+        yield "libcudart.so.12"
+        try:                                           # pip's nvidia-cuda-runtime-cu12 (next to pip TensorRT)
+            import nvidia.cuda_runtime as cr
+            yield from sorted(glob.glob(os.path.join(os.path.dirname(cr.__file__), "lib", "libcudart.so*")))
+        except (ImportError, TypeError):               # TypeError: a namespace package without __file__
+            pass
+        for pattern in ("/usr/local/cuda/lib64/libcudart.so.12*", "/usr/local/cuda/targets/*/lib/libcudart.so.12*"):
+            yield from sorted(glob.glob(pattern))
+        for name in ("libcudart.so", ctypes.util.find_library("cudart")):
             if name:
                 yield name
         for pattern in ("/usr/local/cuda/lib64/libcudart.so*", "/usr/local/cuda/targets/*/lib/libcudart.so*"):
             yield from sorted(glob.glob(pattern))
-        try:                                           # pip's nvidia-cuda-runtime-cu12 (next to pip TensorRT)
-            import nvidia.cuda_runtime as cr
-            yield from sorted(glob.glob(os.path.join(os.path.dirname(cr.__file__), "lib", "libcudart.so*")))
-        except ImportError:
-            pass
 
     def check(self, err, what):
         if err != 0:
@@ -103,6 +108,25 @@ class _CudaRuntime:
 
     def sync(self, stream):
         self.check(self.lib.cudaStreamSynchronize(ctypes.c_void_p(stream)), "cudaStreamSynchronize")
+
+    def event(self):
+        e = ctypes.c_void_p()
+        self.check(self.lib.cudaEventCreate(ctypes.byref(e)), "cudaEventCreate")
+        return e.value
+
+    def record(self, event, stream):
+        self.check(self.lib.cudaEventRecord(ctypes.c_void_p(event), ctypes.c_void_p(stream)), "cudaEventRecord")
+
+    def elapsed_ms(self, start, end):
+        """GPU time between two recorded events; waits for ``end``."""
+        self.check(self.lib.cudaEventSynchronize(ctypes.c_void_p(end)), "cudaEventSynchronize")
+        ms = ctypes.c_float()
+        self.check(self.lib.cudaEventElapsedTime(ctypes.byref(ms), ctypes.c_void_p(start), ctypes.c_void_p(end)),
+                   "cudaEventElapsedTime")
+        return ms.value
+
+    def destroy_event(self, event):
+        self.lib.cudaEventDestroy(ctypes.c_void_p(event))
 
 
 class TrtRunner:
@@ -142,6 +166,42 @@ class TrtRunner:
             self.cuda.d2h(self.host[name], self.device[name])
             out[name] = self.host[name].astype(np.float32, copy=True)
         return out
+
+    def benchmark(self, runs=200, warmup_ms=500.0, feeds=None):
+        """Latency of the engine alone, what ``trtexec --loadEngine`` reports as GPU Compute Time (pip
+        TensorRT has no trtexec): inputs copied once (random unless ``feeds``), then ``runs`` enqueues, each
+        timed with CUDA events after ``warmup_ms`` of warm-up. ``host_median_ms`` is a whole ``__call__``
+        with its input and output copies, which the C++ pipeline does not pay (its tensors stay on the GPU)."""
+        rng = np.random.default_rng(0)
+        if feeds is None:
+            feeds = {n: rng.standard_normal(self.host[n].shape).astype(self.host[n].dtype) for n in self.inputs}
+        t_end = time.perf_counter() + warmup_ms / 1e3
+        self(feeds)
+        while time.perf_counter() < t_end:
+            self.context.execute_async_v3(self.stream)
+            self.cuda.sync(self.stream)
+        start, end = self.cuda.event(), self.cuda.event()
+        gpu = []
+        try:
+            for _ in range(runs):
+                self.cuda.record(start, self.stream)
+                if not self.context.execute_async_v3(self.stream):
+                    raise RuntimeError("%s: execute_async_v3 failed" % self.path)
+                self.cuda.record(end, self.stream)
+                gpu.append(self.cuda.elapsed_ms(start, end))
+        finally:
+            self.cuda.destroy_event(start)
+            self.cuda.destroy_event(end)
+        host = []
+        for _ in range(max(runs // 4, 10)):
+            t = time.perf_counter()
+            self(feeds)
+            host.append(1e3 * (time.perf_counter() - t))
+        gpu = np.asarray(gpu)
+        return dict(runs=runs, gpu_median_ms=round(float(np.median(gpu)), 3),
+                    gpu_p99_ms=round(float(np.percentile(gpu, 99)), 3), gpu_mean_ms=round(float(gpu.mean()), 3),
+                    gpu_min_ms=round(float(gpu.min()), 3), gpu_max_ms=round(float(gpu.max()), 3),
+                    host_median_ms=round(float(np.median(host)), 3))
 
     def __del__(self):
         for ptr in getattr(self, "device", {}).values():

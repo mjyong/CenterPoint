@@ -9,8 +9,9 @@ Voxelization, pillar decoration, scatter and decoding stay outside the
 engines (``dog_perception.detection.pillar_export`` / ``decode``). With
 ``--check`` the ONNX graphs are run with onnxruntime on a real cloud and
 compared to the PyTorch model stage by stage and end to end. The script
-prints the ``trtexec`` commands to build FP16 engines on the Orin itself
-(engines are specific to the GPU and TensorRT version, so build them there).
+prints the commands that build the engines on the machine that runs them
+(engines are specific to the GPU and TensorRT version): tools/deploy/build_engines.py,
+or ``trtexec`` where it is installed.
 
     python tools/dog/export_pillar_onnx.py --config configs/dog/dog_centerpoint_pp_xt32.py \
         --checkpoint work_dirs/dog_pp/latest.pth --out deploy/ --check sample.npy
@@ -123,6 +124,8 @@ def main():
     meta.save(os.path.join(args.out, "model_meta.json"))
     print("exported", sorted(os.listdir(args.out)))
     print("build the engines where they run (engines are tied to the GPU and the TensorRT version):")
+    print("  python tools/deploy/build_engines.py --model-dir %s --precision fp32,fp16 --benchmark 50" % args.out)
+    print("or with trtexec (on the Orin: /usr/src/tensorrt/bin/trtexec):")
     for c in trtexec_commands(args.out):
         print("  " + c)
     if args.check:

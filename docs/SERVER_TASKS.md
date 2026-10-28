@@ -99,7 +99,7 @@
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
 | T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成，已复核。线上继续用 IMM：GRU、Transformer 概率最高的路线偏慢，3 s FDE 都更高（MR 低得多）。predict_ms 2746 / 4322 ms 是并行进程抢 CPU 测出来的，单线程约 16–40 ms，仍超 10 ms。伪真值用 measured，离标签 0.2 m，改为默认。误差主要在纵向，地图暂不做 |
 | T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 完成，已复核。保持现状。在动判断漏报增加、领先不到 90%；速度外推的 FDE 没同时过端到端和标签当检测。复核发现网络估的速度系统性偏慢，原始检测输入有用；人定不在 0921 上继续调，厂区数据来了先修速度目标 |
-| T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 完成。通道通；板上补了 trtexec（libnvinfer-bin 10.3.0.30）。服务器项目环境 TensorRT 10.3.0。小引擎测试失败：torch 2.13 把权重写到外部文件 |
+| T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 完成，已复核。通道通；板上补了 trtexec（libnvinfer-bin 10.3.0.30）。服务器项目环境 TensorRT 10.3.0。小引擎测试失败是建引擎工具没按模型目录找外部权重，已修 |
 | T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 待做 |
 | T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟 | Agent | T26 | 2 小时 | 待做 |
 
@@ -4510,6 +4510,49 @@ sudo 密码问人要，不写进任何文件和报告。
 - `pytest tests/dog/test_deploy.py -q`：4 通过，1 失败。失败的都是 `test_trt_runner_on_a_tiny_engine`，没有跳过
 - 失败原因：torch 2.13 的 `onnx.export` 默认把权重写到 `tiny.onnx.data`，TensorRT 10.3 按进程当前目录找这个文件，找不到就解析失败。同一条网络改成 `external_data=False` 后，FP32 小引擎能建，和 PyTorch 的最大绝对误差是 0。`export_pillar_onnx.py` 已经用 `dynamo=False`，T26 的导出不走这条默认路径
 
+### T25 复核（2026-10-28）
+
+结论：通道和两边的环境都可以开始 T26。下面几处已经改了，T26、T27 的命令也跟着改了。
+
+1. **小引擎测试失败，根子在建引擎工具，不只是测试**：
+   - `build_engines.build` 原来把 ONNX 读成字节再解析，TensorRT 不知道模型在哪个目录，外部权重只能按当前目录找；
+   - 改用 `parser.parse_from_file`，外部权重按模型所在的目录找；
+   - 测试改成：旧导出器导出一份权重内嵌的图，再另存一份权重在外部文件的图，从另一个目录建引擎，两份的输出都要和 PyTorch 一致；
+   - 上线 Pillar 的导出本来就走旧导出器、权重内嵌，T26 不受影响。
+2. **测引擎延迟**：
+   - T25 之后板上从 NVIDIA r36.4 仓库补了 `libnvinfer-bin`，trtexec 在 `/usr/src/tensorrt/bin/trtexec`，T26 第 6e 步照原样用它；
+   - 另外新增 `tools/deploy/bench_engines.py`：输入只拷一次，然后用 CUDA event 计每次执行的 GPU 时间，给中位数和 p99，和 trtexec 的 GPU Compute Time 是同一个量。服务器的 pip TensorRT 没有 trtexec，靠它测；
+   - `build_engines.py --benchmark` 也改用它。原来测的是含输入输出拷贝的主机时间，偏大；
+   - T26 第 6e 步在板上两个都测一遍，对得上（中位数差 < 10%），以后 T27 和 C++ 的板上对比就可以只用其中一个。
+3. **`orin_check.sh`**：
+   - 去掉 `colcon version-check`：它要联网查 PyPI，没网就卡住。改为打印 colcon 的路径和 dpkg 版本；
+   - 新增 `PYTHON=` 指定检查用哪个 Python，服务器上传项目环境的路径；
+   - 没有 trtexec 不再标 `MISSING`，因为 bench_engines.py 可以代替。
+4. **libcudart**：
+   - 服务器默认的 libcudart 是 CUDA 13 的，pip 的 TensorRT 10.3 是 CUDA 12 编的；
+   - T25 的测试里两套运行时混用也算对了（同一个驱动、同一个上下文），但不保险；
+   - `exported.py` 改为先加载 `libcudart.so.12`（`import tensorrt` 已经带进进程），找不到再用系统的。
+5. **ModelOpt 0.47.0**：
+   - 下载 wheel 核对了 `quantize`：`quantize_int8.py` 用到的参数名都在，含义没变；输入数组按第一维拆成逐帧校准；
+   - 没进 INT8 的层存成 FP16，输入输出保持 FP32；输出图的 opset 是 19；
+   - 两处对齐：
+     - 排除节点按 ModelOpt 的 `re.match` 计数（原来用 fullmatch，对 `.*/hm/.*` 结果一样）；
+     - 日志多记 ModelOpt 版本和排除的节点数。
+6. **numpy**：项目环境保持 1.26.4，也就是测试通过的版本。cupy-cuda12x 14.2 声明要 numpy ≥ 2，本项目不用 cupy，不处理。以后 pip 再把 numpy 升到 2.x，就装回 1.26.4，并在报告里写明。
+7. **板上的 torch**：板上有 torch 2.5（NVIDIA 的版本），但没有 det3d，所以 `torch` 后端仍只在服务器跑，板上继续和服务器的 dump 比。
+8. **锁频要人做**：
+   - `ssh orin 'sudo ...'` 没有终端，输不了密码；
+   - 功耗模式已经是 MAXN；
+   - T26 第 6c 步改为请人在板上执行 `sudo jetson_clocks`；
+   - 人不在就不锁频，测出的延迟标明"未锁频"。
+9. **服务器的 C++ 环境**：
+   - 没有 CUDA 12 工具链、没有 sudo，要看 Docker 能不能用；
+   - T26 第 0 步加了只查不装的检查，结果决定 C++ 在哪里编（DEPLOY_ORIN.md 第 3 节）。
+10. **空间**：
+    - 服务器根分区剩 35 GB，T26 的产物不大；
+    - TensorRT 容器约 9 GB，第 0 步先看 Docker 数据目录在哪个盘、剩多少；
+    - 板上剩 5.5 GB，两个场景各 100 帧加一个模型目录放得下，T27 做完就删。
+
 ## T26 Orin 部署：FP32 / FP16 转换和转换前后评估（含原 T8）
 
 把上线的 nuScenes Pillar（`work_dirs/pretrained/nusc_pp.pth`）导出，建 TensorRT 引擎，在三个层面和 PyTorch 比：
@@ -4523,8 +4566,17 @@ sudo 密码问人要，不写进任何文件和报告。
 任务 T26：导出上线 Pillar 的 ONNX 和元数据，按柱数定 P_max，建 FP32 / FP16 引擎（服务器 x86 和 Orin 各一套），
 逐段、逐框、按标签和 PyTorch 比较，测板上引擎延迟。
 先按通用约定做（拉到了代码改动，跑快速测试）。前置：T25 完成。
+T25 失败的 tests/dog/test_deploy.py::test_trt_runner_on_a_tiny_engine 现在应当通过（含外部权重和 bench_engines.py），不过就停下报告。
 
 0. mkdir -p data/reports/T26 data/deploy; TASK=T26；VAL、ev 同 T18 第 0、3 步。
+   服务器 C++ 环境检查（只查不装；输出写进 data/reports/T26/docker.txt）：
+     docker info --format '{{.DockerRootDir}} {{.ServerVersion}}'; df -h "$(docker info --format '{{.DockerRootDir}}')"
+     docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu22.04 nvidia-smi -L
+   - 要 sudo、permission denied、--gpus 用不了、拉不到镜像：把报错原样记下，不要想办法绕；
+   - 能用 GPU，且 Docker 数据目录所在的盘剩 ≥ 40 GB：
+       docker pull nvcr.io/nvidia/tensorrt:24.08-py3
+       docker run --rm --gpus all nvcr.io/nvidia/tensorrt:24.08-py3 bash -c "nvcc --version | tail -1; ls /usr/lib/x86_64-linux-gnu/libnvinfer.so.10*"
+     再记一次剩余空间。拉不下来也只记报错。
 1. 导出（原 T8）：
      f=$(ls data/runs/0921_165659_s004/frames/*.npy | sed -n 150p)
      python tools/dog/export_pillar_onnx.py --checkpoint work_dirs/pretrained/nusc_pp.pth \
@@ -4561,11 +4613,11 @@ sudo 密码问人要，不写进任何文件和报告。
    b. 拷过去（同样的 stride 和 limit，选出的帧和第 a 步一致）：
         deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp --dumps data/deploy/dumps \
             --frames data/runs/0921_164127_s000/frames --frames data/runs/0921_165659_s004/frames --stride 3 --limit 100
-   c. 最高功耗模式、锁频（sudo），然后建 Orin 引擎：
-        ssh orin 'sudo nvpmodel -m 0; sudo jetson_clocks; nvpmodel -q'
+   c. 锁频（要人）：请人在板子的终端执行 `sudo jetson_clocks`（板子重启过就要重新执行），人确认后再继续。
+      人不在就不锁频，后面的延迟都标"未锁频"。然后确认功耗模式、建 Orin 引擎：
+        ssh orin 'nvpmodel -q' 2>&1 | tee data/reports/T26/orin_power.txt
         ssh orin 'cd ~/dogperc/repo && python3 tools/deploy/build_engines.py --model-dir ~/dogperc/models/nusc_pp \
             --precision fp32,fp16 --benchmark 50' 2>&1 | tee data/reports/T26/build_orin.txt
-      板上没有 python tensorrt 时改用 trtexec（export.txt 末尾打印的命令，引擎名 <graph>.<precision>.engine）。
    d. 板上比较（参考是服务器的 PyTorch 检测）：
         for s in 0921_164127_s000 0921_165659_s004; do
           ssh orin "cd ~/dogperc/repo && python3 tools/deploy/compare_backends.py --model-dir ~/dogperc/models/nusc_pp \
@@ -4574,11 +4626,18 @@ sudo 密码问人要，不写进任何文件和报告。
               --out /home/seres/dogperc/data/compare_$s.json" 2>&1 | tail -6 | tee data/reports/T26/orin_compare_$s.txt
           scp orin:/home/seres/dogperc/data/compare_$s.json data/reports/T26/orin_compare_$s.json
         done
-   e. 引擎延迟：
+   e. 引擎延迟，trtexec 和 bench_engines.py 各测一遍（后者用 CUDA event 计 GPU 时间，同 trtexec 的 GPU Compute Time）：
         for e in pfn.fp32 pfn.fp16 rpn_head.fp32 rpn_head.fp16; do
           ssh orin "/usr/src/tensorrt/bin/trtexec --loadEngine=/home/seres/dogperc/models/nusc_pp/$e.engine \
               --iterations=200 --warmUp=500" 2>&1 | grep -E "GPU Compute Time|Throughput" | tee data/reports/T26/orin_trtexec_$e.txt
         done
+        ssh orin 'cd ~/dogperc/repo && python3 tools/deploy/bench_engines.py --model-dir ~/dogperc/models/nusc_pp \
+            --engines pfn.fp32 pfn.fp16 rpn_head.fp32 rpn_head.fp16 --runs 200 --out /home/seres/dogperc/data/bench_orin.json' \
+            2>&1 | tee data/reports/T26/orin_bench.txt
+        scp orin:/home/seres/dogperc/data/bench_orin.json data/reports/T26/orin_bench.json
+      服务器上同样测一遍 x86 引擎（挑一张空闲的卡，CUDA_VISIBLE_DEVICES 指定）：
+        python tools/deploy/bench_engines.py --model-dir data/deploy/nusc_pp --runs 200 \
+            --out data/reports/T26/x86_bench.json 2>&1 | tee data/reports/T26/x86_bench.txt
 
 门槛（DEPLOY_ORIN.md 第 6 节）：
 - trt:fp32 对 torch：heads rel < 1e-3，检测几乎完全一致；不满足说明导出或后端有错，停下报告；
@@ -4590,10 +4649,12 @@ sudo 密码问人要，不写进任何文件和报告。
 提交：data/reports/T26/、本文档。不提交 ONNX、引擎和 dumps（data/deploy/ 被 .gitignore 忽略）。
 报告（写进"T26 结果"）：
 - export.txt 的误差行；pillars.json；最终的 P_max；
-- 服务器和 Orin 的建引擎日志（每个引擎的耗时、大小、--benchmark 中位数）；
+- 服务器和 Orin 的建引擎日志（每个引擎的耗时、大小、--benchmark 的 GPU 时间中位数和 p99）；
 - 每个场景 compare 的表，和 10 个场景的汇总：reported match 最小值，score / center p99 的最大值，heads rel 的最大值；
 - 第 5 步三份 report.md 的 AP@2、AP@4 和 MAIN_METRICS，并排一张表；
-- 板上两个场景的 compare 表、trtexec 的 GPU Compute Time（中位数、p99）；
+- 板上两个场景的 compare 表；
+- 板上每个引擎 trtexec 的 GPU Compute Time 和 bench_engines 的 GPU 时间（中位数、p99）并排一张表，服务器 bench_engines 一张表；板上锁频了没有；
+- 第 0 步的 Docker 检查：数据目录和剩余空间、能不能用 GPU、TensorRT 容器拉没拉下来；
 - 结论：FP16 能不能用。
 ```
 
@@ -4620,6 +4681,7 @@ FP16 先过了再做。INT8 的做法：
      python tools/deploy/quantize_int8.py --model-dir data/deploy/nusc_pp --frames $F --num 128 --method entropy \
          --exclude ".*/hm/.*" --suffix int8_hmfp16 2>&1 | tee data/reports/T27/quantize_int8_hmfp16.txt
    第二个的输出里 exclude 应匹配到 18 个节点。内存不够就把 --num 降到 64，并在报告里写明。
+   ONNX Runtime 的 CUDA EP 加载失败、回退到 CPU 时照样做（只是慢），在报告里写明用的是哪个。
 2. 服务器 x86 引擎：
      python tools/deploy/build_engines.py --model-dir data/deploy/nusc_pp --graphs rpn_head \
          --precision int8,int8_hmfp16 --benchmark 50 2>&1 | tee data/reports/T27/build_x86.txt
@@ -4630,11 +4692,11 @@ FP16 先过了再做。INT8 的做法：
    - sync_to_orin.sh --model data/deploy/nusc_pp 拷两个 int8 图；
    - build_engines.py --graphs rpn_head --precision int8,int8_hmfp16 --benchmark 50；
    - 用 T26 的帧和 dumps 跑 compare（后端 dump:...,trt:fp16,trt:int8,trt:int8_hmfp16）；
-   - trtexec 测 rpn_head.int8 和 rpn_head.int8_hmfp16。
+   - 测 rpn_head.fp16、rpn_head.int8、rpn_head.int8_hmfp16 的延迟（同 T26 第 6e 步，锁频同 6c）：T26 里两者对得上就只用 trtexec，对不上两个都测。
 
 门槛（DEPLOY_ORIN.md 第 6 节）：
 - 两个 INT8 版本各自看 AP@2 / AP@4 比 pillar 低不超过 0.01，MAIN_METRICS 差值在 pillar 那份 90% 区间之内；
-- 板上 rpn_head 的 GPU Compute Time 比 FP16 低 ≥ 30%。
+- 板上 rpn_head 的 GPU Compute Time 中位数比 FP16 低 ≥ 30%。
 都满足的选延迟低的；都不满足就上线用 FP16。最后由人定。
 
 停止条件：量化报错；任何引擎建不出来。
@@ -4643,7 +4705,7 @@ FP16 先过了再做。INT8 的做法：
 - 两次量化的日志（帧数、耗时、exclude 匹配数）；
 - 建引擎日志；每个场景 compare 的表和 10 个场景的汇总；
 - 四份 report.md 并排的 AP 和 MAIN_METRICS；
-- 板上 compare 和 trtexec（FP16 对 INT8 对 INT8_hmfp16）；
+- 板上 compare 和延迟（FP16 对 INT8 对 INT8_hmfp16）；
 - 结论。
 ```
 

@@ -18,7 +18,7 @@ Backends: ``torch`` (det3d + the checkpoint in model_meta.json), ``onnx``, ``trt
 is no INT8 PFN), ``dump:<dir>`` (detections another machine saved with ``--dump``). The gates of
 docs/DEPLOY_ORIN.md (P1) are checked against the reference and printed.
 
-Across machines (the Orin has neither PyTorch nor the full data): on the server
+Across machines (the Orin has neither det3d nor the full data): on the server
 ``--backends torch --dump data/deploy/dumps`` saves the reference detections of the copied frames;
 on the Orin ``--backends dump:dumps/torch,trt:fp16`` compares its engines with them.
 """
