@@ -19,6 +19,10 @@ same number as trtexec's GPU Compute Time, also where there is no trtexec). Each
 
 Graphs are parsed from their file, so ONNX weights stored in an external file next to the graph
 (torch's dynamo exporter writes ``<name>.onnx.data``) are found whatever the working directory.
+
+A PFN exported with ``--dynamic-pillars`` gets one optimization profile: 1 .. ``max_pillars`` pillars
+(model_meta.json), kernels tuned for ``--opt-pillars`` (default: half of max_pillars, near the
+median frame of the 0921 data).
 """
 import argparse
 import json
@@ -45,7 +49,8 @@ def onnx_for(model_dir, graph, precision):
     return os.path.join(model_dir, "%s.onnx" % graph)
 
 
-def build(onnx_path, engine_path, precision, workspace_mb=4096, dla=None, timing_cache=None):
+def build(onnx_path, engine_path, precision, workspace_mb=4096, dla=None, timing_cache=None, profile=None):
+    """``profile``: {input name: (min shape, opt shape, max shape)}, required for every dynamic input."""
     import tensorrt as trt
     logger = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger)
@@ -56,6 +61,16 @@ def build(onnx_path, engine_path, precision, workspace_mb=4096, dla=None, timing
         raise RuntimeError("%s: ONNX parse failed:\n  %s" % (onnx_path, "\n  ".join(errors)))
     config = builder.create_builder_config()
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_mb << 20)
+    inputs = [network.get_input(i) for i in range(network.num_inputs)]
+    dynamic = [t for t in inputs if any(d < 0 for d in t.shape)]
+    if dynamic:
+        missing = [t.name for t in dynamic if t.name not in (profile or {})]
+        if missing:
+            raise ValueError("%s: dynamic inputs %s need a profile (min, opt, max)" % (onnx_path, missing))
+        opt_profile = builder.create_optimization_profile()
+        for t in dynamic:
+            opt_profile.set_shape(t.name, *[tuple(int(d) for d in x) for x in profile[t.name]])
+        config.add_optimization_profile(opt_profile)
     if precision == "fp16" or is_int8(precision):
         config.set_flag(trt.BuilderFlag.FP16)        # INT8: layers left unquantized run in FP16
     if is_int8(precision):
@@ -78,12 +93,21 @@ def build(onnx_path, engine_path, precision, workspace_mb=4096, dla=None, timing
     if cache is not None:
         with open(timing_cache, "wb") as f:
             f.write(cache.serialize())
-    return dict(trt=trt.__version__, seconds=round(time.time() - t0, 1), bytes=os.path.getsize(engine_path))
+    info = dict(trt=trt.__version__, seconds=round(time.time() - t0, 1), bytes=os.path.getsize(engine_path))
+    if dynamic:
+        info["profile"] = {t.name: [list(x) for x in profile[t.name]] for t in dynamic}
+    return info
 
 
-def benchmark(engine_path, runs, warmup_ms=500.0):
+def pillar_profile(meta, opt_pillars=None):
+    """Optimization profile of a dynamic PFN: 1 .. max_pillars pillars."""
+    shape = lambda p: (1, meta.pfn_channels, int(p), meta.max_points)  # noqa: E731
+    return {meta.onnx["pfn"]["input"]: (shape(1), shape(opt_pillars or meta.max_pillars // 2), shape(meta.max_pillars))}
+
+
+def benchmark(engine_path, runs, warmup_ms=500.0, shapes=None):
     from dog_perception.detection.exported import TrtRunner
-    return TrtRunner(engine_path).benchmark(runs, warmup_ms)
+    return TrtRunner(engine_path).benchmark(runs, warmup_ms, shapes=shapes)
 
 
 def machine():
@@ -104,7 +128,12 @@ def main():
     ap.add_argument("--timing-cache", default=None, help="file to reuse tactic timings between builds")
     ap.add_argument("--benchmark", type=int, default=0, help="time every new engine N times (random inputs)")
     ap.add_argument("--warmup-ms", type=float, default=500.0, help="warm-up before --benchmark timing")
+    ap.add_argument("--opt-pillars", type=int, default=None,
+                    help="dynamic PFN: pillar count the kernels are tuned for (default max_pillars / 2)")
     args = ap.parse_args()
+
+    from dog_perception.detection.model_meta import ModelMeta
+    meta = ModelMeta.load(os.path.join(args.model_dir, "model_meta.json"))
 
     log_path = os.path.join(args.model_dir, "engines.json")
     log = json.load(open(log_path)) if os.path.exists(log_path) else []
@@ -116,7 +145,9 @@ def main():
             name = "%s.%s%s.engine" % (graph, prec, "" if args.dla is None else ".dla%d" % args.dla)
             engine_path = os.path.join(args.model_dir, name)
             print("building %s from %s ..." % (name, os.path.basename(onnx_path)), flush=True)
-            info = build(onnx_path, engine_path, prec, args.workspace_mb, args.dla, args.timing_cache)
+            dyn = graph == "pfn" and meta.onnx["pfn"].get("dynamic")
+            profile = pillar_profile(meta, args.opt_pillars) if dyn else None
+            info = build(onnx_path, engine_path, prec, args.workspace_mb, args.dla, args.timing_cache, profile)
             info.update(graph=graph, precision=prec, engine=name, onnx=os.path.basename(onnx_path), dla=args.dla,
                         built=time.strftime("%Y-%m-%d %H:%M:%S"), **machine())
             if args.benchmark:

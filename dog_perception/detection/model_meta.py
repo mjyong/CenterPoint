@@ -40,7 +40,9 @@ class ModelMeta:
     label_map: list                  # model class -> dog class index (-1: dropped)
     subclass_map: list               # model class -> vehicle subclass index (-1: none)
     merged_nms: dict                 # dog class -> radius or [radius, weak radius, weak ratio]
-    onnx: dict = field(default_factory=lambda: {"pfn": {"input": "pillars", "output": "pillar_features"},
+    # pfn "dynamic": the pillar dimension is free (export_pillar_onnx.py --dynamic-pillars), max_pillars caps it
+    onnx: dict = field(default_factory=lambda: {"pfn": {"input": "pillars", "output": "pillar_features",
+                                                        "dynamic": False},
                                                 "rpn": {"input": "bev", "outputs": []}})
     source: dict = field(default_factory=dict)
     version: int = META_VERSION
@@ -84,7 +86,7 @@ def _plain(x):
     return x
 
 
-def meta_from_detector(det, max_pillars):
+def meta_from_detector(det, max_pillars, dynamic_pillars=False):
     """ModelMeta of a ``CenterPointDetector`` (Pillar)."""
     cfg = det.cfg
     vg, tc = cfg.voxel_generator, cfg.test_cfg
@@ -103,6 +105,7 @@ def meta_from_detector(det, max_pillars):
         tasks=tasks, head_keys=keys, test_cfg=test_cfg, label_map=det.label_map.tolist(),
         subclass_map=det.subclass_map.tolist(), merged_nms={k: v for k, v in det.merged_nms.items()})
     meta.onnx["rpn"]["outputs"] = meta.rpn_outputs
+    meta.onnx["pfn"]["dynamic"] = bool(dynamic_pillars)
     return meta
 
 

@@ -99,6 +99,14 @@ def test_compare_backends_and_pillar_stats_tools(exported, sim_frames, tmp_path)
                    check=True, env=env, capture_output=True)
     r = json.load(open(report))["backends"]["onnx#2"]
     assert r["gates"]["passed"] and r["stages"]["heads_rel"] == 0.0 and r["final"]["reported_match"] == 1.0
+    assert r["final"]["reported_match_tol"] == 1.0 and sum(r["final"]["missed_by"].values()) == 0
+    # a PyTorch reference has no intermediate tensors: stages are taken against the first exported backend
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "compare_backends.py"), "--model-dir", out,
+                    "--frames", str(frames / "*.npy"), "--backends", "torch,onnx,onnx", "--out", str(report)],
+                   check=True, env=env, capture_output=True)
+    r = json.load(open(report))
+    assert r["stage_reference"] == "onnx" and r["backends"]["onnx"]["stages"] == {}
+    assert r["backends"]["onnx#2"]["stages"]["heads_rel"] == 0.0 and r["backends"]["onnx"]["gates"]["passed"]
     # across machines: one saves its detections, the other compares with them
     dump = tmp_path / "dumps"
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "compare_backends.py"), "--model-dir", out,
@@ -117,10 +125,36 @@ def test_compare_backends_and_pillar_stats_tools(exported, sim_frames, tmp_path)
     assert s["frames"] == 2 and 0 < s["max"] <= s["suggested_max_pillars"] and s["frames_over_current"] == 0
 
 
+def test_compare_classifies_reported_misses():
+    """Misses / extras at the reporting threshold: near (score noise across it), score, class, none."""
+    from collections import defaultdict
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from compare_backends import det_stats, summarize_dets
+    from dog_perception.detection.boxes import Detections
+
+    def dets(xy, scores, labels):
+        b = np.zeros((len(xy), 7))
+        b[:, :2], b[:, 3:6] = xy, (4.0, 2.0, 1.5)
+        return Detections(b, np.zeros((len(xy), 2)), np.asarray(scores, float), np.asarray(labels))
+
+    xy = [[10.0 * k, 0.0] for k in range(6)]               # vehicles, reported from 0.4
+    ref = dets(xy, [0.8, 0.41, 0.6, 0.7, 0.9, 0.39], [0] * 6)
+    # 0 same; 1 just below (near); 2 far below (score); 3 now a cyclist (class); 4 gone (none);
+    # 5 just above (near extra); and a new box at 100 m (none extra)
+    got = dets(xy[:4] + [xy[5], [100.0, 0.0]], [0.8, 0.395, 0.2, 0.7, 0.405, 0.5], [0, 0, 0, 2, 0, 0])
+    acc = defaultdict(int, score=[], center=[], yaw=[], size=[])
+    det_stats(ref, got, 0.5, acc, tol=0.02)
+    r = summarize_dets(acc)
+    assert r["reported_ref"] == 5 and (r["reported_missed"], r["reported_extra"]) == (4, 3)
+    assert r["missed_by"] == {"near": 1, "score": 1, "class": 1, "none": 1}
+    assert r["extra_by"] == {"near": 1, "score": 0, "class": 1, "none": 1}
+    assert r["reported_match"] == pytest.approx(1 - 7 / 5) and r["reported_match_tol"] == pytest.approx(1 - 5 / 5)
+
+
 def test_engine_names_and_run_sequence_specs(tmp_path):
     sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
     sys.path.insert(0, os.path.join(ROOT, "tools", "dog"))
-    from bench_engines import engine_paths
+    from bench_engines import engine_paths, parse_shapes
     from build_engines import onnx_for
     from run_sequence import parse_exported
     from dog_perception.detection.exported import graph_file
@@ -140,6 +174,36 @@ def test_engine_names_and_run_sequence_specs(tmp_path):
     assert found == [str(tmp_path / "pfn.fp16.engine"), str(tmp_path / "rpn_head.int8.engine")]
     named = engine_paths("d", ["pfn.fp16", "rpn_head.fp16.engine"])
     assert named == [os.path.join("d", "pfn.fp16.engine"), os.path.join("d", "rpn_head.fp16.engine")]
+    assert parse_shapes("pillars:1x10x10000x20,b:1x3") == {"pillars": (1, 10, 10000, 20), "b": (1, 3)}
+    assert parse_shapes(None) == {}
+
+
+@pytest.mark.slow
+@requires_det3d
+def test_dynamic_pillar_pfn_matches_static(exported, sim_frames, tmp_path):
+    """--dynamic-pillars: the PFN gets only the used pillars; detections as with the padded graph."""
+    from export_pillar_onnx import export
+    from dog_perception.detection.exported import ExportedPillarDetector
+    from dog_perception.detection.model_meta import ModelMeta, meta_from_detector
+
+    det, out = exported
+    dyn = str(tmp_path / "dyn")
+    export(det, dyn, 20000, dynamic_pillars=True)
+    meta = meta_from_detector(det, 20000, dynamic_pillars=True)
+    meta.source = dict(config=PP_CFG, checkpoint=PP_CKPT, xy_range=40.8)
+    meta.save(os.path.join(dyn, "model_meta.json"))
+    assert ModelMeta.load(os.path.join(dyn, "model_meta.json")).onnx["pfn"]["dynamic"]
+    assert not ModelMeta.load(os.path.join(out, "model_meta.json")).onnx["pfn"]["dynamic"]
+    a, b = ExportedPillarDetector(out, "onnx", keep_stages=True), ExportedPillarDetector(dyn, "onnx", keep_stages=True)
+    assert not a.pfn_dynamic and b.pfn_dynamic
+    for fr in sim_frames["frames"][-2:]:
+        ra, rb = a(fr.points, fr.stamp), b(fr.points, fr.stamp)
+        assert len(ra) == len(rb) > 0
+        ia, ib = np.argsort(-ra.scores), np.argsort(-rb.scores)
+        assert np.abs(ra.scores[ia] - rb.scores[ib]).max() < 1e-5 and np.abs(ra.boxes[ia] - rb.boxes[ib]).max() < 1e-4
+        used, _ = b.last_pillars
+        assert b.last_stages["pfn_in"].shape[2] == used < a.last_stages["pfn_in"].shape[2] == 20000
+        assert np.abs(a.last_stages["bev"] - b.last_stages["bev"]).max() < 1e-5
 
 
 def test_trt_runner_on_a_tiny_engine(tmp_path, monkeypatch):
@@ -177,6 +241,26 @@ def test_trt_runner_on_a_tiny_engine(tmp_path, monkeypatch):
     b = benchmark(str(tmp_path / "tiny.fp32.engine"), 20, warmup_ms=50)
     assert b["runs"] == 20 and 0 < b["gpu_min_ms"] <= b["gpu_median_ms"] <= b["gpu_p99_ms"] <= b["gpu_max_ms"]
     assert b["host_median_ms"] > 0
+    # a dynamic dimension (the pillars of a --dynamic-pillars PFN) needs an optimization profile
+    dnet = torch.nn.Sequential(torch.nn.Conv2d(3, 4, 1), torch.nn.ReLU()).eval()
+    dyn_path = str(tmp_path / "tiny_dyn.onnx")
+    torch.onnx.export(dnet, torch.randn(1, 3, 50, 4), dyn_path, input_names=["x"], output_names=["y"],
+                      opset_version=17, dynamic_axes={"x": {2: "p"}, "y": {2: "p"}}, **kw)
+    with pytest.raises(ValueError):
+        build(dyn_path, str(tmp_path / "tiny_dyn.fp32.engine"), "fp32", workspace_mb=256)
+    prof = {"x": ((1, 3, 1, 4), (1, 3, 30, 4), (1, 3, 50, 4))}
+    info = build(dyn_path, str(tmp_path / "tiny_dyn.fp32.engine"), "fp32", workspace_mb=256, profile=prof)
+    assert info["profile"]["x"][2] == [1, 3, 50, 4]
+    r = TrtRunner(str(tmp_path / "tiny_dyn.fp32.engine"))
+    assert r.dynamic == ["x"] and r.profiles["x"][1] == (1, 3, 30, 4)
+    for p in (1, 17, 50):
+        xi = torch.randn(1, 3, p, 4)
+        y = r({"x": xi.numpy()})["y"]
+        assert y.shape == (1, 4, p, 4) and np.abs(y - dnet(xi).detach().numpy()).max() < 1e-4
+    with pytest.raises(ValueError):
+        r({"x": np.zeros((1, 3, 51, 4), np.float32)})
+    assert r.benchmark(10, warmup_ms=10, shapes={"x": (1, 3, 20, 4)})["shapes"]["x"] == [1, 3, 20, 4]
+    assert r.benchmark(10, warmup_ms=10)["shapes"]["x"] == [1, 3, 30, 4]
     report = tmp_path / "bench.json"
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "bench_engines.py"), "--model-dir",
                     str(tmp_path), "--engines", "tiny.fp32", "--runs", "10", "--warmup-ms", "20", "--out", str(report)],

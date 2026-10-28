@@ -100,8 +100,8 @@
 | T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成，已复核。线上继续用 IMM：GRU、Transformer 概率最高的路线偏慢，3 s FDE 都更高（MR 低得多）。predict_ms 2746 / 4322 ms 是并行进程抢 CPU 测出来的，单线程约 16–40 ms，仍超 10 ms。伪真值用 measured，离标签 0.2 m，改为默认。误差主要在纵向，地图暂不做 |
 | T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 完成，已复核。保持现状。在动判断漏报增加、领先不到 90%；速度外推的 FDE 没同时过端到端和标签当检测。复核发现网络估的速度系统性偏慢，原始检测输入有用；人定不在 0921 上继续调，厂区数据来了先修速度目标 |
 | T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 完成，已复核。通道通；板上补了 trtexec（libnvinfer-bin 10.3.0.30）。服务器项目环境 TensorRT 10.3.0。小引擎测试失败是建引擎工具没按模型目录找外部权重，已修 |
-| T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 完成。P_max 24000。FP32 逐框通过。FP16 在 10 个验证场景里有 8 个 reported match 低于 0.99（最低 0.969），按门槛不能用；标签上 AP 只掉 0.001，主要指标都在 90% 区间里。板上两个场景的 FP16 是 pass |
-| T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟 | Agent | T26 | 2 小时 | 待做 |
+| T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 完成，已复核。P_max 24000。FP32、FP16 都能用，上线先用 FP16。FP16 有 8 个场景匹配率低于 0.99，判断是阈值附近的框来回翻，门槛改为不计这类（T27 重算确认）；标签上 AP 只掉 0.001。板上 FP16 的 GPU 时间：PFN 3.4 ms、RPN 4.7 ms。服务器 C++ 用 TensorRT 容器 |
+| T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟；动态柱数的 PFN | Agent | T26 | 2.5 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -4735,6 +4735,51 @@ ONNX 十个场景都是 pass。完整表在 `compare_<场景>.txt`。
 
 **结论：** FP32 可以用。FP16 按「每个验证场景都要 pass」这条不能用，差在匹配率 0.969–0.989，不是分数或位置漂出了门槛。标签上的 AP 和主要指标都在允许范围内。板上抽的两个场景 FP16 是 pass。
 
+### T26 复核（2026-10-28）
+
+结论：**FP32、FP16 都可以用，上线先用 FP16**。板上 FP16 的 GPU 时间：PFN 3.4 ms（FP32 5.2 ms），RPN 4.7 ms（FP32 9.1 ms）。FP16 没过的只有匹配率这一条。复核认为是这条门槛定得不对，已改；T27 第 3 步会用新的算法把 FP16 再算一遍确认。
+
+1. **FP16 的匹配率：多半是阈值附近的框在来回翻，不是丢了物体**：
+   - 漏的和多的个数相近，总框数几乎不变：s005 漏 7、多 5，过滤后 1265 对 1264；板上 s000 也是 7 / 5；
+   - FP16 分数差最大 0.015、p99 0.0075，中心差 p99 5 mm。分数离上报阈值不到 0.015 的框，换个精度就可能跨过去；
+   - 下游看不出影响：AP@2 / AP@4 只掉 0.001，跟踪、预测的主要指标都在 90% 区间里（IDSW 每分钟 1.86 → 2.07，也在区间内）；
+   - 原来的匹配率把"分数变了 0.01、跨过了阈值"和"真丢了一个物体"算成一样，阈值附近的框多的场景就不容易过。
+   - **改法**（`tools/deploy/compare_backends.py`）：每个漏的、多的框归为四类：
+     - near：同一个框，分数差 ≤ 0.02（和 score p99 的门槛相同），只是跨过了阈值；
+     - score：同一个框，分数差更大；
+     - class：0.5 m 内只有别的类的框；
+     - none：0.5 m 内什么都没有。
+   - 门槛改为不计 near 的匹配率 ≥ 0.99（`reported_match_tol`）。原来的匹配率照样打印。near 的分数差本来就由 score p99 管着。
+   - **还要确认**：T26 的报告没有逐框记录，上面是推断。T27 第 3 步本来就要重跑 trt:fp16 对 torch，新表会给出四类的个数。如果 near 以外的占多数，就要回头查 FP16。
+   - FP16 的朝向差 p99 是 0.08 rad（4.6°），FP32 是 0.02 rad。表里新加了 yaw p99 一列，做 INT8 时一起看。
+2. **逐段误差没算出来**：
+   - 参考是 torch，而 torch 后端不保留中间张量，所以 heads rel 一列是空的；
+   - 改为：参考没有中间张量时，逐段误差对第一个导出的后端算（通常是 onnx），报告里记下 `stage_reference`；
+   - onnx 对 torch 的逐段误差由导出时的检查保证（heads 4.5e-5）；
+   - T27 的后端列表里要带上 onnx。
+3. **板上延迟和下一步的优化**（GPU 时间，已锁频，FP16）：
+   - PFN 3.4 ms，RPN 加 head 4.7 ms，合计 8.2 ms；
+   - PFN 占了 42%，并不是我之前写的"计算量小"。它总按 P_max = 24000 算，而柱数中位数约 10000（`pillars.json`：p50 10040，p99 16162，最大 19668）；
+   - 新增 `export_pillar_onnx.py --dynamic-pillars`：
+     - PFN 的柱数维度放开；
+     - 建引擎时给一个范围（1 到 P_max），按 `--opt-pillars` 调优，默认 P_max 的一半；
+     - 检测器只送实际用到的柱；
+     - 数学上和补零一样，测试里两种 ONNX 的检测结果一致；
+     - 预计中位帧上 PFN 省一半以上（约 2 ms），T27 第 6 步实测。
+   - PFN 不做 INT8：它的输入里有 ±40 m 的绝对坐标，也有 0.1 m 量级的柱内偏移。整个张量共用一个 scale，偏移就量化没了。减少柱数更直接。
+   - 板上 compare 的 network ms 是 41–44 ms，比 8.2 ms 多出来的是 Python 端的拷贝（PFN 输入 19 MB、BEV 画布 42.6 MB）和 numpy 的 scatter。C++ 版这些都在 GPU 上，不经过主机。
+4. **服务器的 C++ 环境定了**：
+   - Docker 免 sudo 就能用 GPU；
+   - `nvcr.io/nvidia/tensorrt:24.08-py3` 已拉下来，TensorRT 10.3.0、CUDA 12.6，和板子一致；
+   - Docker 数据目录在 `/zjst`，剩 692 TB；
+   - C++ 全部（含 CUDA、TensorRT）先在这个容器里开发、测试，再到板上原生编译、终验。
+5. **`sync_to_orin.sh`**：rsync 只建目标路径的最后一级，场景目录不存在就失败。已改为先在板上建好所有场景的目录。
+6. **板子时钟停在 1970 年**：
+   - 不影响引擎和对比；
+   - P6 的 bag 回放用 bag 的时间戳（`use_sim_time`），也不受影响；
+   - 上车实时跑之前要校时，否则节点的延迟统计和日志时间都不对。这一步要人做：从本机同步时间，或配 chrony / NTP。
+7. **板上 scipy 的警告**：apt 装的 scipy 1.8 要 numpy < 1.25，板上是 1.26.4，导入时会警告。只有 Python 端用到 scipy，C++ 不用，不处理。
+
 ## T27 Orin 部署：INT8 量化
 
 FP16 先过了再做。INT8 的做法：
@@ -4742,11 +4787,16 @@ FP16 先过了再做。INT8 的做法：
 - 校准只用训练场景，验证场景留给打分；
 - 再做一个热力图层保持 FP16 的混合精度版本，对比哪个更好。
 
+另外试动态柱数的 PFN（T26 复核第 3 条）：PFN 只算实际用到的柱，不按 P_max 补零。PFN 不做 INT8。
+
 ```text
-任务 T27：rpn_head 做 INT8 PTQ（纯 INT8 和热力图层保持 FP16 两个版本），和 FP16、PyTorch 比精度，测板上延迟。
+任务 T27：rpn_head 做 INT8 PTQ（纯 INT8 和热力图层保持 FP16 两个版本），和 FP16、PyTorch 比精度，测板上延迟；
+再导出动态柱数的 PFN，比精度、测板上延迟。
 先按通用约定做。前置：T26 通过。
 
 0. mkdir -p data/reports/T27；TASK=T27；VAL、TRAIN、ev 同 T18。
+   先跑 `pytest tests/dog/test_deploy.py -q 2>&1 | tee data/reports/T27/pytest_deploy.txt`（含 slow 和 TensorRT 那几条）。
+   T26 复核新加的动态 PFN、逐段参考、四类分类都在里面，复核时这台机器没有 torch，没能跑。全过才往下做，不过就停下报告。
 1. 量化（校准用训练场景，128 帧均匀取）：
      F=$(for s in $TRAIN; do echo "data/runs/$s/frames/*.npy"; done)
      python tools/deploy/quantize_int8.py --model-dir data/deploy/nusc_pp --frames $F --num 128 --method entropy \
@@ -4758,7 +4808,10 @@ FP16 先过了再做。INT8 的做法：
 2. 服务器 x86 引擎：
      python tools/deploy/build_engines.py --model-dir data/deploy/nusc_pp --graphs rpn_head \
          --precision int8,int8_hmfp16 --benchmark 50 2>&1 | tee data/reports/T27/build_x86.txt
-3. 逐段、逐框（同 T26 第 4 步）：后端 torch,trt:fp16,trt:int8,trt:int8_hmfp16，输出 compare_$s.json / .txt。
+3. 逐段、逐框（同 T26 第 4 步）：后端 torch,onnx,trt:fp16,trt:int8,trt:int8_hmfp16，输出 compare_$s.json / .txt；
+   表比 T26 多一行，`tail -6` 改成 `tail -8`。
+   表里多了"match w/o near"一列，以及漏、多的四类个数（near / score / class / none，T26 复核第 1 条）。
+   trt:fp16 这一行就是 T26 复核要的确认：报告 10 个场景 FP16 的四类合计。
 4. 按标签（同 T26 第 5 步）：--exported trt_fp16=...:trt:fp16、trt_int8=...:trt:int8、trt_int8_hmfp16=...:trt:int8_hmfp16，
    再加 --detectors pillar；输出到 data/deploy/T27_runs/{scene}，四份分别 ev。
 5. 板上：
@@ -4766,6 +4819,32 @@ FP16 先过了再做。INT8 的做法：
    - build_engines.py --graphs rpn_head --precision int8,int8_hmfp16 --benchmark 50；
    - 用 T26 的帧和 dumps 跑 compare（后端 dump:...,trt:fp16,trt:int8,trt:int8_hmfp16）；
    - 测 rpn_head.fp16、rpn_head.int8、rpn_head.int8_hmfp16 的延迟（同 T26 第 6e 步，锁频同 6c）：T26 里两者对得上就只用 trtexec，对不上两个都测。
+6. 动态柱数的 PFN（引擎都是 FP16）：
+   a. 服务器导出、建引擎、比较：
+        f=$(ls data/runs/0921_165659_s004/frames/*.npy | sed -n 150p)
+        python tools/dog/export_pillar_onnx.py --checkpoint work_dirs/pretrained/nusc_pp.pth --max-pillars 24000 \
+            --dynamic-pillars --out data/deploy/nusc_pp_dyn --check $f 2>&1 | tee data/reports/T27/export_dyn.txt
+        python tools/deploy/build_engines.py --model-dir data/deploy/nusc_pp_dyn --precision fp16 --opt-pillars 10000 \
+            2>&1 | tee data/reports/T27/build_dyn_x86.txt
+        for s in 0921_164127_s000 0921_165659_s004; do
+          python tools/deploy/compare_backends.py --model-dir data/deploy/nusc_pp_dyn --frames "data/runs/$s/frames/*.npy" \
+              --stride 3 --limit 100 --backends torch,onnx,trt:fp16 --device cuda:0 --out data/reports/T27/compare_dyn_$s.json \
+              2>&1 | tail -6 | tee data/reports/T27/compare_dyn_$s.txt
+        done
+   b. 板上：
+      - sync_to_orin.sh --model data/deploy/nusc_pp_dyn；
+      - build_engines.py --model-dir ~/dogperc/models/nusc_pp_dyn --precision fp16 --opt-pillars 10000；
+      - compare（T26 的帧和 dumps，后端 dump:...,trt:fp16），输出 orin_compare_dyn_$s.json / .txt；
+      - 延迟（锁频）：静态的 pfn.fp16 再测一次作对照；动态的在 10000、16000、24000 柱各测一次：
+          for P in 10000 16000 24000; do
+            ssh orin "/usr/src/tensorrt/bin/trtexec --loadEngine=/home/seres/dogperc/models/nusc_pp_dyn/pfn.fp16.engine \
+                --shapes=pillars:1x10x${P}x20 --iterations=200 --warmUp=500" 2>&1 | grep -E "GPU Compute Time" \
+                | tee data/reports/T27/orin_trtexec_pfn_dyn_$P.txt
+          done
+   - export_dyn.txt 的 --check 要和 T26 的 export.txt 一样过；
+   - 这两个场景上 compare 要过门槛，几项差值要和 T26 静态的 trt:fp16 在同一个量级；
+   - 板上 10000 柱的 PFN 时间要比静态的低，24000 柱的时间不比静态的高出 10% 以上。
+   做完记下板上根分区的剩余空间；低于 3 GB 就删掉 ~/dogperc/data 下的帧和 dumps（以后 C++ 的对比会重新拷）。
 
 门槛（DEPLOY_ORIN.md 第 6 节）：
 - 两个 INT8 版本各自看 AP@2 / AP@4 比 pillar 低不超过 0.01，MAIN_METRICS 差值在 pillar 那份 90% 区间之内；
@@ -4779,7 +4858,9 @@ FP16 先过了再做。INT8 的做法：
 - 建引擎日志；每个场景 compare 的表和 10 个场景的汇总；
 - 四份 report.md 并排的 AP 和 MAIN_METRICS；
 - 板上 compare 和延迟（FP16 对 INT8 对 INT8_hmfp16）；
-- 结论。
+- 第 3 步 trt:fp16 的四类合计（T26 复核要的确认）；
+- 第 6 步：export_dyn 的误差行，两个场景的 compare 表（服务器、板上），板上 PFN 的时间表（静态 24000，动态 10000 / 16000 / 24000）；
+- 结论：INT8 选哪个；动态 PFN 用不用。
 ```
 
 ### T27 结果

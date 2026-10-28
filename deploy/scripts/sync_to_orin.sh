@@ -25,7 +25,10 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-ssh "$HOST" "mkdir -p $DIR/repo $DIR/models $DIR/data"
+# rsync creates only the last directory of a target: make the scene directories first
+dirs="$DIR/repo $DIR/models $DIR/data"
+for f in "${FRAMES[@]}"; do dirs="$dirs $DIR/data/$(basename "$(dirname "$f")")/frames"; done
+ssh "$HOST" "mkdir -p $dirs"
 rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build/' --exclude 'install/' --exclude 'log/' \
   dog_perception tools deploy configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
 if [ -n "$MODEL" ]; then

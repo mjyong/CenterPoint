@@ -1,6 +1,7 @@
 """Export CenterPoint-Pillar as two static-shape ONNX graphs for TensorRT on Orin.
 
-    pfn.onnx         (1, 10, P_max, N_max) -> (1, 64, P_max, 1)
+    pfn.onnx         (1, 10, P_max, N_max) -> (1, 64, P_max, 1); with --dynamic-pillars the pillar
+                     dimension is free (1 .. P_max) and the detector feeds only the pillars it has
     rpn_head.onnx    (1, 64, ny, nx)       -> raw head maps (reg, height, dim, rot, vel, hm per task)
     model_meta.json  grid, pillar limits, head layout, decoder, class mapping (detection/model_meta.py):
                      what the exported detector (detection/exported.py) and the C++ pipeline read
@@ -42,15 +43,16 @@ def _onnx_export(model, args, path, **kw):
     torch.onnx.export(model, args, path, **kw)
 
 
-def export(det, out_dir, max_pillars, opset=17):
+def export(det, out_dir, max_pillars, opset=17, dynamic_pillars=False):
     os.makedirs(out_dir, exist_ok=True)
     cfg = det.cfg
     net = det.net.cpu().eval()
     n_pts = cfg.voxel_generator.max_points_in_voxel
     c_in = net.reader.pfn_layers[0].linear.in_features
     pfn = PFNExport(net.reader, n_pts).eval()
+    dyn = dict(dynamic_axes={"pillars": {2: "pillars"}, "pillar_features": {2: "pillars"}}) if dynamic_pillars else {}
     _onnx_export(pfn, torch.zeros(1, c_in, max_pillars, n_pts), os.path.join(out_dir, "pfn.onnx"),
-                 input_names=["pillars"], output_names=["pillar_features"], opset_version=opset)
+                 input_names=["pillars"], output_names=["pillar_features"], opset_version=opset, **dyn)
     nx, ny = int(det.voxel_generator.grid_size[0]), int(det.voxel_generator.grid_size[1])
     c_bev = cfg.model.neck.num_input_features
     rpn = RPNHeadExport(net).eval()
@@ -109,6 +111,8 @@ def main():
     ap.add_argument("--max-pillars", type=int, default=30000,
                     help="P_max of the PFN graph (tools/deploy/pillar_stats.py: the most any frame needs)")
     ap.add_argument("--opset", type=int, default=17)
+    ap.add_argument("--dynamic-pillars", action="store_true",
+                    help="free pillar dimension in pfn.onnx: the PFN runs on the pillars a frame has, not P_max")
     ap.add_argument("--xy-range", type=float, default=40.8)
     ap.add_argument("--check", default=None, help="det-frame cloud (.npy, N x 5) to verify ONNX vs PyTorch")
     args = ap.parse_args()
@@ -118,8 +122,8 @@ def main():
         from dog_perception.detection.centerpoint import checkpoint_arch
         args.config = PRESET_CONFIGS[(checkpoint_arch(args.checkpoint) if args.checkpoint else None) or "pillar"]
     det = CenterPointDetector(args.config, args.checkpoint, device="cpu", xy_range=args.xy_range)
-    keys = export(det, args.out, args.max_pillars, args.opset)
-    meta = meta_from_detector(det, args.max_pillars)
+    keys = export(det, args.out, args.max_pillars, args.opset, args.dynamic_pillars)
+    meta = meta_from_detector(det, args.max_pillars, args.dynamic_pillars)
     meta.source = dict(config=args.config, checkpoint=args.checkpoint, xy_range=args.xy_range, opset=args.opset)
     meta.save(os.path.join(args.out, "model_meta.json"))
     print("exported", sorted(os.listdir(args.out)))

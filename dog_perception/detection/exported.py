@@ -32,13 +32,15 @@ from .voxelize import voxelize
 
 
 class OnnxRunner:
-    """One ONNX graph in ONNX Runtime: ``runner({input: array}) -> {output: array}``."""
+    """One ONNX graph in ONNX Runtime: ``runner({input: array}) -> {output: array}``. ``dynamic``: the
+    inputs with a free dimension (the PFN exported with ``--dynamic-pillars``)."""
 
     def __init__(self, path, providers=None):
         import onnxruntime as ort
         self.path = path
         self.session = ort.InferenceSession(path, providers=providers or ["CPUExecutionProvider"])
         self.outputs = [o.name for o in self.session.get_outputs()]
+        self.dynamic = [i.name for i in self.session.get_inputs() if not all(isinstance(d, int) for d in i.shape)]
 
     def __call__(self, feeds):
         return dict(zip(self.outputs, self.session.run(None, feeds)))
@@ -130,8 +132,9 @@ class _CudaRuntime:
 
 
 class TrtRunner:
-    """One TensorRT engine (TensorRT 10 API, static shapes): ``runner({input: array}) -> {output: array}``.
-    Device buffers are allocated once; inputs and outputs are copied synchronously."""
+    """One TensorRT engine (TensorRT 10 API): ``runner({input: array}) -> {output: array}``.
+    Device buffers are allocated once (for a dynamic input, at the maximum of its optimization profile,
+    ``profiles[name] = (min, opt, max)``); inputs and outputs are copied synchronously."""
 
     def __init__(self, path):
         import tensorrt as trt
@@ -144,37 +147,65 @@ class TrtRunner:
             raise RuntimeError("%s: TensorRT could not load the engine (built with another version / GPU?)" % path)
         self.context = self.engine.create_execution_context()
         self.stream = self.cuda.stream()
-        self.inputs, self.outputs, self.host, self.device = [], [], {}, {}
-        for i in range(self.engine.num_io_tensors):
-            name = self.engine.get_tensor_name(i)
+        self.host, self.device, self.profiles = {}, {}, {}
+        names = [self.engine.get_tensor_name(i) for i in range(self.engine.num_io_tensors)]
+        self.inputs = [n for n in names if self.engine.get_tensor_mode(n) == trt.TensorIOMode.INPUT]
+        self.outputs = [n for n in names if n not in self.inputs]
+        for name in self.inputs:
             shape = tuple(self.engine.get_tensor_shape(name))
             if any(d < 0 for d in shape):
-                raise ValueError("%s: tensor %s has a dynamic shape %s; export static shapes" % (path, name, shape))
-            arr = np.zeros(shape, dtype=trt.nptype(self.engine.get_tensor_dtype(name)))
-            self.host[name], self.device[name] = arr, self.cuda.malloc(arr.nbytes)
-            self.context.set_tensor_address(name, self.device[name])
-            (self.inputs if self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT else self.outputs).append(name)
+                lo, opt, hi = (tuple(d) for d in self.engine.get_tensor_profile_shape(name, 0))
+                self.profiles[name], shape = (lo, opt, hi), hi
+                self.context.set_input_shape(name, hi)
+            self._alloc(trt, name, shape)
+        for name in self.outputs:                      # sized for the largest inputs
+            self._alloc(trt, name, tuple(self.context.get_tensor_shape(name)))
+
+    @property
+    def dynamic(self):
+        return list(self.profiles)
+
+    def _alloc(self, trt, name, shape):
+        arr = np.zeros(shape, dtype=trt.nptype(self.engine.get_tensor_dtype(name)))
+        self.host[name], self.device[name] = arr, self.cuda.malloc(arr.nbytes)
+        self.context.set_tensor_address(name, self.device[name])
 
     def __call__(self, feeds):
         for name in self.inputs:
-            self.cuda.h2d(self.device[name], np.ascontiguousarray(feeds[name], dtype=self.host[name].dtype))
+            a = np.ascontiguousarray(feeds[name], dtype=self.host[name].dtype)
+            if name in self.profiles:
+                lo, _, hi = self.profiles[name]
+                inside = all(a_ <= d <= b_ for a_, d, b_ in zip(lo, a.shape, hi))
+                if not (inside and self.context.set_input_shape(name, a.shape)):
+                    raise ValueError("%s: %s shape %s outside the profile %s - %s" % (self.path, name, a.shape, lo, hi))
+            elif a.shape != self.host[name].shape:
+                raise ValueError("%s: %s shape %s, the engine takes %s"
+                                 % (self.path, name, a.shape, self.host[name].shape))
+            self.cuda.h2d(self.device[name], a)
         if not self.context.execute_async_v3(self.stream):
             raise RuntimeError("%s: execute_async_v3 failed" % self.path)
         self.cuda.sync(self.stream)
         out = {}
         for name in self.outputs:
-            self.cuda.d2h(self.host[name], self.device[name])
-            out[name] = self.host[name].astype(np.float32, copy=True)
+            host = self.host[name]
+            if self.profiles:
+                host = np.empty(tuple(self.context.get_tensor_shape(name)), host.dtype)
+            self.cuda.d2h(host, self.device[name])
+            out[name] = host.astype(np.float32, copy=True)
         return out
 
-    def benchmark(self, runs=200, warmup_ms=500.0, feeds=None):
+    def benchmark(self, runs=200, warmup_ms=500.0, feeds=None, shapes=None):
         """Latency of the engine alone, what ``trtexec --loadEngine`` reports as GPU Compute Time (pip
         TensorRT has no trtexec): inputs copied once (random unless ``feeds``), then ``runs`` enqueues, each
         timed with CUDA events after ``warmup_ms`` of warm-up. ``host_median_ms`` is a whole ``__call__``
-        with its input and output copies, which the C++ pipeline does not pay (its tensors stay on the GPU)."""
+        with its input and output copies, which the C++ pipeline does not pay (its tensors stay on the GPU).
+        A dynamic input takes its shape from ``shapes`` ({name: shape}), else the profile's optimum."""
         rng = np.random.default_rng(0)
         if feeds is None:
-            feeds = {n: rng.standard_normal(self.host[n].shape).astype(self.host[n].dtype) for n in self.inputs}
+            shapes = dict(shapes or {})
+            for n in self.inputs:
+                shapes.setdefault(n, self.profiles[n][1] if n in self.profiles else self.host[n].shape)
+            feeds = {n: rng.standard_normal(shapes[n]).astype(self.host[n].dtype) for n in self.inputs}
         t_end = time.perf_counter() + warmup_ms / 1e3
         self(feeds)
         while time.perf_counter() < t_end:
@@ -198,7 +229,8 @@ class TrtRunner:
             self(feeds)
             host.append(1e3 * (time.perf_counter() - t))
         gpu = np.asarray(gpu)
-        return dict(runs=runs, gpu_median_ms=round(float(np.median(gpu)), 3),
+        return dict(runs=runs, shapes={n: list(feeds[n].shape) for n in self.inputs},
+                    gpu_median_ms=round(float(np.median(gpu)), 3),
                     gpu_p99_ms=round(float(np.percentile(gpu, 99)), 3), gpu_mean_ms=round(float(gpu.mean()), 3),
                     gpu_min_ms=round(float(gpu.min()), 3), gpu_max_ms=round(float(gpu.max()), 3),
                     host_median_ms=round(float(np.median(host)), 3))
@@ -226,6 +258,9 @@ class ExportedPillarDetector:
         make = OnnxRunner if runtime == "onnx" else TrtRunner
         self.pfn = make(os.path.join(model_dir, pfn) if pfn else graph_file(model_dir, "pfn", runtime, precision))
         self.rpn = make(os.path.join(model_dir, rpn) if rpn else graph_file(model_dir, "rpn_head", runtime, precision))
+        # a PFN with a free pillar dimension (export_pillar_onnx.py --dynamic-pillars) gets only the used
+        # pillars instead of all max_pillars
+        self.pfn_dynamic = self.meta.onnx["pfn"]["input"] in self.pfn.dynamic
         self.runtime, self.precision = runtime, precision
         self.filter_cfg = DetectionFilterConfig() if filter_cfg == "default" else filter_cfg
         self.frame = self.meta.model_frame
@@ -247,6 +282,8 @@ class ExportedPillarDetector:
         v, c, n = voxelize(pts, m.voxel_size, m.pc_range, m.max_points, m.max_voxels)
         feats = decorate_pillars(v, n, c, m.voxel_size, m.pc_range)
         x, cpad, nv = pad_pillars(feats, c, m.max_pillars)
+        if self.pfn_dynamic:
+            x = np.ascontiguousarray(x[:, :, :max(nv, 1)])
         self.last_pillars = (nv, len(v))
         t0 = time.perf_counter()
         pf = self.pfn({m.onnx["pfn"]["input"]: x})[m.onnx["pfn"]["output"]][0, :, :, 0]

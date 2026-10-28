@@ -39,7 +39,8 @@ Python 流水线是唯一的参考实现。每换一样东西（运行时、精�
 - gcc 11.4、cmake 3.22、eigen 3.4、yaml-cpp 0.7、gtest 1.11、colcon 0.3；
 - `trtexec`：板上原来的 apt 源没有，T25 从 NVIDIA r36.4 仓库装了 `libnvinfer-bin` 10.3.0.30，在 `/usr/src/tensorrt/bin/trtexec`；
 - 功耗模式已是 MAXN；
-- 根分区剩余约 5.5 GB；
+- 根分区剩余约 5.5 GB（T26 拷完两个场景后 4.7 GB）；
+- 系统时钟停在 1970 年（没有校时）：bag 回放用 bag 的时间戳不受影响，上车实时跑之前要人校时；
 - `l4tbr0` 上的 192.168.55.1 是 down 的，不要用。
 
 **服务器的配置**（T25 实测，`data/reports/T25/server_*.txt`）：
@@ -98,12 +99,12 @@ sudo apt install python3-libnvinfer        # 若没有 TensorRT 的 Python 绑�
 - 以上 T25 已装好。`orin_check.sh` 在服务器上要指定项目环境：`PYTHON=<venv>/bin/python deploy/scripts/orin_check.sh`。
 - pip 的 TensorRT 是 CUDA 12 编的，`exported.py` 先加载 `libcudart.so.12`（`import tensorrt` 已带进来），找不到再用系统的。
 
-**服务器上的 C++ 开发环境**：服务器没有 CUDA 12 工具链，也没有 sudo。T26 第 0 步检查 Docker 能不能免 sudo 用 GPU，再定：
-- **能用**：用 `nvcr.io/nvidia/tensorrt:24.08-py3`（TensorRT 10.3.0、CUDA 12.6，Ubuntu 22.04，和板子一致，约 9 GB），
-  在里面装 Eigen、yaml-cpp、GoogleTest 和 ROS 2 Humble。C++ 全部（含 CUDA、TensorRT）先在服务器的 4090 上开发、测试，再到板上原生编译、终验。
-- **不能用**：服务器只编 C++ 的 CPU 部分（Eigen、yaml-cpp、GoogleTest 用 CMake FetchContent 拉，不要 sudo）；
-  CUDA 和 TensorRT 部分直接在板上编、测，板上依赖都齐。
-- 两种情况下，Python 参考、golden 数据和全量评估都在服务器上做。
+**服务器上的 C++ 开发环境**（T26 定）：服务器没有 CUDA 12 工具链，也没有 sudo，但 Docker 免 sudo 就能用 GPU。
+- 用 `nvcr.io/nvidia/tensorrt:24.08-py3`：TensorRT 10.3.0、CUDA 12.6、Ubuntu 22.04，和板子一致，已拉下来；
+- Docker 数据目录在 `/zjst`，空间充足；
+- 在容器里装 Eigen、yaml-cpp、GoogleTest 和 ROS 2 Humble；
+- C++ 全部（含 CUDA、TensorRT）先在服务器的 4090 上开发、测试，再到板上原生编译、终验；
+- Python 参考、golden 数据和全量评估都在服务器上做。
 
 ## 4. 模型转换（P1）
 
@@ -149,11 +150,27 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 - 拷模型目录和 2–3 个场景的帧，在板上建 FP16 引擎；
 - 服务器先用 `compare_backends.py --backends torch --dump <dir>` 存下这些帧上 PyTorch 的检测，拷到板上；
 - 板上用 `--backends dump:<dir>/torch,trt:fp16` 对比；
+- T26 实测（锁频，GPU 时间中位数）：
+
+  | 引擎 | FP32 | FP16 |
+  |---|---|---|
+  | pfn（24000 柱） | 5.2 ms | 3.4 ms |
+  | rpn_head | 9.1 ms | 4.7 ms |
+
+  Python 检测器在板上的 network ms 是 41–44 ms，多出来的是主机拷贝（PFN 输入 19 MB、BEV 画布 42.6 MB）和 numpy 的 scatter；C++ 版都在 GPU 上。
 - 延迟用 `trtexec --loadEngine=<引擎> --iterations=200`，看 GPU Compute Time 的中位数和 p99；
 - 或 `tools/deploy/bench_engines.py --model-dir <目录> --engines pfn.fp16 rpn_head.fp16 --runs 200`：
   - 输入只拷一次，CUDA event 计每次执行的 GPU 时间，给中位数和 p99，和 trtexec 的 GPU Compute Time 是同一个量；
   - 服务器的 pip TensorRT 没有 trtexec，就用它；
   - `build_engines.py --benchmark N` 建完引擎顺手测的也是这个。
+
+**动态柱数的 PFN**：
+- 静态的 PFN 总按 P_max 算，而 0921 的柱数中位数约 10000，P_max 是 24000；
+- `export_pillar_onnx.py --dynamic-pillars` 把 PFN 的柱数维度放开，`model_meta.json` 里记 `onnx.pfn.dynamic`；
+- `build_engines.py` 给它一个范围（1 到 P_max），按 `--opt-pillars` 调优；
+- 检测器只送实际用到的柱，数学上和补零一样；
+- 测延迟要给柱数：`trtexec --shapes=pillars:1x10x10000x20`、`bench_engines.py --shapes pillars:1x10x10000x20`；
+- T27 实测之后决定用不用；C++ 的 detect 两种都支持（`setInputShape`）。
 
 ## 5. INT8 量化（P2）
 
@@ -163,7 +180,7 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
   - 只用**训练**场景的帧，验证场景留给打分；
   - 默认 128 帧，一个 BEV 画布 42.6 MB，128 帧共 5.4 GB 内存。
 - **混合精度**：`--exclude ".*/hm/.*" --suffix int8_hmfp16` 让 18 个热力图卷积保持 FP16，生成 `rpn_head.int8_hmfp16.onnx` / `.engine`，后端写 `trt:int8_hmfp16`。
-- **PFN**：计算量小，默认保持 FP16。INT8 的后端在没有 INT8 PFN 时自动用 `pfn.fp16.engine`。
+- **PFN**：不做 INT8，保持 FP16。它的输入里既有 ±40 m 的绝对坐标，也有 0.1 m 量级的柱内偏移，整个张量共用一个 scale，偏移就量化没了。它的时间（板上 FP16 3.4 ms，占网络的 42%）靠动态柱数来省。INT8 的后端在没有 INT8 PFN 时自动用 `pfn.fp16.engine`。
 - **DLA**：`build_engines.py --dla 0` 把 RPN 放到 DLA，DLA 跑不了的层回退到 GPU。只测、只报告。
 
 ## 6. 验收
@@ -171,7 +188,7 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 | 比什么 | 门槛 |
 |---|---|
 | TRT FP32 对 PyTorch | head 图相对误差 < 1e-3；检测几乎完全一致 |
-| TRT FP16 对 PyTorch | head 图相对误差 < 1e-2；上报阈值下 ≥ 99% 的框配得上（0.5 m 内同类）；分数差 p99 < 0.02；中心差 p99 < 0.1 m；`compare_backends.py` 打印 pass |
+| TRT FP16 对 PyTorch | head 图相对误差 < 1e-2（对 onnx）；上报阈值下 ≥ 99% 的框配得上（0.5 m 内同类；分数差 ≤ 0.02、只是跨过阈值的不算错，见下）；分数差 p99 < 0.02；中心差 p99 < 0.1 m；`compare_backends.py` 打印 pass |
 | TRT FP16 对 PyTorch，标签上 | AP@2 / AP@4 掉 ≤ 0.005；`pipeline_eval.py` 的主要指标差值在 90% 区间之内 |
 | INT8 对 FP32 | AP 掉 ≤ 0.01；流水线指标不显著变差；板上延迟比 FP16 降 ≥ 30% 才值得用，否则用 FP16（人定） |
 | C++ 对 Python（P4） | 点 1e-4 m；体素集合相同；喂相同检测时跟踪 ID 完全一致、状态 1e-6；预测 1e-4 |
@@ -182,6 +199,16 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 - **final**：过滤之后，也就是跟踪器拿到的。
 
 上报阈值用 `DEFAULT_SCORE_THRESHOLDS`。
+
+上报阈值下漏的、多的框各分四类（T26 复核）：
+- near：同一个框，分数差 ≤ 0.02，只是跨过了阈值；
+- score：同一个框，分数差更大；
+- class：0.5 m 内只有别的类的框；
+- none：0.5 m 内什么都没有。
+
+门槛用不计 near 的匹配率（`reported_match_tol`）。near 是分数噪声，分数差已经由 score p99 管着；不算它，是为了不把"分数变了 0.01"当成"丢了一个物体"。原来的匹配率照样打印。
+
+逐段误差要中间张量：参考是 `torch` 或 `dump:` 时，对第一个导出的后端（通常是 onnx）算。
 
 ## 7. C++ 和 ROS 2（P3–P6，写代码中）
 
