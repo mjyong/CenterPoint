@@ -1,7 +1,9 @@
 """Export CenterPoint-Pillar as two static-shape ONNX graphs for TensorRT on Orin.
 
-    pfn.onnx       (1, 10, P_max, N_max) -> (1, 64, P_max, 1)
-    rpn_head.onnx  (1, 64, ny, nx)       -> raw head maps (reg, height, dim, rot, vel, hm per task)
+    pfn.onnx         (1, 10, P_max, N_max) -> (1, 64, P_max, 1)
+    rpn_head.onnx    (1, 64, ny, nx)       -> raw head maps (reg, height, dim, rot, vel, hm per task)
+    model_meta.json  grid, pillar limits, head layout, decoder, class mapping (detection/model_meta.py):
+                     what the exported detector (detection/exported.py) and the C++ pipeline read
 
 Voxelization, pillar decoration, scatter and decoding stay outside the
 engines (``dog_perception.detection.pillar_export`` / ``decode``). With
@@ -27,6 +29,7 @@ import inspect  # noqa: E402
 from dog_perception.detection.centerpoint import CenterPointDetector  # noqa: E402
 from dog_perception.detection.filters import filter_detections  # noqa: E402
 from dog_perception.detection.decode import HEAD_ORDER, decode_centerpoint  # noqa: E402
+from dog_perception.detection.model_meta import meta_from_detector  # noqa: E402
 from dog_perception.detection.pillar_export import (PFNExport, RPNHeadExport, decorate_pillars,  # noqa: E402
                                                     pad_pillars, scatter_pillars, split_head_outputs)
 
@@ -38,7 +41,7 @@ def _onnx_export(model, args, path, **kw):
     torch.onnx.export(model, args, path, **kw)
 
 
-def export(det, out_dir, max_pillars, opset=13):
+def export(det, out_dir, max_pillars, opset=17):
     os.makedirs(out_dir, exist_ok=True)
     cfg = det.cfg
     net = det.net.cpu().eval()
@@ -88,9 +91,12 @@ def run_onnx(det, out_dir, points_det, keys, max_pillars):
 
 
 def trtexec_commands(out_dir, fp16=True):
+    """Quick engines with trtexec, named as detection/exported.py expects (<graph>.<precision>.engine).
+    tools/deploy/build_engines.py builds the same with a build log and also INT8 from Q/DQ graphs."""
+    prec = "fp16" if fp16 else "fp32"
     flag = " --fp16" if fp16 else ""
     return ["trtexec --onnx=%s --saveEngine=%s%s" % (os.path.join(out_dir, f + ".onnx"),
-                                                    os.path.join(out_dir, f + ".engine"), flag)
+                                                    os.path.join(out_dir, "%s.%s.engine" % (f, prec)), flag)
             for f in ("pfn", "rpn_head")]
 
 
@@ -99,7 +105,9 @@ def main():
     ap.add_argument("--config", default=None, help="default: from --checkpoint (nuScenes or dog model)")
     ap.add_argument("--checkpoint", default=None)
     ap.add_argument("--out", default="deploy/centerpoint_pillar")
-    ap.add_argument("--max-pillars", type=int, default=30000)
+    ap.add_argument("--max-pillars", type=int, default=30000,
+                    help="P_max of the PFN graph (tools/deploy/pillar_stats.py: the most any frame needs)")
+    ap.add_argument("--opset", type=int, default=17)
     ap.add_argument("--xy-range", type=float, default=40.8)
     ap.add_argument("--check", default=None, help="det-frame cloud (.npy, N x 5) to verify ONNX vs PyTorch")
     args = ap.parse_args()
@@ -109,9 +117,12 @@ def main():
         from dog_perception.detection.centerpoint import checkpoint_arch
         args.config = PRESET_CONFIGS[(checkpoint_arch(args.checkpoint) if args.checkpoint else None) or "pillar"]
     det = CenterPointDetector(args.config, args.checkpoint, device="cpu", xy_range=args.xy_range)
-    keys = export(det, args.out, args.max_pillars)
+    keys = export(det, args.out, args.max_pillars, args.opset)
+    meta = meta_from_detector(det, args.max_pillars)
+    meta.source = dict(config=args.config, checkpoint=args.checkpoint, xy_range=args.xy_range, opset=args.opset)
+    meta.save(os.path.join(args.out, "model_meta.json"))
     print("exported", sorted(os.listdir(args.out)))
-    print("build the engines on the Orin (FP16 first; INT8 needs calibration frames):")
+    print("build the engines where they run (engines are tied to the GPU and the TensorRT version):")
     for c in trtexec_commands(args.out):
         print("  " + c)
     if args.check:

@@ -420,7 +420,11 @@ python -m pytest tests/dog -n 4 -q                  # 完整：4 核约 3 分钟
 
 ## 8. Orin 部署
 
-部署平台定为 NVIDIA Jetson Orin，推理用 TensorRT。本节说明换平台后哪些结论变了，以及上板的做法和顺序。本环境没有 Orin，以下延迟和精度结论都要上板实测确认。
+部署平台定为 NVIDIA Jetson Orin，推理用 TensorRT。本节说明换平台后哪些结论变了，以及延迟预算。
+
+**2026-10-28 起的具体做法见 [DEPLOY_ORIN.md](DEPLOY_ORIN.md)**：机器和通道、TensorRT 转换和 INT8 量化、验收门槛、C++ 和 ROS 2 的结构，以及服务器任务 T25 起。本节的 8.4–8.6 是早先的设想，以那份为准。
+
+板子是 AGX Orin 64 GB（JetPack 6.x，L4T R36.4.4，TensorRT 10.3），本节以下的延迟和精度结论都要上板实测确认。
 
 ### 8.1 换平台后改了哪些结论
 

@@ -19,9 +19,10 @@ from det3d.torchie import Config
 from det3d.torchie.trainer import load_checkpoint
 
 from .boxes import (CLASSES, NUSC_TO_DOG, NUSC_TO_SUBCLASS, SUBCLASS_TO_CLASS, SUBCLASSES, Detections, class_index,
-                    classwise_circle_nms, det3d_to_standard, subclass_index)
+                    subclass_index)
 from .filters import DetectionFilterConfig, filter_detections
 from .frame_adapter import ModelFrame
+from .model_meta import postprocess
 
 # center-distance NMS radii (squared meters, det3d convention), per class
 CIRCLE_NMS_SQ_RADIUS = {
@@ -283,14 +284,8 @@ class CenterPointDetector:
         return dets
 
     def postprocess(self, box9, scores, model_labels, stamp=None):
-        model_labels = model_labels.astype(np.int64)
-        labels = self.label_map[model_labels]
-        keep = labels >= 0
-        std, vel = det3d_to_standard(box9[keep])
-        std, vel = self.frame.boxes_from_model(std, vel)
-        dets = Detections(std, vel, scores[keep].astype(np.float64), labels[keep], "det", stamp,
-                          self.subclass_map[model_labels[keep]])
-        return classwise_circle_nms(dets, self.merged_nms)
+        return postprocess(box9, scores, model_labels, self.label_map, self.subclass_map, self.frame, self.merged_nms,
+                           stamp)
 
     @property
     def classes(self):

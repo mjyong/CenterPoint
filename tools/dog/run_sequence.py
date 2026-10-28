@@ -21,6 +21,9 @@ exported from. ``--no-predict`` skips the trajectory prediction nobody reads in 
 ``--save-raw`` adds, per frame, the detections before the geometric filters (``raw_detections``) and
 what the filters measure on them (``raw_measured``: box bottom above the ground, current-sweep points),
 for ``tools/dog/pipeline_eval.py --detections raw``.
+Exported models (ONNX Runtime or TensorRT engines, ``dog_perception/detection/exported.py``) run next
+to or instead of the PyTorch ones: ``--detectors '' --exported trt_fp16=data/deploy/nusc_pp:trt:fp16``
+(repeatable; results in ``<out>/trt_fp16/``), so conversions are scored with the same tools.
 Several scenes go in one call (``--out`` with ``{scene}``), ``--jobs N`` runs N of them at once,
 each worker loading the detectors once:
 
@@ -102,10 +105,31 @@ def replay_frames(run_dir):
         print("%s: %d frames of the results have no saved frame" % (run_dir, missing))
 
 
+def parse_exported(spec):
+    """``name=dir[:runtime[:precision]]`` -> (name, dir, runtime, precision); runtime onnx | trt (default trt),
+    precision fp32 | fp16 | int8 (default fp16)."""
+    name, _, rest = spec.partition("=")
+    if not name or not rest:
+        raise ValueError("--exported %r: name=dir[:runtime[:precision]]" % spec)
+    parts = rest.split(":")
+    return name, parts[0], parts[1] if len(parts) > 1 else "trt", parts[2] if len(parts) > 2 else "fp16"
+
+
 def build_detectors(args):
-    from dog_perception.detection.centerpoint import CenterPointDetector
-    return {n: CenterPointDetector(getattr(args, "config_" + n), getattr(args, "ckpt_" + n),
-                                   device=args.device, tta=args.tta) for n in args.detectors.split(",")}
+    dets = {}
+    if args.detectors:
+        from dog_perception.detection.centerpoint import CenterPointDetector
+        dets = {n: CenterPointDetector(getattr(args, "config_" + n), getattr(args, "ckpt_" + n),
+                                       device=args.device, tta=args.tta) for n in args.detectors.split(",")}
+    for spec in args.exported:
+        from dog_perception.detection.exported import ExportedPillarDetector, graph_file
+        name, path, runtime, prec = parse_exported(spec)
+        pfn = "pfn.fp16.engine" if prec.startswith("int8") and not os.path.exists(graph_file(path, "pfn", "trt", prec)) \
+            else None
+        dets[name] = ExportedPillarDetector(path, runtime, prec, pfn=pfn if runtime == "trt" else None)
+    if not dets:
+        raise SystemExit("no detector: give --detectors and / or --exported")
+    return dets
 
 
 def run_scene(source, out, dets, args):
@@ -201,7 +225,10 @@ def main():
                      help="earlier run directories with frames/ (--save-frames) and <detector>/results.pkl: "
                           "replay the saved detector inputs instead of preprocessing the scans")
     ap.add_argument("--seq-root", default="data/seq", help="--replay: <seq-root>/<scene> for the camera streams")
-    ap.add_argument("--detectors", default="pillar")
+    ap.add_argument("--detectors", default="pillar", help="PyTorch detectors (pillar, voxel); '' for none")
+    ap.add_argument("--exported", action="append", default=[], metavar="NAME=DIR[:RUNTIME[:PRECISION]]",
+                    help="an exported Pillar (detection/exported.py), e.g. trt_fp16=data/deploy/nusc_pp:trt:fp16; "
+                         "repeatable; results in <out>/NAME/")
     ap.add_argument("--config-pillar", default=None, help="default: from --ckpt-pillar (nuScenes or dog model)")
     ap.add_argument("--config-voxel", default=None, help="default: from --ckpt-voxel")
     ap.add_argument("--ckpt-pillar", default=None)

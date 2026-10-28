@@ -38,6 +38,7 @@
 | [DETECTION_POSTPROCESS.md](docs/DETECTION_POSTPROCESS.md) | 检测后处理逐步讲解（真实一帧） |
 | [TRACKING_PREDICTION.md](docs/TRACKING_PREDICTION.md) | 跟踪（含运动状态）和预测的原理与代码 |
 | [PIPELINE_TUNING.md](docs/PIPELINE_TUNING.md) | 后处理、跟踪、预测在狗数据上怎么调：指标、可视化、任务顺序（T18–T23） |
+| [DEPLOY_ORIN.md](docs/DEPLOY_ORIN.md) | 部署到 Jetson AGX Orin：机器和通道、TensorRT 转换和 INT8 量化、验收门槛、C++ 和 ROS 2 的结构（服务器任务 T25 起） |
 | [DRIVABLE_AREA_PLAN.md](docs/DRIVABLE_AREA_PLAN.md) | 可行驶区域 / 占据栅格（激光 + 鱼眼）的方案和工作量，暂不做 |
 | [CENTERPOINT_NETWORK.md](docs/CENTERPOINT_NETWORK.md) / [CENTERPOINT_VOXEL_NETWORK.md](docs/CENTERPOINT_VOXEL_NETWORK.md) | Pillar / Voxel 网络逐层详解 |
 | [NUSC_CLIP_EVAL.md](docs/NUSC_CLIP_EVAL.md) | nuScenes 片段上的检测、跟踪、预测评估 |

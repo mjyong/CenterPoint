@@ -30,3 +30,10 @@ data/labels/**/*.mcap
 # vendored SUSTechPOINTS: keep its sources; scenes exported into its data/ stay local (its own .gitignore)
 !third_party/SUSTechPOINTS/**/*.sh
 !third_party/SUSTechPOINTS/data/
+# deployment (docs/DEPLOY_ORIN.md): its scripts, the engine builder and the ROS 2 parameter files are sources;
+# build trees, ONNX graphs and engines stay local
+!deploy/**/*.sh
+!tools/deploy/build_engines.py
+!deploy/ros2/**/*.yaml
+*.onnx
+*.engine

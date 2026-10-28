@@ -77,7 +77,7 @@
 | T5 | 应用审核结果，导出 v1 数据集 | Agent | H1 | 30 分钟 | 完成（2026-10-23 补审后重导） |
 | T6 | 训练 v1（单卡，和 v0 同配方）；同时跑基线：nuScenes 原始模型、v0 | Agent | T5 | 约 1.2 小时（两个训练挤一张卡时约 2 小时） | 完成 |
 | T7 | 比较 7 个模型，选部署 Voxel 还是 Pillar、上报阈值 | Agent | T6 | 1 小时 | 完成 |
-| T8 | 部署：导出上线 Pillar 的 ONNX（2026-10-26 起是 nuScenes Pillar，见 T15 复核）；选了 Voxel 时再打包 Voxel，人在 Orin 上测（H2） | Agent | T7 | 10 分钟 | 待做 |
+| T8 | 部署：导出上线 Pillar 的 ONNX（2026-10-26 起是 nuScenes Pillar，见 T15 复核）；选了 Voxel 时再打包 Voxel，人在 Orin 上测（H2） | Agent | T7 | 10 分钟 | 并入 T26（2026-10-28） |
 | H2 | （T7 选了 Voxel 时）在 Orin 上测 Voxel v1 的延迟，放得下就部署 Voxel，否则部署 Pillar | 人 | T8 | 半天 | 待做 |
 | T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
 | T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
@@ -99,6 +99,9 @@
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
 | T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成，已复核。线上继续用 IMM：GRU、Transformer 概率最高的路线偏慢，3 s FDE 都更高（MR 低得多）。predict_ms 2746 / 4322 ms 是并行进程抢 CPU 测出来的，单线程约 16–40 ms，仍超 10 ms。伪真值用 measured，离标签 0.2 m，改为默认。误差主要在纵向，地图暂不做 |
 | T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 完成，已复核。保持现状。在动判断漏报增加、领先不到 90%；速度外推的 FDE 没同时过端到端和标签当检测。复核发现网络估的速度系统性偏慢，原始检测输入有用；人定不在 0921 上继续调，厂区数据来了先修速度目标 |
+| T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 待做 |
+| T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 待做 |
+| T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟 | Agent | T26 | 2 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -4439,3 +4442,188 @@ sweep.csv 里每行：
 - `train_predictor.py` 的状态表加带符号的速度偏差（投到真实运动方向），直接看偏慢有没有修掉；
 - 运动状态的阈值做成可调的；再加一种"否决"用法：跟踪器说在动、网络很确定不在动时才改成不在动。这样跟踪器仍是主判断，只用网络去掉停着的车的假运动，不会新增漏报；
 - 用厂区的验证 / 测试集重跑 T24 的配对比较。
+
+## T25 Orin 部署：环境和通道
+
+部署到 Jetson AGX Orin 的总体做法见 [DEPLOY_ORIN.md](DEPLOY_ORIN.md)：模型转换、量化、C++ 移植、ROS 2 集成，以及每一步的验收。T25 先把通道打通、把两边的环境查清楚，不改代码。
+
+```text
+任务 T25：打通服务器到 Orin 的通道，记录服务器和 Orin 的环境，装好缺的包。
+先按通用约定做。前置：人在本机开着反向隧道（DEPLOY_ORIN.md 第 2 节的 autossh 命令）。
+sudo 密码问人要，不写进任何文件和报告。
+
+0. mkdir -p data/reports/T25
+1. 通道：
+   - 服务器 ~/.ssh/config 加 Host orin（HostName localhost、Port 5037、User seres，DEPLOY_ORIN.md 第 2 节）；
+   - 服务器公钥放到板子上：ssh-copy-id orin（要人输一次密码）；
+   - ssh orin 'hostname; uname -m' 应输出 ubuntu、aarch64。连不上就停，报告错误。
+2. 同步代码：deploy/scripts/sync_to_orin.sh
+3. 环境报告：
+     bash deploy/scripts/orin_check.sh 2>&1 | tee data/reports/T25/server_env.txt
+     ssh orin 'bash ~/dogperc/repo/deploy/scripts/orin_check.sh' 2>&1 | tee data/reports/T25/orin_env.txt
+4. 板上补包（sudo）。标 MISSING 的才装：
+     sudo apt install -y libeigen3-dev libyaml-cpp-dev libgtest-dev python3-colcon-common-extensions
+     sudo apt install -y python3-libnvinfer                # 没有 python tensorrt 时
+     python3 -m pip install --user numpy scipy             # 没有 numpy / scipy 时
+   装完再跑一次 orin_check.sh，存成 orin_env_after.txt。根分区剩余 < 3 GB 就停，报告，不要自己删板上的东西。
+5. 服务器补包：在项目环境里装
+     pip install "tensorrt==10.3.*" onnx onnxruntime polygraphy "nvidia-modelopt[onnx]"
+   - tensorrt 的大版本和小版本要和板子一致（10.3）；
+   - 和项目环境冲突就新建 conda 环境 deploy，装同样的包加项目依赖，torch 后端那一步回项目环境跑；
+   - 再记下：python -c "import tensorrt; print(tensorrt.__version__)"、nvidia-smi、docker --version、
+     sudo -n true 是否可用、0921 原始 bag 在服务器上的路径（T30 要从中截 ROS 2 bag 片段）。
+6. 测试：python -m pytest tests/dog -m "not slow" -q，以及 python -m pytest tests/dog/test_deploy.py -q。
+   test_deploy.py 里 TensorRT 小引擎那条在服务器上不应跳过；跳过就说明 tensorrt 或 CUDA 没装好。
+
+停止条件：通道不通；板上根分区剩余 < 3 GB；安装报错。
+提交：data/reports/T25/、本文档。
+报告（写进"T25 结果"）：
+- 两份环境报告里的版本行和 MISSING 行，装了什么，装完后的剩余空间；
+- 服务器的 tensorrt 版本、GPU 型号和驱动、有没有 docker 和 sudo、0921 原始 bag 的路径；
+- 测试结果。
+```
+
+### T25 结果
+
+（待填）
+
+## T26 Orin 部署：FP32 / FP16 转换和转换前后评估（含原 T8）
+
+把上线的 nuScenes Pillar（`work_dirs/pretrained/nusc_pp.pth`）导出，建 TensorRT 引擎，在三个层面和 PyTorch 比：
+- 逐段：PFN、BEV、head 图；
+- 逐框；
+- 审过标签上的指标。
+
+先在服务器 x86 GPU 上全量比，再在板上用两个场景的小子集比，并测板上引擎的延迟。各后端的接口见 DEPLOY_ORIN.md 第 4 节，门槛见第 6 节。
+
+```text
+任务 T26：导出上线 Pillar 的 ONNX 和元数据，按柱数定 P_max，建 FP32 / FP16 引擎（服务器 x86 和 Orin 各一套），
+逐段、逐框、按标签和 PyTorch 比较，测板上引擎延迟。
+先按通用约定做（拉到了代码改动，跑快速测试）。前置：T25 完成。
+
+0. mkdir -p data/reports/T26 data/deploy; TASK=T26；VAL、ev 同 T18 第 0、3 步。
+1. 导出（原 T8）：
+     f=$(ls data/runs/0921_165659_s004/frames/*.npy | sed -n 150p)
+     python tools/dog/export_pillar_onnx.py --checkpoint work_dirs/pretrained/nusc_pp.pth \
+         --out data/deploy/nusc_pp --check $f 2>&1 | tee data/reports/T26/export.txt
+   通过：pfn / bev / heads 的相对误差都 < 1e-3，检测个数相同，分数差 < 1e-3，中心差 < 1 cm。
+2. 柱数：
+     python tools/deploy/pillar_stats.py --model-dir data/deploy/nusc_pp --frames "data/runs/*/frames/*.npy" \
+         --stride 5 --jobs 8 --out data/reports/T26/pillars.json
+   suggested_max_pillars 和 30000 不同，就用它重做第 1 步（加 --max-pillars <值>，export.txt 覆盖）。
+   frames_over_current > 0 时必须重做。
+3. 服务器 x86 引擎：
+     python tools/deploy/build_engines.py --model-dir data/deploy/nusc_pp --precision fp32,fp16 --benchmark 50 \
+         2>&1 | tee data/reports/T26/build_x86.txt
+4. 逐段、逐框（10 个验证场景，每 3 帧取 1）：
+     for s in $VAL; do
+       python tools/deploy/compare_backends.py --model-dir data/deploy/nusc_pp --frames "data/runs/$s/frames/*.npy" \
+           --stride 3 --backends torch,onnx,trt:fp32,trt:fp16 --device cuda:0 --out data/reports/T26/compare_$s.json \
+           2>&1 | tail -6 | tee data/reports/T26/compare_$s.txt
+     done
+5. 按标签（同一批帧，PyTorch、TRT FP32、TRT FP16 各跑一遍完整流水线，再分别评估）：
+     python tools/dog/run_sequence.py --replay $(for s in $VAL; do echo data/runs/$s; done) \
+         --detectors pillar --ckpt-pillar work_dirs/pretrained/nusc_pp.pth \
+         --exported trt_fp32=data/deploy/nusc_pp:trt:fp32 --exported trt_fp16=data/deploy/nusc_pp:trt:fp16 \
+         --save-raw --no-predict --no-mcap --jobs 4 --device cuda:0 --out data/deploy/T26_runs/{scene}
+     for b in pillar trt_fp32 trt_fp16; do
+       ev $b "$VAL" "data/deploy/T26_runs/{scene}/$b/results.pkl" --detections raw --no-mcap
+     done
+6. 板上：
+   a. 服务器上存参考检测：两个场景，每 3 帧取 1，最多 100 帧：
+        for s in 0921_164127_s000 0921_165659_s004; do
+          python tools/deploy/compare_backends.py --model-dir data/deploy/nusc_pp --frames "data/runs/$s/frames/*.npy" \
+              --stride 3 --limit 100 --backends torch --device cuda:0 --dump data/deploy/dumps/$s
+        done
+   b. 拷过去（同样的 stride 和 limit，选出的帧和第 a 步一致）：
+        deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp --dumps data/deploy/dumps \
+            --frames data/runs/0921_164127_s000/frames --frames data/runs/0921_165659_s004/frames --stride 3 --limit 100
+   c. 最高功耗模式、锁频（sudo），然后建 Orin 引擎：
+        ssh orin 'sudo nvpmodel -m 0; sudo jetson_clocks; nvpmodel -q'
+        ssh orin 'cd ~/dogperc/repo && python3 tools/deploy/build_engines.py --model-dir ~/dogperc/models/nusc_pp \
+            --precision fp32,fp16 --benchmark 50' 2>&1 | tee data/reports/T26/build_orin.txt
+      板上没有 python tensorrt 时改用 trtexec（export.txt 末尾打印的命令，引擎名 <graph>.<precision>.engine）。
+   d. 板上比较（参考是服务器的 PyTorch 检测）：
+        for s in 0921_164127_s000 0921_165659_s004; do
+          ssh orin "cd ~/dogperc/repo && python3 tools/deploy/compare_backends.py --model-dir ~/dogperc/models/nusc_pp \
+              --frames '/home/seres/dogperc/data/$s/frames/*.npy' \
+              --backends dump:/home/seres/dogperc/data/dumps/$s/torch,trt:fp32,trt:fp16 \
+              --out /home/seres/dogperc/data/compare_$s.json" 2>&1 | tail -6 | tee data/reports/T26/orin_compare_$s.txt
+          scp orin:/home/seres/dogperc/data/compare_$s.json data/reports/T26/orin_compare_$s.json
+        done
+   e. 引擎延迟：
+        for e in pfn.fp32 pfn.fp16 rpn_head.fp32 rpn_head.fp16; do
+          ssh orin "/usr/src/tensorrt/bin/trtexec --loadEngine=/home/seres/dogperc/models/nusc_pp/$e.engine \
+              --iterations=200 --warmUp=500" 2>&1 | grep -E "GPU Compute Time|Throughput" | tee data/reports/T26/orin_trtexec_$e.txt
+        done
+
+门槛（DEPLOY_ORIN.md 第 6 节）：
+- trt:fp32 对 torch：heads rel < 1e-3，检测几乎完全一致；不满足说明导出或后端有错，停下报告；
+- trt:fp16：每个场景 compare_backends 打印 pass；
+- 第 5 步 AP@2 / AP@4 比 pillar 低不超过 0.005，MAIN_METRICS 的差值在 pillar 那份 90% 区间之内；
+- 板上 trt:fp16 对服务器 torch 也打印 pass。
+
+停止条件：第 1 步不过；trt:fp32 不过；任何报错。
+提交：data/reports/T26/、本文档。不提交 ONNX、引擎和 dumps（data/deploy/ 被 .gitignore 忽略）。
+报告（写进"T26 结果"）：
+- export.txt 的误差行；pillars.json；最终的 P_max；
+- 服务器和 Orin 的建引擎日志（每个引擎的耗时、大小、--benchmark 中位数）；
+- 每个场景 compare 的表，和 10 个场景的汇总：reported match 最小值，score / center p99 的最大值，heads rel 的最大值；
+- 第 5 步三份 report.md 的 AP@2、AP@4 和 MAIN_METRICS，并排一张表；
+- 板上两个场景的 compare 表、trtexec 的 GPU Compute Time（中位数、p99）；
+- 结论：FP16 能不能用。
+```
+
+### T26 结果
+
+（待填）
+
+## T27 Orin 部署：INT8 量化
+
+FP16 先过了再做。INT8 的做法：
+- NVIDIA ModelOpt 在真实帧上算 scale，生成带 Q/DQ 的图，再建 INT8 引擎（DEPLOY_ORIN.md 第 5 节）；
+- 校准只用训练场景，验证场景留给打分；
+- 再做一个热力图层保持 FP16 的混合精度版本，对比哪个更好。
+
+```text
+任务 T27：rpn_head 做 INT8 PTQ（纯 INT8 和热力图层保持 FP16 两个版本），和 FP16、PyTorch 比精度，测板上延迟。
+先按通用约定做。前置：T26 通过。
+
+0. mkdir -p data/reports/T27；TASK=T27；VAL、TRAIN、ev 同 T18。
+1. 量化（校准用训练场景，128 帧均匀取）：
+     F=$(for s in $TRAIN; do echo "data/runs/$s/frames/*.npy"; done)
+     python tools/deploy/quantize_int8.py --model-dir data/deploy/nusc_pp --frames $F --num 128 --method entropy \
+         2>&1 | tee data/reports/T27/quantize_int8.txt
+     python tools/deploy/quantize_int8.py --model-dir data/deploy/nusc_pp --frames $F --num 128 --method entropy \
+         --exclude ".*/hm/.*" --suffix int8_hmfp16 2>&1 | tee data/reports/T27/quantize_int8_hmfp16.txt
+   第二个的输出里 exclude 应匹配到 18 个节点。内存不够就把 --num 降到 64，并在报告里写明。
+2. 服务器 x86 引擎：
+     python tools/deploy/build_engines.py --model-dir data/deploy/nusc_pp --graphs rpn_head \
+         --precision int8,int8_hmfp16 --benchmark 50 2>&1 | tee data/reports/T27/build_x86.txt
+3. 逐段、逐框（同 T26 第 4 步）：后端 torch,trt:fp16,trt:int8,trt:int8_hmfp16，输出 compare_$s.json / .txt。
+4. 按标签（同 T26 第 5 步）：--exported trt_fp16=...:trt:fp16、trt_int8=...:trt:int8、trt_int8_hmfp16=...:trt:int8_hmfp16，
+   再加 --detectors pillar；输出到 data/deploy/T27_runs/{scene}，四份分别 ev。
+5. 板上：
+   - sync_to_orin.sh --model data/deploy/nusc_pp 拷两个 int8 图；
+   - build_engines.py --graphs rpn_head --precision int8,int8_hmfp16 --benchmark 50；
+   - 用 T26 的帧和 dumps 跑 compare（后端 dump:...,trt:fp16,trt:int8,trt:int8_hmfp16）；
+   - trtexec 测 rpn_head.int8 和 rpn_head.int8_hmfp16。
+
+门槛（DEPLOY_ORIN.md 第 6 节）：
+- 两个 INT8 版本各自看 AP@2 / AP@4 比 pillar 低不超过 0.01，MAIN_METRICS 差值在 pillar 那份 90% 区间之内；
+- 板上 rpn_head 的 GPU Compute Time 比 FP16 低 ≥ 30%。
+都满足的选延迟低的；都不满足就上线用 FP16。最后由人定。
+
+停止条件：量化报错；任何引擎建不出来。
+提交：data/reports/T27/、本文档。不提交 ONNX 和引擎。
+报告（写进"T27 结果"）：
+- 两次量化的日志（帧数、耗时、exclude 匹配数）；
+- 建引擎日志；每个场景 compare 的表和 10 个场景的汇总；
+- 四份 report.md 并排的 AP 和 MAIN_METRICS；
+- 板上 compare 和 trtexec（FP16 对 INT8 对 INT8_hmfp16）；
+- 结论。
+```
+
+### T27 结果
+
+（待填）
