@@ -1,0 +1,12 @@
+python=/home/engineers/junyongmou/robot/ultralytics/.venv/bin/python
+tensorrt 10.3.0
+polygraphy 0.53.6
+modelopt 0.47.0
+numpy 1.26.4  (restored to 1.26.4 after modelopt pulled 2.2.6)
+onnx 1.21.0  (was 1.22.0 before this install)
+NVIDIA GeForce RTX 4090, 580.126.09
+Docker version 27.3.1, build ce12230
+sudo -n: no (password required)
+bags=/zjst/robot/rosbag0921  (same dir as /public/zjst/robot/rosbag0921, nfs)
+/zjst/robot/rosbag0921/rosbag2_2026_09_21-16_41_27
+/zjst/robot/rosbag0921/rosbag2_2026_09_21-16_56_59

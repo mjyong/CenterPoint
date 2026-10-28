@@ -1,0 +1,67 @@
+
+== host
+gpu1
+Linux 5.15.0-127-generic x86_64
+Ubuntu 22.04.5 LTS
+
+== cuda
+Cuda compilation tools, release 13.0, V13.0.48
+Build cuda_13.0.r13.0/compiler.36260728_0
+/usr/local/cuda
+/usr/local/cuda-11.1
+/usr/local/cuda-13.0
+
+== cudnn / tensorrt
+libcudnn9 
+libcudnn9-cuda-12 9.11.0.98-1
+libcudnn9-dev 
+libcudnn9-dev-cuda-12 9.11.0.98-1
+libcudnn9-headers 
+libcudnn9-headers-cuda-12 9.11.0.98-1
+libcudnn9-jit 
+libcudnn9-jit-dev 
+libcudnn9-jit-static 
+libcudnn9-samples 9.11.0.98-1
+libcudnn9-static 
+libcudnn9-static-cuda-12 9.11.0.98-1
+MISSING python tensorrt (python3-libnvinfer / pip tensorrt)
+MISSING trtexec
+
+== opencv
+
+== ros 2
+MISSING /opt/ros
+MISSING colcon (python3-colcon-common-extensions)
+
+== build tools
+gcc (Ubuntu 10.5.0-1ubuntu1~22.04.2) 10.5.0
+g++ (Ubuntu 10.5.0-1ubuntu1~22.04.2) 10.5.0
+cmake version 3.22.1
+MISSING libeigen3-dev
+MISSING libyaml-cpp-dev
+MISSING libgtest-dev
+zlib1g-dev 1:1.2.11.dfsg-2ubuntu9.2
+
+== python
+Python 3.10.12
+numpy 1.26.4 scipy 1.10.1
+onnxruntime 1.23.2
+(no torch: not needed on the Orin)
+
+== power
+
+== memory / disk
+               total        used        free      shared  buff/cache   available
+Mem:           1.0Ti        99Gi       167Gi       7.4Gi       740Gi       895Gi
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sdc3       877G  798G   35G  96% /
+
+== gpu
+NVIDIA GeForce RTX 4090, 23028 MiB, 580.126.09
+NVIDIA GeForce RTX 4090, 23028 MiB, 580.126.09
+NVIDIA GeForce RTX 4090, 23028 MiB, 580.126.09
+NVIDIA GeForce RTX 4090, 23028 MiB, 580.126.09
+NVIDIA GeForce RTX 4090, 23028 MiB, 580.126.09
+NVIDIA GeForce RTX 4090, 23028 MiB, 580.126.09
+NVIDIA GeForce RTX 4090, 23028 MiB, 580.126.09
+NVIDIA GeForce RTX 4090, 23028 MiB, 580.126.09

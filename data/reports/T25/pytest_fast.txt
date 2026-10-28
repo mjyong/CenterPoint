@@ -1,0 +1,137 @@
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[31mF[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[31m [ 44%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[31m [ 88%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[31m                                                      [100%][0m
+=================================== FAILURES ===================================
+[31m[1m_______________________ test_trt_runner_on_a_tiny_engine _______________________[0m
+
+tmp_path = PosixPath('/tmp/pytest-of-junyongmou/pytest-26/test_trt_runner_on_a_tiny_engi0')
+
+    [0m[94mdef[39;49;00m[90m [39;49;00m[92mtest_trt_runner_on_a_tiny_engine[39;49;00m(tmp_path):[90m[39;49;00m
+    [90m    [39;49;00m[33m"""Only where TensorRT and a GPU are installed (the server, the Orin)."""[39;49;00m[90m[39;49;00m
+        trt = pytest.importorskip([33m"[39;49;00m[33mtensorrt[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+        torch = pytest.importorskip([33m"[39;49;00m[33mtorch[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+        sys.path.insert([94m0[39;49;00m, os.path.join(ROOT, [33m"[39;49;00m[33mtools[39;49;00m[33m"[39;49;00m, [33m"[39;49;00m[33mdeploy[39;49;00m[33m"[39;49;00m))[90m[39;49;00m
+        [94mfrom[39;49;00m[90m [39;49;00m[04m[96mbuild_engines[39;49;00m[90m [39;49;00m[94mimport[39;49;00m build[90m[39;49;00m
+        [94mfrom[39;49;00m[90m [39;49;00m[04m[96mdog_perception[39;49;00m[04m[96m.[39;49;00m[04m[96mdetection[39;49;00m[04m[96m.[39;49;00m[04m[96mexported[39;49;00m[90m [39;49;00m[94mimport[39;49;00m TrtRunner[90m[39;49;00m
+        [94mtry[39;49;00m:[90m[39;49;00m
+            [94mfrom[39;49;00m[90m [39;49;00m[04m[96mdog_perception[39;49;00m[04m[96m.[39;49;00m[04m[96mdetection[39;49;00m[04m[96m.[39;49;00m[04m[96mexported[39;49;00m[90m [39;49;00m[94mimport[39;49;00m _CudaRuntime[90m[39;49;00m
+            _CudaRuntime()[90m[39;49;00m
+        [94mexcept[39;49;00m [96mOSError[39;49;00m:[90m[39;49;00m
+            pytest.skip([33m"[39;49;00m[33mno CUDA runtime[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+        net = torch.nn.Sequential(torch.nn.Conv2d([94m3[39;49;00m, [94m4[39;49;00m, [94m3[39;49;00m, padding=[94m1[39;49;00m), torch.nn.ReLU()).eval()[90m[39;49;00m
+        x = torch.randn([94m1[39;49;00m, [94m3[39;49;00m, [94m8[39;49;00m, [94m8[39;49;00m)[90m[39;49;00m
+        onnx_path = [96mstr[39;49;00m(tmp_path / [33m"[39;49;00m[33mtiny.onnx[39;49;00m[33m"[39;49;00m)[90m[39;49;00m
+        torch.onnx.export(net, x, onnx_path, input_names=[[33m"[39;49;00m[33mx[39;49;00m[33m"[39;49;00m], output_names=[[33m"[39;49;00m[33my[39;49;00m[33m"[39;49;00m], opset_version=[94m17[39;49;00m)[90m[39;49;00m
+>       build(onnx_path, [96mstr[39;49;00m(tmp_path / [33m"[39;49;00m[33mtiny.fp32.engine[39;49;00m[33m"[39;49;00m), [33m"[39;49;00m[33mfp32[39;49;00m[33m"[39;49;00m, workspace_mb=[94m256[39;49;00m)[90m[39;49;00m
+
+[1m[31mtests/dog/test_deploy.py[0m:153: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+onnx_path = '/tmp/pytest-of-junyongmou/pytest-26/test_trt_runner_on_a_tiny_engi0/tiny.onnx'
+engine_path = '/tmp/pytest-of-junyongmou/pytest-26/test_trt_runner_on_a_tiny_engi0/tiny.fp32.engine'
+precision = 'fp32', workspace_mb = 256, dla = None, timing_cache = None
+
+    [0m[94mdef[39;49;00m[90m [39;49;00m[92mbuild[39;49;00m(onnx_path, engine_path, precision, workspace_mb=[94m4096[39;49;00m, dla=[94mNone[39;49;00m, timing_cache=[94mNone[39;49;00m):[90m[39;49;00m
+        [94mimport[39;49;00m[90m [39;49;00m[04m[96mtensorrt[39;49;00m[90m [39;49;00m[94mas[39;49;00m[90m [39;49;00m[04m[96mtrt[39;49;00m[90m[39;49;00m
+        logger = trt.Logger(trt.Logger.WARNING)[90m[39;49;00m
+        builder = trt.Builder(logger)[90m[39;49;00m
+        network = builder.create_network([94m0[39;49;00m)            [90m# TensorRT 10: explicit batch is the only mode[39;49;00m[90m[39;49;00m
+        parser = trt.OnnxParser(network, logger)[90m[39;49;00m
+        [94mwith[39;49;00m [96mopen[39;49;00m(onnx_path, [33m"[39;49;00m[33mrb[39;49;00m[33m"[39;49;00m) [94mas[39;49;00m f:[90m[39;49;00m
+            [94mif[39;49;00m [95mnot[39;49;00m parser.parse(f.read()):[90m[39;49;00m
+                errors = [[96mstr[39;49;00m(parser.get_error(i)) [94mfor[39;49;00m i [95min[39;49;00m [96mrange[39;49;00m(parser.num_errors)][90m[39;49;00m
+>               [94mraise[39;49;00m [96mRuntimeError[39;49;00m([33m"[39;49;00m[33m%s[39;49;00m[33m: ONNX parse failed:[39;49;00m[33m\n[39;49;00m[33m  [39;49;00m[33m%s[39;49;00m[33m"[39;49;00m % (onnx_path, [33m"[39;49;00m[33m\n[39;49;00m[33m  [39;49;00m[33m"[39;49;00m.join(errors)))[90m[39;49;00m
+[1m[31mE               RuntimeError: /tmp/pytest-of-junyongmou/pytest-26/test_trt_runner_on_a_tiny_engi0/tiny.onnx: ONNX parse failed:[0m
+[1m[31mE                 In node -1 with name:  and operator:  (parseGraph): UNSUPPORTED_NODE: Assertion failed: ctx->getWeightsContext().convertOnnxWeights(initializer, &weights) && "Failed to import initializer."[0m
+
+[1m[31mtools/deploy/build_engines.py[0m:55: RuntimeError
+----------------------------- Captured stdout call -----------------------------
+[torch.onnx] Obtain model graph for `Sequential([...]` with `torch.export.export(..., strict=False)`...
+[torch.onnx] Obtain model graph for `Sequential([...]` with `torch.export.export(..., strict=False)`... ✅
+[torch.onnx] Run decompositions...
+[torch.onnx] Run decompositions... ✅
+[torch.onnx] Translate the graph into ONNX...
+[torch.onnx] Translate the graph into ONNX... ✅
+[torch.onnx] Optimize the ONNX graph...
+[torch.onnx] Optimize the ONNX graph... ✅
+[10/28/2026-16:11:37] [TRT] [E] WeightsContext.cpp:178: Failed to open file: tiny.onnx.data
+----------------------------- Captured stderr call -----------------------------
+W1028 16:11:23.540000 1752825 torch/onnx/_internal/exporter/_compat.py:133] Setting ONNX exporter to use operator set version 18 because the requested opset_version 17 is a lower version than we have implementations for. Automatic version conversion will be performed, which may not be successful at converting to the requested version. If version conversion is unsuccessful, the opset version of the exported model will be kept at 18. Please consider setting opset_version >=18 to leverage latest ONNX features
+------------------------------ Captured log call -------------------------------
+[33mWARNING [0m torch.onnx._internal.exporter._compat:_compat.py:133 Setting ONNX exporter to use operator set version 18 because the requested opset_version 17 is a lower version than we have implementations for. Automatic version conversion will be performed, which may not be successful at converting to the requested version. If version conversion is unsuccessful, the opset version of the exported model will be kept at 18. Please consider setting opset_version >=18 to leverage latest ONNX features
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:meta_utils.py:276 
+[35mDEBUG   [0m torch.__trace:meta_utils.py:514 
+[35mDEBUG   [0m torch.__trace:meta_utils.py:2271 
+[35mDEBUG   [0m torch.__trace:utils.py:2350 
+[35mDEBUG   [0m torch.__trace:utils.py:2350 
+[35mDEBUG   [0m torch.__trace:utils.py:2350 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:structured.py:28 
+[35mDEBUG   [0m torch.__trace:graph_capture.py:426 
+[35mDEBUG   [0m torch.__trace:graph_capture.py:444 
+[35mDEBUG   [0m torch.__trace:utils.py:2350 
+[33mWARNING [0m onnxscript.version_converter:__init__.py:121 The model version conversion is not supported by the onnxscript version converter and fallback is enabled. The model will be converted using the onnx C API (target version: 17).
+[33m=============================== warnings summary ===============================[0m
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/numba/core/decorators.py:159: NumbaDeprecationWarning: [1mThe keyword argument 'nopython=False' was supplied. From Numba 0.59.0 the default is True and supplying this argument has no effect.[0m
+    warnings.warn(msg, NumbaDeprecationWarning)
+
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488: DeprecationWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_trt_runner_on_a_tiny_engine
+  /usr/lib/python3.10/copyreg.py:101: FutureWarning: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+    return cls.__new__(cls, *args)
+
+d20car_predict/CenterPoint/tests/dog/test_detection.py::test_decoder_matches_det3d_predict[configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py-102]
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+    return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+
+d20car_predict/CenterPoint/tests/dog/test_detection.py::test_voxel_detector_builds
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+    ret[slices] = updates.view(*output_shape)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 10 durations =============================
+14.60s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_trt_runner_on_a_tiny_engine
+5.74s setup    d20car_predict/CenterPoint/tests/dog/test_prediction.py::test_mirror_and_moving_windows
+4.74s call     d20car_predict/CenterPoint/tests/dog/test_pipeline_eval.py::test_learned_predictor_and_track_logs
+3.94s setup    d20car_predict/CenterPoint/tests/dog/test_time_offset.py::test_meta_offset_is_applied_when_reading
+3.93s call     d20car_predict/CenterPoint/tests/dog/test_pipeline_eval.py::test_sources_raw_and_labels
+3.78s setup    d20car_predict/CenterPoint/tests/dog/test_bag_split.py::test_one_pass_split_matches_the_whole_bag
+3.17s call     d20car_predict/CenterPoint/tests/dog/test_pipeline_eval.py::test_tool_writes_report_mcap_and_sweep
+3.12s call     d20car_predict/CenterPoint/tests/dog/test_data_speed.py::test_voxel_lookup_buffer_reuse_matches_a_fresh_one
+3.01s call     d20car_predict/CenterPoint/tests/dog/test_detection.py::test_voxel_detector_builds
+2.64s call     d20car_predict/CenterPoint/tests/dog/test_detection.py::test_decoder_matches_det3d_predict[configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py-102]
+[36m[1m=========================== short test summary info ============================[0m
+[31mFAILED[0m tests/dog/test_deploy.py::[1mtest_trt_runner_on_a_tiny_engine[0m - RuntimeError: /tmp/pytest-of-junyongmou/pytest-26/test_trt_runner_on_a_tiny...
+[31m[31m[1m1 failed[0m, [32m162 passed[0m, [33m14 deselected[0m, [33m8 warnings[0m[31m in 79.10s (0:01:19)[0m[0m

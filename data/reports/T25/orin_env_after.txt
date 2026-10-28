@@ -1,0 +1,74 @@
+
+== host
+ubuntu
+Linux 5.15.148-tegra aarch64
+NVIDIA Jetson AGX Orin Developer Kit
+# R36 (release), REVISION: 4.4, GCID: 41062509, BOARD: generic, EABI: aarch64, DATE: Mon Jun 16 16:07:13 UTC 2025
+nvidia-l4t-core 36.4.4-20250616085344
+Ubuntu 22.04.5 LTS
+
+== cuda
+Cuda compilation tools, release 12.6, V12.6.68
+Build cuda_12.6.r12.6/compiler.34714021_0
+/usr/local/cuda
+/usr/local/cuda-12
+/usr/local/cuda-12.6
+
+== cudnn / tensorrt
+libcudnn9 
+libcudnn9-cuda-12 9.3.0.75-1
+libcudnn9-dev 
+libcudnn9-dev-cuda-12 9.3.0.75-1
+libcudnn9-samples 9.3.0.75-1
+libcudnn9-static 
+libcudnn9-static-cuda-12 9.3.0.75-1
+libnvinfer-dev 10.3.0.30-1+cuda12.5
+libnvinfer10 10.3.0.30-1+cuda12.5
+libnvonnxparsers-dev 10.3.0.30-1+cuda12.5
+libnvonnxparsers10 10.3.0.30-1+cuda12.5
+python tensorrt 10.3.0
+MISSING trtexec
+
+== opencv
+/usr/lib/aarch64-linux-gnu/libopencv_core.so.4.5.4d
+/usr/lib/aarch64-linux-gnu/libopencv_core.so.4.5d
+/usr/local/lib/libopencv_core.so
+
+== ros 2
+humble
+ros-humble-rclcpp 16.0.19-1jammy.20260725.145505
+ros-humble-rclcpp-components 16.0.19-1jammy.20260725.164149
+ros-humble-rosbag2-cpp 0.15.16-1jammy.20260725.204629
+ros-humble-sensor-msgs 4.9.2-1jammy.20260717.003956
+ros-humble-visualization-msgs 4.9.2-1jammy.20260717.005824
+
+== build tools
+gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+cmake version 3.22.1
+libeigen3-dev 3.4.0-2ubuntu2
+libyaml-cpp-dev 0.7.0+dfsg-8build1
+libgtest-dev 1.11.0-3
+zlib1g-dev 1:1.2.11.dfsg-2ubuntu9.2
+
+== python
+Python 3.10.12
+numpy 1.26.4 scipy 1.8.0
+(no onnxruntime: not needed on the Orin)
+torch 2.5.0a0+872d972e41.nv24.08
+
+== power
+NV Power Mode: MAXN
+0
+
+== memory / disk
+               total        used        free      shared  buff/cache   available
+Mem:            61Gi       1.6Gi        58Gi        28Mi       1.8Gi        59Gi
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/mmcblk0p1   54G   46G  5.5G  90% /
+
+== gpu
+Orin (nvgpu), [N/A], 540.4.0
+01-01-1970 09:45:46 RAM 1697/62841MB (lfb 7x4MB) SWAP 0/31420MB (cached 0MB) CPU [0%@729,0%@729,0%@729,1%@729,0%@729,0%@729,0%@729,0%@729,0%@729,0%@729,0%@729,0%@729] GR3D_FREQ 0% cpu@45.656C soc2@42.437C soc0@42.968C gpu@41.812C tj@45.656C soc1@43.781C VDD_GPU_SOC 3193mW/3193mW VDD_CPU_CV 0mW/0mW VIN_SYS_5V0 4233mW/4233mW
+
+# identical to orin_env.txt: nothing was installed on the Orin.

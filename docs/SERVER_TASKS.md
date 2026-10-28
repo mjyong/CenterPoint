@@ -99,7 +99,7 @@
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
 | T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成，已复核。线上继续用 IMM：GRU、Transformer 概率最高的路线偏慢，3 s FDE 都更高（MR 低得多）。predict_ms 2746 / 4322 ms 是并行进程抢 CPU 测出来的，单线程约 16–40 ms，仍超 10 ms。伪真值用 measured，离标签 0.2 m，改为默认。误差主要在纵向，地图暂不做 |
 | T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 完成，已复核。保持现状。在动判断漏报增加、领先不到 90%；速度外推的 FDE 没同时过端到端和标签当检测。复核发现网络估的速度系统性偏慢，原始检测输入有用；人定不在 0921 上继续调，厂区数据来了先修速度目标 |
-| T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 待做 |
+| T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 完成。通道通；板上指定的包都已有，只缺 trtexec。服务器项目环境 TensorRT 10.3.0。小引擎测试失败：torch 2.13 把权重写到外部文件 |
 | T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 待做 |
 | T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟 | Agent | T26 | 2 小时 | 待做 |
 
@@ -4485,7 +4485,30 @@ sudo 密码问人要，不写进任何文件和报告。
 
 ### T25 结果
 
-（待填）
+2026-10-28。`ssh orin` 输出 `ubuntu`、`aarch64`。代码在板上 `~/dogperc`（1.9 MB）。原始输出在 `data/reports/T25/`。
+
+**板子**（`orin_env.txt`；`orin_env_after.txt` 与它相同，因为没有新装包）：
+
+- Jetson AGX Orin，L4T R36.4.4，Ubuntu 22.04.5，内核 5.15.148-tegra aarch64
+- CUDA 12.6，cuDNN 9.3.0.75，libnvinfer 10.3.0.30+cuda12.5，Python tensorrt 10.3.0（`~/.local`）
+- ROS 2 Humble（rclcpp、rosbag2、sensor_msgs、visualization_msgs），colcon 0.3.0（`python3-colcon-common-extensions`）。`colcon version-check` 没有输出、一直占着，已结束该进程，报告才写完后面的段
+- gcc 11.4，eigen 3.4.0，yaml-cpp 0.7.0，gtest 1.11.0；numpy 1.26.4，scipy 1.8.0
+- 功耗模式 MAXN。内存 61 GiB，根分区剩余 5.5 GB / 54 GB（90%）
+- 唯一的 `MISSING` 行是 `trtexec`。apt 索引里没有带这个文件的包。`sudo -n` 要密码，没有装。第 4 步列出的 eigen、yaml-cpp、gtest、colcon、python3-libnvinfer、numpy、scipy 都已经在
+
+**服务器**：
+
+- `orin_check.sh` 用的是 PATH 上的 `/zjst/robot/qnn/py310/bin/python3`，所以 `server_env.txt` 里是 `MISSING python tensorrt`、`MISSING trtexec`、没有 torch。项目环境是 `/home/engineers/junyongmou/robot/ultralytics/.venv`（torch 2.13.0+cu130，spconv 2.3.8）
+- 装进项目环境：tensorrt 10.3.0（`tensorrt-cu12`，和板上 10.3 对齐）、polygraphy 0.53.6、nvidia-modelopt 0.47.0、onnxruntime-gpu 1.22.0。onnx、onnxruntime 本来就有
+- modelopt 把 numpy 升到 2.2.6、onnx 从 1.22.0 降到 1.21.0。numpy 已装回 1.26.4，之后 torch、scipy、spconv、cv2、modelopt 都能导入。cupy-cuda12x 14.2.0 声明要 numpy ≥ 2，和装回的 1.26.4 冲突，这次没再拆它。机器上没有 conda，没有另建 `deploy` 环境
+- GPU：8× NVIDIA GeForce RTX 4090，驱动 580.126.09。Docker 27.3.1。`sudo -n` 不可用
+- 0921 原始 bag：`/zjst/robot/rosbag0921`（和 `/public/zjst/robot/rosbag0921` 是同一目录，NFS）。里面是 `rosbag2_2026_09_21-16_41_27`、`rosbag2_2026_09_21-16_56_59`，共 35 GB
+
+**测试**（项目环境，`PYTHONPATH=.`）：
+
+- `pytest tests/dog -m "not slow" -q`：162 通过，14 个 slow 排除，1 失败
+- `pytest tests/dog/test_deploy.py -q`：4 通过，1 失败。失败的都是 `test_trt_runner_on_a_tiny_engine`，没有跳过
+- 失败原因：torch 2.13 的 `onnx.export` 默认把权重写到 `tiny.onnx.data`，TensorRT 10.3 按进程当前目录找这个文件，找不到就解析失败。同一条网络改成 `external_data=False` 后，FP32 小引擎能建，和 PyTorch 的最大绝对误差是 0。`export_pillar_onnx.py` 已经用 `dynamo=False`，T26 的导出不走这条默认路径
 
 ## T26 Orin 部署：FP32 / FP16 转换和转换前后评估（含原 T8）
 
