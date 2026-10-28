@@ -1,0 +1,160 @@
+{
+ "model_dir": "data/deploy/nusc_pp",
+ "frames": 101,
+ "skipped": 0,
+ "reference": "torch",
+ "backends": {
+  "torch": {
+   "timing_ms": {
+    "voxelize_ms": 41.80480167269707,
+    "network_ms": 22.07590639591217,
+    "post_ms": 38.917385041713715
+   }
+  },
+  "onnx": {
+   "timing_ms": {
+    "voxelize_ms": 131.0037560760975,
+    "network_ms": 353.482473641634,
+    "post_ms": 39.924126118421555,
+    "pfn_ms": 141.0251520574093,
+    "scatter_ms": 22.507116198539734,
+    "rpn_ms": 188.45050781965256
+   },
+   "raw": {
+    "n_ref": 6901,
+    "n_got": 6899,
+    "matched": 6887,
+    "score_max": 0.004571124911308289,
+    "score_p99": 0.0014475339651107812,
+    "center_max": 0.27098547499014486,
+    "center_p99": 0.0013525242978354689,
+    "yaw_p99": 0.021798592805862452,
+    "size_p99": 0.0155892086029053,
+    "reported_ref": 709,
+    "reported_missed": 0,
+    "reported_extra": 0,
+    "reported_match": 1.0
+   },
+   "final": {
+    "n_ref": 4105,
+    "n_got": 4101,
+    "matched": 4092,
+    "score_max": 0.0031632333993911743,
+    "score_p99": 0.0010745641589164742,
+    "center_max": 0.27098547499014486,
+    "center_p99": 0.0010590051785914873,
+    "yaw_p99": 0.01493681043386461,
+    "size_p99": 0.0106575393676758,
+    "reported_ref": 611,
+    "reported_missed": 0,
+    "reported_extra": 0,
+    "reported_match": 1.0
+   },
+   "stages": {},
+   "gates": {
+    "reported_match": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  },
+  "trt:fp32": {
+   "timing_ms": {
+    "voxelize_ms": 142.75329560041428,
+    "network_ms": 36.11104190349579,
+    "post_ms": 28.436392545700073,
+    "pfn_ms": 11.90134882926941,
+    "scatter_ms": 15.124320983886719,
+    "rpn_ms": 8.498288691043854
+   },
+   "raw": {
+    "n_ref": 6901,
+    "n_got": 6903,
+    "matched": 6890,
+    "score_max": 0.0045957863330841064,
+    "score_p99": 0.0014962965250015243,
+    "center_max": 0.42422066401767644,
+    "center_p99": 0.0014232877864521196,
+    "yaw_p99": 0.025010709464549957,
+    "size_p99": 0.016308193206787093,
+    "reported_ref": 709,
+    "reported_missed": 0,
+    "reported_extra": 0,
+    "reported_match": 1.0
+   },
+   "final": {
+    "n_ref": 4105,
+    "n_got": 4104,
+    "matched": 4094,
+    "score_max": 0.00325678288936615,
+    "score_p99": 0.0011062523722648635,
+    "center_max": 0.42422066401767644,
+    "center_p99": 0.001153445404124258,
+    "yaw_p99": 0.018339885473251376,
+    "size_p99": 0.011800861358642584,
+    "reported_ref": 611,
+    "reported_missed": 0,
+    "reported_extra": 0,
+    "reported_match": 1.0
+   },
+   "stages": {},
+   "gates": {
+    "reported_match": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  },
+  "trt:fp16": {
+   "timing_ms": {
+    "voxelize_ms": 143.96259561181068,
+    "network_ms": 34.79008749127388,
+    "post_ms": 28.31963077187538,
+    "pfn_ms": 11.459998786449432,
+    "scatter_ms": 15.262793749570847,
+    "rpn_ms": 7.168654352426529
+   },
+   "raw": {
+    "n_ref": 6901,
+    "n_got": 6905,
+    "matched": 6834,
+    "score_max": 0.0684918463230133,
+    "score_p99": 0.006735878512263302,
+    "center_max": 0.49440070028601724,
+    "center_p99": 0.005929498516675106,
+    "yaw_p99": 0.13180076040327549,
+    "size_p99": 0.06087385177612305,
+    "reported_ref": 709,
+    "reported_missed": 1,
+    "reported_extra": 4,
+    "reported_match": 0.9929478138222849
+   },
+   "final": {
+    "n_ref": 4105,
+    "n_got": 4099,
+    "matched": 4053,
+    "score_max": 0.010409772396087646,
+    "score_p99": 0.004871624410152436,
+    "center_max": 0.49440070028601724,
+    "center_p99": 0.004649372224651907,
+    "yaw_p99": 0.08879441976547245,
+    "size_p99": 0.05449859619140625,
+    "reported_ref": 611,
+    "reported_missed": 2,
+    "reported_extra": 4,
+    "reported_match": 0.9901800327332242
+   },
+   "stages": {},
+   "gates": {
+    "reported_match": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  }
+ },
+ "pillars": {
+  "max": 17268,
+  "truncated_frames": 0
+ }
+}

@@ -1,0 +1,13 @@
+{
+ "frames": 2084,
+ "max": 19668,
+ "p50": 10040.0,
+ "p99": 16161.800000000003,
+ "p999": 19214.918000000092,
+ "mean": 9806.964011516315,
+ "current_max_pillars": 30000,
+ "frames_over_current": 0,
+ "full_pillars_mean": 1967.0427063339732,
+ "suggested_max_pillars": 24000,
+ "worst_frame": "data/runs/0921_165659_s020/frames/1789981620.372857.npy"
+}

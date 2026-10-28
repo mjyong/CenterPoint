@@ -1,0 +1,67 @@
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+== 0921_164127_s000
+[pillar] 288 frames, network 22.6 ms (median)
+[trt_fp32] 288 frames, network 37.4 ms (median)
+[trt_fp16] 288 frames, network 35.3 ms (median)
+== 0921_164127_s001
+[pillar] 288 frames, network 23.8 ms (median)
+[trt_fp32] 288 frames, network 41.7 ms (median)
+[trt_fp16] 288 frames, network 39.7 ms (median)
+== 0921_164127_s002
+[pillar] 288 frames, network 26.9 ms (median)
+[trt_fp32] 288 frames, network 41.0 ms (median)
+[trt_fp16] 288 frames, network 39.1 ms (median)
+== 0921_164127_s003
+[pillar] 287 frames, network 25.8 ms (median)
+[trt_fp32] 287 frames, network 42.8 ms (median)
+[trt_fp16] 287 frames, network 41.1 ms (median)
+== 0921_164127_s004
+[pillar] 288 frames, network 23.3 ms (median)
+[trt_fp32] 288 frames, network 40.6 ms (median)
+[trt_fp16] 288 frames, network 39.8 ms (median)
+== 0921_164127_s005
+[pillar] 288 frames, network 22.7 ms (median)
+[trt_fp32] 288 frames, network 30.4 ms (median)
+[trt_fp16] 288 frames, network 28.5 ms (median)
+== 0921_165659_s003
+[pillar] 276 frames, network 25.3 ms (median)
+[trt_fp32] 276 frames, network 39.9 ms (median)
+[trt_fp16] 276 frames, network 38.1 ms (median)
+== 0921_165659_s004
+[pillar] 276 frames, network 22.9 ms (median)
+[trt_fp32] 276 frames, network 38.4 ms (median)
+[trt_fp16] 276 frames, network 36.9 ms (median)
+== 0921_165659_s005
+[pillar] 303 frames, network 20.0 ms (median)
+[trt_fp32] 303 frames, network 36.8 ms (median)
+[trt_fp16] 303 frames, network 35.5 ms (median)
+== 0921_165659_s006
+[pillar] 302 frames, network 15.5 ms (median)
+[trt_fp32] 302 frames, network 37.0 ms (median)
+[trt_fp16] 302 frames, network 35.7 ms (median)

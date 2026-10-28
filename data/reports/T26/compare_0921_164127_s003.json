@@ -1,0 +1,160 @@
+{
+ "model_dir": "data/deploy/nusc_pp",
+ "frames": 96,
+ "skipped": 0,
+ "reference": "torch",
+ "backends": {
+  "torch": {
+   "timing_ms": {
+    "voxelize_ms": 29.14530038833618,
+    "network_ms": 21.9049584120512,
+    "post_ms": 32.88915567100048
+   }
+  },
+  "onnx": {
+   "timing_ms": {
+    "voxelize_ms": 94.65770982205868,
+    "network_ms": 336.6058710962534,
+    "post_ms": 35.780441015958786,
+    "pfn_ms": 144.7623409330845,
+    "scatter_ms": 23.607835173606873,
+    "rpn_ms": 153.69321405887604
+   },
+   "raw": {
+    "n_ref": 8809,
+    "n_got": 8804,
+    "matched": 8789,
+    "score_max": 0.004005983471870422,
+    "score_p99": 0.001124977469444275,
+    "center_max": 0.24661322465847096,
+    "center_p99": 0.0008784697912009804,
+    "yaw_p99": 0.022338542938232512,
+    "size_p99": 0.003862457275390632,
+    "reported_ref": 804,
+    "reported_missed": 0,
+    "reported_extra": 1,
+    "reported_match": 0.9987562189054726
+   },
+   "final": {
+    "n_ref": 4716,
+    "n_got": 4716,
+    "matched": 4705,
+    "score_max": 0.003189563751220703,
+    "score_p99": 0.0011218267679214478,
+    "center_max": 0.24661322465847096,
+    "center_p99": 0.0006470457593828083,
+    "yaw_p99": 0.01626170158386231,
+    "size_p99": 0.0032847595214843773,
+    "reported_ref": 718,
+    "reported_missed": 0,
+    "reported_extra": 1,
+    "reported_match": 0.9986072423398329
+   },
+   "stages": {},
+   "gates": {
+    "reported_match": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  },
+  "trt:fp32": {
+   "timing_ms": {
+    "voxelize_ms": 130.9733036905527,
+    "network_ms": 37.590114399790764,
+    "post_ms": 24.67925474047661,
+    "pfn_ms": 11.692140251398087,
+    "scatter_ms": 16.681615263223648,
+    "rpn_ms": 7.9786647111177444
+   },
+   "raw": {
+    "n_ref": 8809,
+    "n_got": 8804,
+    "matched": 8786,
+    "score_max": 0.004204019904136658,
+    "score_p99": 0.0012052327394485468,
+    "center_max": 0.47326705439129096,
+    "center_p99": 0.0009417849951653919,
+    "yaw_p99": 0.02501066923141471,
+    "size_p99": 0.004078114032745356,
+    "reported_ref": 804,
+    "reported_missed": 0,
+    "reported_extra": 3,
+    "reported_match": 0.996268656716418
+   },
+   "final": {
+    "n_ref": 4716,
+    "n_got": 4714,
+    "matched": 4702,
+    "score_max": 0.003125131130218506,
+    "score_p99": 0.0011700615286827079,
+    "center_max": 0.47326705439129096,
+    "center_p99": 0.0007232305660151818,
+    "yaw_p99": 0.021650354862213082,
+    "size_p99": 0.0034564781188964715,
+    "reported_ref": 718,
+    "reported_missed": 0,
+    "reported_extra": 3,
+    "reported_match": 0.9958217270194986
+   },
+   "stages": {},
+   "gates": {
+    "reported_match": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  },
+  "trt:fp16": {
+   "timing_ms": {
+    "voxelize_ms": 120.00925280153751,
+    "network_ms": 36.300407722592354,
+    "post_ms": 24.824757128953934,
+    "pfn_ms": 11.645695194602013,
+    "scatter_ms": 16.733363270759583,
+    "rpn_ms": 6.892062723636627
+   },
+   "raw": {
+    "n_ref": 8809,
+    "n_got": 8826,
+    "matched": 8722,
+    "score_max": 0.02871880680322647,
+    "score_p99": 0.006035165041685104,
+    "center_max": 0.4776598870497397,
+    "center_p99": 0.004157439234963401,
+    "yaw_p99": 0.11704836010932894,
+    "size_p99": 0.03566854953765824,
+    "reported_ref": 804,
+    "reported_missed": 1,
+    "reported_extra": 16,
+    "reported_match": 0.9788557213930348
+   },
+   "final": {
+    "n_ref": 4716,
+    "n_got": 4735,
+    "matched": 4674,
+    "score_max": 0.014593809843063354,
+    "score_p99": 0.006194611191749559,
+    "center_max": 0.414195430731731,
+    "center_p99": 0.0035519258741660066,
+    "yaw_p99": 0.10932286262512171,
+    "size_p99": 0.035419850349426046,
+    "reported_ref": 718,
+    "reported_missed": 3,
+    "reported_extra": 16,
+    "reported_match": 0.9735376044568245
+   },
+   "stages": {},
+   "gates": {
+    "reported_match": false,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": false
+   }
+  }
+ },
+ "pillars": {
+  "max": 13918,
+  "truncated_frames": 0
+ }
+}

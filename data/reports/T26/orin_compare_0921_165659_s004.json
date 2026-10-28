@@ -1,0 +1,109 @@
+{
+ "model_dir": "/home/seres/dogperc/models/nusc_pp",
+ "frames": 92,
+ "skipped": 0,
+ "reference": "dump:/home/seres/dogperc/data/dumps/0921_165659_s004/torch",
+ "backends": {
+  "dump:/home/seres/dogperc/data/dumps/0921_165659_s004/torch": {
+   "timing_ms": {}
+  },
+  "trt:fp32": {
+   "timing_ms": {
+    "voxelize_ms": 91.92250050000439,
+    "network_ms": 49.76512000030198,
+    "post_ms": 34.91291000136698,
+    "pfn_ms": 23.89644100003352,
+    "scatter_ms": 9.172275999844715,
+    "rpn_ms": 16.71537849961169
+   },
+   "raw": {
+    "n_ref": 6847,
+    "n_got": 6840,
+    "matched": 6834,
+    "score_max": 0.0034140944480895996,
+    "score_p99": 0.0009078744053840639,
+    "center_max": 0.4197193899675818,
+    "center_p99": 0.0007244759999679934,
+    "yaw_p99": 0.020443706512451174,
+    "size_p99": 0.004388093948364263,
+    "reported_ref": 314,
+    "reported_missed": 1,
+    "reported_extra": 0,
+    "reported_match": 0.9968152866242038
+   },
+   "final": {
+    "n_ref": 3866,
+    "n_got": 3860,
+    "matched": 3853,
+    "score_max": 0.0027888715267181396,
+    "score_p99": 0.0008498191833496094,
+    "center_max": 0.0012416273104491867,
+    "center_p99": 0.0006128378825822683,
+    "yaw_p99": 0.01816369533538819,
+    "size_p99": 0.004103164672851563,
+    "reported_ref": 258,
+    "reported_missed": 1,
+    "reported_extra": 0,
+    "reported_match": 0.9961240310077519
+   },
+   "stages": {},
+   "gates": {
+    "reported_match": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  },
+  "trt:fp16": {
+   "timing_ms": {
+    "voxelize_ms": 91.86512500127719,
+    "network_ms": 43.481729000632185,
+    "post_ms": 35.006092000003264,
+    "pfn_ms": 22.128022499600775,
+    "scatter_ms": 9.108917999583355,
+    "rpn_ms": 12.242132999745081
+   },
+   "raw": {
+    "n_ref": 6847,
+    "n_got": 6845,
+    "matched": 6788,
+    "score_max": 0.013803839683532715,
+    "score_p99": 0.00525476008653641,
+    "center_max": 0.490269806784115,
+    "center_p99": 0.0047049777442163005,
+    "yaw_p99": 0.09107031583786052,
+    "size_p99": 0.03589962959289557,
+    "reported_ref": 314,
+    "reported_missed": 2,
+    "reported_extra": 0,
+    "reported_match": 0.9936305732484076
+   },
+   "final": {
+    "n_ref": 3866,
+    "n_got": 3864,
+    "matched": 3814,
+    "score_max": 0.013803839683532715,
+    "score_p99": 0.004103043675422665,
+    "center_max": 0.490269806784115,
+    "center_p99": 0.0029913117602519417,
+    "yaw_p99": 0.0781173688173293,
+    "size_p99": 0.02722942352294921,
+    "reported_ref": 258,
+    "reported_missed": 1,
+    "reported_extra": 1,
+    "reported_match": 0.9922480620155039
+   },
+   "stages": {},
+   "gates": {
+    "reported_match": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  }
+ },
+ "pillars": {
+  "max": 14445,
+  "truncated_frames": 0
+ }
+}

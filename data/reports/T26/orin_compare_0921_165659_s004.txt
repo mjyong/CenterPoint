@@ -1,0 +1,6 @@
+
+reference: dump:/home/seres/dogperc/data/dumps/0921_165659_s004/torch, 92 frames
+| backend | reported match | missed / extra | score p99 | center p99 m | heads rel (max) | network ms | gates |
+|---|---|---|---|---|---|---|---|
+| trt:fp32 | 0.9961 | 1 / 0 | 8.50e-04 | 6.13e-04 | - | 49.8 | pass |
+| trt:fp16 | 0.9922 | 1 / 1 | 4.10e-03 | 2.99e-03 | - | 43.5 | pass |

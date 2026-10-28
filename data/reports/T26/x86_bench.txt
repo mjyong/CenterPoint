@@ -1,0 +1,6 @@
+| engine | GPU median ms | GPU p99 ms | GPU mean ms | min | max | host median ms |
+|---|---|---|---|---|---|---|
+| pfn.fp16.engine | 0.457 | 0.460 | 0.457 | 0.454 | 0.460 | 2.583 |
+| pfn.fp32.engine | 0.719 | 0.724 | 0.719 | 0.717 | 0.748 | 2.744 |
+| rpn_head.fp16.engine | 0.804 | 0.810 | 0.804 | 0.801 | 0.812 | 4.496 |
+| rpn_head.fp32.engine | 1.876 | 1.887 | 1.895 | 1.866 | 5.608 | 5.946 |

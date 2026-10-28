@@ -1,0 +1,52 @@
+{
+ "machine": {
+  "host": "gpu1",
+  "arch": "x86_64"
+ },
+ "trt": "10.3.0",
+ "runs": 200,
+ "warmup_ms": 500.0,
+ "date": "2026-10-28 17:24:02",
+ "engines": [
+  {
+   "runs": 200,
+   "gpu_median_ms": 0.457,
+   "gpu_p99_ms": 0.46,
+   "gpu_mean_ms": 0.457,
+   "gpu_min_ms": 0.454,
+   "gpu_max_ms": 0.46,
+   "host_median_ms": 2.583,
+   "engine": "pfn.fp16.engine"
+  },
+  {
+   "runs": 200,
+   "gpu_median_ms": 0.719,
+   "gpu_p99_ms": 0.724,
+   "gpu_mean_ms": 0.719,
+   "gpu_min_ms": 0.717,
+   "gpu_max_ms": 0.748,
+   "host_median_ms": 2.744,
+   "engine": "pfn.fp32.engine"
+  },
+  {
+   "runs": 200,
+   "gpu_median_ms": 0.804,
+   "gpu_p99_ms": 0.81,
+   "gpu_mean_ms": 0.804,
+   "gpu_min_ms": 0.801,
+   "gpu_max_ms": 0.812,
+   "host_median_ms": 4.496,
+   "engine": "rpn_head.fp16.engine"
+  },
+  {
+   "runs": 200,
+   "gpu_median_ms": 1.876,
+   "gpu_p99_ms": 1.887,
+   "gpu_mean_ms": 1.895,
+   "gpu_min_ms": 1.866,
+   "gpu_max_ms": 5.608,
+   "host_median_ms": 5.946,
+   "engine": "rpn_head.fp32.engine"
+  }
+ ]
+}

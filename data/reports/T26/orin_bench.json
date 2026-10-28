@@ -1,0 +1,53 @@
+{
+ "machine": {
+  "host": "ubuntu",
+  "arch": "aarch64",
+  "model": "NVIDIA Jetson AGX Orin Developer Kit"
+ },
+ "trt": "10.3.0",
+ "runs": 200,
+ "warmup_ms": 500.0,
+ "date": "1970-01-01 11:08:14",
+ "engines": [
+  {
+   "runs": 200,
+   "gpu_median_ms": 5.222,
+   "gpu_p99_ms": 5.251,
+   "gpu_mean_ms": 5.226,
+   "gpu_min_ms": 5.215,
+   "gpu_max_ms": 5.253,
+   "host_median_ms": 8.954,
+   "engine": "pfn.fp32.engine"
+  },
+  {
+   "runs": 200,
+   "gpu_median_ms": 3.434,
+   "gpu_p99_ms": 3.477,
+   "gpu_mean_ms": 3.438,
+   "gpu_min_ms": 3.429,
+   "gpu_max_ms": 3.483,
+   "host_median_ms": 7.315,
+   "engine": "pfn.fp16.engine"
+  },
+  {
+   "runs": 200,
+   "gpu_median_ms": 9.092,
+   "gpu_p99_ms": 9.134,
+   "gpu_mean_ms": 9.094,
+   "gpu_min_ms": 9.061,
+   "gpu_max_ms": 9.146,
+   "host_median_ms": 16.176,
+   "engine": "rpn_head.fp32.engine"
+  },
+  {
+   "runs": 200,
+   "gpu_median_ms": 4.72,
+   "gpu_p99_ms": 4.73,
+   "gpu_mean_ms": 4.719,
+   "gpu_min_ms": 4.703,
+   "gpu_max_ms": 4.73,
+   "host_median_ms": 11.899,
+   "engine": "rpn_head.fp16.engine"
+  }
+ ]
+}

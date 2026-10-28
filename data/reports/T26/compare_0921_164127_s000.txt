@@ -1,0 +1,6 @@
+reference: torch, 96 frames
+| backend | reported match | missed / extra | score p99 | center p99 m | heads rel (max) | network ms | gates |
+|---|---|---|---|---|---|---|---|
+| onnx | 0.9992 | 0 / 1 | 1.70e-03 | 9.33e-04 | - | 335.8 | pass |
+| trt:fp32 | 0.9992 | 0 / 1 | 1.60e-03 | 9.75e-04 | - | 34.5 | pass |
+| trt:fp16 | 0.9910 | 5 / 6 | 8.45e-03 | 4.93e-03 | - | 36.2 | pass |

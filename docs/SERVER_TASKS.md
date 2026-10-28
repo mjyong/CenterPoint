@@ -100,7 +100,7 @@
 | T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成，已复核。线上继续用 IMM：GRU、Transformer 概率最高的路线偏慢，3 s FDE 都更高（MR 低得多）。predict_ms 2746 / 4322 ms 是并行进程抢 CPU 测出来的，单线程约 16–40 ms，仍超 10 ms。伪真值用 measured，离标签 0.2 m，改为默认。误差主要在纵向，地图暂不做 |
 | T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 完成，已复核。保持现状。在动判断漏报增加、领先不到 90%；速度外推的 FDE 没同时过端到端和标签当检测。复核发现网络估的速度系统性偏慢，原始检测输入有用；人定不在 0921 上继续调，厂区数据来了先修速度目标 |
 | T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 完成，已复核。通道通；板上补了 trtexec（libnvinfer-bin 10.3.0.30）。服务器项目环境 TensorRT 10.3.0。小引擎测试失败是建引擎工具没按模型目录找外部权重，已修 |
-| T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 待做 |
+| T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 完成。P_max 24000。FP32 逐框通过。FP16 在 10 个验证场景里有 8 个 reported match 低于 0.99（最低 0.969），按门槛不能用；标签上 AP 只掉 0.001，主要指标都在 90% 区间里。板上两个场景的 FP16 是 pass |
 | T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟 | Agent | T26 | 2 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
@@ -4660,7 +4660,80 @@ T25 失败的 tests/dog/test_deploy.py::test_trt_runner_on_a_tiny_engine 现在�
 
 ### T26 结果
 
-（待填）
+2026-10-28。推理和建引擎在物理 GPU 5 上（`CUDA_VISIBLE_DEVICES=5`，命令里仍是 `cuda:0`）。当时这张卡空闲约 8.5 GB、利用率 0。原始输出在 `data/reports/T26/`。ONNX 和引擎在 `data/deploy/nusc_pp`（不提交）。
+
+复核 `62ff348` 改了 ONNX 按模型目录解析外部权重，以及用 CUDA event 计 GPU 时间。拉下来之后快速测试 `pytest tests/dog -m "not slow" -n 8`：163 passed。`tests/dog/test_deploy.py`：5 passed，含 `test_trt_runner_on_a_tiny_engine`。逐框和标签是同一套引擎测的，没有为了新计时重建引擎。
+
+**导出。** 先按默认 P_max 30000 导出，检查通过。柱数（2084 帧，每 5 帧取 1）：最大 19668，p99 16162，`frames_over_current` 0，建议 **24000**。按 24000 重导，`export.txt` 已覆盖。检查帧 `0921_165659_s004` 第 150 帧：
+
+- pfn / bev / heads 相对误差 7.3e-06 / 7.3e-06 / 4.5e-05，都小于 1e-3
+- 检测 40 对 40；分数差 4.86e-06；中心差 7.12e-06 m
+- 这一帧用了 13524 / 24000 根柱
+
+`compare_backends` 的表里 heads rel 一列是空的，工具这次没算。上面的 heads 误差来自导出时的逐段检查。
+
+**服务器引擎**（TensorRT 10.3.0，x86）。建引擎日志里的 `--benchmark 50` 中位数是复核前的主机时间（含拷贝）。GPU 时间是复核后 `bench_engines.py` 用 CUDA event 测的（200 次，物理 GPU 5，`x86_bench.json`）：
+
+| 引擎 | 构建 | 大小 | 主机中位数 | GPU 中位数 | GPU p99 |
+|---|---|---|---|---|---|
+| pfn.fp32 | 2.6 s | 678 KB | 2.75 ms | 0.719 ms | 0.724 ms |
+| rpn_head.fp32 | 9.6 s | 41.1 MB | 5.70 ms | 1.876 ms | 1.887 ms |
+| pfn.fp16 | 6.1 s | 179 KB | 2.66 ms | 0.457 ms | 0.460 ms |
+| rpn_head.fp16 | 20.6 s | 13.5 MB | 4.62 ms | 0.804 ms | 0.810 ms |
+
+**10 个验证场景，每 3 帧取 1，对 PyTorch。** trt:fp32 全部 pass。trt:fp16 有 8 个场景只因 `reported_match` < 0.99 失败，分数差和中心差都在门槛内。汇总：reported match 最小 fp32 0.992、fp16 0.969；score p99 最大 fp32 2.0e-3、fp16 8.4e-3；center p99 最大 fp32 1.4e-3 m、fp16 4.9e-3 m。
+
+| 场景 | fp32 match | fp16 match | fp16 门 |
+|---|---|---|---|
+| 0921_164127_s000 | 0.9992 | 0.9910 | pass |
+| 0921_164127_s001 | 0.9978 | 0.9888 | FAIL |
+| 0921_164127_s002 | 0.9991 | 0.9889 | FAIL |
+| 0921_164127_s003 | 0.9958 | 0.9735 | FAIL |
+| 0921_164127_s004 | 0.9982 | 0.9700 | FAIL |
+| 0921_164127_s005 | 0.9949 | 0.9694 | FAIL |
+| 0921_165659_s003 | 1.0000 | 0.9834 | FAIL |
+| 0921_165659_s004 | 0.9922 | 0.9845 | FAIL |
+| 0921_165659_s005 | 0.9981 | 0.9885 | FAIL |
+| 0921_165659_s006 | 1.0000 | 0.9902 | pass |
+
+ONNX 十个场景都是 pass。完整表在 `compare_<场景>.txt`。
+
+**按标签**（raw 检测，10 个场景）。重放 `--jobs 4`：每个进程约 1.5 GB，四路加起来放得进这张卡。AP@2 / AP@4：pillar 0.834 / 0.853，trt_fp32 0.834 / 0.853，trt_fp16 0.833 / 0.852。FP16 比 pillar 低 0.001，不超过 0.005。主要指标里 FP16 的值都落在 pillar 那一列的 90% 区间内（FP32 也是）。
+
+| metric | pillar | trt_fp32 | trt_fp16 | pillar 90% 区间 |
+|---|---|---|---|---|
+| recall | 0.839 | 0.838 | 0.838 | 0.789 – 0.860 |
+| precision | 0.825 | 0.825 | 0.824 | 0.634 – 0.903 |
+| F1 | 0.832 | 0.831 | 0.831 | 0.710 – 0.873 |
+| FP / keyframe | 0.641 | 0.645 | 0.648 | 0.484 – 0.799 |
+| MOTA | 0.609 | 0.606 | 0.606 | 0.304 – 0.709 |
+| IDF1 | 0.786 | 0.785 | 0.785 | 0.663 – 0.838 |
+| IDSW / min | 1.862 | 1.862 | 2.069 | 0.419 – 3.356 |
+| false tracks / min | 27.102 | 27.309 | 26.895 | 20.238 – 33.793 |
+| confirm p90 s | 1.200 | 1.200 | 1.200 | 0.501 – 4.000 |
+| moving missed | 2 | 2 | 2 | 0 – 4 |
+| false moving / h | 86.891 | 86.891 | 86.891 | 12.388 – 175.081 |
+| FDE 3 s | 2.795 | 2.794 | 2.801 | 2.297 – 3.621 |
+| MR 3 s | 0.521 | 0.521 | 0.530 | 0.430 – 0.694 |
+
+**板上。** 同步前先建了两个场景的 `frames` 目录，否则 `sync_to_orin.sh` 会因父目录不存在而失败。拷了 96 + 92 帧和参考检测。根分区同步后剩 4.7 GB。两个场景的 trt:fp32、trt:fp16 对服务器 PyTorch 都是 pass。
+
+锁频了。`nvpmodel -q` 是 MAXN（0），写在 `orin_power.txt`。测延迟前执行过 `jetson_clocks`；这次 bench 之前再看，CPU 最低频率等于最高频率（2.2016 GHz），GPU 1.3005 GHz 同样钉死，EMC `FreqOverride=1`。板子时钟停在 1970-01-01（没有校时），引擎日志里的时间是这个。
+
+建引擎日志里的 benchmark 中位数是主机时间。trtexec 和 `bench_engines.py`（200 次，CUDA event）的 GPU 中位数相差 1.0%–2.6%，都在 10% 以内。T27 的延迟可以只用 trtexec。
+
+| 引擎 | 构建 | 大小 | 主机中位数 | trtexec GPU 中位数 | trtexec p99 | bench GPU 中位数 | bench p99 |
+|---|---|---|---|---|---|---|---|
+| pfn.fp32 | 22.2 s | 83 KB | 9.21 ms | 5.285 ms | 5.295 ms | 5.222 ms | 5.251 ms |
+| pfn.fp16 | 66.1 s | 66 KB | 7.43 ms | 3.526 ms | 3.531 ms | 3.434 ms | 3.477 ms |
+| rpn_head.fp32 | 37.2 s | 23.6 MB | 16.42 ms | 9.182 ms | 9.219 ms | 9.092 ms | 9.134 ms |
+| rpn_head.fp16 | 63.7 s | 12.3 MB | 12.09 ms | 4.847 ms | 4.860 ms | 4.720 ms | 4.730 ms |
+
+板上 compare 的 network ms（含两段引擎）：s000 的 fp32 / fp16 是 47.1 / 40.9 ms，s004 是 49.8 / 43.5 ms。
+
+**Docker。** 数据目录 `/zjst/sekj_tech/docker`（Docker 27.3.1），在 `/zjst` 上，当时剩 693 TB。`nvidia/cuda:12.6.0-base-ubuntu22.04` 里 `nvidia-smi -L` 看到 8 张 RTX 4090。`nvcr.io/nvidia/tensorrt:24.08-py3` 拉下来了：容器里是 TensorRT 10.3.0，nvcc 是 `cuda_12.6.r12.6/compiler.34431801_0`，有 `libnvinfer.so.10` 和 `libnvinfer.so.10.3.0`。拉完这盘还剩 692 TB。
+
+**结论：** FP32 可以用。FP16 按「每个验证场景都要 pass」这条不能用，差在匹配率 0.969–0.989，不是分数或位置漂出了门槛。标签上的 AP 和主要指标都在允许范围内。板上抽的两个场景 FP16 是 pass。
 
 ## T27 Orin 部署：INT8 量化
 

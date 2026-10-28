@@ -1,0 +1,226 @@
+=== docker info ===
+/zjst/sekj_tech/docker 27.3.1
+root=/zjst/sekj_tech/docker
+Filesystem                     Size  Used Avail Use% Mounted on
+cqzjst.seres.cn:/mnt/hpc/zjst  950T  258T  693T  28% /zjst
+=== cuda image ===
+Unable to find image 'nvidia/cuda:12.6.0-base-ubuntu22.04' locally
+12.6.0-base-ubuntu22.04: Pulling from nvidia/cuda
+3713021b0277: Already exists
+46c9c54348df: Pulling fs layer
+efc9014e2a4c: Pulling fs layer
+67b3546b211d: Pulling fs layer
+d339273dfb7f: Pulling fs layer
+67b3546b211d: Verifying Checksum
+d339273dfb7f: Verifying Checksum
+d339273dfb7f: Download complete
+46c9c54348df: Verifying Checksum
+46c9c54348df: Download complete
+efc9014e2a4c: Verifying Checksum
+efc9014e2a4c: Download complete
+46c9c54348df: Pull complete
+efc9014e2a4c: Pull complete
+67b3546b211d: Pull complete
+d339273dfb7f: Pull complete
+Digest: sha256:5dca947f477ec8ea91624447bdad7cc5f6a0dfe038ef53642c884bf5416478a6
+Status: Downloaded newer image for nvidia/cuda:12.6.0-base-ubuntu22.04
+GPU 0: NVIDIA GeForce RTX 4090 (UUID: GPU-74791742-e18c-1469-ab91-974a7dc6ebc6)
+GPU 1: NVIDIA GeForce RTX 4090 (UUID: GPU-56efbea7-9b36-b6f7-2986-bbbc01759256)
+GPU 2: NVIDIA GeForce RTX 4090 (UUID: GPU-48873a68-ec05-1b57-14ce-da8de1e4e1a4)
+GPU 3: NVIDIA GeForce RTX 4090 (UUID: GPU-a0cea6ed-8880-386a-ff68-6da40e03fe64)
+GPU 4: NVIDIA GeForce RTX 4090 (UUID: GPU-25881a45-cd93-a9b3-ba80-6837e138552f)
+GPU 5: NVIDIA GeForce RTX 4090 (UUID: GPU-8de45609-0ab1-804c-7727-9fa6acc3e2f8)
+GPU 6: NVIDIA GeForce RTX 4090 (UUID: GPU-7c2f2626-d43b-d917-8666-872aba68560f)
+GPU 7: NVIDIA GeForce RTX 4090 (UUID: GPU-b72e1d1d-127c-d4c2-7263-60c9655010c4)
+=== tensorrt image ===
+24.08-py3: Pulling from nvidia/tensorrt
+857cc8cb19c0: Pulling fs layer
+0b41952b72ac: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+07ba40811e97: Pulling fs layer
+5225d47729a1: Pulling fs layer
+a6736266741e: Pulling fs layer
+1d4f5bd6b322: Pulling fs layer
+31b0ebce44a6: Pulling fs layer
+80331719ab01: Pulling fs layer
+89611129266d: Pulling fs layer
+a6fb8d7f959b: Pulling fs layer
+92d994dcc9cf: Pulling fs layer
+5bb995e55ec8: Pulling fs layer
+9a2596b7b726: Pulling fs layer
+421fee862c24: Pulling fs layer
+2dca07a5c83d: Pulling fs layer
+d882805229b2: Pulling fs layer
+9952b1d626bd: Pulling fs layer
+2a4b20fe4772: Pulling fs layer
+5ae633c023c0: Pulling fs layer
+0c353b37a6d6: Pulling fs layer
+c7c2572da34d: Pulling fs layer
+04ae89237460: Pulling fs layer
+f5d6274ae920: Pulling fs layer
+178d88eeef5d: Pulling fs layer
+98286d44914c: Pulling fs layer
+297f3eadeb82: Pulling fs layer
+489d697c0d2a: Pulling fs layer
+421fee862c24: Waiting
+f3b84e90d830: Pulling fs layer
+2dca07a5c83d: Waiting
+d882805229b2: Waiting
+42d152fa25b7: Pulling fs layer
+9952b1d626bd: Waiting
+2a4b20fe4772: Waiting
+b48a5fafcaba: Pulling fs layer
+5ae633c023c0: Waiting
+0c353b37a6d6: Waiting
+c7c2572da34d: Waiting
+f5f0ebd8b818: Pulling fs layer
+04ae89237460: Waiting
+7944bac1063c: Pulling fs layer
+f5d6274ae920: Waiting
+b174367b0579: Pulling fs layer
+178d88eeef5d: Waiting
+98286d44914c: Waiting
+92d994dcc9cf: Waiting
+297f3eadeb82: Waiting
+a6fb8d7f959b: Waiting
+489d697c0d2a: Waiting
+f3b84e90d830: Waiting
+42d152fa25b7: Waiting
+b48a5fafcaba: Waiting
+5bb995e55ec8: Waiting
+9a2596b7b726: Waiting
+f5f0ebd8b818: Waiting
+7944bac1063c: Waiting
+b174367b0579: Waiting
+31b0ebce44a6: Download complete
+80331719ab01: Download complete
+1d4f5bd6b322: Verifying Checksum
+1d4f5bd6b322: Download complete
+5225d47729a1: Download complete
+4f4fb700ef54: Verifying Checksum
+4f4fb700ef54: Download complete
+89611129266d: Download complete
+5bb995e55ec8: Verifying Checksum
+5bb995e55ec8: Download complete
+421fee862c24: Download complete
+d882805229b2: Verifying Checksum
+d882805229b2: Download complete
+9952b1d626bd: Verifying Checksum
+9952b1d626bd: Download complete
+2a4b20fe4772: Verifying Checksum
+2a4b20fe4772: Download complete
+2dca07a5c83d: Verifying Checksum
+2dca07a5c83d: Download complete
+857cc8cb19c0: Download complete
+c7c2572da34d: Verifying Checksum
+c7c2572da34d: Download complete
+5ae633c023c0: Verifying Checksum
+5ae633c023c0: Download complete
+a6fb8d7f959b: Verifying Checksum
+a6fb8d7f959b: Download complete
+178d88eeef5d: Verifying Checksum
+178d88eeef5d: Download complete
+98286d44914c: Verifying Checksum
+98286d44914c: Download complete
+f5d6274ae920: Verifying Checksum
+f5d6274ae920: Download complete
+297f3eadeb82: Verifying Checksum
+297f3eadeb82: Download complete
+489d697c0d2a: Verifying Checksum
+489d697c0d2a: Download complete
+f3b84e90d830: Verifying Checksum
+f3b84e90d830: Download complete
+b48a5fafcaba: Verifying Checksum
+b48a5fafcaba: Download complete
+f5f0ebd8b818: Download complete
+0b41952b72ac: Verifying Checksum
+0b41952b72ac: Download complete
+7944bac1063c: Verifying Checksum
+7944bac1063c: Download complete
+b174367b0579: Verifying Checksum
+b174367b0579: Download complete
+42d152fa25b7: Verifying Checksum
+42d152fa25b7: Download complete
+857cc8cb19c0: Pull complete
+07ba40811e97: Verifying Checksum
+07ba40811e97: Download complete
+0c353b37a6d6: Verifying Checksum
+0c353b37a6d6: Download complete
+9a2596b7b726: Verifying Checksum
+9a2596b7b726: Download complete
+92d994dcc9cf: Verifying Checksum
+92d994dcc9cf: Download complete
+04ae89237460: Verifying Checksum
+04ae89237460: Download complete
+0b41952b72ac: Pull complete
+4f4fb700ef54: Pull complete
+07ba40811e97: Pull complete
+5225d47729a1: Pull complete
+a6736266741e: Verifying Checksum
+a6736266741e: Download complete
+a6736266741e: Pull complete
+1d4f5bd6b322: Pull complete
+31b0ebce44a6: Pull complete
+80331719ab01: Pull complete
+89611129266d: Pull complete
+a6fb8d7f959b: Pull complete
+92d994dcc9cf: Pull complete
+5bb995e55ec8: Pull complete
+9a2596b7b726: Pull complete
+421fee862c24: Pull complete
+2dca07a5c83d: Pull complete
+d882805229b2: Pull complete
+9952b1d626bd: Pull complete
+2a4b20fe4772: Pull complete
+5ae633c023c0: Pull complete
+0c353b37a6d6: Pull complete
+c7c2572da34d: Pull complete
+04ae89237460: Pull complete
+f5d6274ae920: Pull complete
+178d88eeef5d: Pull complete
+98286d44914c: Pull complete
+297f3eadeb82: Pull complete
+489d697c0d2a: Pull complete
+f3b84e90d830: Pull complete
+42d152fa25b7: Pull complete
+b48a5fafcaba: Pull complete
+f5f0ebd8b818: Pull complete
+7944bac1063c: Pull complete
+b174367b0579: Pull complete
+Digest: sha256:9507e5f248fc61a5b2c985ce6e386ecf2576c3d96112ceb38cf88b240d4ca072
+Status: Downloaded newer image for nvcr.io/nvidia/tensorrt:24.08-py3
+nvcr.io/nvidia/tensorrt:24.08-py3
+pull_exit=0
+
+=====================
+== NVIDIA TensorRT ==
+=====================
+
+NVIDIA Release 24.08 (build 106933332)
+NVIDIA TensorRT Version 10.3.0
+Copyright (c) 2016-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Container image Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+https://developer.nvidia.com/tensorrt
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+To install Python sample dependencies, run /opt/tensorrt/python/python_setup.sh
+
+To install the open-source samples corresponding to this TensorRT release version
+run /opt/tensorrt/install_opensource.sh.  To build the open source parsers,
+plugins, and samples for current top-of-tree on master or a different branch,
+run /opt/tensorrt/install_opensource.sh -b <branch>
+See https://github.com/NVIDIA/TensorRT for more information.
+
+Build cuda_12.6.r12.6/compiler.34431801_0
+/usr/lib/x86_64-linux-gnu/libnvinfer.so.10
+/usr/lib/x86_64-linux-gnu/libnvinfer.so.10.3.0
+run_exit=0
+=== disk after ===
+Filesystem                     Size  Used Avail Use% Mounted on
+cqzjst.seres.cn:/mnt/hpc/zjst  950T  259T  692T  28% /zjst

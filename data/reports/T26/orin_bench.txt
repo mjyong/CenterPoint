@@ -1,0 +1,8 @@
+/usr/lib/python3/dist-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.17.3 and <1.25.0 is required for this version of SciPy (detected version 1.26.4
+  warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
+| engine | GPU median ms | GPU p99 ms | GPU mean ms | min | max | host median ms |
+|---|---|---|---|---|---|---|
+| pfn.fp32.engine | 5.222 | 5.251 | 5.226 | 5.215 | 5.253 | 8.954 |
+| pfn.fp16.engine | 3.434 | 3.477 | 3.438 | 3.429 | 3.483 | 7.315 |
+| rpn_head.fp32.engine | 9.092 | 9.134 | 9.094 | 9.061 | 9.146 | 16.176 |
+| rpn_head.fp16.engine | 4.720 | 4.730 | 4.719 | 4.703 | 4.730 | 11.899 |
