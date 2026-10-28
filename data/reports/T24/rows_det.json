@@ -1,0 +1,21 @@
+[
+ {},
+ {
+  "eval.learned_model": "data/train/pred_v2/det.pt",
+  "eval.learned_mode": "trajectory"
+ },
+ {
+  "eval.learned_model": "data/train/pred_v2/det.pt",
+  "eval.learned_mode": "velocity"
+ },
+ {
+  "eval.learned_model": "data/train/pred_v2/det.pt",
+  "eval.learned_mode": "imm",
+  "eval.learned_motion": true
+ },
+ {
+  "eval.learned_model": "data/train/pred_v2/det.pt",
+  "eval.learned_mode": "velocity",
+  "eval.learned_motion": true
+ }
+]

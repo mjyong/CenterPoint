@@ -98,7 +98,7 @@
 | T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 完成。从原始扫描完整跑，IDF1 0.786，和 T20 final_A 相同；新默认值相对旧默认值 IDF1 +0.060。MCAP 在 data/tune/T22_mcap（872 MB） |
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
 | T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成，已复核。线上继续用 IMM：GRU、Transformer 概率最高的路线偏慢，3 s FDE 都更高（MR 低得多）。predict_ms 2746 / 4322 ms 是并行进程抢 CPU 测出来的，单线程约 16–40 ms，仍超 10 ms。伪真值用 measured，离标签 0.2 m，改为默认。误差主要在纵向，地图暂不做 |
-| T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 待做 |
+| T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 完成。保持现状。在动判断漏报增加、领先不到 90%；速度外推的 FDE 没同时过端到端和标签当检测 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -4202,4 +4202,183 @@ T23 复核的结论：
 
 ### T24 结果
 
-（待填）
+拉到 `92c9da8`。`dog_perception/`、`tools/` 有改动，快速测试 160 passed（`CUDA_VISIBLE_DEVICES=3`，24 s）。
+
+跟踪日志覆盖 T23 的，35 个，`rows` 是 16 列。耗时：logs_val 7 s，logs_train 13 s。训练在物理 GPU 5 上（空闲 8993 MiB，利用率 0%，进程里是 `cuda:0`），目标是默认的 measured。state 46 s，det 52 s。loss 没有 nan。对比（CPU）：pred_state 54 s，pred_state_oracle 49 s，pred_det 54 s，pred_det_oracle 49 s。
+
+窗口数（两份相同）：
+
+```text
+windows: train 5830 (416 moving), val 3523 (351 moving)
+kept 2031 training windows (all 416 moving, 30 % of the rest)
+mirrored: 4062 training windows
+```
+
+**保持现状。** 运动状态规则和 IMM 都不换。两个模型留在 `data/train/pred_v2/`（不提交）。
+
+运动状态（端到端第 4 行对第 1 行）两边都不满足：
+
+- state：false moving / h 62.065 对 86.891，领先只有 67%；moving missed 4 对 2，增加了；确认相关的 latency p90 1.9 s 对 1.2 s，晚了 0.7 s；hazard_reported 2 对 3，少了 1。false_alarms_per_h 从 12.413 降到 0。
+- det：false moving / h 同样是 62.065，领先 66%；moving missed 同样增加到 4。latency p90 1.301 s，只晚 0.1 s；hazard_reported 仍是 3；false_alarms_per_h 也降到 0。假运动少了，但漏掉的运动段变多，领先比例不到 90%。
+
+速度外推（第 3 行对第 1 行）也不满足：
+
+- state：端到端 FDE 3 s 3.059 对 2.795，更高，领先 27%；MR 3 s 0.709 对 0.521，更高。标签当检测的 FDE 2.607 对 1.388，更高。
+- det：端到端 FDE 3 s 2.603，比 IMM 低 0.193，领先 75%，不到 90%；MR 3 s 0.530，比 0.521 高。标签当检测的 FDE 2.175 对 1.388，更高。误报和 hazard_reported 与 IMM 相同（12.413 / 小时，3 次）。
+
+两项都没过，第 5 行（一起用）不再采用。det 的速度外推在端到端上比 state 低（2.603 对 3.059），运动状态的 latency p90 也更短（1.301 s 对 1.9 s），hazard 没少报；但两边都没过门槛，原始检测输入这一项不单独上线。
+
+predict_ms 只记录、不作门槛。端到端上 IMM 约 1.1 ms，网络的几种用法大约 3.4–4.8 ms。
+
+`train_state.txt` 最后两张表：
+
+| windows | predictor | minADE | minFDE | ADE1 | FDE1 | MR@2m | n |
+|---|---|---|---|---|---|---|---|
+| all | cv | 0.536 | 0.829 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | imm | 0.536 | 0.828 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | learned | 0.188 | 0.235 | 0.385 | 0.553 | 0.019 | 3523 |
+| moving | cv | 1.858 | 2.907 | 1.858 | 2.907 | 0.556 | 351 |
+| moving | imm | 1.856 | 2.903 | 1.857 | 2.907 | 0.556 | 351 |
+| moving | learned | 0.862 | 1.250 | 1.867 | 2.944 | 0.188 | 351 |
+| static | cv | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | imm | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | learned | 0.113 | 0.123 | 0.221 | 0.288 | 0.001 | 3172 |
+
+State now (targets: velocity over +-0.5 s and the auto-label's moving rule on the pseudo ground truth; tracker: its velocity and logged motion state, moving = 'moving'; learned: P(moving) >= 0.5)
+
+| windows | estimator | vel err m/s | moving recall | false moving | n |
+|---|---|---|---|---|---|
+| all | tracker | 0.209 | 0.829 | 0.0186 | 3509 |
+| all | learned | 0.082 | 0.693 | 0.0094 | 3509 |
+| moving | tracker | 0.685 | 0.831 | 0.0915 | 349 |
+| moving | learned | 0.648 | 0.729 | 0.0211 | 349 |
+| static | tracker | 0.156 | 0.810 | 0.0153 | 3160 |
+| static | learned | 0.019 | 0.333 | 0.0089 | 3160 |
+
+`train_det.txt` 最后两张表：
+
+| windows | predictor | minADE | minFDE | ADE1 | FDE1 | MR@2m | n |
+|---|---|---|---|---|---|---|---|
+| all | cv | 0.536 | 0.829 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | imm | 0.536 | 0.828 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | learned | 0.187 | 0.249 | 0.370 | 0.545 | 0.021 | 3523 |
+| moving | cv | 1.858 | 2.907 | 1.858 | 2.907 | 0.556 | 351 |
+| moving | imm | 1.856 | 2.903 | 1.857 | 2.907 | 0.556 | 351 |
+| moving | learned | 0.836 | 1.290 | 1.809 | 2.956 | 0.191 | 351 |
+| static | cv | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | imm | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | learned | 0.115 | 0.134 | 0.211 | 0.278 | 0.002 | 3172 |
+
+State now (targets: velocity over +-0.5 s and the auto-label's moving rule on the pseudo ground truth; tracker: its velocity and logged motion state, moving = 'moving'; learned: P(moving) >= 0.5)
+
+| windows | estimator | vel err m/s | moving recall | false moving | n |
+|---|---|---|---|---|---|
+| all | tracker | 0.209 | 0.829 | 0.0186 | 3509 |
+| all | learned | 0.067 | 0.697 | 0.0091 | 3509 |
+| moving | tracker | 0.685 | 0.831 | 0.0915 | 349 |
+| moving | learned | 0.540 | 0.744 | 0.0211 | 349 |
+| static | tracker | 0.156 | 0.810 | 0.0153 | 3160 |
+| static | learned | 0.015 | 0.238 | 0.0086 | 3160 |
+
+四份 sweep.md：
+
+`pred_state/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | defaults | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | eval.learned_model=data/train/pred_v2/state.pt, eval.learned_mode=trajectory | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 3.303 | 0.274 |
+| 3 | eval.learned_model=data/train/pred_v2/state.pt, eval.learned_mode=velocity | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 3.059 | 0.709 |
+| 4 | eval.learned_model=data/train/pred_v2/state.pt, eval.learned_mode=imm, eval.learned_motion=True | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 4 | 62.065 | 2.795 | 0.521 |
+| 5 | eval.learned_model=data/train/pred_v2/state.pt, eval.learned_mode=velocity, eval.learned_motion=True | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 4 | 62.065 | 3.059 | 0.709 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.508 (14%) | -0.248 (100%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.264 (27%) | 0.188 (5%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 2 (0%) | -24.826 (67%) | 0.000 (0%) | 0.000 (0%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 2 (0%) | -24.826 (67%) | 0.264 (27%) | 0.188 (5%) |
+
+`pred_state_oracle/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | defaults | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.388 | 0.286 |
+| 2 | eval.learned_model=data/train/pred_v2/state.pt, eval.learned_mode=trajectory | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 2.920 | 0.168 |
+| 3 | eval.learned_model=data/train/pred_v2/state.pt, eval.learned_mode=velocity | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 2.607 | 0.621 |
+| 4 | eval.learned_model=data/train/pred_v2/state.pt, eval.learned_mode=imm, eval.learned_motion=True | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 2 | 0.000 | 1.388 | 0.286 |
+| 5 | eval.learned_model=data/train/pred_v2/state.pt, eval.learned_mode=velocity, eval.learned_motion=True | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 2 | 0.000 | 2.607 | 0.621 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 1.532 (1%) | -0.118 (100%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 1.219 (1%) | 0.335 (5%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 2 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 2 (0%) | 0.000 (0%) | 1.219 (1%) | 0.335 (5%) |
+
+`pred_det/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | defaults | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.795 | 0.521 |
+| 2 | eval.learned_model=data/train/pred_v2/det.pt, eval.learned_mode=trajectory | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 3.260 | 0.274 |
+| 3 | eval.learned_model=data/train/pred_v2/det.pt, eval.learned_mode=velocity | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 2 | 86.891 | 2.603 | 0.530 |
+| 4 | eval.learned_model=data/train/pred_v2/det.pt, eval.learned_mode=imm, eval.learned_motion=True | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 4 | 62.065 | 2.795 | 0.521 |
+| 5 | eval.learned_model=data/train/pred_v2/det.pt, eval.learned_mode=velocity, eval.learned_motion=True | 0.839 | 0.825 | 0.832 | 0.641 | 0.609 | 0.786 | 1.862 | 27.102 | 1.200 | 4 | 62.065 | 2.603 | 0.530 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.465 (16%) | -0.248 (100%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | -0.193 (75%) | 0.009 (38%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 2 (0%) | -24.826 (66%) | 0.000 (0%) | 0.000 (0%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 2 (0%) | -24.826 (66%) | -0.193 (75%) | 0.009 (38%) |
+
+`pred_det_oracle/sweep.md`：
+
+| # | parameters | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | defaults | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 1.388 | 0.286 |
+| 2 | eval.learned_model=data/train/pred_v2/det.pt, eval.learned_mode=trajectory | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 2.941 | 0.186 |
+| 3 | eval.learned_model=data/train/pred_v2/det.pt, eval.learned_mode=velocity | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 0 | 0.000 | 2.175 | 0.435 |
+| 4 | eval.learned_model=data/train/pred_v2/det.pt, eval.learned_mode=imm, eval.learned_motion=True | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 1 | 0.000 | 1.388 | 0.286 |
+| 5 | eval.learned_model=data/train/pred_v2/det.pt, eval.learned_mode=velocity, eval.learned_motion=True | 1.000 | 1.000 | 1.000 | 0.000 | 0.961 | 0.957 | 1.655 | 0.000 | 0.501 | 1 | 0.000 | 2.175 | 0.435 |
+
+Difference to row 1 (ahead %):
+
+| # | det recall | det precision | det F1 | det FP / frame | MOTA | IDF1 | IDSW / min | false tracks / min | confirm p90 s | moving missed | false moving / h | FDE 3 s | MR 3 s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 1.553 (1%) | -0.099 (100%) |
+| 3 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0 (0%) | 0.000 (0%) | 0.787 (1%) | 0.149 (5%) |
+| 4 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 1 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) |
+| 5 | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 0.000 (0%) | 1 (0%) | 0.000 (0%) | 0.787 (1%) | 0.149 (5%) |
+
+sweep.csv 里每行：
+
+| 报告 | 行 | latency p90 | moving recall | false moving | along | bias | across | false alarms / h | hazard reported | predict_ms |
+|---|---|---|---|---|---|---|---|---|---|---|
+| pred_state | 1 IMM | 1.200 | 0.760 | 0.017 | 2.722 | -0.074 | 0.582 | 12.413 | 3 | 1.112 |
+| pred_state | 2 trajectory | 1.200 | 0.760 | 0.017 | 3.289 | -2.326 | 0.320 | 24.826 | 3 | 3.450 |
+| pred_state | 3 velocity | 1.200 | 0.760 | 0.017 | 3.056 | -1.971 | 0.329 | 12.413 | 3 | 3.414 |
+| pred_state | 4 motion | 1.900 | 0.640 | 0.011 | 2.722 | -0.074 | 0.582 | 0.000 | 2 | 4.563 |
+| pred_state | 5 velocity+motion | 1.900 | 0.640 | 0.011 | 3.056 | -1.971 | 0.329 | 0.000 | 2 | 3.407 |
+| pred_state_oracle | 1 IMM | 1.498 | 0.727 | 0.004 | 1.416 | -1.006 | 0.219 | 0.000 | 5 | 0.711 |
+| pred_state_oracle | 2 trajectory | 1.498 | 0.727 | 0.004 | 2.994 | -2.867 | 0.103 | 0.000 | 5 | 2.821 |
+| pred_state_oracle | 3 velocity | 1.498 | 0.727 | 0.004 | 2.712 | -2.624 | 0.119 | 0.000 | 5 | 2.824 |
+| pred_state_oracle | 4 motion | 3.700 | 0.453 | 0.002 | 1.416 | -1.006 | 0.219 | 0.000 | 2 | 3.645 |
+| pred_state_oracle | 5 velocity+motion | 3.700 | 0.453 | 0.002 | 2.712 | -2.624 | 0.119 | 0.000 | 2 | 2.816 |
+| pred_det | 1 IMM | 1.200 | 0.760 | 0.017 | 2.722 | -0.074 | 0.582 | 12.413 | 3 | 1.097 |
+| pred_det | 2 trajectory | 1.200 | 0.760 | 0.017 | 3.240 | -2.567 | 0.299 | 24.826 | 3 | 3.684 |
+| pred_det | 3 velocity | 1.200 | 0.760 | 0.017 | 2.578 | -1.993 | 0.299 | 12.413 | 3 | 3.636 |
+| pred_det | 4 motion | 1.301 | 0.620 | 0.010 | 2.722 | -0.074 | 0.582 | 0.000 | 3 | 4.815 |
+| pred_det | 5 velocity+motion | 1.301 | 0.620 | 0.010 | 2.578 | -1.993 | 0.299 | 0.000 | 3 | 3.631 |
+| pred_det_oracle | 1 IMM | 1.498 | 0.727 | 0.004 | 1.416 | -1.006 | 0.219 | 0.000 | 5 | 0.702 |
+| pred_det_oracle | 2 trajectory | 1.498 | 0.727 | 0.004 | 3.026 | -2.914 | 0.136 | 0.000 | 5 | 2.997 |
+| pred_det_oracle | 3 velocity | 1.498 | 0.727 | 0.004 | 2.272 | -2.198 | 0.094 | 0.000 | 5 | 3.031 |
+| pred_det_oracle | 4 motion | 3.800 | 0.494 | 0.003 | 1.416 | -1.006 | 0.219 | 0.000 | 5 | 3.777 |
+| pred_det_oracle | 5 velocity+motion | 3.800 | 0.494 | 0.003 | 2.272 | -2.198 | 0.094 | 0.000 | 5 | 3.061 |

@@ -1,0 +1,39 @@
+windows: train 5830 (416 moving), val 3523 (351 moving)
+kept 2031 training windows (all 416 moving, 30 % of the rest)
+mirrored: 4062 training windows
+epoch 4 loss 3.159 | val minADE 0.483 minFDE 0.674 FDE1 0.720 MR 0.069 | vel err 0.166 moving recall 0.000 false moving 0.0000
+epoch 9 loss 0.442 | val minADE 0.355 minFDE 0.510 FDE1 0.822 MR 0.068 | vel err 0.146 moving recall 0.697 false moving 0.0122
+epoch 14 loss -0.039 | val minADE 0.215 minFDE 0.270 FDE1 0.532 MR 0.027 | vel err 0.089 moving recall 0.719 false moving 0.0079
+epoch 19 loss -0.431 | val minADE 0.188 minFDE 0.231 FDE1 0.477 MR 0.021 | vel err 0.067 moving recall 0.741 false moving 0.0119
+epoch 24 loss -0.485 | val minADE 0.185 minFDE 0.233 FDE1 0.521 MR 0.018 | vel err 0.084 moving recall 0.583 false moving 0.0052
+epoch 29 loss -0.556 | val minADE 0.191 minFDE 0.243 FDE1 0.566 MR 0.017 | vel err 0.083 moving recall 0.623 false moving 0.0094
+epoch 34 loss -0.677 | val minADE 0.183 minFDE 0.236 FDE1 0.509 MR 0.017 | vel err 0.075 moving recall 0.737 false moving 0.0098
+epoch 39 loss -0.838 | val minADE 0.181 minFDE 0.241 FDE1 0.502 MR 0.020 | vel err 0.068 moving recall 0.737 false moving 0.0088
+epoch 44 loss -0.916 | val minADE 0.184 minFDE 0.242 FDE1 0.525 MR 0.020 | vel err 0.064 moving recall 0.737 false moving 0.0101
+epoch 49 loss -1.010 | val minADE 0.185 minFDE 0.245 FDE1 0.534 MR 0.021 | vel err 0.068 moving recall 0.706 false moving 0.0091
+epoch 54 loss -1.072 | val minADE 0.186 minFDE 0.248 FDE1 0.541 MR 0.020 | vel err 0.068 moving recall 0.693 false moving 0.0088
+epoch 59 loss -1.100 | val minADE 0.187 minFDE 0.249 FDE1 0.545 MR 0.021 | vel err 0.067 moving recall 0.697 false moving 0.0091
+
+| windows | predictor | minADE | minFDE | ADE1 | FDE1 | MR@2m | n |
+|---|---|---|---|---|---|---|---|
+| all | cv | 0.536 | 0.829 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | imm | 0.536 | 0.828 | 0.536 | 0.829 | 0.114 | 3523 |
+| all | learned | 0.187 | 0.249 | 0.370 | 0.545 | 0.021 | 3523 |
+| moving | cv | 1.858 | 2.907 | 1.858 | 2.907 | 0.556 | 351 |
+| moving | imm | 1.856 | 2.903 | 1.857 | 2.907 | 0.556 | 351 |
+| moving | learned | 0.836 | 1.290 | 1.809 | 2.956 | 0.191 | 351 |
+| static | cv | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | imm | 0.390 | 0.599 | 0.390 | 0.599 | 0.065 | 3172 |
+| static | learned | 0.115 | 0.134 | 0.211 | 0.278 | 0.002 | 3172 |
+
+State now (targets: velocity over +-0.5 s and the auto-label's moving rule on the pseudo ground truth; tracker: its velocity and logged motion state, moving = 'moving'; learned: P(moving) >= 0.5)
+
+| windows | estimator | vel err m/s | moving recall | false moving | n |
+|---|---|---|---|---|---|
+| all | tracker | 0.209 | 0.829 | 0.0186 | 3509 |
+| all | learned | 0.067 | 0.697 | 0.0091 | 3509 |
+| moving | tracker | 0.685 | 0.831 | 0.0915 | 349 |
+| moving | learned | 0.540 | 0.744 | 0.0211 | 349 |
+| static | tracker | 0.156 | 0.810 | 0.0153 | 3160 |
+| static | learned | 0.015 | 0.238 | 0.0086 | 3160 |
+saved data/train/pred_v2/det.pt
