@@ -3,8 +3,10 @@ import pytest
 import torch
 
 from dog_perception.demo import oracle_tracking_log
-from dog_perception.prediction import (FeatureConfig, SampleConfig, build_inputs, build_samples, merge_modes,
-                                       rts_smooth)
+from dog_perception.prediction import (FeatureConfig, SampleConfig, TrackLogger, build_inputs, build_samples,
+                                       merge_modes, rts_smooth)
+from dog_perception.prediction.dataset import ROW
+from dog_perception.prediction.metrics import along_across
 from dog_perception.prediction.learned import (LearnedPredictor, evaluate_kinematic, evaluate_learned,
                                                train_predictor)
 from dog_perception.prediction.model import ModelConfig, TrajectoryPredictor, load_model, predictor_loss, save_model
@@ -140,3 +142,43 @@ def test_train_predictor_tool_reports_moving_and_static(tmp_path):
     res = json.load(open(tmp_path / "pred" / "gru_eval.json"))
     assert {"all", "moving", "static"} <= set(res["eval"]) and "learned" in res["eval"]["moving"]
     assert out.exists()
+
+
+def test_along_across_splits_speed_from_path():
+    gt = np.array([[1.0, 0.0], [1.0, 1.0], [1.0, 2.0]])          # one step along +x, then a left turn
+    along, across = along_across(np.array([[0.9, 1.0], [1.5, 0.5], [2.0, 0.0]]), np.zeros(2), gt)
+    assert np.allclose(along, [1.0, -0.5, -2.0]) and np.allclose(across, [0.1, 0.5, 1.0])
+    # beyond its ends the path runs on along the first / last segment
+    along, across = along_across(np.array([[4.0, 1.0], [-1.0, 0.5]]), np.zeros(2), np.array([[1.0, 0.0], [3.0, 0.0]]))
+    assert np.allclose(along, [3.0, -4.0]) and np.allclose(across, [1.0, 0.5])
+    assert np.isnan(along_across(np.ones((1, 2)), np.zeros(2), np.zeros((1, 2)))).all()   # no path: a parked car
+
+
+def test_logged_detections_and_measured_targets():
+    """The track log keeps the matched detection of every observed frame; the targets can be smoothed
+    from those instead of the tracker's positions. Logs written before keep working with "filtered"."""
+    rng = np.random.default_rng(0)
+    trk, log, fed = MultiObjectTracker(TrackerConfig()), TrackLogger(), {}
+    for k in range(80):
+        t = 0.1 * k
+        if 40 <= k < 43:                                       # missed for 0.3 s: the track coasts
+            dets = Detections(stamp=t)
+        else:
+            box = np.array([[5.0 + 2.0 * t + rng.normal(0, 0.1), rng.normal(0, 0.1), 0.8, 4.5, 1.9, 1.6, 0.0]])
+            fed[round(t, 6)] = box[0, :2]
+            dets = Detections(box, np.array([[2.0, 0.0]]), np.array([0.9]), np.zeros(1, np.int64), "world", t)
+        log.add(t, trk.step(dets, t))
+    d = log.to_dict()
+    rows = d["rows"]
+    assert rows.shape[1] == len(ROW) == 15
+    coast = rows[:, 8] < 0.5
+    assert coast.sum() == 3 and np.isnan(rows[coast, 9:]).all()
+    assert all(np.allclose(r[9:11], fed[round(r[0], 6)]) for r in rows[~coast])   # the detections themselves
+    assert np.allclose(rows[~coast, 12], 2.0) and np.allclose(rows[~coast, 14], 0.9)
+    filtered, measured = build_samples(d, SampleConfig()), build_samples(d, SampleConfig(targets="measured"))
+    assert len(measured["future"]) == len(filtered["future"]) > 10
+    assert not np.allclose(measured["future"], filtered["future"])
+    old = dict(d, rows=rows[:, :9])
+    assert np.allclose(build_samples(old)["future"], filtered["future"])
+    with pytest.raises(ValueError):
+        build_samples(old, SampleConfig(targets="measured"))

@@ -21,3 +21,30 @@ def displacement_metrics(pred_modes, probs, gt, valid=None, miss_threshold=2.0):
         ADE1=float(ade[idx, top].mean()), FDE1=float(fde[idx, top].mean()),
         MR=float((fde.min(1) > miss_threshold).mean()), num=int(len(gt)),
     )
+
+
+def along_across(points, start, gt):
+    """Split the error of a predicted path against the true one. ``points`` (T, 2): predicted
+    positions at the steps of ``gt`` (T, 2), the true positions after ``start`` (2,). The true path is
+    the polyline start -> gt, its first and last segments extended. Returns (T,) ``along``: signed
+    distance along the path from the true position to the prediction's foot point (+: ahead, the
+    predicted speed too high), and (T,) ``across``: distance from the path (its shape: where a map
+    would help). NaN when the true path has no length."""
+    path = np.vstack([start, gt]).astype(np.float64)
+    seg = np.diff(path, axis=0)
+    L = np.hypot(seg[:, 0], seg[:, 1])
+    s0 = np.r_[0.0, np.cumsum(L)]
+    ok = np.nonzero(L > 1e-6)[0]
+    along, across = np.full(len(points), np.nan), np.full(len(points), np.nan)
+    if len(ok) == 0:
+        return along, across
+    for k, p in enumerate(np.asarray(points, np.float64)):
+        best = (np.inf, 0.0)
+        for j in ok:
+            u = (p - path[j]) @ seg[j] / L[j] ** 2
+            u = min(max(u, -np.inf if j == ok[0] else 0.0), np.inf if j == ok[-1] else 1.0)
+            d = float(np.hypot(*(p - path[j] - u * seg[j])))
+            if d < best[0]:
+                best = (d, s0[j] + u * L[j])
+        across[k], along[k] = best[0], best[1] - s0[k + 1]
+    return along, across

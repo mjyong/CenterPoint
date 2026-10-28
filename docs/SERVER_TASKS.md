@@ -97,7 +97,7 @@
 | T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 完成。运动模型、合并距离留默认（cv:1.5+ct:1.5:0.25，merge_dist 0.25）；训练 oracle 上 CV 比 IMM 差 |
 | T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 完成。从原始扫描完整跑，IDF1 0.786，和 T20 final_A 相同；新默认值相对旧默认值 IDF1 +0.060。MCAP 在 data/tune/T22_mcap（872 MB） |
 | H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
-| T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 待做 |
+| T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -3752,6 +3752,14 @@ MCAP：`data/tune/T22_mcap/`，10 个场景，共 872 MB。
 **预期要放低**：0921 上运动的车只有约 70 辆（训练场景 41、验证场景 27），窗口大多来自停着的车。
 这一版主要是把流程跑通、留一个基线，新数据（DATA_COLLECTION_PLAN.md 3.2、3.3）到了再训。
 
+附带两项检查（2026-10-28 加，评估工具每次都会算，第 1 步的报告里就有）：
+- **误差拆分**：运动车概率最高那条路线的误差，拆成沿标注路径的纵向（速度、起步、停车；bias 为正表示预测快了）
+  和离开路径的横向（路线形状）。用来判断要不要加道路地图 / 占据栅格：横向占比小就不需要。
+- **训练目标有多准**：训练目标是伪真值，由跟踪日志事后平滑得到。有两种来源：
+  - filtered：跟踪器的位置；
+  - measured：匹配到的原始检测框中心，日志从这一版起记录。
+  评估工具按 train_predictor.py 切窗的同样规则切出每个预测样本的训练目标，和审过的标签比。第 1 步据此选第 2 步用哪种。
+
 ```text
 任务 T23：用上线的检测器和定版的跟踪参数生成 35 个场景的跟踪日志，训练第二档预测的第一版（GRU、Transformer 各一个），
 在验证集上和 IMM 配对比较，判断能不能替换第一档。
@@ -3765,13 +3773,21 @@ MCAP：`data/tune/T22_mcap/`，10 个场景，共 872 MB。
      ev logs_train "$TRAIN" "data/tune/nusc_pp_train/{scene}/pillar/results.pkl" --detections raw --no-mcap --bootstrap 0 \
          --track-logs data/tune/track_logs
      ls data/tune/track_logs/*.npz | wc -l        # 应是 35
+     python -c "import numpy as np; print(np.load('data/tune/track_logs/$(echo $VAL | cut -d' ' -f1).npz')['rows'].shape[1])"   # 应是 15（含匹配到的检测）
+   两份 report.md（data/reports/T23/logs_val、logs_train）里看：
+   - "Prediction" 的 moving、moving straight、moving turning 三张表：IMM、CV 的 along / bias / across；
+   - "Training targets" 表：filtered、measured 两种目标各自的 windows、mean、p90、> 1 m、along / bias / across。
+   选训练目标 TGT：measured 在两份报告里 moving 3 s 的 mean 都比 filtered 低，且 > 1 m 的比例不更高，就用 measured；
+   否则用 filtered。
 2. 训练：训练场景训，验证场景验，GRU、Transformer 各一个：
+     TGT=measured        # 或 filtered，按第 1 步
      LT=$(for r in $TRAIN; do echo data/tune/track_logs/$r.npz; done); LV=$(for r in $VAL; do echo data/tune/track_logs/$r.npz; done)
      for enc in gru transformer; do
        python tools/dog/train_predictor.py --logs $LT --val-logs $LV --encoder $enc --modes 6 --epochs 60 \
-           --static-keep 0.3 --mirror --out data/train/pred_v1/$enc.pt 2>&1 | tee data/reports/T23/train_$enc.txt
+           --static-keep 0.3 --mirror --targets $TGT --out data/train/pred_v1/$enc.pt 2>&1 | tee data/reports/T23/train_$enc.txt
      done
    train_*.txt 开头打印窗口数（其中运动的），最后一张表是验证窗口上的 cv / imm / learned，分全部、运动、静止。
+   这张表的"真值"是同一种伪真值；能不能替换 IMM 只看第 3 步（对标签）。
 3. 和标签比（配对：第 1 行 IMM，第 2 行第二档；端到端和标签当检测各一次）：
      for enc in gru transformer; do
        ev pred_$enc "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections raw --no-mcap \
@@ -3779,7 +3795,8 @@ MCAP：`data/tune/T22_mcap/`，10 个场景，共 872 MB。
        ev pred_${enc}_oracle "$VAL" "data/tune/deploy/{scene}/pillar/results.pkl" --detections labels \
            --dense-labels "data/labels/{scene}/labels_full2.pkl" --no-mcap --set "eval.learned_model=,data/train/pred_v1/$enc.pt"
      done
-   每份的 sweep.md 看 FDE 3 s、MR 3 s；sweep.csv 里还有 pred_minFDE3_moving、false_alarms_per_h、hazard_reported、predict_ms。
+   每份的 sweep.md 看 FDE 3 s、MR 3 s；sweep.csv 里还有 pred_minFDE3_moving、false_alarms_per_h、hazard_reported、predict_ms，
+   以及 3 s 误差拆分 pred_along3_moving、pred_along_bias3_moving、pred_across3_moving。
 
 怎么选（能不能替换第一档；都满足的 encoder 里选端到端 FDE 3 s 低的）：
 - 端到端（pred_*）：FDE 3 s 比第 1 行（IMM）低，领先比例 ≥ 90%；MR 3 s 不高于第 1 行；
@@ -3790,12 +3807,15 @@ MCAP：`data/tune/T22_mcap/`，10 个场景，共 872 MB。
 都不满足：线上继续用 IMM，模型留作基线，新数据来了再训。满足了写清是哪个 encoder，由人决定是否上线
 （ROS 2 节点参数 predictor_model）。
 
-停止条件：任何报错；第 1 步日志不是 35 个；训练 loss 出现 nan。
+停止条件：任何报错；第 1 步日志不是 35 个，或 rows 不是 15 列（代码没拉到）；训练 loss 出现 nan。
 提交：data/reports/T23/、本文档。不提交 .pt 和跟踪日志。
 报告（写进"T23 结果"）：
+- 第 1 步两份 report.md 的 "Prediction"（moving、moving straight、moving turning）和 "Training targets" 两部分；
+  选的 TGT 和理由；
 - 两个 train_*.txt 开头的窗口数行、最后的表；
 - 四份 sweep.md 的两张表；
-- sweep.csv 里两行的 predict_ms、false_alarms_per_h、hazard_reported、pred_minFDE3_moving；
+- sweep.csv 里两行的 predict_ms、false_alarms_per_h、hazard_reported、pred_minFDE3_moving，
+  pred_along3_moving、pred_along_bias3_moving、pred_across3_moving；
 - 按"怎么选"给出的结论；每个训练的耗时。
 ```
 

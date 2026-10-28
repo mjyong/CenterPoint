@@ -5,7 +5,11 @@ The tracker output *is* the label source: cut every confirmed track into
 
 * inputs = the causal tracker estimates (what the network sees online);
 * targets = an RTS-smoothed (non-causal) version of the observed positions,
-  which removes most tracker lag/noise from the supervision.
+  which removes most tracker lag/noise from the supervision. "Observed": the
+  tracker's updated positions in the frames it matched a detection
+  (``targets="filtered"``), or the matched detections' centers themselves
+  (``"measured"``, logs written since 2026-10-28). Either is a pseudo ground
+  truth; pipeline_eval measures both against the reviewed labels.
 
 Windows whose future is mostly coasting (occluded) are dropped, and the split
 into train/val should be by recording, not by window (windows overlap).
@@ -18,7 +22,10 @@ import numpy as np
 from ..geometry import yaw_of
 from .features import FeatureConfig, build_inputs, future_to_agent_frame
 
-ROW = ("t", "id", "label", "x", "y", "vx", "vy", "yaw", "observed")
+ROW = ("t", "id", "label", "x", "y", "vx", "vy", "yaw", "observed",
+       # the matched detection (NaN when coasting): center, yaw, velocity head, score
+       "det_x", "det_y", "det_yaw", "det_vx", "det_vy", "det_score")
+OLD_ROW = 9          # logs written before 2026-10-28 stop after "observed"
 
 
 class TrackLogger:
@@ -36,8 +43,9 @@ class TrackLogger:
 
     def add(self, stamp, track_states, T_world_body=None, predictions=None):
         for s in track_states:
+            m = s.measurement if s.measurement is not None else np.full(6, np.nan)
             self.rows.append((stamp, s.track_id, s.label, s.position[0], s.position[1],
-                              s.velocity[0], s.velocity[1], s.yaw, 0.0 if s.coasting else 1.0))
+                              s.velocity[0], s.velocity[1], s.yaw, 0.0 if s.coasting else 1.0, *m))
         if T_world_body is not None:
             self.ego.append((stamp, T_world_body[0, 3], T_world_body[1, 3], yaw_of(T_world_body[:3, :3])))
         for p in predictions or ():
@@ -115,6 +123,51 @@ class SampleConfig:
     min_future_observed: float = 0.8
     frame_stride: int = 2
     smooth_targets: bool = True
+    targets: str = "filtered"      # what is smoothed into the targets: "filtered" / "measured" (module docstring)
+
+
+def split_tracks(rows):
+    """{track id: its rows sorted by time}."""
+    tracks = defaultdict(list)
+    for r in rows:
+        tracks[int(r[1])].append(r)
+    return {k: np.asarray(sorted(v, key=lambda r: r[0])) for k, v in tracks.items()}
+
+
+def track_targets(tracks, source="filtered", smooth=True):
+    """{track id: (times, (N, 2) smoothed positions)} over the frames each track was observed.
+    ``source``: "filtered" (the tracker's positions) or "measured" (the matched detections' centers)."""
+    if source not in ("filtered", "measured"):
+        raise ValueError("targets: 'filtered' or 'measured', not %r" % source)
+    out = {}
+    for tid, tr in tracks.items():
+        if source == "measured" and tr.shape[1] <= OLD_ROW:
+            raise ValueError("targets='measured' needs a log with the matched detections (written since 2026-10-28)")
+        obs = tr[:, 8] > 0.5
+        if source == "measured":
+            obs &= np.isfinite(tr[:, 9])
+        if obs.sum() < 3:
+            continue
+        xy = tr[obs][:, 3:5] if source == "filtered" else tr[obs][:, 9:11]
+        out[tid] = (tr[obs][:, 0], rts_smooth(tr[obs][:, 0], xy) if smooth else xy)
+    return out
+
+
+def window_target(target, t_now, fut_t, stamps, min_future_observed=0.8):
+    """(T, 2) target positions at ``t_now + fut_t`` from ``track_targets``' (times, positions), or None
+    when the window is not used for training: the future runs past the track's last observation, or
+    the track is observed in fewer than ``min_future_observed`` of the logged frames (``stamps``) of it."""
+    if target is None:
+        return None
+    tt, sm = target
+    q = t_now + fut_t
+    if q[-1] > tt[-1] + 1e-6:
+        return None
+    n_future = int(((stamps > t_now) & (stamps <= q[-1] + 1e-6)).sum())
+    span = (tt > t_now) & (tt <= q[-1] + 1e-6)
+    if span.sum() < min_future_observed * n_future:
+        return None
+    return np.column_stack([np.interp(q, tt, sm[:, 0]), np.interp(q, tt, sm[:, 1])])
 
 
 def build_samples(log, cfg=None):
@@ -124,19 +177,8 @@ def build_samples(log, cfg=None):
     rows, ego = log["rows"], log.get("ego")
     if len(rows) == 0:
         return {}
-    tracks = defaultdict(list)
-    for r in rows:
-        tracks[int(r[1])].append(r)
-    tracks = {k: np.asarray(sorted(v, key=lambda r: r[0])) for k, v in tracks.items()}
-
-    targets = {}
-    for tid, tr in tracks.items():
-        obs = tr[:, 8] > 0.5
-        if obs.sum() < 3:
-            continue
-        xy = tr[obs][:, 3:5]
-        sm = rts_smooth(tr[obs][:, 0], xy) if cfg.smooth_targets else xy
-        targets[tid] = (tr[obs][:, 0], sm)
+    tracks = split_tracks(rows)
+    targets = track_targets(tracks, cfg.targets, cfg.smooth_targets)
 
     online = {}
     if "pred_index" in log:
@@ -156,22 +198,16 @@ def build_samples(log, cfg=None):
             h = tr[m]
             hist[tid] = np.column_stack([h[:, 0], h[:, 3:7], h[:, 8]])
             labels[tid], yaws[tid] = int(h[-1, 2]), float(h[-1, 7])
-        n_future_frames = int(((stamps > t_now) & (stamps <= t_now + fut_t[-1] + 1e-6)).sum())
         focal, futs, fvalid = [], [], []
         for tid, h in hist.items():
-            if tid not in targets or h[-1, 0] - h[0, 0] < cfg.min_history - 1e-6:
+            if h[-1, 0] - h[0, 0] < cfg.min_history - 1e-6:
                 continue
-            tt, sm = targets[tid]
-            q = t_now + fut_t
-            ok = (q <= tt[-1] + 1e-6)
-            # fraction of the future frames in which the track was actually observed
-            span = (tt > t_now) & (tt <= t_now + fut_t[-1] + 1e-6)
-            if not ok.all() or span.sum() < cfg.min_future_observed * n_future_frames:
+            fut = window_target(targets.get(tid), t_now, fut_t, stamps, cfg.min_future_observed)
+            if fut is None:
                 continue
-            fut = np.column_stack([np.interp(q, tt, sm[:, 0]), np.interp(q, tt, sm[:, 1])])
             focal.append(tid)
             futs.append(fut)
-            fvalid.append(ok.astype(np.float32))
+            fvalid.append(np.ones(len(fut_t), np.float32))
         if not focal:
             continue
         eh = ego_history(ego, t_now, horizon) if ego is not None and len(ego) else None

@@ -148,6 +148,9 @@ class TrackState:
     time_since_moving: float = float("inf")   # [s] since the track was last moving
     speed_displacement: float = float("nan")  # [m/s] the two readings of the last motion update
     speed_head: float = float("nan")
+    # the detection matched this frame, world frame: [x, y, yaw, vx, vy, score] (velocity head NaN when
+    # not used); None when coasting. Logged for the tier-2 training targets (prediction/dataset.py)
+    measurement: np.ndarray = None
 
     @property
     def name(self):
@@ -179,6 +182,7 @@ class Track:
         self.fast = deque(maxlen=cfg.motion_window)
         self.centers = deque()                  # (stamp, x, y) of the detections, for the displacement speed
         self._add_center(box)
+        self._measure(box, vel, score)
         self._record(True)
         self._update_motion(vel if cfg.use_velocity else None)
 
@@ -220,7 +224,12 @@ class Track:
             self.confirmed = True
         self._record(True)
         self._add_center(box)
+        self._measure(box, vel, score)
         self._update_motion(vel if cfg.use_velocity else None)
+
+    def _measure(self, box, vel, score):
+        v = (np.nan, np.nan) if vel is None else vel[:2]
+        self.meas = np.array([box[0], box[1], box[6], v[0], v[1], score], dtype=np.float64)
 
     def _add_center(self, box):
         self.centers.append((self.stamp, float(box[0]), float(box[1])))
@@ -294,7 +303,8 @@ class Track:
             mode_probs=self.imm.mu.copy(), age=self.stamp - self.birth, hits=self.hits,
             coasting=self.time_since_update > 1e-6, history=np.asarray(self.history), motion=self.motion,
             time_since_moving=float("inf") if self.last_moving is None else self.stamp - self.last_moving,
-            speed_displacement=self.speeds[0], speed_head=self.speeds[1])
+            speed_displacement=self.speeds[0], speed_head=self.speeds[1],
+            measurement=None if self.time_since_update > 1e-6 else self.meas.copy())
 
 
 class MultiObjectTracker:

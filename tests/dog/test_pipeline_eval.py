@@ -143,6 +143,15 @@ def test_scene_metrics(scene):
     assert m["motion_relevant_segments"] >= 1 and m["motion_relevant_missed"] == 0
     assert m["pred_samples_moving"] > 10 and m["pred_FDE3_moving"] < 3.0
     assert m["CV_FDE3_moving"] < 3.0
+    # the 3 s error split along / across the labelled path; it is all there is to FDE on a straight path
+    r3 = m["tables"]["prediction"]["moving"]["IMM"][3.0]
+    assert r3["along"] <= r3["FDE1"] + 1e-9 and r3["across"] <= r3["FDE1"] + 1e-9
+    assert np.hypot(r3["along"], r3["across"]) >= 0.7 * r3["FDE1"]
+    assert "along" not in m["tables"]["prediction"]["all matched"]["IMM"][3.0]      # parked cars have no path
+    # the training targets cut from this run's track log: a few cm off the labels (detections 0.15 m noisy)
+    for source in pe.TARGET_SOURCES:
+        assert m["target_%s_err3_moving" % source] < 0.15 and m["target_%s_kept_moving" % source] > 0.8
+        assert m["tables"]["targets"][source]["static"]["by_h"][3.0]["mean"] < 0.15
     hz = m["tables"]["hazard"]
     assert len(hz) == 1 and hz[0]["gt"] == 3 and hz[0]["reported"] and hz[0]["lead"] > 0
     assert m["AP@2.0"] > 0.9
@@ -161,6 +170,7 @@ def test_sources_raw_and_labels(scene):
         pe.summarize([r_raw])["det_fp_per_frame"]
     oracle = pe.summarize([pe.run_scene(scene, pe.EvalConfig(), source="labels")])
     assert oracle["det_precision_near"] == 1.0 and oracle["MOTA"] > pe.summarize([r_res])["MOTA"]   # no clutter
+    assert oracle["target_measured_err3_moving"] < 1e-6 and oracle["pred_across3_moving"] < 1e-6   # labels in, labels out
 
 
 def test_bootstrap_is_paired(scene):
@@ -190,6 +200,7 @@ def test_tool_writes_report_mcap_and_sweep(tmp_path):
     subprocess.run([sys.executable, tool] + common + ["--out", str(out)], check=True, env=env, capture_output=True)
     report = (out / "report.md").read_text()
     assert "MOTA" in report and "IDF1" in report and "FDE" in report
+    assert "## Training targets" in report and "| measured | moving |" in report and "| across |" in report
     assert (out / "issues.csv").exists() and (out / "report.json").exists() and (out / "scene_a_bev.png").exists()
     from mcap.reader import make_reader
     with open(out / "scene_a.mcap", "rb") as f:
@@ -224,5 +235,6 @@ def test_learned_predictor_and_track_logs(scene, tmp_path):
     assert np.isfinite(m["pred_FDE3_moving"]) and "learned" in m["tables"]["prediction"]["moving"]
     samples = build_samples(imm_log.to_dict(), SampleConfig())
     assert len(samples["future"]) > 50 and "imm_modes" in samples   # the online IMM is logged for comparison
+    assert len(build_samples(imm_log.to_dict(), SampleConfig(targets="measured"))["future"]) == len(samples["future"])
     grid = pe.parse_grid(["eval.learned_model=," + path])
     assert grid == [{"eval.learned_model": ""}, {"eval.learned_model": path}]

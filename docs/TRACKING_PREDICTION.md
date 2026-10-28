@@ -547,20 +547,20 @@ __call__(tracker, ego_hist)                                  learned.py:37
 
 #### 3.3.5 训练数据（`dataset.py`）
 
-**记录**：`TrackLogger`（`:24`）每帧记录三样东西，由 `run_sequence.py` 保存为 `track_log.npz`：
+**记录**：`TrackLogger`（`:31`）每帧记录三样东西，由 `run_sequence.py` 保存为 `track_log.npz`：
 
-- 每条上报轨迹一行 `rows: [t, id, label, x, y, vx, vy, yaw, observed]`；
+- 每条上报轨迹一行 `rows: [t, id, label, x, y, vx, vy, yaw, observed, det_x, det_y, det_yaw, det_vx, det_vy, det_score]`：前 9 列是跟踪器的估计，后 6 列是这一帧匹配到的检测（`TrackState.measurement`，coasting 时为 NaN；2026-10-28 之前的日志只有前 9 列）；
 - 机器狗位姿 `ego: [t, x, y, yaw]`；
 - 第一档线上实际输出的预测（概率最高的 2 个模态），用于在同一批样本上公平对比两档。
 
-**切窗**：`build_samples`（`:120`）：
+**切窗**：`build_samples`（`:173`）：
 
-1. **真值**：每条轨迹只取实际观测到的帧，用 RTS 平滑器（`rts_smooth`，`:65`，CV 模型，前向卡尔曼加后向平滑）得到非因果的平滑轨迹，作为真值来源；
+1. **真值**：每条轨迹只取实际观测到的帧，用 RTS 平滑器（`rts_smooth`，CV 模型，前向卡尔曼加后向平滑）得到非因果的平滑轨迹，作为真值来源（`track_targets`）。平滑什么由 `SampleConfig.targets` 定：`filtered`（默认）是跟踪器在这些帧更新后的位置，已经滤波过一次，起步、停车时会留一点滞后；`measured` 是匹配到的检测框中心本身，没有滞后，但带检测的抖动。两种都是**伪真值**，不是车的真实轨迹：ID 切换会把别的车的未来当成目标，假轨迹会混进窗口，未来被遮挡的窗口被丢掉。它们离审过的标签有多远，`pipeline_eval.py` 的 "Training targets" 表会量（3.3.7 节）；
 2. 每 2 帧取一个当前时刻 `t_now`；
 3. 对 `t_now` 时存在、且已有 ≥ 0.5 s 历史的轨迹：
    - 未来 3 s 必须都在轨迹寿命内；
    - 未来时段内至少 80% 的帧真的观测到了目标（不是 coasting）；
-   - 满足条件就从平滑轨迹上插值出 0.5, 1.0, …, 3.0 s 的真值；
+   - 满足条件就从平滑轨迹上插值出 0.5, 1.0, …, 3.0 s 的真值（`window_target`）；
 4. 输入用 `build_inputs` 构造，历史取跟踪器的**因果**估计，与线上完全一致；
 5. 真值转到目标坐标系保存；同时保存同一窗口的第一档线上预测。
 
@@ -604,10 +604,14 @@ python tools/dog/train_predictor.py --sim 10 --encoder transformer      # 没有
    - `--static-keep 0.3`：3 s 内移动不到 `--moving-disp`（1.5 m）的窗口只留 30%，运动的全留；
    - `--mirror`：每个训练窗口再加一份左右镜像。
    - 验证窗口不抽、不镜像。结果按全部、运动、静止三组分别打印：静止的车被预测成要开走，会让狗误停。
-3. **和标签比（端到端）。**
+3. **训练目标选哪种。** `train_predictor.py --targets filtered|measured`（3.3.5 节）。
+   - 评估工具每次都把每个预测样本的训练目标（按同样规则从本次跟踪日志切出）和标注的未来比，报告里是 "Training targets" 表，`report.json` 里是 `target_<filtered|measured>_err3_moving`；
+   - 哪种离标签近就用哪种。`train_predictor.py` 打印的验证表用的也是这种伪真值，能不能替换 IMM 只看下一步对标签的比较。
+4. **和标签比（端到端）。**
    - `pipeline_eval.py --set "eval.learned_model=,<model.pt>"`：第 1 行 IMM，第 2 行第二档，同一批轨迹配对重抽；
-   - 指标名是 `pred_*`，指线上实际在用的预测器；`CV_*` 是匀速。
-4. **上线**：ROS 2 节点参数 `predictor_model:=<model.pt>`。历史不足 0.5 s 的轨迹自动回退 IMM（3.3.4 节）。
+   - 指标名是 `pred_*`，指线上实际在用的预测器；`CV_*` 是匀速；
+   - 运动车的误差还拆成沿标注路径的纵向（`pred_along3_moving`，`pred_along_bias3_moving` 为带符号的均值，正 = 预测快了）和离开路径的横向（`pred_across3_moving`，`prediction/metrics.py` 的 `along_across`）。横向占比小，说明误差在速度和起停上，道路地图 / 占据栅格帮不上。
+5. **上线**：ROS 2 节点参数 `predictor_model:=<model.pt>`。历史不足 0.5 s 的轨迹自动回退 IMM（3.3.4 节）。
 
 ### 3.4 给下游
 

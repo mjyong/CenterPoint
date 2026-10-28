@@ -12,7 +12,10 @@ parameters, scene by scene, and compared with the reviewed keyframe labels (2 Hz
 * motion state against the labels' ``moving`` flags (``tracking/motion_eval.py``);
 * prediction against the labelled future (keyframes every 0.5 s are the 0.5 s prediction steps):
   ADE / FDE of the most likely mode and over all modes, miss rate, at 1 / 2 / 3 s, IMM against
-  constant velocity, for moving vehicles split into straight / turning and by speed;
+  constant velocity, for moving vehicles split into straight / turning and by speed, and their error
+  split along / across the labelled path (speed against path shape, ``prediction.metrics.along_across``);
+* the tier-2 training targets (pseudo ground truth smoothed from the track log, filtered or measured)
+  of the same samples against the labels (``_score_targets``);
 * a hazard proxy: a moving vehicle that comes within ``hazard_radius`` of the robot within
   ``hazard_horizon`` should raise an alarm (a moving track whose most likely predicted path, or its
   position now, comes that close), how early it does, and alarms without such a vehicle.
@@ -40,8 +43,9 @@ from .detection.boxes import CLASSES, Detections, score_threshold_array
 from .detection.evaluate import _on_ignore, evaluate_detections, match_frame
 from .detection.filters import DetectionFilterConfig, filter_reasons
 from .geometry import inv_T, wrap_angle
+from .prediction.dataset import SampleConfig, TrackLogger, split_tracks, track_targets, window_target
 from .prediction.kinematic import IMMPredictor
-from .prediction.metrics import displacement_metrics
+from .prediction.metrics import along_across, displacement_metrics
 from .tracking import MultiObjectTracker, TrackerConfig
 from .tracking.evaluate import MotAccumulator
 from .tracking.motion_eval import MotionStateAccumulator
@@ -49,6 +53,7 @@ from .tracking.tracker import ClassParams
 
 VEHICLE = CLASSES.index("vehicle")
 HORIZONS = (1.0, 2.0, 3.0)
+TARGET_SOURCES = ("filtered", "measured")      # the tier-2 training targets (prediction/dataset.py)
 RANGE_BINS = ((10, "0-10 m"), (20, "10-20 m"), (30, "20-30 m"), (None, "30-40 m"))
 POINT_BINS = ((10, "1-9 pts"), (50, "10-49 pts"), (None, ">=50 pts"))
 FP_CAUSES = ("second track on a tracked vehicle", "beside a vehicle (2-4 m off)", "coasting after the vehicle was lost",
@@ -413,7 +418,8 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
     draw every frame into; ``cloud_of(stamp)``: the saved detector input (N, 5, det frame) or None,
     for the lidar in ``viz`` and the snapshot, and for ``raw`` with changed measuring settings.
     ``logger``: a ``prediction.TrackLogger`` that records the tracks, robot poses and predictions
-    (the tier-2 training data, tools/dog/train_predictor.py)."""
+    (the tier-2 training data, tools/dog/train_predictor.py). The training targets cut from that log
+    are scored against the labels either way (``_score_targets``)."""
     cfg = cfg or EvalConfig()
     res = SceneResult(sd.name, sd.rows[0]["stamp"] if sd.rows else 0.0, merges=sd.merges)
     tracker = MultiObjectTracker(cfg.tracker)
@@ -427,6 +433,7 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
     else:
         times = np.arange(1, 7) * 0.5
     ego = deque(maxlen=64)              # the robot's own history, a neighbour of every agent for tier 2
+    log = logger if logger is not None else TrackLogger()
     mot = MotAccumulator(["vehicle"], cfg.match_dist)
     motion = MotionStateAccumulator(("vehicle",), cfg.match_dist, relevant_speed=1.0, relevant_range=cfg.near_range)
     good = [r for r in sd.rows if not r.get("pose_bad")]
@@ -468,8 +475,7 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
         else:
             preds = predictor(tracker) if predictor else []
         t4 = time.perf_counter()
-        if logger is not None:
-            logger.add(stamp, tracks, T_body, preds)
+        log.add(stamp, tracks, T_body, preds if logger is not None else None)
         res.timings["filter_ms"].append(1e3 * (t2 - t1))
         res.timings["track_ms"].append(1e3 * (t3 - t2))
         res.timings["predict_ms"].append(1e3 * (t4 - t3))
@@ -610,11 +616,14 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
                 seg = seg[np.hypot(*seg.T) > 0.3]
                 turn = float(np.degrees(abs(wrap_angle(np.arctan2(seg[-1, 1], seg[-1, 0]) - np.arctan2(seg[0, 1], seg[0, 0]))))) \
                     if len(seg) >= 2 else 0.0
-                sample = dict(scene=sd.name, t=stamp, gt=fut, modes=p.modes, probs=p.probs,
+                sample = dict(scene=sd.name, t=stamp, gt=fut, cur=cur, modes=p.modes, probs=p.probs,
                               cv=s.position[:2] + np.outer(times, s.velocity[:2]),
                               moving=bool(np.hypot(*(fut[-1] - cur)) >= cfg.moving_disp), turning=turn > cfg.turn_deg,
                               speed=float(np.hypot(*seg.T).sum() / times[-1]) if len(seg) else 0.0,
                               range=by_g[g]["rng"], gt_id=g, track=tid)
+                # moving: the most likely mode's error along / across the labelled path
+                sample["split"] = dict(imm=along_across(p.modes[int(np.argmax(p.probs))], cur, fut),
+                                       cv=along_across(sample["cv"], cur, fut)) if sample["moving"] else None
                 res.pred.append(sample)
                 fde_k = np.hypot(*(p.modes[:, -1] - fut[-1]).T)
                 f1 = float(fde_k[int(np.argmax(p.probs))])
@@ -687,7 +696,32 @@ def run_scene(sd, cfg=None, source="results", viz=None, cloud_of=None, lidar_str
         last_pose = (stamp, T[:2, 3].copy())
 
     _finish(res, sd, cfg, mot, motion, keys, seen_near, tracked_at, fp_kf, fn_kf, alarm_kf, hazard_kf, match_kf)
+    if res.pred:
+        _score_targets(res.pred, log.to_dict(), times)
     return res
+
+
+def _score_targets(samples, log, times, sample_cfg=None):
+    """The tier-2 training target of every prediction sample, cut from the scene's track log the way
+    ``build_samples`` cuts it (the same windows are kept), against the labelled future. Adds
+    ``target[source]``: None (no training window there) or dict(err, along, across), (T,) each
+    (along / across only for moving samples)."""
+    sc = sample_cfg or SampleConfig()
+    rows = log["rows"]
+    tracks = split_tracks(rows[np.isin(rows[:, 1], [s["track"] for s in samples])])   # smooth only these
+    stamps = np.unique(rows[:, 0])
+    for source in TARGET_SOURCES:
+        targets = track_targets(tracks, source, sc.smooth_targets)
+        for s in samples:
+            tr = tracks.get(s["track"])
+            fut = None
+            if tr is not None and s["t"] - tr[0, 0] >= sc.min_history - 1e-6:
+                fut = window_target(targets.get(s["track"]), s["t"], times, stamps, sc.min_future_observed)
+            if fut is None:
+                s.setdefault("target", {})[source] = None
+                continue
+            along, across = along_across(fut, s["cur"], s["gt"]) if s["moving"] else (None, None)
+            s.setdefault("target", {})[source] = dict(err=np.hypot(*(fut - s["gt"]).T), along=along, across=across)
 
 
 def _finish(res, sd, cfg, mot, motion, keys, seen_near, tracked_at, fp_kf, fn_kf, alarm_kf, hazard_kf, match_kf):
@@ -807,18 +841,51 @@ def _pad(samples, kind):
 
 def prediction_metrics(samples, step=0.5, name="IMM"):
     """{predictor: {horizon: displacement metrics}} for the online predictor (all its modes; ``name``:
-    "IMM" or "learned") and constant velocity."""
+    "IMM" or "learned") and constant velocity. When every sample moves, also the most likely mode's
+    error split against the labelled path: ``along`` (mean |along|), ``along_bias`` (mean signed, +:
+    ahead) and ``across`` (``prediction.metrics.along_across``)."""
     if not samples:
         return {}
     gt = np.stack([s["gt"] for s in samples])
+    split = all(s.get("split") is not None for s in samples)
     out = {}
     for kind, name in (("imm", name), ("cv", "CV")):
         M, P = _pad(samples, kind)
         out[name] = {}
+        if split:
+            along = np.stack([s["split"][kind][0] for s in samples])
+            across = np.stack([s["split"][kind][1] for s in samples])
         for h in HORIZONS:
             n = int(round(h / step))
             if n <= gt.shape[1]:
-                out[name][h] = displacement_metrics(M[:, :, :n], P, gt[:, :n])
+                out[name][h] = r = displacement_metrics(M[:, :, :n], P, gt[:, :n])
+                if split:
+                    r.update(along=float(np.nanmean(np.abs(along[:, n - 1]))),
+                             along_bias=float(np.nanmean(along[:, n - 1])), across=float(np.nanmean(across[:, n - 1])))
+    return out
+
+
+def target_metrics(samples, source, step=0.5):
+    """How far the tier-2 training targets (``_score_targets``) lie from the labels: windows (samples
+    with a training window, of all), and per horizon the mean, p90 and share over 1 m of the error,
+    and for moving samples its split along / across the labelled path."""
+    kept = [s["target"][source] for s in samples if (s.get("target") or {}).get(source) is not None]
+    out = dict(windows=len(kept), samples=len(samples), by_h={})
+    if not kept:
+        return out
+    err = np.stack([k["err"] for k in kept])
+    split = all(k["along"] is not None for k in kept)
+    for h in HORIZONS:
+        n = int(round(h / step))
+        if n > err.shape[1]:
+            continue
+        e = err[:, n - 1]
+        r = dict(mean=float(e.mean()), p90=_q(e, 90), over1=float((e > 1.0).mean()))
+        if split:
+            a = np.array([k["along"][n - 1] for k in kept])
+            r.update(along=float(np.nanmean(np.abs(a))), along_bias=float(np.nanmean(a)),
+                     across=float(np.nanmean([k["across"][n - 1] for k in kept])))
+        out["by_h"][h] = r
     return out
 
 
@@ -888,7 +955,14 @@ def summarize(results, step=0.5, tables=True):
         r3 = pm.get(name, {}).get(HORIZONS[-1])
         m["%s_minFDE3_moving" % key] = r3["minFDE"] if r3 else float("nan")
         m["%s_MR3_moving" % key] = r3["MR"] if r3 else float("nan")
+        for part in ("along", "along_bias", "across"):
+            m["%s_%s3_moving" % (key, part)] = r3.get(part, float("nan")) if r3 else float("nan")
     m["pred_samples_moving"] = len(mov)
+    for source in TARGET_SOURCES:
+        tm = target_metrics(mov, source, step)
+        r3 = tm["by_h"].get(HORIZONS[-1])
+        m["target_%s_err3_moving" % source] = r3["mean"] if r3 else float("nan")
+        m["target_%s_kept_moving" % source] = tm["windows"] / tm["samples"] if tm["samples"] else float("nan")
     hz = [h for r in results for h in r.hazard]
     m["hazard_events"] = len(hz)
     m["hazard_reported"] = sum(h["reported"] for h in hz)
@@ -907,6 +981,10 @@ def summarize(results, step=0.5, tables=True):
     t = dict(counts=c, mot=dict(k), minutes=minutes, keyframes=kf, frames=sum(r.frames for r in results),
              merges=sum(r.merges for r in results), detection=det, motion=ms,
              prediction={name: prediction_metrics(v, step, online) for name, v in prediction_subsets(samples).items()},
+             targets={source: {name: target_metrics(v, source, step) for name, v in
+                               (("all matched", samples), ("moving", mov),
+                                ("static", [s for s in samples if not s["moving"]])) if v}
+                      for source in TARGET_SOURCES},
              latency_n=len(lat), hazard=hz, timing={key: (_q(v, 50), _q(v, 90)) for key, v in timing.items()})
     m["tables"] = t
     return m

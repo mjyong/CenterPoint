@@ -240,16 +240,37 @@ def write_report(args, cfg, overrides, m, boot, results, issue_counts, figures):
     L += ["## Prediction", "", "Tracks matched to a vehicle with 3 s of labelled future (keyframes every 0.5 s). Moving: "
           ">= %.1f m in 3 s; turning: heading changes > %.0f deg. ADE1 / FDE1: the most likely mode; minADE / minFDE: "
           "the best; MR: no mode ends within 2 m. %s is what runs online (IMM: tier 1, learned: tier 2), CV keeps the "
-          "track's velocity." % (cfg.moving_disp, cfg.turn_deg, results[0].predictor if results else "IMM"), ""]
+          "track's velocity. Moving vehicles: the most likely mode's error split against the labelled path, along: "
+          "mean distance along it from the true position (speed, starting, stopping), bias: its mean signed value (+: "
+          "ahead, predicted too fast), across: mean distance from the path (its shape: what a road map could fix)."
+          % (cfg.moving_disp, cfg.turn_deg, results[0].predictor if results else "IMM"), ""]
     for subset, res in t["prediction"].items():
         n = next(iter(next(iter(res.values()), {}).values()), {}).get("num", 0)
-        L += ["**%s** (%d samples)" % (subset, n), "", "| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m |",
-              "|---|---|---|---|---|---|---|"]
+        L += ["**%s** (%d samples)" % (subset, n), "",
+              "| predictor | horizon | ADE1 | FDE1 | minADE | minFDE | MR@2m | along | bias | across |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
         for name, by_h in res.items():
             for h, r in by_h.items():
-                L.append("| %s | %.0f s | %s | %s | %s | %s | %s |" % (name, h, _f(r["ADE1"], 2), _f(r["FDE1"], 2),
-                                                                       _f(r["minADE"], 2), _f(r["minFDE"], 2), _f(r["MR"])))
+                L.append("| %s | %.0f s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+                    name, h, _f(r["ADE1"], 2), _f(r["FDE1"], 2), _f(r["minADE"], 2), _f(r["minFDE"], 2), _f(r["MR"]),
+                    _f(r.get("along", float("nan")), 2), _f(r.get("along_bias", float("nan")), 2),
+                    _f(r.get("across", float("nan")), 2)))
         L.append("")
+    L += ["## Training targets", "", "The tier-2 training targets (prediction/dataset.py) of the same samples, cut from "
+          "this run's track log the way train_predictor.py cuts them, against the labelled future: a pseudo ground "
+          "truth, smoothed afterwards from the tracker's positions (filtered) or from the matched detections' centers "
+          "(measured). windows: samples whose track has a training window there. Errors in m; > 1 m: share; along / "
+          "bias / across as above (moving).", "",
+          "| targets | samples | windows | horizon | mean | p90 | > 1 m | along | bias | across |",
+          "|---|---|---|---|---|---|---|---|---|---|"]
+    for source, by_subset in t["targets"].items():
+        for subset, tm in by_subset.items():
+            for h, r in tm["by_h"].items():
+                L.append("| %s | %s | %d / %d | %.0f s | %s | %s | %s | %s | %s | %s |" % (
+                    source, subset, tm["windows"], tm["samples"], h, _f(r["mean"], 2), _f(r["p90"], 2), _f(r["over1"]),
+                    _f(r.get("along", float("nan")), 2), _f(r.get("along_bias", float("nan")), 2),
+                    _f(r.get("across", float("nan")), 2)))
+    L.append("")
     hz = t["hazard"]
     lead = [h["lead"] for h in hz if h["reported"]]
     L += ["## Hazard proxy", "", "A moving vehicle that comes within %.0f m of the robot within %.0f s (labelled future, "
@@ -287,7 +308,8 @@ def write_report(args, cfg, overrides, m, boot, results, issue_counts, figures):
                                                                            for key, v in boot.items()
                                                                            if np.isfinite(v).any()},
                               counts=dict(c), mot=k, motion={kk: vv for kk, vv in ms.items() if kk != "details"},
-                              prediction=t["prediction"], detection=d, hazard=hz, timing=t["timing"])), f, indent=1)
+                              prediction=t["prediction"], targets=t["targets"], detection=d, hazard=hz,
+                              timing=t["timing"])), f, indent=1)
     return text
 
 
