@@ -165,7 +165,7 @@ CenterPointDetector.__call__(points_det, stamp)
 | `postprocess` | `boxes (84,7) f64`、`velocities (84,2) f64` | 3 类，D 系，yaw 为逆时针、从 +x 起算 |
 | `filter_detections` | `(84,7)` → **`(55,7)`** | 仍保留低分框，第二阶段关联要用 |
 | 输出 `Detections` | `boxes (55,7) f64`、`velocities (55,2) f64`、`scores (55,) f64`、`labels (55,) i64`（0=vehicle，1=pedestrian，2=cyclist） | `last_raw_count = 84` |
-| `Detections.above(DEFAULT_SCORE_THRESHOLDS)` | `(17,7)` | 用于上报 / 可视化，阈值为车 0.35、人 0.3、骑行 0.4 |
+| `Detections.above(DEFAULT_SCORE_THRESHOLDS)` | `(17,7)` | 用于上报 / 可视化，阈值为车 0.35、人 0.3、骑行 0.4（这一帧是按当时的值算的；2026-10-27 起车改为 0.40） |
 
 `predict` 之后的几行是当前代码在样例 bag 第 10 帧上的实测（`tools/dog/trace_postprocess.py --frame 10`）；上面几行是早先在另一帧上测的，量级相同。
 

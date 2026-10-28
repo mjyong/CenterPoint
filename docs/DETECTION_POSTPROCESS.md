@@ -271,4 +271,4 @@ postprocess 输出 `boxes (84, 7) f64`、`velocities (84, 2) f64`，D 系，yaw 
 | `ground_cell` / `ground_ring` / `ground_percentile` | 同上 | 2 m / 4 m / 10% | 局部地面的估计方式 |
 | `min_points` | 同上 | 车 5、行人 3、骑行 3 | 调高：远处的车更容易被滤掉 |
 | `cross_class_margin` | 同上 | 0.2 m | |
-| `DEFAULT_SCORE_THRESHOLDS` | `filters.py` | 车 0.35、行人 0.30、骑行 0.40 | 上报阈值，也是新建轨迹的阈值 |
+| `DEFAULT_SCORE_THRESHOLDS` | `filters.py` | 车 0.40（2026-10-27 前是 0.35；本文的例子还是按 0.35 走的）、行人 0.30、骑行 0.40 | 上报阈值，也是新建轨迹的阈值。车的 0.40 是在 0921 验证场景上为 nuScenes Pillar 调的（PIPELINE_TUNING.md，T19） |

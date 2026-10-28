@@ -62,8 +62,8 @@ def test_ground_support_uses_local_ground():
 
 
 def test_report_thresholds_are_per_class():
-    d = Detections(np.zeros((3, 7)), np.zeros((3, 2)), np.array([0.36, 0.36, 0.36]), np.array([0, 1, 2]))
-    assert list(d.above(DEFAULT_SCORE_THRESHOLDS).labels) == [0, 1]   # cyclist needs 0.4
+    d = Detections(np.zeros((4, 7)), np.zeros((4, 2)), np.array([0.41, 0.38, 0.36, 0.36]), np.array([0, 0, 1, 2]))
+    assert list(d.above(DEFAULT_SCORE_THRESHOLDS).labels) == [0, 1]   # vehicle and cyclist need 0.4
     assert len(d.above(0.5)) == 0
 
 
@@ -96,14 +96,14 @@ def test_tracker_start_and_report_thresholds():
     trk = MultiObjectTracker(cfg)
     cyc = lambda s, x: Detections(np.array([[x, 0, 0.8, 1.8, 0.6, 1.5, 0.0]]), np.zeros((1, 2)), np.array([s]),
                                   np.array([2]), "world")
-    for k in range(4):                       # 0.38 >= default 0.35 but < cyclist 0.4: never starts a track
+    for k in range(4):                       # 0.38 >= the pedestrian 0.3 but < cyclist 0.4: never starts a track
         trk.step(cyc(0.38, 5.0), 0.1 * (k + 1))
     assert trk.tracks == []
     for k in range(3):
         out = trk.step(cyc(0.6, 5.0), 0.5 + 0.1 * k)
     assert len(out) == 1
-    for k in range(15):                      # kept alive by low-score boxes, score decays below 0.3
-        out = trk.step(cyc(0.12, 5.0), 0.8 + 0.1 * k)
+    for k in range(15):                      # kept alive by low-score boxes (>= low_score 0.2), score decays below 0.3
+        out = trk.step(cyc(0.22, 5.0), 0.8 + 0.1 * k)
     assert len(trk.tracks) == 1 and out == [] and trk.reported_tracks() == []
 
 

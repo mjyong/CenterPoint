@@ -19,8 +19,10 @@ from scipy.spatial import cKDTree
 from .boxes import CLASSES
 
 # score needed to report a detection or to start a track. Cyclist is the
-# noisiest nuScenes class on vegetation / poles for a low-mounted lidar.
-DEFAULT_SCORE_THRESHOLDS = {"vehicle": 0.35, "pedestrian": 0.3, "cyclist": 0.4}
+# noisiest nuScenes class on vegetation / poles for a low-mounted lidar. Vehicle 0.40: tuned for the
+# deployed nuScenes Pillar on the 0921 validation scenes (T19, 2026-10-27; 0.35 before), best detection
+# F1 within 30 m without missing more moving vehicles.
+DEFAULT_SCORE_THRESHOLDS = {"vehicle": 0.4, "pedestrian": 0.3, "cyclist": 0.4}
 
 
 @dataclass

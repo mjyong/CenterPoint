@@ -37,7 +37,7 @@ far car scores 0.3-0.4 most of the time, but a real one is seen clearly at
 some point; a false one rarely is, several times).
 """
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -45,6 +45,7 @@ from .detection.boxes import CLASSES, SUBCLASS_TO_CLASS, SUBCLASSES
 from .geometry import wrap_angle
 from .prediction.dataset import rts_smooth
 from .tracking import MultiObjectTracker, TrackerConfig
+from .tracking.tracker import DEFAULT_CLASS_PARAMS
 
 
 @dataclass
@@ -74,9 +75,19 @@ def _weighted_median(x, w):
     return float(x[o][np.searchsorted(c, 0.5 * c[-1])])
 
 
+def label_tracker_config():
+    """The tracker settings the 0921 auto-labels were made with. The online defaults were tuned for the
+    deployed Pillar afterwards (docs/PIPELINE_TUNING.md, T19-T20, 2026-10-27); the teacher's offline
+    association keeps these, so labels made again come out the same."""
+    vehicle = replace(DEFAULT_CLASS_PARAMS["vehicle"], max_age=1.0, min_hits=2)
+    return TrackerConfig(classes=CLASSES, class_params=dict(DEFAULT_CLASS_PARAMS, vehicle=vehicle), low_score=0.1,
+                         high_score={"vehicle": 0.35, "pedestrian": 0.3, "cyclist": 0.4},
+                         output_min_score={"vehicle": 0.3, "pedestrian": 0.25, "cyclist": 0.3})
+
+
 def associate_offline(frames, tracker_cfg=None):
     """frames: list of (stamp, Detections in world frame). Returns {track_id: list of obs}."""
-    trk = MultiObjectTracker(tracker_cfg or TrackerConfig(classes=CLASSES))
+    trk = MultiObjectTracker(tracker_cfg or label_tracker_config())
     obs = defaultdict(list)
     for stamp, dets in frames:
         trk.step(dets, stamp)

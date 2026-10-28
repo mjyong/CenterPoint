@@ -120,8 +120,8 @@ def test_long_vehicle_two_boxes_stay_one_track():
 def test_vehicles_side_by_side_stay_two_tracks():
     trk = MultiObjectTracker(TrackerConfig())
     side = _vehicles([(0.0, 0.0, 4.5, 1.8, 0.0, 0.8), (0.0, 4.0, 4.5, 1.8, 0.0, 0.8)])
-    trk.step(side, 0.1)
-    out = trk.step(side, 0.2)
+    for k in range(3):                         # vehicles are confirmed on the 3rd hit
+        out = trk.step(side, 0.1 * (k + 1))
     assert len(out) == 2
 
 
@@ -165,10 +165,10 @@ def test_motion_state_parked_car_stays_static():
     head = np.where((t >= 5) & (t < 5.5), 1.2, 0.0)
     head[:3] = [12.0, 8.0, 5.0]
     out = _drive(MultiObjectTracker(TrackerConfig()), x, 0.0, 0.1, head, rng, vel_noise=0.1)
-    assert all(s[0].motion == "static" for s in out[1:])
+    assert all(s[0].motion == "static" for s in out[2:])          # reported from the 3rd frame (min_hits 3)
     displacement_only = _drive(MultiObjectTracker(TrackerConfig(use_velocity=False)), x, 0.0, 0.1, head,
                                np.random.default_rng(0), vel_noise=0.1)
-    assert any(s[0].motion == "moving" for s in displacement_only[1:])
+    assert any(s[0].motion == "moving" for s in displacement_only[2:])
 
 
 def test_motion_state_start_stop_and_forget():
@@ -178,7 +178,7 @@ def test_motion_state_start_stop_and_forget():
     v = np.where((t >= 3) & (t < 8), 3.0, 0.0)              # drives 3 m/s from 3 s to 8 s
     x = 10 + np.cumsum(v) * 0.1
     out = _drive(trk, x, 0.0, 0.1, v, rng)
-    motion = np.array([s[0].motion if s else "static" for s in out])       # confirmed from the 2nd frame
+    motion = np.array([s[0].motion if s else "static" for s in out])       # confirmed from the 3rd frame
     t_moving = t[np.argmax(motion == "moving")]
     assert (motion[t < 3] == "static").all() and 3.0 < t_moving <= 3.5
     t_stopped = t[(t > 8) & (motion == "stopped")][0]
@@ -188,7 +188,7 @@ def test_motion_state_start_stop_and_forget():
     # a car already driving when first seen is reported moving within 0.5 s
     drive = _drive(MultiObjectTracker(TrackerConfig()), 10 + 3.0 * t[:20], 0.0, 0.1, np.full(20, 3.0),
                    np.random.default_rng(2))
-    assert [s[0].motion for s in drive[1:]].index("moving") + 1 <= 5
+    assert next(k for k, s in enumerate(drive) if s and s[0].motion == "moving") <= 5
 
 
 def test_motion_eval_counts_false_moving_and_latency():

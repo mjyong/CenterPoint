@@ -64,8 +64,10 @@ class ClassParams:
     init_omega_std: float = 0.3
 
 
+# vehicle max_age 1.5 s and min_hits 3: tuned for the deployed nuScenes Pillar on the 0921 validation scenes
+# (T20, 2026-10-27; 1.0 s and 2 before): fewer false tracks and ID switches, no later confirmation
 DEFAULT_CLASS_PARAMS = {
-    "vehicle": ClassParams(3.0, 1.0, 2, 0.30, 0.8, (("cv", 1.5), ("ct", 1.5, 0.25))),
+    "vehicle": ClassParams(3.0, 1.5, 3, 0.30, 0.8, (("cv", 1.5), ("ct", 1.5, 0.25))),
     "pedestrian": ClassParams(1.5, 1.5, 2, 0.15, 0.5, (("cv", 0.4), ("cv", 2.0))),
     "cyclist": ClassParams(2.5, 1.0, 2, 0.20, 0.6, (("cv", 1.5), ("ct", 1.5, 0.4))),
 }
@@ -80,14 +82,15 @@ class TrackerConfig:
     # score needed to start a track (float or {class: score}); below it, down to
     # low_score, detections only continue existing confirmed tracks
     high_score: object = field(default_factory=lambda: dict(DEFAULT_SCORE_THRESHOLDS))
-    low_score: float = 0.1
+    low_score: float = 0.2               # T19, 2026-10-27 (0.1 before)
     matching: str = "greedy"             # or "hungarian"
     use_velocity: bool = True            # CenterPoint velocity head as a measurement
     tentative_max_age: float = 0.15      # [s]; at 10 Hz a tentative track survives one missed frame
     output_coasting: bool = True
     # tracks are kept alive by low-score detections (stage 2); only report those
-    # whose smoothed score is still at least this (float or {class: score})
-    output_min_score: object = field(default_factory=lambda: {"vehicle": 0.3, "pedestrian": 0.25, "cyclist": 0.3})
+    # whose smoothed score is still at least this (float or {class: score}); vehicle 0.35 since T19
+    # (2026-10-27; 0.3 before)
+    output_min_score: object = field(default_factory=lambda: {"vehicle": 0.35, "pedestrian": 0.25, "cyclist": 0.3})
     history: float = 3.0                 # [s] kept for the predictors
     size_alpha: float = 0.2
     z_alpha: float = 0.3

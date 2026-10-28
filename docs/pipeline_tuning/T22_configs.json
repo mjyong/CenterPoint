@@ -1,0 +1,5 @@
+[
+  {"tracker.high_score": 0.35, "tracker.output_min_score": 0.3, "tracker.low_score": 0.1,
+   "tracker.vehicle.max_age": 1.0, "tracker.vehicle.min_hits": 2},
+  {}
+]

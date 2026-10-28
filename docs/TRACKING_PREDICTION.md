@@ -187,7 +187,7 @@ P = Σ_j μ_j·( P_j + (x_j−x)(x_j−x)ᵀ )          第二项：模态之间
 
 | 类别 | 模型 1 | 模型 2 | 关联门限 | 保活时间 | 确认所需命中 | 位置噪声 | 速度噪声 |
 |---|---|---|---|---|---|---|---|
-| 车辆 | CV（q_acc 1.5） | CT（q_acc 1.5，q_ω 0.25） | 3.0 m | 1.0 s | 2 | 0.30 m | 0.8 m/s |
+| 车辆 | CV（q_acc 1.5） | CT（q_acc 1.5，q_ω 0.25） | 3.0 m | 1.5 s | 3 | 0.30 m | 0.8 m/s |
 | 行人 | CV（q_acc 0.4） | CV（q_acc 2.0） | 1.5 m | 1.5 s | 2 | 0.15 m | 0.5 m/s |
 | 骑行者 | CV（q_acc 1.5） | CT（q_acc 1.5，q_ω 0.4） | 2.5 m | 1.0 s | 2 | 0.20 m | 0.6 m/s |
 
@@ -222,7 +222,7 @@ P = Σ_j μ_j·( P_j + (x_j−x)(x_j−x)ᵀ )          第二项：模态之间
 step(dets_w, stamp)                                                      tracker.py:320
 1  所有轨迹 IMM 预测到当前时刻                       Track.predict         :324
 2  按类别阈值把检测分成两组                                               :327-330
-     high = score ≥ high_score[类别]      车辆 0.35 / 行人 0.30 / 骑行者 0.40
+     high = score ≥ high_score[类别]      车辆 0.40 / 行人 0.30 / 骑行者 0.40
      low  = 0.1 ≤ score < high_score
 3  第一阶段：high 与全部轨迹关联                    _associate            :332
 4  第二阶段：low 只与第一阶段没匹配上的"已确认"轨迹关联                     :334-336
@@ -335,7 +335,7 @@ IMM.update(z, H, R)
             ▼                               ▼                 │
           删除                           coasting ─────────────┘
                                             │ 距上次匹配 > max_age
-                                            ▼  （行人 1.5 s，车辆和骑行者 1.0 s）
+                                            ▼  （行人、车辆 1.5 s，骑行者 1.0 s）
                                           删除
 ```
 
@@ -349,7 +349,7 @@ IMM.update(z, H, R)
 
 1. 已确认；
 2. 正在 coasting 的，`output_coasting=True` 时也上报（默认开）；
-3. 平滑后的分数 ≥ `output_min_score`（车辆 0.3、行人 0.25、骑行者 0.3）。
+3. 平滑后的分数 ≥ `output_min_score`（车辆 0.35、行人 0.25、骑行者 0.3）。
 
 这条规则和分数衰减叠加，产生两个容易忽略的效果：
 
@@ -387,16 +387,22 @@ IMM.update(z, H, R)
 
 ### 2.9 参数一览：`TrackerConfig`（`tracker.py:75`）
 
+2026-10-27 起，车辆的 `high_score` 0.35 → 0.40、`output_min_score` 0.3 → 0.35、`low_score` 0.1 → 0.2，
+车辆的 `max_age` 1.0 → 1.5 s、`min_hits` 2 → 3（1.7 节的表）。这些值是在 0921 的验证场景上为上线的 nuScenes Pillar 调出来的，
+见 [PIPELINE_TUNING.md](PIPELINE_TUNING.md) 和 SERVER_TASKS.md 的 T19–T20。
+离线自动标注（`autolabel.label_tracker_config`）仍用调之前的值，0921 的标签就是用它们做的。
+
 | 参数 | 默认值 | 作用 |
 |---|---|---|
 | `class_params` | 1.7 节的表 | 按类别的模型、门限、保活时间、噪声 |
-| `high_score` | 车辆 0.35 / 行人 0.30 / 骑行者 0.40 | 能新建轨迹、参与第一阶段的分数 |
-| `low_score` | 0.1 | 参与第二阶段的最低分数 |
+| `classes` | `("vehicle",)` | 只跟踪这些类别（检测器仍输出行人、骑行者） |
+| `high_score` | 车辆 0.40 / 行人 0.30 / 骑行者 0.40 | 能新建轨迹、参与第一阶段的分数 |
+| `low_score` | 0.2 | 参与第二阶段的最低分数 |
 | `matching` | `"greedy"` | 或 `"hungarian"` |
 | `use_velocity` | True | 是否把 CenterPoint 速度作为量测 |
 | `tentative_max_age` | 0.15 s | tentative 轨迹允许的漏检时间 |
 | `output_coasting` | True | coasting 的轨迹是否上报 |
-| `output_min_score` | 车辆 0.3 / 行人 0.25 / 骑行者 0.3 | 上报所需的平滑分数 |
+| `output_min_score` | 车辆 0.35 / 行人 0.25 / 骑行者 0.3 | 上报所需的平滑分数 |
 | `history` | 3.0 s | 历史保留长度 |
 | `size_alpha` / `z_alpha` / `yaw_alpha` | 0.2 / 0.3 / 0.4 | EMA 系数 |
 | `heading_from_velocity` | 1.0 m/s | 车辆和骑行者速度超过它，朝向对齐运动方向 |
