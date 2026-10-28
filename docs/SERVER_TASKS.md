@@ -3830,7 +3830,7 @@ MCAP：`data/tune/T22_mcap/`，10 个场景，共 872 MB。
 
 误差拆分（IMM，moving，3 s）：验证集纵向 2.72 m、bias −0.07、横向 0.58 m；训练集纵向 2.50 m、bias +1.01、横向 1.09 m。验证集上横向比纵向小很多，误差主要在沿路径的速度上；训练集转弯（42 个样本）横向升到 1.84 m。
 
-**线上继续用 IMM。** GRU 和 Transformer 都不满足替换条件，模型留在 `data/train/pred_v1/`（不提交），新数据来了再训。
+**线上继续用 IMM。** GRU 和 Transformer 都不满足替换条件。权重在 `work_dirs/pred/gru.pt`（629 KB）、`work_dirs/pred/transformer.pt`（986 KB），新数据来了再训。
 
 - 端到端 FDE 3 s 要低于 IMM 且领先 ≥ 90%：GRU 3.034 对 2.795（领先 31%），Transformer 3.517 对 2.795（领先 14%）。两边的 MR 3 s 都更低（0.188、0.239 对 0.521），但 FDE 不合格。minFDE 更低（GRU 1.251、Transformer 1.495 对 2.793），最好的那条模式更近，概率最高的那条更差。
 - 标签当检测时 FDE 3 s 不能更高：GRU 2.390 对 1.388，Transformer 3.046 对 1.388，都更高。
@@ -4111,7 +4111,7 @@ sweep.csv 里两行（第 1 行 IMM，第 2 行第二档）：
    - 真要上线得先优化：只对在动的轨迹跑网络（停着的走 IMM）；邻居的历史每帧只编码一次，不按每个目标重复编码；Orin 上导出 TensorRT。
 5. **误报** 12.4 → 24.8 次 / 小时，其实是 1 次变 2 次（验证集关键帧时长约 4.8 分钟）。样本太少，不单独下结论。
 
-模型 `data/train/pred_v1/` 留作基线，厂区新数据来了用同样的流程再训（训练目标默认 measured）。
+基线权重在 `work_dirs/pred/gru.pt`、`work_dirs/pred/transformer.pt`，厂区新数据来了用同样的流程再训（训练目标默认 measured）。
 
 ## T24 第二档第二版：跟踪的部分合并（状态估计交给网络）
 
@@ -4214,7 +4214,7 @@ kept 2031 training windows (all 416 moving, 30 % of the rest)
 mirrored: 4062 training windows
 ```
 
-**保持现状。** 运动状态规则和 IMM 都不换。两个模型留在 `data/train/pred_v2/`（不提交）。
+**保持现状。** 运动状态规则和 IMM 都不换。权重在 `work_dirs/pred/state.pt`（663 KB）、`work_dirs/pred/det.pt`（664 KB）。
 
 运动状态（端到端第 4 行对第 1 行）两边都不满足：
 
