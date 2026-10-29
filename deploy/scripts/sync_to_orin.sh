@@ -32,7 +32,8 @@ dirs="$DIR/repo $DIR/models $DIR/data"
 for f in "${FRAMES[@]}"; do dirs="$dirs $DIR/data/$(basename "$(dirname "$f")")/frames"; done
 for s in "${SEQS[@]}"; do dirs="$dirs $DIR/seq/$(basename "$s")/scans"; done
 ssh "$HOST" "mkdir -p $dirs"
-rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build/' --exclude 'install/' --exclude 'log/' \
+# build*/: the C++ build directories (deploy/cpp/build, build_cuda) are per machine; excluded ones survive --delete
+rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build*/' --exclude 'install/' --exclude 'log/' \
   dog_perception tools deploy configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
 if [ -n "$MODEL" ]; then
   rsync -az --include '*.onnx' --include '*.json' --exclude '*' "$MODEL/" "$HOST:$DIR/models/$(basename "$MODEL")/"

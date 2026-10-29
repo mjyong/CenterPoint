@@ -126,7 +126,7 @@ def test_compare_backends_and_pillar_stats_tools(exported, sim_frames, tmp_path)
 
 
 def test_compare_classifies_reported_misses():
-    """Misses / extras at the reporting threshold: near (score noise across it), score, class, none."""
+    """Misses / extras at the reporting threshold: near (score noise across it), filter, score, class, none."""
     from collections import defaultdict
     sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
     from compare_backends import det_stats, summarize_dets
@@ -146,9 +146,20 @@ def test_compare_classifies_reported_misses():
     det_stats(ref, got, 0.5, acc, tol=0.02)
     r = summarize_dets(acc)
     assert r["reported_ref"] == 5 and (r["reported_missed"], r["reported_extra"]) == (4, 3)
-    assert r["missed_by"] == {"near": 1, "score": 1, "class": 1, "none": 1}
-    assert r["extra_by"] == {"near": 1, "score": 0, "class": 1, "none": 1}
+    assert r["missed_by"] == {"near": 1, "filter": 0, "score": 1, "class": 1, "none": 1}
+    assert r["extra_by"] == {"near": 1, "filter": 0, "score": 0, "class": 1, "none": 1}
     assert r["reported_match"] == pytest.approx(1 - 7 / 5) and r["reported_match_tol"] == pytest.approx(1 - 5 / 5)
+
+    # after the filters: box 4 was detected (got raw) and filtered; the new box at 100 m was in ref raw
+    # at 0.45 and filtered there; box 2's raw partner at 0.2 is a score difference, not a filter flip
+    got_raw = dets(xy[:5] + [xy[5], [100.0, 0.0]], [0.8, 0.395, 0.2, 0.7, 0.9, 0.405, 0.5], [0, 0, 0, 2, 0, 0, 0])
+    ref_raw = dets(xy + [[100.0, 0.0]], [0.8, 0.41, 0.6, 0.7, 0.9, 0.39, 0.45], [0] * 7)
+    acc = defaultdict(int, score=[], center=[], yaw=[], size=[])
+    det_stats(ref, got, 0.5, acc, 0.02, ref_raw, got_raw)
+    r = summarize_dets(acc)
+    assert r["missed_by"] == {"near": 1, "filter": 1, "score": 1, "class": 1, "none": 0}
+    assert r["extra_by"] == {"near": 1, "filter": 1, "score": 0, "class": 1, "none": 0}
+    assert r["reported_match_tol"] == pytest.approx(1 - 3 / 5)
 
 
 def test_engine_names_and_run_sequence_specs(tmp_path):

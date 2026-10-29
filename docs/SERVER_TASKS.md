@@ -18,7 +18,7 @@
 1. 仓库 CenterPoint，分支 `claude/me/v01`。开始前 `git pull`，所有命令在仓库根目录执行，`export PYTHONPATH=.`，`SPLIT=data/survey/split/split.csv`。
 2. 只做交给你的那一个任务，按步骤顺序做。
    - 先检查"前置条件"，不满足就停下报告。
-   - 遇到"停止条件"就停下报告，不要自己改代码、改配置或换参数绕过去。
+   - 遇到"停止条件"就停下报告，不要改门槛、改配置或换参数绕过去。代码可以按约定 9 改。
 3. 不要删除或覆盖 `data/seq`、`data/runs`、`data/labels` 里已有的东西，除非步骤里写了。SUSTechPOINTS 的场景目录（公共盘的 `sustech/`）里是人的审核结果，任何时候都不要删除或用 `--force` 覆盖。
    - 数据集目录（`data/dog_veh` 链接指向的目录）：有训练、评估在读的时候，不要删，也不要往里导出。GT 库的文件按序号命名，新导出会把正在跑的训练贴进场景的车换成别的车的点云（T3D 的 Pillar 双卡就是这样坏的）。
    - 新数据集导出到新目录，再把链接指过去（T5 第 3 步）。2026-10-23 之后启动的训练、评估在开始时就把链接解析成真实目录，链接改指不影响它们。
@@ -60,6 +60,23 @@
    - 一条命令跑完所有场景，`--jobs N` 同时跑 N 个场景，`--out` 写成 `data/runs_xxx/{scene}`。每个进程装一份模型，两个模型一起约 4.5 GB 显存，N 按空闲显存和 CPU 核数定（一般 4）。
    - `dist_test.py` 每个约 1.5 GB、1 分钟，3 个一起跑（`&` 后 `wait`）。
    - 测延迟不能并行，也不要和别的任务挤同一张卡（T7 第 2b 步）。
+9. 改代码（2026-10-29 起）。为了少来回一趟，下面这些情况自己改了接着做，不用停下等复核。
+   - 可以改：
+     - 环境和编译：库路径、CMake 和依赖、真实的 nvcc / TensorRT 头文件下的编译错误、库的 API 版本差异、脚本里的路径和参数；
+     - 工具的 bug：崩溃、读写格式不对、参数没接上，原因清楚、改动局部的；
+     - C++ 和 Python 对不上：以 Python 为准改 C++（`deploy/cpp/`）；
+     - 做完这一步缺的小功能（多一个参数、多打印一项），以及不改结果的提速（并行、缓存）。
+   - 不能改，停下报告：
+     - 门槛、停止条件、配置和参数的默认值（`configs/`、dataclass 的默认值）、训练设置、评估指标的定义；
+     - 删掉、跳过或放宽测试（加测试可以）；
+     - Python 流水线的行为（`dog_perception/`）：它是参考实现，觉得它错了就报告；只有明显的崩溃可以修；
+     - 一个问题改了 30 分钟还没好，或者要动 3 个以上文件、要改设计的。
+   - 规矩：
+     - 每个修复单独提交，提交信息写"<任务> 修：原因和改法"；提交前跑相关测试（C++ 的 ctest；动了 Python 就跑约定 7 的快速测试）；
+     - 推送前 `git pull`，有冲突就停下报告，不要 force push；
+     - 报告里加一节"代码改动"：每条写提交号、文件、原因、怎么验证的；
+     - 改了代码，前面已经跑完、受影响的步骤要重跑。
+   - 任务里写了"可以改的范围"的，以任务里的为准。
 
 ## 状态
 
@@ -101,8 +118,8 @@
 | T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 完成，已复核。保持现状。在动判断漏报增加、领先不到 90%；速度外推的 FDE 没同时过端到端和标签当检测。复核发现网络估的速度系统性偏慢，原始检测输入有用；人定不在 0921 上继续调，厂区数据来了先修速度目标 |
 | T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 完成，已复核。通道通；板上补了 trtexec（libnvinfer-bin 10.3.0.30）。服务器项目环境 TensorRT 10.3.0。小引擎测试失败是建引擎工具没按模型目录找外部权重，已修 |
 | T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 完成，已复核。P_max 24000。FP32、FP16 都能用，上线先用 FP16。FP16 有 8 个场景匹配率低于 0.99，判断是阈值附近的框来回翻，门槛改为不计这类（T27 重算确认）；标签上 AP 只掉 0.001。板上 FP16 的 GPU 时间：PFN 3.4 ms、RPN 4.7 ms。服务器 C++ 用 TensorRT 容器 |
-| T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟；动态柱数的 PFN | Agent | T26 | 2.5 小时 | 完成。两个 INT8 的 AP@2 掉 0.124 / 0.099，超过 0.01，不上。板上 RPN GPU 时间：FP16 5.05 ms，INT8 2.65 ms，热力图保持 FP16 的 2.90 ms。动态 PFN 用：10000 柱 1.50 ms，静态 24000 柱 3.52 ms |
-| T28 | Orin 部署 P4 / P5：C++ 核心库在服务器容器里编译、跑对齐测试（含 GPU、TensorRT）；10 个验证场景上 Python 和 C++ 比（同一批检测、各自检测）并打分；板上原生编译、测试、测延迟 | Agent + 人（锁频） | T26、T27 | 3 小时 | 待做 |
+| T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟；动态柱数的 PFN | Agent | T26 | 2.5 小时 | 完成，已复核。上线用 FP16 加动态 PFN（`nusc_pp_dyn`）。FP16 剩下的漏报多是过滤器的阈值翻转（过滤前 10 个场景都 ≥ 0.991），比较工具加了 filter 一类、heads rel 不再卡门槛。INT8 差得不正常（有个 head 余弦为负），多半是稀疏 BEV 上 entropy 校准截断太狠，现在不追。两个 INT8 的 AP@2 掉 0.124 / 0.099，不上。板上 RPN：FP16 5.05 ms，INT8 2.65 ms。PFN：动态 10000 柱 1.50 ms，静态 3.52 ms |
+| T28 | Orin 部署 P4 / P5：C++ 核心库在服务器容器里编译、跑对齐测试（含 GPU、TensorRT）；10 个验证场景上 Python 和 C++ 比（同一批检测、各自检测）并打分；板上原生编译、测试、测延迟 | Agent（锁频掉了才要人） | T27 | 3 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -4931,6 +4948,34 @@ FP16 先过了再做。INT8 的做法：
 
 **结论：** INT8 两个版本都不用，上线继续用 FP16。动态柱数的 PFN 用。最后由人定。
 
+### T27 复核
+
+2026-10-29。结论同意：INT8 两版都不上，上线用 FP16；动态柱数的 PFN 上线，模型目录 `data/deploy/nusc_pp_dyn`（板上 `~/dogperc/models/nusc_pp_dyn`，引擎已建）。人定之前，T28 先按这个做。
+
+1. **FP16 剩下的漏报多是过滤器的阈值翻转。** 把 10 个场景 JSON 里过滤前（raw）和过滤后（final）分开看：
+   - 过滤前，不计 near 的匹配率 10 个场景都 ≥ 0.991（s004 0.9940，s005 0.9911），none 每个场景 0–2 个；
+   - 过滤后 none 变多（s000 从 0 个变成 5 个），s004、s005 掉到 0.9859、0.9898；
+   - 动态 PFN 的 s004 上，FP32 的 onnx 对 torch 在过滤后也有一个 none。两边的分数差 p99 只有 8e-4、中心差 p99 0.6 mm，过滤器（框底离地高度、框里的点数）照样会翻。
+
+   所以过滤后的 none 多数是：对面过滤前有这个框，被过滤器去掉了。改了 `compare_backends.py`：
+   - 加一类 filter：对面过滤前有这个框（0.5 m 内同类，上报了或者分数差在 0.02 内），被对面的过滤器去掉了；
+   - 门槛的匹配率不计 near 和 filter，过滤前、过滤后都要 ≥ 0.99；
+   - `cpp_parity.py compare` 用同样的规则。
+
+   T28 第 0 步用新规则重算 s004、s005。
+2. **逐段的 heads rel 不再卡门槛。** 这项是整张图上 max |a − b| / max |ref| 的最大值，多半由空格子里小的回归输出决定：FP16 是 0.23，框的中心差却在 5 mm 以内，十个场景都因为它打印 FAIL。现在：
+   - 只打印，不卡门槛；
+   - 按 head 种类（hm、reg、height、dim、rot、vel）分别记最差的余弦，表里一列 "worst head cos"。
+3. **INT8 差得不正常。** PointPillars 做 INT8 PTQ 通常只掉一点，这里 AP@2 掉 0.12，匹配率 0.25，yaw p99 3.1 rad。有一个 head 的余弦是 −0.58，两版一样，所以不是 hm。
+   - 最可能的原因：BEV 画布 95% 以上是 0，entropy 校准给输入取的截断值太小，把柱子的特征截掉了（和 PFN 不做 INT8 是类似的道理）。
+   - 不用 INT8，板上 RPN 多 2.4 ms。网络合计约 6.6 ms（动态 PFN 1.5 ms 加 RPN 5.05 ms），离 50 ms 的预算还远，现在不追。
+   - T30 要是时间不够再试：`--method max`；第一层卷积和各 head 的最后一层不量化；先用每个 head 的余弦定位是哪一层坏的。
+   - T28 第 0 步顺手跑一次带 trt:int8 的 compare，记下哪个 head 的余弦是负的。
+4. ONNX Runtime 的 CUDA EP 起不来（找不到 libcudnn_adv），onnx 后端每帧 434 ms，跑在 CPU 上。不影响结果，只是慢。按约定 9 可以自己修：把 pip 装的 cuDNN 所在目录加进 LD_LIBRARY_PATH。
+5. `sync_to_orin.sh` 原来只排除名叫 build 的目录，`--delete` 会删掉板上的 `deploy/cpp/build_cuda`，还会把服务器的 x86 编译目录拷过去。改成排除 `build*/`。板上根分区剩 4.6 GB。
+6. T27 时锁频还在（MAXN，GPU 1.3005 GHz），但板子重启就没了。T28 测延迟前先查，还在就不用找人。
+7. 通用约定加了第 9 条：服务器 Agent 可以按实际情况改代码（环境、编译、工具 bug、C++ 对齐 Python），不能改门槛、默认参数、Python 流水线的行为。
+
 ## T28 Orin 部署：C++ 核心库对齐和全链路评估
 
 C++ 核心库 `deploy/cpp` 已写好（DEPLOY_ORIN.md 第 7 节）。本机只验过 CPU 部分：模拟器序列上和 Python 逐位对齐，跟踪 ID 每帧完全一致。CUDA 部分只编译过，没跑过。这次要：
@@ -4939,35 +4984,53 @@ C++ 核心库 `deploy/cpp` 已写好（DEPLOY_ORIN.md 第 7 节）。本机只�
 - 两边的结果都用 `pipeline_eval.py` 打分，并排比；
 - 板上原生编译、跑测试，测每段延迟。
 
+模型用 T27 定的上线版本：FP16，动态柱数的 PFN（`data/deploy/nusc_pp_dyn`）。
+
+这是 C++ 第一次在真的 GPU 上跑，编译错误、对不上 Python 的地方多半要当场修。本任务可以改的范围（通用约定 9）：
+- `deploy/cpp/`、`deploy/docker/`、`deploy/scripts/`、`tools/deploy/`；
+- `dog_perception/` 不改：对不上时以 Python 为准改 C++。
+
 ```text
 任务 T28：C++ 核心库在服务器容器里编译测试；10 个验证场景上 Python 对 C++（同一批检测、各自检测）并打分；板上编译、测试、测延迟。
-先按通用约定做。前置：T26 完成；T27 在跑就等它完（都要用板子和 data/deploy/nusc_pp）。
+先按通用约定做（第 9 条：可以改代码，范围见本节开头）。前置：T27 完成。
 
-0. mkdir -p data/reports/T28 data/deploy/T28；TASK=T28；VAL、ev 同 T18 第 0、3 步；O=data/deploy/T28。
-   挑一张空闲的卡，记为 G（T26 用的是 5）。
+0. mkdir -p data/reports/T28 data/deploy/T28；TASK=T28；VAL、ev 同 T18 第 0、3 步；O=data/deploy/T28；M=data/deploy/nusc_pp_dyn。
+   挑一张空闲的卡，记为 G（T26 用的是 5），export CUDA_VISIBLE_DEVICES=$G（主机上的 Python 也用这张卡）。
    pytest tests/dog/test_deploy.py -q 2>&1 | tee data/reports/T28/pytest_deploy.txt（不过就停下报告）
+   T27 复核改了比较的规则（filter 一类，过滤前后都卡门槛，heads 不卡），重算两个没过的场景，再看一次 INT8 坏在哪个 head：
+     for s in 0921_164127_s004 0921_164127_s005; do
+       python tools/deploy/compare_backends.py --model-dir data/deploy/nusc_pp --frames "data/runs/$s/frames/*.npy" \
+           --stride 3 --backends torch,onnx,trt:fp16,trt:int8 --device cuda:0 --out data/reports/T28/compare_$s.json \
+           2>&1 | tail -6 | tee data/reports/T28/compare_$s.txt
+     done
+   - trt:fp16 应该两个都 pass。不过的话报告漏、多的分类，接着往下做；
+   - 从 JSON 的 stages 里抄下 trt:int8 每种 head 的余弦（head_<种类>_cos）。
    容器里跑命令的函数，数据目录按原路径挂进去，这样 data/ 下的链接照样能用：
      dk() { docker run --rm --gpus "\"device=$G\"" -u $(id -u):$(id -g) -v $PWD:$PWD -v /public/zjst/robot:/public/zjst/robot \
                 -v /zjst:/zjst -w $PWD dogperc-dev bash -c "$*"; }
 1. 镜像（第一次约几分钟，在 nvcr.io/nvidia/tensorrt:24.08-py3 上装 cmake、Eigen、yaml-cpp、GoogleTest、numpy、scipy）：
      docker build -t dogperc-dev -f deploy/docker/Dockerfile.dev deploy/docker 2>&1 | tail -5 | tee data/reports/T28/docker_build.txt
-2. 编译、测试（DOGPERC_MODEL_DIR：T26 在服务器上建的 x86 引擎，GPU 检测器要和主机拷贝的 TensorRT 检测器逐帧比）：
+2. 编译、测试（DOGPERC_MODEL_DIR：T26 / T27 在服务器上建的 x86 引擎，GPU 检测器要和主机拷贝的 TensorRT 检测器逐帧比）：
      dk "cmake -S deploy/cpp -B deploy/cpp/build_cuda -G Ninja -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUILD_TYPE=Release \
          -DCMAKE_CUDA_ARCHITECTURES=89 && cmake --build deploy/cpp/build_cuda -j16" 2>&1 | tail -20 | tee data/reports/T28/build_x86.txt
-     dk "DOGPERC_MODEL_DIR=$PWD/data/deploy/nusc_pp ctest --test-dir deploy/cpp/build_cuda --output-on-failure -V" \
+     dk "DOGPERC_MODEL_DIR=$PWD/$M ctest --test-dir deploy/cpp/build_cuda --output-on-failure -V" \
          > data/reports/T28/ctest_x86.txt 2>&1; tail -30 data/reports/T28/ctest_x86.txt
-   - 两个 Gpu.* 测试必须跑了（不是 SKIPPED）且通过；
+     # 静态 PFN 也跑一次 GPU 测试（另一条代码路径）
+     dk "DOGPERC_MODEL_DIR=$PWD/data/deploy/nusc_pp deploy/cpp/build_cuda/dogperc_tests --gtest_filter='Gpu.*'" \
+         > data/reports/T28/gtest_gpu_static.txt 2>&1; tail -10 data/reports/T28/gtest_gpu_static.txt
+   - 两个 Gpu.* 测试必须跑了（不是 SKIPPED）且通过，动态、静态两种 PFN 都要；
+   - 编译错误、测试不过，先按通用约定 9 修（C++ 以 Python 为准），修完重编、重跑这一步；
    - 引擎加载失败（"could not load the engine"）就在容器里用 build_engines.py 重建到 data/deploy/T28/engines_x86/，
      再把 DOGPERC_MODEL_DIR 指过去（目录里要有 model_meta.json），并在报告里写明。
 3. 10 个验证场景，每个场景：
      for s in $VAL; do
        mkdir -p $O/$s
-       python tools/deploy/cpp_parity.py python --seq data/seq/$s --exported data/deploy/nusc_pp:trt:fp16 \
+       python tools/deploy/cpp_parity.py python --seq data/seq/$s --exported $M:trt:fp16 \
            --out $O/$s/py.npz --dets $O/$s/py_dets.npz --config $O/$s/config.yaml
        dk "deploy/cpp/build_cuda/dogperc_replay --seq data/seq/$s --config $O/$s/config.yaml \
            --detections $O/$s/py_dets.npz --out $O/$s/cpp_dets.npz"
        dk "deploy/cpp/build_cuda/dogperc_replay --seq data/seq/$s --config $O/$s/config.yaml \
-           --model-dir data/deploy/nusc_pp --precision fp16 --gpu --out $O/$s/cpp.npz"
+           --model-dir $M --precision fp16 --gpu --out $O/$s/cpp.npz"
        python tools/deploy/cpp_parity.py compare --ref $O/$s/py.npz --cpp $O/$s/cpp_dets.npz --same-detections \
            --out data/reports/T28/parity_dets_$s.json | tail -3 | tee data/reports/T28/parity_dets_$s.txt
        python tools/deploy/cpp_parity.py compare --ref $O/$s/py.npz --cpp $O/$s/cpp.npz \
@@ -4977,9 +5040,12 @@ C++ 核心库 `deploy/cpp` 已写好（DEPLOY_ORIN.md 第 7 节）。本机只�
        done
      done
    - Python 的参考运行是 run_sequence.py 那样从原始扫描做预处理，所以一个场景要几分钟；
+   - 先跑一个场景，两次 compare 都过了再跑其余的；
    - 同一批检测（parity_dets）：每个场景都要 pass，即帧相同、检测相同、每帧跟踪 ID 完全一致、状态 ≤ 1e-6、预测 ≤ 1e-4。
-     不过的停下，把第一个不一致的帧报告出来（compare 的 JSON 里有最大差值）；
-   - 各自检测（parity）：门槛同 T26 复核后的 compare_backends（不计 near 的匹配率 ≥ 0.99，分数 p99 ≤ 0.02，中心 p99 ≤ 0.1 m）。
+     不过就找第一个不一致的帧（compare 的 JSON 里有最大差值），按约定 9 修 C++，修完从第 2 步重来；
+     修不好，或者原因在 Python 那边，停下报告；
+   - 各自检测（parity）：门槛同 T27 复核后的 compare_backends（不计 near、filter 的匹配率过滤前后都 ≥ 0.99，分数 p99 ≤ 0.02，中心 p99 ≤ 0.1 m）。
+     不过的先看是不是 GPU 检测器的问题：第 2 步的 Gpu.* 测试是逐帧和主机拷贝的 TensorRT 检测器比的。
 4. 按标签打分（两份结果是同一批帧、同一套预处理）：
      for r in py cpp; do ev $r "$VAL" "$O/runs/{scene}/$r/results.pkl" --detections raw --no-mcap; done
    pipeline_eval 拿存下的过滤前检测（raw_detections、raw_measured）重跑 Python 的过滤、跟踪、预测，所以这一步比的是两边的检测器；
@@ -4988,8 +5054,8 @@ C++ 核心库 `deploy/cpp` 已写好（DEPLOY_ORIN.md 第 7 节）。本机只�
 5. 服务器上的每段延迟（C++ GPU 检测器，4090）：
      python tools/deploy/cpp_parity.py timings $O/*/cpp.npz --out data/reports/T28/x86_timings.json \
          | tee data/reports/T28/x86_timings.txt
-6. 板上：
-   a. 同步代码和一段原始录制（前 150 帧），看剩余空间：
+6. 板上（模型目录 ~/dogperc/models/nusc_pp_dyn，T27 已在板上建好 FP16 引擎）：
+   a. 同步代码和一段原始录制（前 150 帧），看剩余空间（T27 后剩 4.6 GB；低于 3 GB 先删 ~/dogperc/data 下的帧和 dumps）：
         deploy/scripts/sync_to_orin.sh --seq data/seq/0921_164127_s000 --limit 150
         scp $O/0921_164127_s000/config.yaml orin:dogperc/seq/0921_164127_s000/config.yaml
    b. 原生编译（板上没有 ninja 就去掉 -G Ninja）：
@@ -4997,29 +5063,38 @@ C++ 核心库 `deploy/cpp` 已写好（DEPLOY_ORIN.md 第 7 节）。本机只�
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87 \
             && cmake --build deploy/cpp/build_cuda -j8' 2>&1 | tail -20 | tee data/reports/T28/build_orin.txt
       缺包就停下，报告缺什么（T25 查过：eigen、yaml-cpp、gtest、cmake、CUDA 12.6、TensorRT 10.3 都有）。
-   c. 测试（golden 数据在板上生成，约 60 MB；引擎用 T26 在板上建的）：
-        ssh orin 'cd ~/dogperc/repo && DOGPERC_MODEL_DIR=$HOME/dogperc/models/nusc_pp \
+      编译错误（板上是 aarch64、GCC 11）按约定 9 修，修完在服务器容器里也重编、重跑第 2 步的测试。
+   c. 测试（golden 数据在板上用 Python 生成，约 60 MB；板上 scipy 是 1.8.0）：
+        ssh orin 'cd ~/dogperc/repo && DOGPERC_MODEL_DIR=$HOME/dogperc/models/nusc_pp_dyn \
             ctest --test-dir deploy/cpp/build_cuda --output-on-failure -V' > data/reports/T28/ctest_orin.txt 2>&1
-   d. 锁频（要人，同 T26 第 6c 步），然后板上跑 GPU 检测器的全链路，拿回来和服务器的 C++ 比、看延迟：
+      板上生成 golden 失败（golden 那个测试不过）：把服务器的 deploy/cpp/build_cuda/golden/ rsync 到板上同一位置，
+      再用 ctest -FS golden 跳过生成，并在报告里写明。
+   d. 锁频：先看还在不在（T27 时是 MAXN，GPU 最低、最高频率都是 1300500000）：
+        ssh orin 'nvpmodel -q; cat /sys/class/devfreq/17000000.gpu/min_freq /sys/class/devfreq/17000000.gpu/max_freq' \
+            2>&1 | tee data/reports/T28/orin_power.txt
+      还在就不用找人；不在就请人锁（同 T26 第 6c 步，sudo 密码问人，不要写进任何文件）。
+      然后板上跑 GPU 检测器的全链路，拿回来和服务器的 C++ 比、看延迟：
         ssh orin 'cd ~/dogperc/repo && deploy/cpp/build_cuda/dogperc_replay --seq ~/dogperc/seq/0921_164127_s000 \
-            --config ~/dogperc/seq/0921_164127_s000/config.yaml --model-dir ~/dogperc/models/nusc_pp --precision fp16 --gpu \
+            --config ~/dogperc/seq/0921_164127_s000/config.yaml --model-dir ~/dogperc/models/nusc_pp_dyn --precision fp16 --gpu \
             --out ~/dogperc/data/orin_cpp.npz' 2>&1 | tail -3 | tee data/reports/T28/orin_replay.txt
         scp orin:dogperc/data/orin_cpp.npz $O/orin_cpp.npz
-        python tools/deploy/cpp_parity.py compare --ref $O/0921_164127_s000/cpp.npz --cpp $O/orin_cpp.npz \
+        python tools/deploy/cpp_parity.py compare --ref $O/0921_164127_s000/cpp.npz --cpp $O/orin_cpp.npz --subset \
             --out data/reports/T28/orin_parity.json | tail -3 | tee data/reports/T28/orin_parity.txt
         python tools/deploy/cpp_parity.py timings $O/orin_cpp.npz --out data/reports/T28/orin_timings.json \
             | tee data/reports/T28/orin_timings.txt
-      板上只有前 150 帧，比较按两边共有的帧算。
+      板上只有前 150 帧，--subset 按两边共有的帧比。门槛同第 3 步的各自检测。
    e. 做完删掉板上的 ~/dogperc/seq 和 deploy/cpp/build_cuda/golden，记下剩余空间。
 
-停止条件：编译失败；第 2 步有测试失败；第 3 步同一批检测有场景不过。
-提交：data/reports/T28/、本文档。不提交 data/deploy/T28/ 和 build 目录。
+停止条件（都是按约定 9 修不好的时候）：编译失败；第 2 步有测试失败；第 3 步同一批检测有场景不过。
+提交：data/reports/T28/、本文档，以及按约定 9 改的代码（每个修复单独提交）。不提交 data/deploy/T28/ 和 build 目录。
 报告（写进"T28 结果"）：
+- 代码改动（通用约定 9）：每条写提交号、文件、原因、怎么验证的；没有就写没有；
+- 第 0 步：s004、s005 的 compare 表；trt:int8 每种 head 的余弦；
 - 镜像和两边的编译日志里的报错 / 警告（没有就写没有）；
 - 两边 ctest 的结果，GPU 测试打印的每帧行（框数、GPU 各段时间）；
 - 10 个场景两次 compare 的表（同一批检测、各自检测）和汇总；
 - 第 4 步 py / cpp 两份 report.md 的 AP@2、AP@4 和 MAIN_METRICS 并排一张表；
-- 服务器和板上的每段延迟表（preprocess、det_gpu、det_voxelize、det_pfn、det_rpn、det_post、track、predict、total 的中位数和 p99），板上锁频了没有；
+- 服务器和板上的每段延迟表（preprocess、det_gpu、det_voxelize、det_pfn、det_rpn、det_post、track、predict、total 的中位数和 p99），板上锁频了没有，用的柱数；
 - 板上对服务器 C++ 的 compare 表；
 - 结论：C++ 能不能替代 Python；板上离"网络以外 < 15 ms、端到端 < 50 ms"（DEPLOY_ORIN.md 第 6 节）还差多少，差在哪一段。
 ```

@@ -136,9 +136,11 @@ def compare(args):
     for s in common:
         i, j = ri[s], ci[s]
         pose = max(pose, float(np.abs(ref["T_world_det"][i] - cpp["T_world_det"][j]).max()))
-        det_stats(frame_dets(ref, "det", i), frame_dets(cpp, "det", j), 0.5, acc["final"])
-        if "raw_offsets" in ref and "raw_offsets" in cpp:
-            det_stats(frame_dets(ref, "raw", i), frame_dets(cpp, "raw", j), 0.5, acc["raw"])
+        raws = (frame_dets(ref, "raw", i), frame_dets(cpp, "raw", j)) if "raw_offsets" in ref and "raw_offsets" in cpp \
+            else (None, None)
+        det_stats(frame_dets(ref, "det", i), frame_dets(cpp, "det", j), 0.5, acc["final"], 0.02, *raws)
+        if raws[0] is not None:
+            det_stats(raws[0], raws[1], 0.5, acc["raw"])
         ra, rb = ref["trk_offsets"][i], ref["trk_offsets"][i + 1]
         ca, cb = cpp["trk_offsets"][j], cpp["trk_offsets"][j + 1]
         rid, cid = list(ref["trk_id"][ra:rb]), list(cpp["trk_id"][ca:cb])
@@ -166,18 +168,22 @@ def compare(args):
                track_ids_identical_frames=ids_same, track_pairs=n_trk, track_max_diff=dict(worst),
                motion_agreement=motion_same / max(motion_n, 1), prediction_max_diff=pred_worst)
     trk = max(worst.values()) if worst else 0.0
+    # --subset: the C++ run covers the first frames only (the Orin copy of a recording)
+    frames_ok = len(common) == len(cs) > 0 if args.subset else len(common) == len(rs) == len(cs)
     if args.same_detections:
         d = out["detections"]
         same = d["score_max"] == 0.0 and d["matched"] == d["n_ref"] == d["n_got"]
-        gates = dict(frames=len(common) == len(rs) == len(cs), detections_identical=same,
+        gates = dict(frames=frames_ok, detections_identical=same,
                      track_ids=ids_same == len(common), track_states=trk <= 1e-6, predictions=pred_worst <= 1e-4)
     else:
         d = out["detections"]
-        gates = dict(frames=len(common) == len(rs) == len(cs), reported_match_tol=d["reported_match_tol"] >= 0.99,
+        gates = dict(frames=frames_ok, reported_match_tol=d["reported_match_tol"] >= 0.99,
                      score_p99=d["score_p99"] <= 0.02, center_p99=d["center_p99"] <= 0.1)
+        if out["raw_detections"]:
+            gates["raw_match_tol"] = out["raw_detections"]["reported_match_tol"] >= 0.99
     out["gates"] = dict(gates, passed=all(gates.values()))
     d = out["detections"]
-    print("| frames ref / cpp / common | pose max | det match w/o near | missed (%s) | extra | track IDs same | "
+    print("| frames ref / cpp / common | pose max | det match w/o flips | missed (%s) | extra | track IDs same | "
           "track max diff | motion agree | pred max diff | gates |" % "/".join(KINDS))
     print("|---|---|---|---|---|---|---|---|---|---|")
     print("| %d / %d / %d | %.1e | %.4f | %d (%s) | %d | %d / %d | %.1e | %.4f | %.1e | %s |" % (
@@ -279,6 +285,7 @@ def main():
     c.add_argument("--ref", required=True)
     c.add_argument("--cpp", required=True)
     c.add_argument("--same-detections", action="store_true", help="C++ ran on the Python detections")
+    c.add_argument("--subset", action="store_true", help="the C++ run has only the first frames of the reference")
     c.add_argument("--out", default=None)
     r = sub.add_parser("to-results", help="dogperc_replay output -> results.pkl for pipeline_eval.py")
     r.add_argument("--cpp", required=True)
