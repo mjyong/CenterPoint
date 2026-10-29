@@ -12,6 +12,7 @@
 | [SERVER_TASKS.md](SERVER_TASKS.md) | 0921 数据在服务器上的训练任务：每一步的命令、结果和复核（只检车辆的版本） |
 | [DATA_LINEAGE.md](DATA_LINEAGE.md) | 每一步读写哪些文件、哪些字段 |
 | [SENSORS.md](SENSORS.md) | 传感器参数和外参 |
+| [RETROSPECTIVE.md](RETROSPECTIVE.md) | 项目复盘：从需求到 Orin 落地，各阶段做了什么、遇到的问题、还剩什么 |
 
 第 9 节是用两段样例 bag 实际跑通一轮（训练、评估、对比、导出）的记录。
 
