@@ -1,0 +1,3 @@
+| frames ref / cpp / common | pose max | det match w/o flips | missed (near/filter/score/class/none) | extra | track IDs same | track max diff | motion agree | pred max diff | gates |
+|---|---|---|---|---|---|---|---|---|---|
+| 287 / 287 / 287 | 4.4e-16 | 1.0000 | 0 (0/0/0/0/0) | 0 | 287 / 287 | 1.0e-06 | 1.0000 | 4.8e-12 | pass |

@@ -1,0 +1,19 @@
+Note: Google Test filter = Gpu.*
+[==========] Running 2 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 2 tests from Gpu
+[ RUN      ] Gpu.PillarPreprocessingMatchesTheCpu
+[       OK ] Gpu.PillarPreprocessingMatchesTheCpu (618 ms)
+[ RUN      ] Gpu.GpuDetectorMatchesTheHostCopyDetector
+frame 0: 14 boxes, gpu 2.89 ms (voxelize 0.66, pfn 0.46, rpn 0.82), host-copy network 37.94 ms
+frame 5: 10 boxes, gpu 3.70 ms (voxelize 1.45, pfn 0.45, rpn 0.80), host-copy network 31.34 ms
+frame 10: 7 boxes, gpu 3.82 ms (voxelize 1.56, pfn 0.45, rpn 0.80), host-copy network 31.45 ms
+frame 15: 10 boxes, gpu 3.58 ms (voxelize 1.32, pfn 0.45, rpn 0.80), host-copy network 32.01 ms
+frame 20: 9 boxes, gpu 3.58 ms (voxelize 1.30, pfn 0.45, rpn 0.80), host-copy network 37.91 ms
+frame 25: 7 boxes, gpu 3.58 ms (voxelize 1.31, pfn 0.45, rpn 0.80), host-copy network 32.39 ms
+[       OK ] Gpu.GpuDetectorMatchesTheHostCopyDetector (1032 ms)
+[----------] 2 tests from Gpu (1650 ms total)
+
+[----------] Global test environment tear-down
+[==========] 2 tests from 1 test suite ran. (1651 ms total)
+[  PASSED  ] 2 tests.

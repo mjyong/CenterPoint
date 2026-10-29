@@ -1,0 +1,71 @@
+-- The CXX compiler identification is GNU 11.4.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test HAVE_NO_DANGLING_REFERENCE
+-- Performing Test HAVE_NO_DANGLING_REFERENCE - Success
+-- Found ZLIB: /usr/lib/aarch64-linux-gnu/libz.so (found version "1.2.11") 
+-- Looking for C++ include pthread.h
+-- Looking for C++ include pthread.h - found
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- The CUDA compiler identification is NVIDIA 12.6.68
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: /usr/local/cuda/bin/nvcc - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Found CUDAToolkit: /usr/local/cuda/include (found version "12.6.68") 
+-- Found GTest: /usr/lib/aarch64-linux-gnu/cmake/GTest/GTestConfig.cmake (found version "1.11.0")  
+-- Found Python3: /usr/bin/python3.10 (found version "3.10.12") found components: Interpreter 
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/seres/dogperc/repo/deploy/cpp/build_cuda
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/seres/dogperc/repo/deploy/cpp/build_cuda
+gmake[2]: Warning: File '../src/common.cpp' has modification time 1793161188 s in the future
+[ 24%] Building CXX object CMakeFiles/dogperc.dir/src/pose_buffer.cpp.o
+[ 24%] Building CXX object CMakeFiles/dogperc.dir/src/npz.cpp.o
+[ 24%] Building CXX object CMakeFiles/dogperc.dir/src/detections.cpp.o
+[ 24%] Building CXX object CMakeFiles/dogperc.dir/src/config.cpp.o
+[ 24%] Building CXX object CMakeFiles/dogperc.dir/src/preprocess.cpp.o
+[ 24%] Building CXX object CMakeFiles/dogperc.dir/src/localization.cpp.o
+[ 24%] Building CXX object CMakeFiles/dogperc.dir/src/common.cpp.o
+[ 24%] Building CXX object CMakeFiles/dogperc.dir/src/geometry.cpp.o
+[ 27%] Building CXX object CMakeFiles/dogperc.dir/src/sequence.cpp.o
+[ 30%] Building CXX object CMakeFiles/dogperc.dir/src/pipeline.cpp.o
+[ 33%] Building CXX object CMakeFiles/dogperc.dir/src/detection/model_meta.cpp.o
+[ 36%] Building CXX object CMakeFiles/dogperc.dir/src/detection/pillars.cpp.o
+[ 39%] Building CXX object CMakeFiles/dogperc.dir/src/detection/decode.cpp.o
+[ 42%] Building CXX object CMakeFiles/dogperc.dir/src/detection/filters.cpp.o
+[ 45%] Building CXX object CMakeFiles/dogperc.dir/src/detection/detector.cpp.o
+[ 48%] Building CXX object CMakeFiles/dogperc.dir/src/tracking/imm.cpp.o
+[ 51%] Building CXX object CMakeFiles/dogperc.dir/src/tracking/association.cpp.o
+[ 54%] Building CXX object CMakeFiles/dogperc.dir/src/tracking/tracker.cpp.o
+[ 57%] Building CXX object CMakeFiles/dogperc.dir/src/prediction/imm_predictor.cpp.o
+[ 60%] Building CUDA object CMakeFiles/dogperc.dir/src/cuda/pillars.cu.o
+[ 63%] Building CXX object CMakeFiles/dogperc.dir/src/cuda/trt_engine.cpp.o
+[ 66%] Building CXX object CMakeFiles/dogperc.dir/src/cuda/gpu_detector.cpp.o
+[ 69%] Linking CXX static library libdogperc.a
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 69%] Built target dogperc
+gmake[2]: Warning: File '../tools/dogperc_replay.cpp' has modification time 1793161145 s in the future
+gmake[2]: Warning: File '../tests/test_main.cpp' has modification time 1793161145 s in the future
+[ 90%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_detection.cpp.o
+[ 90%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_main.cpp.o
+[ 90%] Building CXX object CMakeFiles/dogperc_replay.dir/tools/dogperc_replay.cpp.o
+[ 90%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_pipeline.cpp.o
+[ 90%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_tracking.cpp.o
+[ 90%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_io_geometry.cpp.o
+[ 90%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_preprocess.cpp.o
+[ 93%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_gpu.cpp.o
+[ 96%] Linking CXX executable dogperc_replay
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 96%] Built target dogperc_replay
+[100%] Linking CXX executable dogperc_tests
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+[100%] Built target dogperc_tests

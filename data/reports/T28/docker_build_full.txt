@@ -1,0 +1,180 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.dev
+#1 transferring dockerfile:
+#1 transferring dockerfile: 1.05kB done
+#1 DONE 0.3s
+
+#2 [internal] load metadata for nvcr.io/nvidia/tensorrt:24.08-py3
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 2B done
+#3 DONE 0.3s
+
+#4 [1/3] FROM nvcr.io/nvidia/tensorrt:24.08-py3
+#4 DONE 1.5s
+
+#5 [2/3] RUN apt-get update && apt-get install -y --no-install-recommends         cmake ninja-build libeigen3-dev libyaml-cpp-dev libgtest-dev zlib1g-dev     && rm -rf /var/lib/apt/lists/*
+#5 260.4 Get:1 http://archive.ubuntu.com/ubuntu jammy InRelease [270 kB]
+#5 261.0 Get:2 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+#5 262.4 Get:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+#5 263.1 Get:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+#5 263.4 Get:5 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages [4430 kB]
+#5 264.7 Get:6 http://archive.ubuntu.com/ubuntu jammy/multiverse amd64 Packages [266 kB]
+#5 265.6 Get:7 http://archive.ubuntu.com/ubuntu jammy/restricted amd64 Packages [164 kB]
+#5 265.6 Get:8 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages [1792 kB]
+#5 267.5 Get:9 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages [17.5 MB]
+#5 268.7 Get:10 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 Packages [96.8 kB]
+#5 269.4 Get:11 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 Packages [7955 kB]
+#5 273.2 Get:12 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1325 kB]
+#5 276.4 Get:13 http://archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 Packages [104 kB]
+#5 276.4 Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [4792 kB]
+#5 278.2 Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 Packages [8289 kB]
+#5 281.8 Get:16 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1629 kB]
+#5 282.6 Get:17 http://archive.ubuntu.com/ubuntu jammy-backports/main amd64 Packages [82.9 kB]
+#5 282.6 Get:18 http://archive.ubuntu.com/ubuntu jammy-backports/universe amd64 Packages [35.6 kB]
+#5 283.1 Fetched 49.1 MB in 23s (2144 kB/s)
+#5 283.1 Reading package lists...
+#5 285.4 Reading package lists...
+#5 287.0 Building dependency tree...
+#5 287.3 Reading state information...
+#5 287.5 zlib1g-dev is already the newest version (1:1.2.11.dfsg-2ubuntu9.2).
+#5 287.5 zlib1g-dev set to manually installed.
+#5 287.5 The following additional packages will be installed:
+#5 287.5   cmake-data dh-elpa-helper emacsen-common googletest libarchive13 libicu70
+#5 287.5   libjsoncpp25 librhash0 libuv1 libxml2 libyaml-cpp0.7 pkg-config
+#5 287.5 Suggested packages:
+#5 287.5   cmake-doc cmake-format lrzip libeigen3-doc libmpfrc++-dev
+#5 287.6 The following NEW packages will be installed:
+#5 287.6   cmake cmake-data dh-elpa-helper emacsen-common googletest libarchive13
+#5 287.6   libeigen3-dev libgtest-dev libicu70 libjsoncpp25 librhash0 libuv1 libxml2
+#5 287.6   libyaml-cpp-dev libyaml-cpp0.7 ninja-build pkg-config
+#5 288.8 0 upgraded, 17 newly installed, 0 to remove and 141 not upgraded.
+#5 288.8 Need to get 21.2 MB of archives.
+#5 288.8 After this operation, 86.6 MB of additional disk space will be used.
+#5 288.8 Get:1 http://archive.ubuntu.com/ubuntu jammy/main amd64 libicu70 amd64 70.1-2 [10.6 MB]
+#5 298.7 Get:2 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libxml2 amd64 2.9.13+dfsg-1ubuntu0.14 [765 kB]
+#5 299.7 Get:3 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libuv1 amd64 1.43.0-1ubuntu0.1 [92.7 kB]
+#5 299.7 Get:4 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libarchive13 amd64 3.6.0-1ubuntu1.9 [368 kB]
+#5 299.9 Get:5 http://archive.ubuntu.com/ubuntu jammy/main amd64 libjsoncpp25 amd64 1.9.5-3 [80.0 kB]
+#5 299.9 Get:6 http://archive.ubuntu.com/ubuntu jammy/main amd64 librhash0 amd64 1.4.2-1ubuntu1 [125 kB]
+#5 300.1 Get:7 http://archive.ubuntu.com/ubuntu jammy/main amd64 dh-elpa-helper all 2.0.9ubuntu1 [7610 B]
+#5 300.1 Get:8 http://archive.ubuntu.com/ubuntu jammy/main amd64 emacsen-common all 3.0.4 [14.9 kB]
+#5 300.1 Get:9 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 cmake-data all 3.22.1-1ubuntu1.22.04.2 [1913 kB]
+#5 301.3 Get:10 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 cmake amd64 3.22.1-1ubuntu1.22.04.2 [5010 kB]
+#5 303.7 Get:11 http://archive.ubuntu.com/ubuntu jammy/universe amd64 googletest all 1.11.0-3 [541 kB]
+#5 303.7 Get:12 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libgtest-dev amd64 1.11.0-3 [250 kB]
+#5 303.7 Get:13 http://archive.ubuntu.com/ubuntu jammy/main amd64 libyaml-cpp0.7 amd64 0.7.0+dfsg-8build1 [97.7 kB]
+#5 303.8 Get:14 http://archive.ubuntu.com/ubuntu jammy/main amd64 libyaml-cpp-dev amd64 0.7.0+dfsg-8build1 [169 kB]
+#5 303.8 Get:15 http://archive.ubuntu.com/ubuntu jammy/universe amd64 ninja-build amd64 1.10.1-1 [111 kB]
+#5 303.8 Get:16 http://archive.ubuntu.com/ubuntu jammy/main amd64 pkg-config amd64 0.29.2-1ubuntu3 [48.2 kB]
+#5 303.8 Get:17 http://archive.ubuntu.com/ubuntu jammy/universe amd64 libeigen3-dev all 3.4.0-2ubuntu2 [1056 kB]
+#5 305.4 debconf: unable to initialize frontend: Dialog
+#5 305.4 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#5 305.4 debconf: falling back to frontend: Readline
+#5 305.5 debconf: unable to initialize frontend: Readline
+#5 305.5 debconf: (This frontend requires a controlling tty.)
+#5 305.5 debconf: falling back to frontend: Teletype
+#5 305.6 dpkg-preconfigure: unable to re-open stdin: 
+#5 305.7 Fetched 21.2 MB in 17s (1261 kB/s)
+#5 305.8 Selecting previously unselected package libicu70:amd64.
+#5 305.8 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 23961 files and directories currently installed.)
+#5 306.1 Preparing to unpack .../00-libicu70_70.1-2_amd64.deb ...
+#5 306.1 Unpacking libicu70:amd64 (70.1-2) ...
+#5 306.9 Selecting previously unselected package libxml2:amd64.
+#5 306.9 Preparing to unpack .../01-libxml2_2.9.13+dfsg-1ubuntu0.14_amd64.deb ...
+#5 306.9 Unpacking libxml2:amd64 (2.9.13+dfsg-1ubuntu0.14) ...
+#5 307.2 Selecting previously unselected package libuv1:amd64.
+#5 307.2 Preparing to unpack .../02-libuv1_1.43.0-1ubuntu0.1_amd64.deb ...
+#5 307.2 Unpacking libuv1:amd64 (1.43.0-1ubuntu0.1) ...
+#5 307.4 Selecting previously unselected package libarchive13:amd64.
+#5 307.4 Preparing to unpack .../03-libarchive13_3.6.0-1ubuntu1.9_amd64.deb ...
+#5 307.5 Unpacking libarchive13:amd64 (3.6.0-1ubuntu1.9) ...
+#5 307.6 Selecting previously unselected package libjsoncpp25:amd64.
+#5 307.6 Preparing to unpack .../04-libjsoncpp25_1.9.5-3_amd64.deb ...
+#5 307.6 Unpacking libjsoncpp25:amd64 (1.9.5-3) ...
+#5 308.0 Selecting previously unselected package librhash0:amd64.
+#5 308.0 Preparing to unpack .../05-librhash0_1.4.2-1ubuntu1_amd64.deb ...
+#5 308.1 Unpacking librhash0:amd64 (1.4.2-1ubuntu1) ...
+#5 308.3 Selecting previously unselected package dh-elpa-helper.
+#5 308.3 Preparing to unpack .../06-dh-elpa-helper_2.0.9ubuntu1_all.deb ...
+#5 308.3 Unpacking dh-elpa-helper (2.0.9ubuntu1) ...
+#5 308.6 Selecting previously unselected package emacsen-common.
+#5 308.6 Preparing to unpack .../07-emacsen-common_3.0.4_all.deb ...
+#5 308.7 Unpacking emacsen-common (3.0.4) ...
+#5 309.5 Selecting previously unselected package cmake-data.
+#5 309.5 Preparing to unpack .../08-cmake-data_3.22.1-1ubuntu1.22.04.2_all.deb ...
+#5 309.6 Unpacking cmake-data (3.22.1-1ubuntu1.22.04.2) ...
+#5 342.6 Selecting previously unselected package cmake.
+#5 342.6 Preparing to unpack .../09-cmake_3.22.1-1ubuntu1.22.04.2_amd64.deb ...
+#5 342.6 Unpacking cmake (3.22.1-1ubuntu1.22.04.2) ...
+#5 343.0 Selecting previously unselected package googletest.
+#5 343.0 Preparing to unpack .../10-googletest_1.11.0-3_all.deb ...
+#5 343.0 Unpacking googletest (1.11.0-3) ...
+#5 347.3 Selecting previously unselected package libgtest-dev:amd64.
+#5 347.3 Preparing to unpack .../11-libgtest-dev_1.11.0-3_amd64.deb ...
+#5 347.3 Unpacking libgtest-dev:amd64 (1.11.0-3) ...
+#5 348.3 Selecting previously unselected package libyaml-cpp0.7:amd64.
+#5 348.3 Preparing to unpack .../12-libyaml-cpp0.7_0.7.0+dfsg-8build1_amd64.deb ...
+#5 348.3 Unpacking libyaml-cpp0.7:amd64 (0.7.0+dfsg-8build1) ...
+#5 348.5 Selecting previously unselected package libyaml-cpp-dev.
+#5 348.5 Preparing to unpack .../13-libyaml-cpp-dev_0.7.0+dfsg-8build1_amd64.deb ...
+#5 348.5 Unpacking libyaml-cpp-dev (0.7.0+dfsg-8build1) ...
+#5 349.3 Selecting previously unselected package ninja-build.
+#5 349.3 Preparing to unpack .../14-ninja-build_1.10.1-1_amd64.deb ...
+#5 349.4 Unpacking ninja-build (1.10.1-1) ...
+#5 349.9 Selecting previously unselected package pkg-config.
+#5 349.9 Preparing to unpack .../15-pkg-config_0.29.2-1ubuntu3_amd64.deb ...
+#5 349.9 Unpacking pkg-config (0.29.2-1ubuntu3) ...
+#5 350.3 Selecting previously unselected package libeigen3-dev.
+#5 350.3 Preparing to unpack .../16-libeigen3-dev_3.4.0-2ubuntu2_all.deb ...
+#5 350.3 Unpacking libeigen3-dev (3.4.0-2ubuntu2) ...
+#5 358.1 Setting up googletest (1.11.0-3) ...
+#5 358.2 Setting up ninja-build (1.10.1-1) ...
+#5 358.2 Setting up libuv1:amd64 (1.43.0-1ubuntu0.1) ...
+#5 358.2 Setting up emacsen-common (3.0.4) ...
+#5 358.4 Setting up libyaml-cpp0.7:amd64 (0.7.0+dfsg-8build1) ...
+#5 358.4 Setting up dh-elpa-helper (2.0.9ubuntu1) ...
+#5 358.4 Setting up libjsoncpp25:amd64 (1.9.5-3) ...
+#5 358.4 Setting up pkg-config (0.29.2-1ubuntu3) ...
+#5 358.8 Setting up librhash0:amd64 (1.4.2-1ubuntu1) ...
+#5 358.8 Setting up cmake-data (3.22.1-1ubuntu1.22.04.2) ...
+#5 358.9 Setting up libicu70:amd64 (70.1-2) ...
+#5 359.0 Setting up libgtest-dev:amd64 (1.11.0-3) ...
+#5 359.0 Setting up libyaml-cpp-dev (0.7.0+dfsg-8build1) ...
+#5 359.0 Setting up libeigen3-dev (3.4.0-2ubuntu2) ...
+#5 359.1 Setting up libxml2:amd64 (2.9.13+dfsg-1ubuntu0.14) ...
+#5 359.1 Setting up libarchive13:amd64 (3.6.0-1ubuntu1.9) ...
+#5 359.1 Setting up cmake (3.22.1-1ubuntu1.22.04.2) ...
+#5 359.1 Processing triggers for libc-bin (2.35-0ubuntu3.8) ...
+#5 DONE 360.1s
+
+#6 [3/3] RUN python3 -m pip install --no-cache-dir "numpy==1.26.4" "scipy>=1.8"
+#6 256.1 Collecting numpy==1.26.4
+#6 256.4   Downloading numpy-1.26.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (61 kB)
+#6 296.8 Collecting scipy>=1.8
+#6 296.9   Downloading scipy-1.15.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (61 kB)
+#6 297.1 Downloading numpy-1.26.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (18.2 MB)
+#6 297.9    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 18.2/18.2 MB 25.1 MB/s eta 0:00:00
+#6 298.0 Downloading scipy-1.15.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (37.7 MB)
+#6 299.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 37.7/37.7 MB 35.8 MB/s eta 0:00:00
+#6 299.2 Installing collected packages: numpy, scipy
+#6 299.2   Attempting uninstall: numpy
+#6 299.2     Found existing installation: numpy 1.23.5
+#6 300.3     Uninstalling numpy-1.23.5:
+#6 301.0       Successfully uninstalled numpy-1.23.5
+#6 338.5 Successfully installed numpy-1.26.4 scipy-1.15.3
+#6 338.5 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable.It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#6 340.7 
+#6 340.7 [notice] A new release of pip is available: 24.2 -> 26.2.2
+#6 340.7 [notice] To update, run: python3 -m pip install --upgrade pip
+#6 DONE 341.0s
+
+#7 exporting to image
+#7 exporting layers
+#7 exporting layers 27.9s done
+#7 writing image sha256:aa37bdc72dc7298f3bd4299b73f65529d1c7ca0b98f486aaca4323ebc85c1754 0.0s done
+#7 naming to docker.io/library/dogperc-dev 0.0s done
+#7 DONE 28.2s

@@ -1,0 +1,3 @@
+0921_164127_s000: 150 scans
+/dev/mmcblk0p1   54G   47G  4.5G  92% /
+1010M	dogperc

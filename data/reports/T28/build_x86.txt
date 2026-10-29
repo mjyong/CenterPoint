@@ -1,0 +1,20 @@
+[14/33] Building CXX object CMakeFiles/dogperc.dir/src/detection/model_meta.cpp.o
+[15/33] Building CXX object CMakeFiles/dogperc.dir/src/config.cpp.o
+[16/33] Building CXX object CMakeFiles/dogperc.dir/src/sequence.cpp.o
+[17/33] Building CXX object CMakeFiles/dogperc.dir/src/prediction/imm_predictor.cpp.o
+[18/33] Building CXX object CMakeFiles/dogperc.dir/src/cuda/gpu_detector.cpp.o
+[19/33] Building CXX object CMakeFiles/dogperc.dir/src/cuda/trt_engine.cpp.o
+[20/33] Building CXX object CMakeFiles/dogperc.dir/src/tracking/tracker.cpp.o
+[21/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_tracking.cpp.o
+[22/33] Building CXX object CMakeFiles/dogperc_replay.dir/tools/dogperc_replay.cpp.o
+[23/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_detection.cpp.o
+[24/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_preprocess.cpp.o
+[25/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_gpu.cpp.o
+[26/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_io_geometry.cpp.o
+[27/33] Building CXX object CMakeFiles/dogperc.dir/src/preprocess.cpp.o
+[28/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_pipeline.cpp.o
+[29/33] Building CXX object CMakeFiles/dogperc.dir/src/tracking/imm.cpp.o
+[30/33] Building CUDA object CMakeFiles/dogperc.dir/src/cuda/pillars.cu.o
+[31/33] Linking CXX static library libdogperc.a
+[32/33] Linking CXX executable dogperc_replay
+[33/33] Linking CXX executable dogperc_tests

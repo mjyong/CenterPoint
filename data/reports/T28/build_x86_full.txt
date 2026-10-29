@@ -1,0 +1,83 @@
+
+=====================
+== NVIDIA TensorRT ==
+=====================
+
+NVIDIA Release 24.08 (build 106933332)
+NVIDIA TensorRT Version 10.3.0
+Copyright (c) 2016-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Container image Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+https://developer.nvidia.com/tensorrt
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+To install Python sample dependencies, run /opt/tensorrt/python/python_setup.sh
+
+To install the open-source samples corresponding to this TensorRT release version
+run /opt/tensorrt/install_opensource.sh.  To build the open source parsers,
+plugins, and samples for current top-of-tree on master or a different branch,
+run /opt/tensorrt/install_opensource.sh -b <branch>
+See https://github.com/NVIDIA/TensorRT for more information.
+
+-- The CXX compiler identification is GNU 11.4.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test HAVE_NO_DANGLING_REFERENCE
+-- Performing Test HAVE_NO_DANGLING_REFERENCE - Success
+-- Found ZLIB: /usr/lib/x86_64-linux-gnu/libz.so (found version "1.2.11") 
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- The CUDA compiler identification is NVIDIA 12.6.20
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: /usr/local/cuda/bin/nvcc - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Found CUDAToolkit: /usr/local/cuda/include (found version "12.6.20") 
+-- Found GTest: /usr/lib/x86_64-linux-gnu/cmake/GTest/GTestConfig.cmake (found version "1.11.0")  
+-- Found Python3: /usr/bin/python3.10 (found version "3.10.12") found components: Interpreter 
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda
+[1/33] Building CXX object CMakeFiles/dogperc.dir/src/common.cpp.o
+[2/33] Building CXX object CMakeFiles/dogperc.dir/src/npz.cpp.o
+[3/33] Building CXX object CMakeFiles/dogperc.dir/src/localization.cpp.o
+[4/33] Building CXX object CMakeFiles/dogperc.dir/src/detection/pillars.cpp.o
+[5/33] Building CXX object CMakeFiles/dogperc.dir/src/detections.cpp.o
+[6/33] Building CXX object CMakeFiles/dogperc.dir/src/detection/decode.cpp.o
+[7/33] Building CXX object CMakeFiles/dogperc.dir/src/tracking/association.cpp.o
+[8/33] Building CXX object CMakeFiles/dogperc.dir/src/detection/detector.cpp.o
+[9/33] Building CXX object CMakeFiles/dogperc.dir/src/geometry.cpp.o
+[10/33] Building CXX object CMakeFiles/dogperc.dir/src/pose_buffer.cpp.o
+[11/33] Building CXX object CMakeFiles/dogperc.dir/src/detection/filters.cpp.o
+[12/33] Building CXX object CMakeFiles/dogperc.dir/src/pipeline.cpp.o
+[13/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_main.cpp.o
+[14/33] Building CXX object CMakeFiles/dogperc.dir/src/detection/model_meta.cpp.o
+[15/33] Building CXX object CMakeFiles/dogperc.dir/src/config.cpp.o
+[16/33] Building CXX object CMakeFiles/dogperc.dir/src/sequence.cpp.o
+[17/33] Building CXX object CMakeFiles/dogperc.dir/src/prediction/imm_predictor.cpp.o
+[18/33] Building CXX object CMakeFiles/dogperc.dir/src/cuda/gpu_detector.cpp.o
+[19/33] Building CXX object CMakeFiles/dogperc.dir/src/cuda/trt_engine.cpp.o
+[20/33] Building CXX object CMakeFiles/dogperc.dir/src/tracking/tracker.cpp.o
+[21/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_tracking.cpp.o
+[22/33] Building CXX object CMakeFiles/dogperc_replay.dir/tools/dogperc_replay.cpp.o
+[23/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_detection.cpp.o
+[24/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_preprocess.cpp.o
+[25/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_gpu.cpp.o
+[26/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_io_geometry.cpp.o
+[27/33] Building CXX object CMakeFiles/dogperc.dir/src/preprocess.cpp.o
+[28/33] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_pipeline.cpp.o
+[29/33] Building CXX object CMakeFiles/dogperc.dir/src/tracking/imm.cpp.o
+[30/33] Building CUDA object CMakeFiles/dogperc.dir/src/cuda/pillars.cu.o
+[31/33] Linking CXX static library libdogperc.a
+[32/33] Linking CXX executable dogperc_replay
+[33/33] Linking CXX executable dogperc_tests
