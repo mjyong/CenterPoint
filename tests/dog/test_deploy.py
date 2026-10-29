@@ -267,3 +267,28 @@ def test_trt_runner_on_a_tiny_engine(tmp_path, monkeypatch):
                    check=True, env=dict(os.environ, PYTHONPATH=ROOT), capture_output=True)
     r = json.load(open(report))
     assert [e["engine"] for e in r["engines"]] == ["tiny.fp32.engine"] and r["trt"] == trt.__version__
+
+
+def test_export_cpp_config(tmp_path):
+    """The C++ parameters come from the dataclasses: every model's q_omega resolved, per-class values for all
+    three classes, a sequence's meta.json reflected, the YAML the C++ loader reads."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from export_cpp_config import config_dict, to_yaml
+    from dog_perception.preprocess import DetFrameConfig, PreprocessConfig
+    from dog_perception.tracking import TrackerConfig
+
+    d = config_dict(PreprocessConfig(det_frame=DetFrameConfig(base_height=0.72, auto_level=True)),
+                    tracker=TrackerConfig(classes=("vehicle", "pedestrian")))
+    assert d["version"] == 1 and d["preprocess"]["det_frame"]["base_height"] == 0.72
+    assert d["preprocess"]["det_frame"]["auto_level"] is True and len(d["preprocess"]["T_body_lidar"]) == 16
+    assert d["tracker"]["classes"] == ["vehicle", "pedestrian"]
+    assert d["tracker"]["class_params"]["vehicle"]["models"] == [["cv", 1.5, 0.001], ["ct", 1.5, 0.25]]
+    assert d["tracker"]["high_score"] == {"vehicle": 0.4, "pedestrian": 0.3, "cyclist": 0.4}
+    assert d["detection_filter"]["min_points"]["cyclist"] == 3.0 and d["predictor"]["horizon"] == 3.0
+    text = to_yaml(d)
+    assert "  T_body_lidar: [1.0, 0.0, 0.0, 0.2," in text and "matching: \"greedy\"" in text
+    out = tmp_path / "kygi.yaml"
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "export_cpp_config.py"), "--robot", "kygi",
+                    "--out", str(out)], check=True, capture_output=True, env=dict(os.environ, PYTHONPATH=ROOT))
+    t = out.read_text()
+    assert "base_height: 0.72" in t and "localization: \"inspvax\"" in t and "ins_lever_arm: [-0.06, -0.54, 0.0]" in t

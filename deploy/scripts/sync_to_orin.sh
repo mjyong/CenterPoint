@@ -7,17 +7,19 @@
 #   deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp      # + the model directory
 #   deploy/scripts/sync_to_orin.sh --frames data/runs/0921_164127_s000/frames --stride 3 --limit 100
 #   deploy/scripts/sync_to_orin.sh --dumps data/deploy/dumps        # reference detections (compare_backends --dump)
+#   deploy/scripts/sync_to_orin.sh --seq data/seq/0921_164127_s000 --limit 150   # a raw recording (dogperc_replay)
 # ORIN_HOST (default orin, ~/.ssh/config) and ORIN_DIR (default ~/dogperc) choose the target.
 set -euo pipefail
 export LC_ALL=C          # list frames in the order Python's sorted() uses (compare_backends.py --stride / --limit)
 HOST=${ORIN_HOST:-orin}
 DIR=${ORIN_DIR:-dogperc}
 cd "$(dirname "$0")/../.."
-MODEL="" ; DUMPS="" ; FRAMES=() ; STRIDE=1 ; LIMIT=0
+MODEL="" ; DUMPS="" ; FRAMES=() ; SEQS=() ; STRIDE=1 ; LIMIT=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --model) MODEL=$2; shift 2 ;;
     --frames) FRAMES+=("$2"); shift 2 ;;
+    --seq) SEQS+=("$2"); shift 2 ;;
     --stride) STRIDE=$2; shift 2 ;;
     --limit) LIMIT=$2; shift 2 ;;
     --dumps) DUMPS=$2; shift 2 ;;
@@ -28,6 +30,7 @@ done
 # rsync creates only the last directory of a target: make the scene directories first
 dirs="$DIR/repo $DIR/models $DIR/data"
 for f in "${FRAMES[@]}"; do dirs="$dirs $DIR/data/$(basename "$(dirname "$f")")/frames"; done
+for s in "${SEQS[@]}"; do dirs="$dirs $DIR/seq/$(basename "$s")/scans"; done
 ssh "$HOST" "mkdir -p $dirs"
 rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build/' --exclude 'install/' --exclude 'log/' \
   dog_perception tools deploy configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
@@ -41,6 +44,18 @@ for f in "${FRAMES[@]}"; do
   [ "$LIMIT" -gt 0 ] && head -n "$LIMIT" "$list" > "$list.cut" && mv "$list.cut" "$list"
   rsync -az --files-from="$list" "$f/" "$HOST:$DIR/data/$scene/frames/"
   echo "$scene: $(wc -l < "$list") frames"
+  rm -f "$list"
+done
+# raw recordings: meta, IMU, odometry and the first --limit scans (all with --limit 0)
+for s in "${SEQS[@]}"; do
+  name=$(basename "$s")
+  rsync -az "$s/meta.json" "$HOST:$DIR/seq/$name/"
+  for f in imu.npy odom.npy; do [ -f "$s/$f" ] && rsync -az "$s/$f" "$HOST:$DIR/seq/$name/"; done
+  list=$(mktemp)
+  ls "$s/scans" | grep '\.npz$' > "$list"
+  [ "$LIMIT" -gt 0 ] && head -n "$LIMIT" "$list" > "$list.cut" && mv "$list.cut" "$list"
+  rsync -az --files-from="$list" "$s/scans/" "$HOST:$DIR/seq/$name/scans/"
+  echo "$name: $(wc -l < "$list") scans"
   rm -f "$list"
 done
 if [ -n "$DUMPS" ]; then

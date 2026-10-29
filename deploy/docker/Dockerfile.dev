@@ -1,0 +1,13 @@
+# C++ development image of the server (docs/DEPLOY_ORIN.md section 3): TensorRT 10.3.0 and CUDA 12.6 like the
+# Orin, plus what deploy/cpp builds and tests with. The repository is mounted, not copied:
+#   docker build -t dogperc-dev -f deploy/docker/Dockerfile.dev deploy/docker
+#   docker run --rm --gpus '"device=5"' -u $(id -u):$(id -g) -v $PWD:/repo -w /repo dogperc-dev \
+#       bash -c "cmake -S deploy/cpp -B deploy/cpp/build_cuda -G Ninja -DDOGPERC_WITH_CUDA=ON && \
+#                cmake --build deploy/cpp/build_cuda -j && ctest --test-dir deploy/cpp/build_cuda --output-on-failure"
+FROM nvcr.io/nvidia/tensorrt:24.08-py3
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cmake ninja-build libeigen3-dev libyaml-cpp-dev libgtest-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+# the golden data of the parity tests (tools/deploy/dump_golden.py): NumPy 1.x like the project environment
+RUN python3 -m pip install --no-cache-dir "numpy==1.26.4" "scipy>=1.8"
+ENV HOME=/tmp

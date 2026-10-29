@@ -8,14 +8,14 @@ Python 流水线是唯一的参考实现。每换一样东西（运行时、精�
 
 | 阶段 | 内容 | 服务器任务 | 状态 |
 |---|---|---|---|
-| P0 | 环境和通道：服务器经本机的反向隧道连到 Orin，查清两边的版本 | T25 | 待做 |
-| P1 | 上线的 Pillar 导出为 ONNX，建 TensorRT FP32 / FP16 引擎，和 PyTorch 比（含原 T8） | T26 | 待做 |
-| P2 | INT8 量化（ModelOpt 显式 Q/DQ），和 FP16 比精度和延迟 | T27 | 待做 |
-| P3 | C++ 核心库，不依赖 ROS：预处理、检测、跟踪、预测 | — | 写代码中 |
-| P4 | Python 和 C++ 逐段对齐（golden 数据加 GoogleTest） | T28 | |
-| P5 | C++ 全链路离线评估（`pipeline_eval.py`） | T29 | |
-| P6 | ROS 2 节点和 `ObjectArray` 消息，bag 回放对比 | T30 | |
-| P7 | 板上性能和稳定性 | T31 | |
+| P0 | 环境和通道：服务器经本机的反向隧道连到 Orin，查清两边的版本 | T25 | 完成 |
+| P1 | 上线的 Pillar 导出为 ONNX，建 TensorRT FP32 / FP16 引擎，和 PyTorch 比（含原 T8） | T26 | 完成，FP16 可用 |
+| P2 | INT8 量化（ModelOpt 显式 Q/DQ），和 FP16 比精度和延迟；动态柱数的 PFN | T27 | 待做 |
+| P3 | C++ 核心库，不依赖 ROS：预处理、检测、跟踪、预测（第 7 节） | — | 已写，本机 CPU 部分全部对上 |
+| P4 | Python 和 C++ 逐段对齐（golden 数据加 GoogleTest），GPU 部分和 TensorRT | T28 | 待做 |
+| P5 | C++ 全链路离线评估：同一批检测时跟踪对齐，各自检测时 `pipeline_eval.py` 打分 | T28 | 待做 |
+| P6 | ROS 2 节点和 `ObjectArray` 消息，bag 回放对比 | T29 | |
+| P7 | 板上性能和稳定性 | T30 | |
 
 已定（2026-10-28）：
 - 板上存储不够，只放 2–3 个验证场景的小子集，全量评估在服务器上做；
@@ -210,19 +210,85 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 
 逐段误差要中间张量：参考是 `torch` 或 `dump:` 时，对第一个导出的后端（通常是 onnx）算。
 
-## 7. C++ 和 ROS 2（P3–P6，写代码中）
+## 7. C++ 核心库（P3）
 
 ```text
-deploy/
-  cpp/            不依赖 ROS 的核心库 libdogperc：loc、preprocess、detect（CUDA + TensorRT）、track、predict、io；
-                  tests/（GoogleTest，读 golden npz）；tools/dogperc_replay（序列进，逐帧结果 npz 出）
-  ros2/           dog_perception_msgs（Object、PredictedPath、ObjectArray）、dog_perception_ros（rclcpp component）
-  config/         tools/deploy/export_cpp_config.py 从 Python 的 dataclass 生成的 YAML，C++ 不硬编码参数
-  scripts/        orin_check.sh、sync_to_orin.sh
+deploy/cpp/
+  include/dogperc/   头文件，一个 Python 模块对应一个
+  src/               CPU 部分；src/cuda/：GPU 体素化（pillars.cu）、TensorRT 引擎、GPU 检测器（DOGPERC_WITH_CUDA）
+  tests/             GoogleTest，读 tools/deploy/dump_golden.py 写的 golden 数据，逐段和 Python 比
+  tools/dogperc_replay.cpp   序列进，逐帧结果 npz 出（格式同 golden 的 pipeline.npz）
+deploy/docker/Dockerfile.dev 服务器上编译测试用的镜像（TensorRT 10.3、CUDA 12.6，同板子）
+deploy/ros2/       P6：dog_perception_msgs（Object、PredictedPath、ObjectArray）、rclcpp 节点（还没写）
 ```
 
-- 每个 C++ 模块对应一个 Python 模块；第二档预测不在线，不移植。
-- 参数只有一个来源：Python 的 dataclass 和节点预设。
+**模块对应**：
+
+| C++ | Python |
+|---|---|
+| `geometry`、`pose_buffer` | `geometry.py`、`pose_buffer.py`（PoseBuffer、ImuPropagator） |
+| `preprocess` | `preprocess/`：去重、自身滤除、去畸变、多帧累积、检测系、地面估计 |
+| `localization` | `inspvax.py`：ENU、航向、杠杆臂、航向检查（ROS 消息解析留给 P6 节点） |
+| `detections` | `detection/boxes.py`、`frame_adapter.py` |
+| `detection/model_meta`、`pillars`、`decode`、`filters`、`detector` | `model_meta.py`、`voxelize.py`、`pillar_host.py`、`decode.py`、`filters.py`、`exported.py` |
+| `detection/trt_engine`、`gpu_detector`（CUDA） | `exported.py` 的 TensorRT 后端 |
+| `tracking/imm`、`association`、`tracker` | `tracking/` |
+| `prediction/imm_predictor` | `prediction/kinematic.py` |
+| `pipeline`、`sequence` | `pipeline.py`、`io.py` |
+
+不移植：第二档的学习预测（不在线），评估和可视化（离线，留在 Python）。
+
+**参数**：只有一个来源，Python 的 dataclass 和节点预设。
+- `tools/deploy/export_cpp_config.py` 写成 YAML：`--robot kygi` 是在线节点的配置（含 ROS 参数），`--seq` 是一段录制按 meta.json 的配置；
+- C++ 读的时候每个键都必须有，缺了就报错；
+- C++ 里的默认值只是照抄，测试检查它们和 Python 的一致。
+
+**数值约定**，为了逐位对得上：
+- Python 用 float32 的地方 C++ 也用 float32（点云、体素、head 图），位姿和跟踪用 float64；
+- 照搬 NumPy 的类型提升：比如 decorate 里 float32 除以 int32 会变成 float64，`np.radians` 是乘预先算好的 pi/180；
+- 编译时关掉 FMA 合并（`-ffp-contract=off`，板子是 aarch64，GCC 默认会合并）；CUDA 核函数用 `__fadd_rn` 这类指定舍入的指令；
+- GPU 体素化：点按格子稳定排序，格子按各自第一个点的顺序编号，点在格子里的序号就是它在格内的位置。这样和 CPU 的体素逐位相同，也就和 det3d 相同。
+
+**本机结果**（模拟器序列，26 帧，用真值加噪声的模拟检测 OracleDetector）：
+- 体素、PFN 输入、BEV 画布和 Python 逐位相同；
+- 解码、NMS、过滤原因完全一致；框差在 float32 的 1 ulp 以内（NumPy 的 exp 和 glibc 的 expf 会差 1 ulp）；
+- 整条流水线：点最大差 9.3e-10 m，跟踪状态 2e-14，预测 1.5e-10，位姿 8e-16；每帧的跟踪 ID 和顺序都完全一样；
+- CUDA 部分在本机只编译过（CUDA 12.0，`sm_87` / `sm_89`），没有 GPU、也没有 TensorRT 头文件，GPU 测试和 TensorRT 都留给 T28。
+
+**编译和测试**：
+
+```bash
+# 只要 CPU 部分：Eigen、yaml-cpp、GoogleTest、zlib；golden 数据要 python3 加 numpy、scipy
+cmake -S deploy/cpp -B deploy/cpp/build -DCMAKE_BUILD_TYPE=Release
+cmake --build deploy/cpp/build -j && ctest --test-dir deploy/cpp/build --output-on-failure
+# 加上 CUDA 和 TensorRT：服务器在 dogperc-dev 容器里，板上原生编译
+cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUILD_TYPE=Release
+# 板上：-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87
+```
+
+- CTest 先跑 `dump_golden.py` 生成 golden 数据（约 60 MB，在 build 目录里），再跑 GoogleTest；
+- 设了 `DOGPERC_MODEL_DIR`（导出的模型目录，引擎已在本机建好）时，GPU 检测器还要和"主机拷贝"的 TensorRT 检测器逐帧比。
+
+**GPU 检测器**：
+- 点云拷到 GPU，体素化、decorate、scatter 都在 GPU 上；
+- 两个引擎直接读写 GPU 缓冲区；
+- 只有 head 图拷回主机（约 2.7 MB），解码、NMS、过滤在 CPU 上；
+- 每段用 CUDA event 计时：voxelize、pfn、scatter、rpn、d2h，写进 `dogperc_replay` 的 `timing_*`。
+
+**Python 和 C++ 在真实录制上比**（`tools/deploy/cpp_parity.py` 加 `dogperc_replay`）：
+1. `cpp_parity.py python`：Python 流水线照 `run_sequence.py` 的方式跑一段录制，存逐帧结果、它用的检测、这次的 C++ 配置；
+2. `dogperc_replay --detections`：C++ 用同一批检测。跟踪 ID 每帧必须完全一致，状态 1e-6，预测 1e-4（第 6 节）；
+3. `dogperc_replay --model-dir ... --gpu`：C++ 用自己的检测器跑全链路，检测按 compare_backends.py 的办法比；
+4. `cpp_parity.py to-results`：转成 `results.pkl`，用 `pipeline_eval.py` 和 Python 并排打分；
+5. `cpp_parity.py timings`：每段延迟的中位数、p90、p99。
+
+**还没做 / 下一步**：
+- P6 ROS 2 节点：消息、rclcpp 组件、INSPVAX 和点云消息解析，bag 回放对比；
+- 性能（P7）：
+  - CPU 预处理在本机 x86 约 12 ms 一帧（去畸变 7 ms，累积和地面 4 ms，约 20 万点），板上 A78 会更慢；
+  - 要优化，或把去畸变和累积搬到 GPU；
+  - 解码搬到 GPU，可以省掉 head 图的拷贝；
+  - 用 cub 并预分配临时内存，代替 thrust 每帧的临时分配；用锁页内存。
 - C++ 统一用 C++17：板上是 gcc 11。
 
 ## 8. 文件一览
@@ -239,5 +305,10 @@ deploy/
 | `tools/deploy/compare_backends.py` | 多个后端逐段、逐框比较，查门槛；`--dump` / `dump:` 跨机器比较 |
 | `tools/deploy/pillar_stats.py` | 柱数分布，定 P_max |
 | `tools/dog/run_sequence.py --exported` | 导出的检测器跑完整流水线，结果给 `pipeline_eval.py` |
+| `deploy/cpp/` | C++ 核心库 libdogperc、GoogleTest 对齐测试、`dogperc_replay`（第 7 节） |
+| `tools/deploy/export_cpp_config.py` | 从 Python 的 dataclass 写 C++ 的参数 YAML |
+| `tools/deploy/dump_golden.py` | C++ 对齐测试用的 golden 数据（模拟器序列加每一段的 Python 输出） |
+| `tools/deploy/cpp_parity.py` | 真实录制上 Python 和 C++ 比：参考运行、比较、转 results.pkl、延迟汇总 |
+| `deploy/docker/Dockerfile.dev` | 服务器上编译测试 C++ 的镜像 |
 | `deploy/scripts/orin_check.sh` | 环境报告 |
 | `deploy/scripts/sync_to_orin.sh` | 代码、模型、帧、参考检测同步到板上 |
