@@ -13,8 +13,15 @@ Writes into --out:
     model/model_meta.json
     pipeline.npz        PerceptionPipeline on seq/ (odometry 50 ms late): per frame the det-frame cloud,
                         poses, ground estimate, detections fed in, tracks and predictions
+                        and the planner-frame output (PerceptionPipeline.to_local, local_*)
     dets.npz            those detections per frame, the C++ replay's input (dogperc_replay --detections)
     geometry.npz, imm.npz, lsa.npz, pose_buffer.npz, preprocess.npz, pillars.npz, decode.npz, ins.npz
+    clouds.npz          PointCloud2 byte layouts (XT32, Livox, integer fields, big-endian) and what
+                        ros_utils.scan_from_msg reads from them
+    kygi.yaml           the kygi node's configuration (export_cpp_config.py --robot kygi, with node:)
+    online_msgs.npz, online.npz, online_dets.npz, online_config.yaml
+                        the moving sample bag's first clouds through the online node's message handling
+                        (cpp_parity.py python --bag); only with rosbags installed and samples/ checked out
 """
 import argparse
 import json
@@ -29,7 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from scipy.optimize import linear_sum_assignment  # noqa: E402
 
-from export_cpp_config import config_dict, to_yaml  # noqa: E402
+from export_cpp_config import config_dict, node_section, to_yaml  # noqa: E402
 from dog_perception.detection.boxes import CLASSES, Detections  # noqa: E402
 from dog_perception.detection.decode import HEAD_ORDER, decode_centerpoint  # noqa: E402
 from dog_perception.detection.filters import (  # noqa: E402
@@ -41,11 +48,13 @@ from dog_perception.detection.voxelize import voxelize  # noqa: E402
 from dog_perception.geometry import inv_T, quat_to_R, rot_zyx, so3_exp, so3_log, wrap_angle  # noqa: E402
 from dog_perception.inspvax import EnuOrigin, pose_from_inspvax  # noqa: E402
 from dog_perception.io import SequenceReader, odom_row, write_sequence  # noqa: E402
+from dog_perception.node_config import node_parameters, preprocess_config  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
 from dog_perception.pose_buffer import PoseBuffer  # noqa: E402
 from dog_perception.preprocess import DetFrameConfig, PreprocessConfig, Preprocessor  # noqa: E402
 from dog_perception.preprocess.frames import det_frame_from_body  # noqa: E402
 from dog_perception.preprocess.pipeline import dedup_returns  # noqa: E402
+from dog_perception.ros_utils import scan_from_msg  # noqa: E402
 from dog_perception.preprocess.self_filter import SelfFilter, SelfFilterConfig, neighbor_counts  # noqa: E402
 from dog_perception.sim import GaitModel, make_scenario  # noqa: E402
 from dog_perception.tracking import TrackerConfig  # noqa: E402
@@ -97,7 +106,7 @@ def run_pipeline(seq_dir, sim, infos, base_height, tracker_cfg):
     pipe = PerceptionPipeline(reader.preprocess_config(), detector=None, tracker_cfg=tracker_cfg)
     oracle = OracleDetector(OracleNoise(), seed=11)
     rec = dict(stamp=[], T_world_det=[], T_world_body=[], num_raw=[], num_kept=[], points=[], ground_offset=[],
-               ground_tilt=[], dets=[], tracks=[], preds=[])
+               ground_tilt=[], dets=[], tracks=[], preds=[], local=[])
     for ev in reader.events(odom_latency=ODOM_LATENCY):
         if ev[0] == "imu":
             pipe.on_imu(ev[1], ev[2])
@@ -126,7 +135,121 @@ def run_pipeline(seq_dir, sim, infos, base_height, tracker_cfg):
         rec["dets"].append(out.detections)
         rec["tracks"].append(out.tracks)
         rec["preds"].append(out.predictions)
+        rec["local"].append(pipe.to_local(out))
     return rec
+
+
+def local_arrays(rec):
+    """PerceptionPipeline.to_local per frame, rows in the order of trk_* / pred_*."""
+    tr = [t for ts, _ in rec["local"] for t in ts]
+    pr = [p for _, ps in rec["local"] for p in ps]
+    T = len(pr[0].times) if pr else 0
+    modes, covs = np.full((len(pr), 2, T, 2), np.nan), np.full((len(pr), 2, T, 2, 2), np.nan)
+    for i, p in enumerate(pr):
+        modes[i, :len(p.probs)], covs[i, :len(p.probs)] = p.modes, p.covs
+    return dict(local_id=np.asarray([t["id"] for t in tr], np.int64),
+                local_position=np.asarray([t["position"] for t in tr], np.float64).reshape(-1, 3),
+                local_velocity=np.asarray([t["velocity"] for t in tr], np.float64).reshape(-1, 2),
+                local_yaw=np.asarray([t["yaw"] for t in tr], np.float64),
+                local_covariance=np.asarray([t["covariance"] for t in tr], np.float64).reshape(-1, 4, 4),
+                local_pred_modes=modes, local_pred_covs=covs)
+
+
+def cloud_cases(rng):
+    """PointCloud2 layouts and what scan_from_msg makes of them (the C++ parser must read the same)."""
+    from types import SimpleNamespace as NS
+
+    def field(name, offset, datatype):
+        return NS(name=name, offset=offset, datatype=datatype, count=1)
+
+    def points(n):
+        xyz = rng.normal(0, 8, (n, 3)).astype(np.float32)
+        xyz[::17] = 0.0                                   # no return
+        xyz[5::23, 1] = np.nan
+        xyz[9::31, 2] = np.inf
+        return xyz
+
+    cases, n = [], 300
+    stamp = NS(sec=1789980190, nanosec=502000000)
+    # Hesai XT32 (0921): float64 absolute seconds at the unaligned offset 18
+    dt = np.dtype({"names": ["x", "y", "z", "intensity", "ring", "timestamp"],
+                   "formats": ["<f4", "<f4", "<f4", "<f4", "<u2", "<f8"], "offsets": [0, 4, 8, 12, 16, 18],
+                   "itemsize": 26})
+    a = np.zeros(n, dt)
+    xyz = points(n)
+    a["x"], a["y"], a["z"] = xyz.T
+    a["intensity"], a["ring"] = rng.uniform(0, 255, n), np.arange(n) % 32
+    a["timestamp"] = 1789980190.4 + np.sort(rng.uniform(0, 0.1, n))
+    cases.append(("xt32", a, [field("x", 0, 7), field("y", 4, 7), field("z", 8, 7), field("intensity", 12, 7),
+                              field("ring", 16, 4), field("timestamp", 18, 8)], 1, "timestamp", "absolute", 0, False))
+    # Livox Mid-360 (livox_ros_driver2): nanoseconds as float64, noise tags
+    dt = np.dtype({"names": ["x", "y", "z", "intensity", "tag", "line", "timestamp"],
+                   "formats": ["<f4", "<f4", "<f4", "<f4", "u1", "u1", "<f8"], "offsets": [0, 4, 8, 12, 16, 17, 18],
+                   "itemsize": 26})
+    a = np.zeros(n, dt)
+    xyz = points(n)
+    a["x"], a["y"], a["z"] = xyz.T
+    a["intensity"], a["tag"], a["line"] = rng.uniform(0, 100, n), rng.integers(0, 16, n), np.arange(n) % 4
+    a["timestamp"] = 1789980190.4e9 + np.sort(rng.uniform(0, 1e8, n))
+    cases.append(("livox", a, [field("x", 0, 7), field("y", 4, 7), field("z", 8, 7), field("intensity", 12, 7),
+                               field("tag", 16, 2), field("line", 17, 2), field("timestamp", 18, 8)], 1,
+                  "timestamp", "absolute_ns", 3, False))
+    # integer coordinates (as some drivers pack them), uint8 intensity, uint32 nanoseconds after the stamp, 2 rows
+    dt = np.dtype({"names": ["x", "y", "z", "intensity", "t"], "formats": ["<i2", "<i2", "<i4", "u1", "<u4"],
+                   "offsets": [0, 2, 4, 8, 12], "itemsize": 16})
+    a = np.zeros(n, dt)
+    a["x"], a["y"], a["z"] = rng.integers(-3000, 3000, n), rng.integers(-3000, 3000, n), rng.integers(-500, 500, n)
+    a["x"][::13] = a["y"][::13] = a["z"][::13] = 0
+    a["intensity"], a["t"] = rng.integers(0, 256, n), np.sort(rng.integers(0, 100_000_000, n))
+    cases.append(("ints", a, [field("x", 0, 3), field("y", 2, 3), field("z", 4, 5), field("intensity", 8, 2),
+                              field("t", 12, 6)], 2, "t", "relative_ns", 0, False))
+    # big-endian, no intensity, no per-point time: the header stamp is the scan's
+    dt = np.dtype({"names": ["x", "y", "z", "rel"], "formats": [">f4", ">f4", ">f4", ">f8"], "offsets": [0, 4, 8, 12],
+                   "itemsize": 20})
+    a = np.zeros(n, dt)
+    a["x"], a["y"], a["z"] = points(n).T
+    a["rel"] = rng.uniform(0, 0.1, n)
+    cases.append(("bigendian", a, [field("x", 0, 7), field("y", 4, 7), field("z", 8, 7), field("rel", 12, 8)], 1,
+                  "time", "relative", 0, True))
+
+    def text(t):                                          # the C++ npz reader takes numbers only
+        return np.frombuffer(t.encode(), np.uint8)
+
+    out = dict(cases=np.asarray(len(cases)))
+    for k, (name, arr, fields, height, tfield, tmode, mask, big) in enumerate(cases):
+        msg = NS(header=NS(stamp=stamp), fields=fields, width=len(arr) // height, height=height,
+                 point_step=arr.dtype.itemsize, is_bigendian=big, data=arr.tobytes())
+        scan = scan_from_msg(msg, tfield, tmode, noise_tag_mask=mask)
+        p = "c%d_" % k
+        out.update({p + "data": np.frombuffer(arr.tobytes(), np.uint8), p + "width": np.asarray(msg.width),
+                    p + "height": np.asarray(height), p + "point_step": np.asarray(arr.dtype.itemsize),
+                    p + "bigendian": np.asarray(int(big)), p + "stamp": np.asarray(stamp.sec + stamp.nanosec * 1e-9),
+                    p + "field_names": text(",".join(f.name for f in fields)), p + "time_field": text(tfield),
+                    p + "field_offsets": np.asarray([f.offset for f in fields], np.int64),
+                    p + "field_types": np.asarray([f.datatype for f in fields], np.int64),
+                    p + "time_mode": text(tmode), p + "mask": np.asarray(mask),
+                    p + "xyz": scan.xyz, p + "intensity": scan.intensity, p + "scan_stamp": np.asarray(scan.stamp),
+                    p + "times": np.zeros(0) if scan.point_times is None else scan.point_times})
+    return out
+
+
+def online_golden(out, max_clouds=8):
+    """The sample bag's first clouds through the online node's message handling (cpp_parity.py python --bag)."""
+    bag = os.path.join(ROOT, "samples", "rosbag2_2026_09_21-16_41_27_moving")
+    try:
+        import rosbags  # noqa: F401
+    except ImportError:
+        print("golden: no rosbags, the online message replay is left out")
+        return
+    if not os.path.isdir(bag):
+        print("golden: %s missing, the online message replay is left out" % bag)
+        return
+    from types import SimpleNamespace as NS
+    from cpp_parity import run_python
+    run_python(NS(seq=None, bag=bag, robot="kygi", messages=os.path.join(out, "online_msgs.npz"),
+                  max_clouds=max_clouds, no_detector=True, exported=None, detections=None, odom_latency=0.0,
+                  save_points=True, out=os.path.join(out, "online.npz"), dets=os.path.join(out, "online_dets.npz"),
+                  config=os.path.join(out, "online_config.yaml")))
 
 
 def pipeline_arrays(rec, save_points=True, points_every=1):
@@ -424,6 +547,7 @@ def main():
 
     rec = run_pipeline(seq, sim, infos, gait.base_height, tracker_cfg)
     pa = pipeline_arrays(rec, points_every=5)                  # the clouds dominate the size: every 5th frame
+    pa.update(local_arrays(rec))
     pa["odom_latency"] = np.float64(ODOM_LATENCY)
     np.savez_compressed(os.path.join(out, "pipeline.npz"), **pa)
     d = dets_arrays("det", rec["dets"])
@@ -436,6 +560,11 @@ def main():
     np.savez_compressed(os.path.join(out, "pose_buffer.npz"), **pose_buffer_data(sim, rng))
     np.savez_compressed(os.path.join(out, "preprocess.npz"), **preprocess_data(seq, sim))
     np.savez_compressed(os.path.join(out, "ins.npz"), **ins_data(rng))
+    np.savez_compressed(os.path.join(out, "clouds.npz"), **cloud_cases(rng))
+    with open(os.path.join(out, "kygi.yaml"), "w") as f:
+        f.write(to_yaml(config_dict(preprocess_config(node_parameters("kygi")), source=dict(robot="kygi"),
+                                    node=node_section("kygi"))) + "\n")
+    online_golden(out)
 
     meta = synthetic_meta()
     os.makedirs(os.path.join(out, "model"), exist_ok=True)

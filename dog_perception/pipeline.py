@@ -95,9 +95,12 @@ class PerceptionPipeline:
         T_dw = inv_T(out.frame.T_world_det)
         R = T_dw[:3, :3]
         dyaw = np.arctan2(R[1, 0], R[0, 0])
+        B = np.zeros((4, 4))                    # [px, py, vx, vy] covariance: both blocks rotate with the frame
+        B[:2, :2] = B[2:, 2:] = R[:2, :2]
         tracks = []
         for s in out.tracks:
             tracks.append(dict(id=s.track_id, label=s.name, position=R @ s.position + T_dw[:3, 3],
                                velocity=R[:2, :2] @ s.velocity, yaw=float(s.yaw + dyaw),
-                               size=s.size, score=s.score, coasting=s.coasting, motion=s.motion))
+                               size=s.size, score=s.score, coasting=s.coasting, motion=s.motion,
+                               covariance=B @ s.covariance @ B.T, age=s.age))
         return tracks, [p.transform(T_dw, "det") for p in out.predictions]

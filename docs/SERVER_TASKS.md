@@ -120,7 +120,8 @@
 | T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 完成，已复核。P_max 24000。FP32、FP16 都能用，上线先用 FP16。FP16 有 8 个场景匹配率低于 0.99，判断是阈值附近的框来回翻，门槛改为不计这类（T27 重算确认）；标签上 AP 只掉 0.001。板上 FP16 的 GPU 时间：PFN 3.4 ms、RPN 4.7 ms。服务器 C++ 用 TensorRT 容器 |
 | T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟；动态柱数的 PFN | Agent | T26 | 2.5 小时 | 完成，已复核。上线用 FP16 加动态 PFN（`nusc_pp_dyn`）。FP16 剩下的漏报多是过滤器的阈值翻转（过滤前 10 个场景都 ≥ 0.991），比较工具加了 filter 一类、heads rel 不再卡门槛。INT8 差得不正常（有个 head 余弦为负），多半是稀疏 BEV 上 entropy 校准截断太狠，现在不追。两个 INT8 的 AP@2 掉 0.124 / 0.099，不上（人定，2026-10-29）。板上 RPN：FP16 5.05 ms，INT8 2.65 ms。PFN：动态 10000 柱 1.50 ms，静态 3.52 ms |
 | T28 | Orin 部署 P4 / P5：C++ 核心库在服务器容器里编译、跑对齐测试（含 GPU、TensorRT）；10 个验证场景上 Python 和 C++ 比（同一批检测、各自检测）并打分；板上原生编译、测试、测延迟 | Agent（锁频掉了才要人） | T27 | 3 小时 | 完成，已复核。复核在样例 bag 的真实扫描上拆开计时：慢的是去重（逐点 unordered_map），不是去畸变；预处理和后处理已提速，输出逐位不变，T28B 复测。C++ 可以替代 Python：10 个场景同一批检测 ID 全同，各自检测匹配率都是 1。标签上 AP@2 / AP@4 都是 0.832 / 0.852。板上锁频还在。端到端中位数 27.7 ms（p99 30.2 ms），网络以外 21.8 ms，比 15 ms 多 6.8 ms，多在去畸变。INT8 最差的 head 是 height（余弦 −0.85） |
-| T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 完成。输出和 T28 逐位相同，1 线程和 4 线程也相同。板上网络以外：1 线程 12.9 ms，4 线程 11.4 ms，都低于 15 ms。用 4 个线程。服务器上 4 线程更慢，体素化 p99 尖峰从 215 ms 降到 19 ms（1 线程），还没消失 |
+| T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 完成，已复核。输出和 T28 逐位相同，1 线程和 4 线程也相同。板上网络以外：1 线程 12.9 ms，4 线程 11.4 ms，都低于 15 ms。用 4 个线程。服务器上 4 线程更慢，体素化 p99 尖峰从 215 ms 降到 19 ms（1 线程），还没消失 |
+| T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5366,3 +5367,121 @@ frame 25:  7 boxes, gpu 2.82 ms (voxelize 0.37, pfn 0.16, rpn 0.74)
 **板上对服务器、1 对 4 线程。** 1 线程的新结果对服务器 1 线程（前 150 帧）：pass。过滤前后匹配率 1，漏 2（near 1、filter 1），多 1（near），和 T28 一样是阈值翻转。4 线程对 1 线程：pass，150 帧，差是 0。柱数中位数仍是 5059。
 
 **结论。** 提速没有改输出。板上网络以外的中位数到了 15 ms 以内：1 线程 12.9 ms，4 线程 11.4 ms。用 4 个线程（端到端 17.3 ms，p99 18.2 ms）。4 个线程省下的是拼帧、自身滤除和去畸变，大约 1.4 ms；去重还是 2.6 ms，没有降。剩下比较长的是去重 2.6 ms、拼帧 2.0 ms、过滤后处理 1.7 ms、体素化 1.6 ms、结果拷回 1.1 ms。网络仍是 PFN 0.80 ms 加 RPN 4.73 ms。服务器上 4 线程比 1 线程慢（预处理 9.4 ms 对 7.7 ms），和复核说的共享 vCPU 没有收益一致，不要在服务器上开 4 线程。做完删了板上的 `~/dogperc/seq`、`orin_t1.npz`、`orin_t4.npz` 和 `build_cuda/golden`，根分区仍是 4.6 GB。
+
+### T28B 复核
+
+2026-10-29。结论同意。
+- 提速没有改输出：两个场景三次比较的差都是 0，1 个线程和 4 个线程也相同；
+- 板上网络以外的中位数到了 15 ms 以内：1 个线程 12.9 ms，4 个线程 11.4 ms，端到端 17.3 ms（p99 18.2 ms）；
+- 板上用 4 个线程，节点的 launch 默认就是 4；服务器上用 1 个。
+
+1. P7 的延迟这一项达标了。还剩稳定性：长时间跑、10 Hz 不丢帧、和板上别的进程抢 CPU / GPU。T29 先在回放 bag 时查不丢帧，长时间要上车（人）。
+2. 服务器体素化的 p99 尖峰（1 线程 18.6 ms，4 线程 79 ms）只在共享的 4090 上有，板上 p99 一直是 2.4 ms。不追。
+3. Gpu.* 的每帧行确实没有 h2d，上传时间只在回放的 `det_h2d_ms` 里，复核里说错了。
+4. `test_trt_runner_on_a_tiny_engine` 那次 worker 中途退出、单独重跑通过。以后再出现就记下是哪个测试、退出码是多少。
+5. P6 的 ROS 2 节点写好了，见 DEPLOY_ORIN.md 第 8 节，T29 编译、验证。
+
+## T29 Orin 部署：C++ ROS 2 节点
+
+ROS 2 节点写好了（`deploy/ros2`，DEPLOY_ORIN.md 第 8 节）。节点的消息处理在 libdogperc 里，不依赖 ROS（`dogperc/online.hpp`），本机已经和 Python 节点的消息处理（`dog_perception/online.py`）在样例 bag 上逐帧对上。ROS 那一层（rclcpp 节点、rosbag2 读取、消息转换）本机没有 ROS，没编译过。这次要：
+- 服务器：Python 节点回放 bag 和 C++ 的消息处理比，样例 bag 和一段 0921 原始 bag；
+- 板上：colcon 编译；`dogperc_bag_replay` 直接读 bag，和服务器上的 C++ 结果逐位比；在线 `ros2 bag play`，查不丢帧、看输出。
+
+本任务可以改的范围（通用约定 9）：`deploy/ros2/`、`deploy/cpp/`、`deploy/docker/`、`deploy/scripts/`、`tools/deploy/`。`dog_perception/` 不改；对不上时以 Python 为准改 C++。
+
+```text
+任务 T29：C++ ROS 2 节点。服务器上 Python 节点的 bag 回放对 C++ 的消息处理；板上 colcon 编译、bag 回放逐位比、在线回放查不丢帧。
+先按通用约定做（第 9 条：可以改代码，范围见本节开头）。前置：T28B 完成。
+
+0. mkdir -p data/reports/T29 data/deploy/T29；TASK=T29；N=data/deploy/T29；M=data/deploy/nusc_pp_dyn；G、dk 同 T28 第 0 步。
+   python -m pytest tests/dog/test_ros2_node.py tests/dog/test_deploy.py -q 2>&1 | tee data/reports/T29/pytest.txt
+   （test_ros2_node 的慢测试要 rosbags 和 samples/，这里要跑到，不能是 skipped）
+   快速测试（约定 7）：python -m pytest tests/dog -m "not slow" -n 8 -q 2>&1 | tail -3 | tee data/reports/T29/pytest_fast.txt
+1. 镜像加了 rosbags（golden 数据多了样例 bag 的在线回放），重建后编译、测试（同 T28 第 2 步）：
+     docker build -t dogperc-dev -f deploy/docker/Dockerfile.dev deploy/docker 2>&1 | tail -3 | tee data/reports/T29/docker_build.txt
+     （编译、ctest 同 T28 第 2 步，输出 build_x86.txt、ctest_x86.txt）
+   - Online.* 五个测试都要跑了、通过；Online.MessageLogMatchesPythonBagReplay 不能是 SKIPPED（打印 "online parity: 8 frames ..."）。
+2. 服务器上，Python 节点回放 bag 对 C++ 的消息处理。两段：
+     B1=samples/rosbag2_2026_09_21-16_41_27_moving             （27 帧）
+     B2=/zjst/robot/rosbag0921/rosbag2_2026_09_21-16_41_27       （只取前 600 帧，约 60 s：--max-clouds 600）
+   每段 b（名字 n = basename，B2 的参数加 --max-clouds 600）：
+     mkdir -p $N/$n
+     python tools/deploy/cpp_parity.py python --bag $b --robot kygi --exported $M:trt:fp16 \
+         --out $N/$n/py.npz --dets $N/$n/py_dets.npz --config $N/$n/kygi.yaml --messages $N/$n/msgs.npz \
+         2>&1 | tail -3 | tee data/reports/T29/python_$n.txt
+     dk "deploy/cpp/build_cuda/dogperc_replay --messages $N/$n/msgs.npz --config $N/$n/kygi.yaml \
+         --detections $N/$n/py_dets.npz --out $N/$n/cpp_dets.npz"
+     dk "deploy/cpp/build_cuda/dogperc_replay --messages $N/$n/msgs.npz --config $N/$n/kygi.yaml \
+         --model-dir $M --precision fp16 --gpu --out $N/$n/cpp.npz"
+     python tools/deploy/cpp_parity.py compare --ref $N/$n/py.npz --cpp $N/$n/cpp_dets.npz --same-detections \
+         --out data/reports/T29/msgs_dets_$n.json | tail -1 | tee data/reports/T29/msgs_dets_$n.txt
+     python tools/deploy/cpp_parity.py compare --ref $N/$n/py.npz --cpp $N/$n/cpp.npz \
+         --out data/reports/T29/msgs_$n.json | tail -1 | tee data/reports/T29/msgs_$n.txt
+   - B2 的消息日志约几百 MB，Python 回放要几分钟；
+   - msgs_dets（喂同一批检测）两段都要 pass：帧相同、每帧跟踪 ID 一致、状态 ≤ 1e-6、预测 ≤ 1e-4。不过就按约定 9 修 C++；
+   - msgs（各自检测）：门槛同 T28 第 3 步。
+3. 板上（ROS 2 Humble 在 /opt/ros/humble）：
+   a. 同步代码、样例 bag 和这一段的输入：
+        deploy/scripts/sync_to_orin.sh --bag samples/rosbag2_2026_09_21-16_41_27_moving
+        n=rosbag2_2026_09_21-16_41_27_moving
+        scp $N/$n/kygi.yaml $N/$n/py_dets.npz $N/$n/msgs.npz orin:dogperc/data/
+   b. 编译（第一次约 10 分钟，libdogperc 带 CUDA 会再编一次）：
+        ssh orin 'source /opt/ros/humble/setup.bash && cd ~/dogperc/repo && colcon build \
+            --base-paths deploy/ros2 kygi665_msgs --build-base deploy/ros2/build --install-base deploy/ros2/install \
+            --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
+            -DCMAKE_CUDA_ARCHITECTURES=87' 2>&1 | tail -30 | tee data/reports/T29/colcon_orin.txt
+      编译错误按约定 9 修（多半是 rclcpp / rosbag2 的接口细节），修完在服务器容器里重编 deploy/cpp、重跑 ctest。
+      CMake 警告 "kygi665_msgs not found" 就是没把 kygi665_msgs 放进 --base-paths，必须修好（kygi 用 INSPVAX 定位）。
+      deploy/cpp 自己的板上编译也更新一下（同 T28 第 6b 步，下面要用它的 dogperc_replay），ctest 同 6c，输出 ctest_orin.txt。
+   c. bag 回放（R 是板上的命令前缀）。同一台机器上，ROS 读 bag 和读消息日志两条路必须逐位相同：
+        R='source /opt/ros/humble/setup.bash && source ~/dogperc/repo/deploy/ros2/install/setup.bash && cd ~/dogperc'
+        ssh orin "$R && ros2 run dogperc_ros dogperc_bag_replay --bag bags/$n --config data/kygi.yaml \
+            --detections data/py_dets.npz --save-points --out data/bag_dets.npz" 2>&1 | tail -3 | tee data/reports/T29/orin_bag_dets.txt
+        ssh orin "cd ~/dogperc && repo/deploy/cpp/build_cuda/dogperc_replay --messages data/msgs.npz --config data/kygi.yaml \
+            --detections data/py_dets.npz --save-points --out data/msgs_dets.npz" 2>&1 | tail -1 | tee -a data/reports/T29/orin_bag_dets.txt
+        ssh orin "$R && ros2 run dogperc_ros dogperc_bag_replay --bag bags/$n --config data/kygi.yaml \
+            --model-dir models/nusc_pp_dyn --precision fp16 --gpu --threads 4 --out data/bag_gpu.npz" \
+            2>&1 | tail -3 | tee data/reports/T29/orin_bag_gpu.txt
+        scp orin:dogperc/data/bag_dets.npz orin:dogperc/data/msgs_dets.npz orin:dogperc/data/bag_gpu.npz $N/$n/
+        python -c "import numpy as np, sys; a, b = np.load(sys.argv[1]), np.load(sys.argv[2]); \
+            d = [k for k in a.files if not k.startswith('timing_') and not np.array_equal(a[k], b[k], equal_nan=True)]; \
+            print('ROS bag vs message log, keys differing:', d)" $N/$n/msgs_dets.npz $N/$n/bag_dets.npz \
+            | tee -a data/reports/T29/orin_bag_dets.txt
+        python tools/deploy/cpp_parity.py compare --ref $N/$n/py.npz --cpp $N/$n/bag_dets.npz --same-detections \
+            --out data/reports/T29/orin_bag_dets.json | tail -1 | tee -a data/reports/T29/orin_bag_dets.txt
+        python tools/deploy/cpp_parity.py compare --ref $N/$n/cpp.npz --cpp $N/$n/bag_gpu.npz \
+            --out data/reports/T29/orin_bag_gpu.json | tail -1 | tee -a data/reports/T29/orin_bag_gpu.txt
+        python tools/deploy/cpp_parity.py timings $N/$n/bag_gpu.npz --skip 3 | tee data/reports/T29/orin_bag_timings.txt
+      - "keys differing" 必须是空的：ROS 消息到 C++ 结构的转换（ros_convert.cpp）和读消息日志完全一样。不一样时先看消息顺序
+        （rosbag2_cpp 和 rosbags 都按 bag 的时间戳读，同一时间戳的几条可能顺序不同），再按约定 9 修 ros_convert.cpp；
+      - bag_dets 对 Python 的 py.npz 用 --same-detections 也要 pass（板上是 aarch64，状态差在 1e-6 以内就行）；
+      - bag_gpu：门槛同 T28 第 6d 步（板上的引擎对服务器的引擎）。
+   d. 在线：节点照常订阅，bag 按原来的节奏播放，录下 ~/objects。用单独的 ROS_DOMAIN_ID，不干扰板上别的 ROS 程序：
+        ssh orin "$R && export ROS_DOMAIN_ID=77 && \
+            (ros2 launch dogperc_ros dogperc.launch.py config:=data/kygi.yaml model_dir:=models/nusc_pp_dyn > data/node.log 2>&1 &) && \
+            sleep 15 && (ros2 bag record -o data/live /dog_perception/objects > data/record.log 2>&1 &) && sleep 3 && \
+            ros2 bag play bags/$n && sleep 3 && pkill -INT -f 'ros2 bag record' ; sleep 2 ; pkill -INT -f dogperc_node ; sleep 2 ; \
+            ros2 bag info data/live" 2>&1 | tail -20 | tee data/reports/T29/orin_live.txt
+        scp -r orin:dogperc/data/live $N/$n/live
+        scp orin:dogperc/data/node.log data/reports/T29/orin_node.log
+        python tools/deploy/objects_bag.py --bag $N/$n/live --replay $N/$n/bag_gpu.npz --out data/reports/T29/orin_live.json \
+            | tee -a data/reports/T29/orin_live.txt
+      - 节点起来要建引擎缓存、读模型，15 s 不够就加长，日志里有 "dog perception up" 再开始播；
+      - objects_bag.py 的 passed：每一帧都有一条消息（不丢帧），时间戳对得上 bag_gpu 的帧；same_ids_frames 报告出来（在线时 IMU / INS 和点云的到达顺序可能和 bag 里略有不同，ID 不要求全同）；
+      - node.log 里的每秒一行（框数、轨迹数、各段 ms）抄几行进报告；有 warn / error 全部抄下。
+   e. 做完删掉板上的 data/live、data/*.npz、bags/，记下根分区剩余空间。deploy/ros2/build 和 install 留着（以后用）。
+
+停止条件（按约定 9 修不好的时候）：板上 colcon 编译失败；第 2 步 msgs_dets 不过；第 3c 步 bag_dets 不过。
+提交：data/reports/T29/、本文档，以及按约定 9 改的代码。不提交 data/deploy/T29/、bag、build、install。
+报告（写进"T29 结果"）：
+- 代码改动（约定 9）：每条写提交号、文件、原因、怎么验证的；
+- 镜像、ctest、colcon 的结果（报错 / 警告）；Online.* 的打印；
+- 第 2 步两段的 compare 表；
+- 第 3c 步两次 compare 和板上的每段延迟（中位数 / p99）；
+- 第 3d 步：ros2 bag info 的消息数、objects_bag.py 的输出（含 example）、node.log 的摘录；
+- 结论：节点能不能上车；还缺什么（比如话题名、坐标系、规划要的字段）。
+```
+
+### T29 结果
+
+（待填）

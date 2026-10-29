@@ -59,6 +59,9 @@ set(DOGPERC_SOURCES
   src/tracking/tracker.cpp
   src/prediction/imm_predictor.cpp
   src/parallel.cpp
+  src/online.cpp
+  src/message_log.cpp
+  src/replay_writer.cpp
 )
 
 if(DOGPERC_WITH_CUDA)
@@ -107,6 +110,7 @@ if(DOGPERC_TESTS)
     tests/test_detection.cpp
     tests/test_preprocess.cpp
     tests/test_pipeline.cpp
+    tests/test_online.cpp
   )
   if(DOGPERC_WITH_CUDA)
     list(APPEND TEST_SOURCES tests/test_gpu.cpp)

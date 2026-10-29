@@ -102,7 +102,7 @@ def _online_frames(monkeypatch):
 
     frames = {}
 
-    def on_scan(scan):
+    def on_scan(scan, detections=None):
         fr = node.pipe.pre.process(scan)
         if fr is not None:
             frames[round(fr.stamp, 6)] = fr

@@ -303,3 +303,45 @@ def test_export_cpp_config(tmp_path):
                     "--out", str(out)], check=True, capture_output=True, env=dict(os.environ, PYTHONPATH=ROOT))
     t = out.read_text()
     assert "base_height: 0.72" in t and "localization: \"inspvax\"" in t and "ins_lever_arm: [-0.06, -0.54, 0.0]" in t
+
+
+def test_objects_bag_against_a_replay(tmp_path):
+    """tools/deploy/objects_bag.py reads a recorded ~/objects bag (the message definitions of
+    deploy/ros2/dog_perception_msgs) and finds dropped frames against a replay of the same input."""
+    pytest.importorskip("rosbags")
+    from rosbags.rosbag2 import Writer
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from objects_bag import read_objects, typestore
+
+    ts = typestore()
+    Obj, Arr = ts.types["dog_perception_msgs/msg/Object"], ts.types["dog_perception_msgs/msg/ObjectArray"]
+    Header, Time = ts.types["std_msgs/msg/Header"], ts.types["builtin_interfaces/msg/Time"]
+    Point, Vec, Pose = (ts.types["geometry_msgs/msg/" + n] for n in ("Point", "Vector3", "Pose"))
+    Quat = ts.types["geometry_msgs/msg/Quaternion"]
+    frames = [(100.1, [3, 5]), (100.2, [3]), (100.3, [3, 7])]
+
+    def message(stamp, ids):
+        objs = [Obj(id=i, label=0, label_name="vehicle", motion=Obj.MOTION_MOVING, score=0.8, coasting=False, age=1.0,
+                    position=Point(x=1.0, y=2.0, z=0.8), yaw=0.1, size=Vec(x=4.5, y=1.9, z=1.6),
+                    velocity=Vec(x=1.0, y=0.0, z=0.0), covariance=np.eye(4).ravel(),
+                    prediction_times=np.array([0.5, 1.0], np.float32), predictions=[]) for i in ids]
+        sec = int(stamp)
+        return Arr(header=Header(stamp=Time(sec=sec, nanosec=int(round((stamp - sec) * 1e9))), frame_id="dog_det"),
+                   world_frame="camera_init", world_pose=Pose(position=Point(x=0.0, y=0.0, z=0.0),
+                                                              orientation=Quat(x=0.0, y=0.0, z=0.0, w=1.0)),
+                   objects=objs)
+
+    bag = tmp_path / "objects"
+    with Writer(bag, version=8) as w:
+        c = w.add_connection("/dog_perception/objects", Arr.__msgtype__, typestore=ts)
+        for stamp, ids in frames[:2]:                          # the third frame was dropped
+            w.write(c, int((stamp + 0.03) * 1e9), ts.serialize_cdr(message(stamp, ids), Arr.__msgtype__))
+    rows = read_objects(bag)
+    assert [r["ids"] for r in rows] == [[3, 5], [3]] and rows[0]["frame"] == "dog_det"
+    replay = tmp_path / "replay.npz"
+    np.savez(replay, stamp=np.array([f[0] for f in frames]), trk_offsets=np.array([0, 2, 3, 5]),
+             trk_id=np.array([3, 5, 3, 3, 7]))
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "objects_bag.py"), "--bag", str(bag),
+                        "--replay", str(replay)], capture_output=True, text=True)
+    rep = json.loads(r.stdout)
+    assert r.returncode == 1 and rep["missing_frames"] == 1 and rep["same_ids_frames"] == 2 and not rep["passed"]

@@ -8,18 +8,20 @@
 #   deploy/scripts/sync_to_orin.sh --frames data/runs/0921_164127_s000/frames --stride 3 --limit 100
 #   deploy/scripts/sync_to_orin.sh --dumps data/deploy/dumps        # reference detections (compare_backends --dump)
 #   deploy/scripts/sync_to_orin.sh --seq data/seq/0921_164127_s000 --limit 150   # a raw recording (dogperc_replay)
+#   deploy/scripts/sync_to_orin.sh --bag samples/rosbag2_2026_09_21-16_41_27_moving  # a rosbag2 (dogperc_bag_replay)
 # ORIN_HOST (default orin, ~/.ssh/config) and ORIN_DIR (default ~/dogperc) choose the target.
 set -euo pipefail
 export LC_ALL=C          # list frames in the order Python's sorted() uses (compare_backends.py --stride / --limit)
 HOST=${ORIN_HOST:-orin}
 DIR=${ORIN_DIR:-dogperc}
 cd "$(dirname "$0")/../.."
-MODEL="" ; DUMPS="" ; FRAMES=() ; SEQS=() ; STRIDE=1 ; LIMIT=0
+MODEL="" ; DUMPS="" ; FRAMES=() ; SEQS=() ; BAGS=() ; STRIDE=1 ; LIMIT=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --model) MODEL=$2; shift 2 ;;
     --frames) FRAMES+=("$2"); shift 2 ;;
     --seq) SEQS+=("$2"); shift 2 ;;
+    --bag) BAGS+=("$2"); shift 2 ;;
     --stride) STRIDE=$2; shift 2 ;;
     --limit) LIMIT=$2; shift 2 ;;
     --dumps) DUMPS=$2; shift 2 ;;
@@ -31,6 +33,7 @@ done
 dirs="$DIR/repo $DIR/models $DIR/data"
 for f in "${FRAMES[@]}"; do dirs="$dirs $DIR/data/$(basename "$(dirname "$f")")/frames"; done
 for s in "${SEQS[@]}"; do dirs="$dirs $DIR/seq/$(basename "$s")/scans"; done
+for b in "${BAGS[@]}"; do dirs="$dirs $DIR/bags"; done
 ssh "$HOST" "mkdir -p $dirs"
 # build*/: the C++ build directories (deploy/cpp/build, build_cuda) are per machine; excluded ones survive --delete
 rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build*/' --exclude 'install/' --exclude 'log/' \
@@ -63,3 +66,8 @@ if [ -n "$DUMPS" ]; then
   rsync -az "$DUMPS/" "$HOST:$DIR/data/dumps/"
 fi
 ssh "$HOST" "df -h / | tail -1; du -sh $DIR 2>/dev/null"
+# rosbag2 directories (metadata.yaml + .db3), whole
+for b in "${BAGS[@]}"; do
+  rsync -az "${b%/}" "$HOST:$DIR/bags/"
+  echo "$(basename "${b%/}"): $(du -sh "$b" | cut -f1)"
+done

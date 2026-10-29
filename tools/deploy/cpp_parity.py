@@ -19,6 +19,16 @@
 ``--same-detections``: C++ got the Python detections, so the tracks must be the same: identical IDs in every
 frame, states within 1e-6, predictions within 1e-4. Without it each side ran its own detector: the
 detections are compared like compare_backends.py does, and the tracks by ID.
+
+The online node's path (docs/DEPLOY_ORIN.md section 8): ``python --bag`` replays a rosbag2 in arrival order
+through dog_perception/online.py (the Python node's message handling) with the ``--robot`` preset, and
+``--messages`` saves those messages as plain arrays for the C++ node path without ROS:
+
+    python tools/deploy/cpp_parity.py python --bag <bag> --robot kygi --exported data/deploy/nusc_pp_dyn \
+        --out <dir>/py_bag.npz --dets <dir>/py_bag_dets.npz --config <dir>/kygi.yaml --messages <dir>/msgs.npz
+    dogperc_replay --messages <dir>/msgs.npz --config <dir>/kygi.yaml --detections <dir>/py_bag_dets.npz \
+        --out <dir>/cpp_msgs.npz        # then compare --same-detections as above
+    dogperc_bag_replay --bag <bag> ...  # (deploy/ros2) the same through the ROS messages: identical to cpp_msgs.npz
 """
 import argparse
 import json
@@ -45,14 +55,53 @@ def frame_dets(z, prefix, f):
 
 
 # ------------------------------------------------------------------ python
+def seq_scans(args, pipe):
+    """The scans of a recorded sequence, the poses fed to ``pipe`` in time order (run_sequence.py)."""
+    from dog_perception.io import SequenceReader
+
+    for ev in SequenceReader(args.seq).events(odom_latency=args.odom_latency):
+        if ev[0] == "imu":
+            pipe.on_imu(ev[1], ev[2])
+        elif ev[0] == "odom":
+            pipe.on_odometry(ev[1], ev[2], ev[3], ev[4])
+        else:
+            yield ev[1]
+
+
+def bag_scans(args, inputs, log=None):
+    """The scans of a bag in arrival order through the online node's message handling."""
+    from message_log import bag_messages
+
+    clouds = 0
+    for kind, msg in bag_messages(args.bag, inputs.params):
+        if kind == "cloud" and args.max_clouds and clouds >= args.max_clouds:
+            break
+        if log is not None:
+            log.add(kind, msg)
+        if kind == "cloud":
+            clouds += 1
+            yield inputs.scan(msg)
+        else:
+            getattr(inputs, "on_" + kind)(msg)
+
+
 def run_python(args):
     from dump_golden import dets_arrays, pipeline_arrays
-    from export_cpp_config import config_dict, to_yaml
-    from dog_perception.io import SequenceReader
+    from export_cpp_config import config_dict, node_section, to_yaml
     from dog_perception.pipeline import PerceptionPipeline
 
-    reader = SequenceReader(args.seq)
-    pcfg = reader.preprocess_config(reader.meta.get("base_height", 0.45))
+    if bool(args.seq) == bool(args.bag):
+        raise SystemExit("--seq or --bag")
+    if args.bag:
+        from dog_perception.node_config import node_parameters, preprocess_config
+        params = node_parameters(args.robot)
+        pcfg = preprocess_config(params)
+        source = dict(robot=args.robot, bag=os.path.abspath(args.bag))
+    else:
+        from dog_perception.io import SequenceReader
+        reader = SequenceReader(args.seq)
+        pcfg = reader.preprocess_config(reader.meta.get("base_height", 0.45))
+        source = dict(seq=os.path.abspath(args.seq))
     det, given = None, None
     if args.exported:
         from dog_perception.detection.exported import ExportedPillarDetector, graph_file
@@ -62,26 +111,30 @@ def run_python(args):
         det = ExportedPillarDetector(path, runtime, prec, pfn=pfn)
     elif args.detections:
         given = np.load(args.detections)
-    else:
-        raise SystemExit("--exported or --detections")
+    elif not args.no_detector:
+        raise SystemExit("--exported, --detections or --no-detector")
     pipe = PerceptionPipeline(pcfg, det, predictor="imm")
+    log = None
+    if args.bag:
+        from message_log import MessageLog
+        from dog_perception.online import OnlineInputs
+        inputs = OnlineInputs(params, pipe)
+        log = MessageLog() if args.messages else None
+        scans = bag_scans(args, inputs, log)
+    else:
+        scans = seq_scans(args, pipe)
     from dog_perception.detection.filters import DetectionFilterConfig, filter_measurements
     rec = dict(stamp=[], T_world_det=[], T_world_body=[], num_raw=[], num_kept=[], points=[], ground_offset=[],
                ground_tilt=[], dets=[], raw=[], tracks=[], preds=[])
     bottoms, counts = [], []
     k = 0
-    for ev in reader.events(odom_latency=args.odom_latency):
-        if ev[0] == "imu":
-            pipe.on_imu(ev[1], ev[2])
-            continue
-        if ev[0] == "odom":
-            pipe.on_odometry(ev[1], ev[2], ev[3], ev[4])
-            continue
-        scan = ev[1]
+    for scan in scans:
         dets, match = None, False
         if given is not None:          # the other run's frames in order, as dogperc_replay --detections reads them
             match = k < len(given["stamp"]) and abs(given["stamp"][k] - scan.stamp) < 1e-9
             dets = frame_dets(given, "", k) if match else Detections()
+        elif det is None:              # --no-detector
+            dets = Detections()
         out = pipe.on_scan(scan, detections=dets)
         if out is None:
             continue
@@ -113,8 +166,13 @@ def run_python(args):
         d = dets_arrays("det", rec["dets"])
         np.savez(args.dets, stamp=np.asarray(rec["stamp"]), **{key[4:]: v for key, v in d.items()})
     if args.config:
+        node = node_section(args.robot) if args.bag else None
         with open(args.config, "w") as f:
-            f.write(to_yaml(config_dict(pcfg, source=dict(seq=os.path.abspath(args.seq)))) + "\n")
+            f.write(to_yaml(config_dict(pcfg, source=source, node=node)) + "\n")
+    if log is not None:
+        log.save(args.messages)
+        print("%d messages (%s) -> %s" % (len(log.order), ", ".join("%d %s" % (n, k) for k, n in log.counts.items()),
+                                          args.messages))
     print("python: %d frames, %d tracks -> %s" % (len(rec["stamp"]), len(a["trk_id"]), args.out))
 
 
@@ -282,7 +340,12 @@ def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("python", help="the Python reference run")
-    p.add_argument("--seq", required=True)
+    p.add_argument("--seq", default=None, help="a recorded sequence (data/seq/<scene>)")
+    p.add_argument("--bag", default=None, help="instead: a rosbag2, replayed in arrival order like the online node")
+    p.add_argument("--robot", default="kygi", help="--bag: the node_config.py preset")
+    p.add_argument("--messages", default=None, help="--bag: also save the messages for dogperc_replay --messages")
+    p.add_argument("--max-clouds", type=int, default=0, help="--bag: stop after this many clouds")
+    p.add_argument("--no-detector", action="store_true", help="no detections (preprocessing and poses only)")
     p.add_argument("--exported", default=None, help="dir[:runtime[:precision]] (exported.py), default runtime trt fp16")
     p.add_argument("--detections", default=None, help="instead of a detector: the detections of another run (dets npz)")
     p.add_argument("--odom-latency", type=float, default=0.0)

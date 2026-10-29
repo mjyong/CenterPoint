@@ -15,7 +15,9 @@ Publishes (world = LIO odom frame, ``world_frame`` parameter):
     ~/predictions   visualization_msgs/MarkerArray  one line strip per predicted mode
     ~/cloud         sensor_msgs/PointCloud2         (debug) accumulated det-frame cloud
 Planner-facing data in the gravity-aligned local frame is available from
-``PerceptionPipeline.to_local``; wire it into your own message type.
+``PerceptionPipeline.to_local``; the C++ node (deploy/ros2, docs/DEPLOY_ORIN.md section 8) publishes it
+as dog_perception_msgs/ObjectArray. The message handling is ``dog_perception/online.py``, shared with
+the offline bag replay (tools/deploy/cpp_parity.py python --bag).
 """
 import os
 import sys
@@ -32,11 +34,9 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy  # noqa: E402
 from sensor_msgs.msg import Imu, PointCloud2, PointField  # noqa: E402
 from visualization_msgs.msg import Marker, MarkerArray  # noqa: E402
 
-from dog_perception.geometry import quat_to_R  # noqa: E402
-from dog_perception.inspvax import INS_RTKFIXED, INS_SOLUTION_GOOD, EnuOrigin, HeadingCheck, pose_from_inspvax  # noqa: E402
-from dog_perception.node_config import ins_lever_arm, node_parameters, preprocess_config  # noqa: E402
+from dog_perception.node_config import node_parameters, preprocess_config  # noqa: E402
+from dog_perception.online import OnlineInputs  # noqa: E402
 from dog_perception.pipeline import PerceptionPipeline  # noqa: E402
-from dog_perception.ros_utils import scan_from_msg  # noqa: E402
 
 COLORS = {"vehicle": (0.2, 0.6, 1.0), "pedestrian": (1.0, 0.3, 0.3), "cyclist": (1.0, 0.8, 0.1)}
 
@@ -60,89 +60,37 @@ class DogPerceptionNode(Node):
             from dog_perception.prediction.learned import LearnedPredictor
             predictor = LearnedPredictor(g("predictor_model"))
         self.pipe = PerceptionPipeline(pcfg, det, predictor=predictor)
+        self.inputs = OnlineInputs(params, self.pipe, self.log)
         self.world_frame = g("world_frame")
-        self.odom_twist = g("odom_twist")
-        self.time_field, self.time_mode = g("time_field"), g("time_mode")
-        self.noise_tag_mask = int(g("noise_tag_mask"))
         self.publish_cloud = bool(g("publish_cloud"))
-        self.kygi_imu = g("imu_convention") == "kygi"
-        self.lidar_time_offset = float(g("lidar_time_offset"))
-        self.ins_lever_arm = ins_lever_arm(params)
-        self.ins_azimuth_offset = float(g("ins_azimuth_offset_deg"))
         if g("localization") == "inspvax":
             self.get_logger().info("INS: heading = %.0f deg - azimuth, lever arm %s m" % (
-                self.ins_azimuth_offset, np.round(self.ins_lever_arm, 3).tolist()))
-        self.heading_check, self.heading_warned = HeadingCheck(), False
+                self.inputs.ins_azimuth_offset, np.round(self.inputs.ins_lever_arm, 3).tolist()))
 
         best_effort = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
-        self.create_subscription(Imu, g("imu_topic"), self.on_imu, 400)
+        self.create_subscription(Imu, g("imu_topic"), self.inputs.on_imu, 400)
         if g("localization") == "inspvax":
             from kygi665_msgs.msg import INSPVAX     # built in the robot's ROS workspace
-            self.origin = None
-            self.create_subscription(INSPVAX, g("inspvax_topic"), self.on_inspvax, 200)
-        elif g("localization") == "odom":
-            self.create_subscription(Odometry, g("odom_topic"), self.on_odom, 50)
+            self.create_subscription(INSPVAX, g("inspvax_topic"), self.inputs.on_inspvax, 200)
         else:
-            raise ValueError("localization must be odom or inspvax, got %r" % g("localization"))
+            self.create_subscription(Odometry, g("odom_topic"), self.inputs.on_odom, 50)
         self.create_subscription(PointCloud2, g("lidar_topic"), self.on_cloud, best_effort)
         self.pub_tracks = self.create_publisher(MarkerArray, "~/tracks", 5)
         self.pub_preds = self.create_publisher(MarkerArray, "~/predictions", 5)
         self.pub_cloud = self.create_publisher(PointCloud2, "~/cloud", 2)
         self.get_logger().info("dog perception up: detector=%s" % kind)
 
-    @staticmethod
-    def _t(stamp):
-        return stamp.sec + stamp.nanosec * 1e-9
-
-    def on_imu(self, msg):
-        if self.kygi_imu:
-            from dog_perception.inspvax import gyro_from_kygi_imu
-            gyro = gyro_from_kygi_imu(msg)
+    def log(self, level, text, throttle=0.0):
+        logger = self.get_logger()
+        fn = {"info": logger.info, "warn": logger.warn, "error": logger.error}[level]
+        if throttle:
+            fn(text, throttle_duration_sec=throttle)
         else:
-            w = msg.angular_velocity
-            gyro = (w.x, w.y, w.z)
-        self.pipe.on_imu(self._t(msg.header.stamp), gyro)
-
-    def on_odom(self, msg):
-        p, q = msg.pose.pose.position, msg.pose.pose.orientation
-        R = quat_to_R([q.x, q.y, q.z, q.w])
-        v = None
-        if self.odom_twist != "none":
-            l = msg.twist.twist.linear
-            v = np.array([l.x, l.y, l.z])
-            if self.odom_twist == "body":
-                v = R @ v
-        self.pipe.on_odometry(self._t(msg.header.stamp), R, [p.x, p.y, p.z], v)
-
-    def on_inspvax(self, msg):
-        """Same reading as the bag converter: heading only, ENU origin at the first good fix."""
-        if self.origin is None:
-            if int(msg.ins_status.data) != INS_SOLUTION_GOOD:
-                self.get_logger().warn("waiting for a good INS solution", throttle_duration_sec=2.0)
-                return
-            self.origin = EnuOrigin(msg.latitude, msg.longitude, msg.height)
-            self.get_logger().info("ENU origin %.8f %.8f %.2f" % (msg.latitude, msg.longitude, msg.height))
-        got = pose_from_inspvax(msg, self.origin, self.ins_lever_arm, self.ins_azimuth_offset)
-        if got is None:
-            self.get_logger().warn("INS solution not good (ins_status %d)" % int(msg.ins_status.data),
-                                   throttle_duration_sec=2.0)
-            return
-        if int(msg.pos_type.data) != INS_RTKFIXED:
-            self.get_logger().warn("RTK not fixed (pos_type %d)" % int(msg.pos_type.data), throttle_duration_sec=5.0)
-        t, R, p, v = got
-        self.heading_check.add(R, v)
-        if self.heading_check.wrong and not self.heading_warned:
-            self.heading_warned = True
-            self.get_logger().error("the robot walks backwards in the body frame: ins_azimuth_offset_deg %.0f does "
-                                    "not match the INS antennas (180 swapped as on 0921, 0 fixed)" % self.ins_azimuth_offset)
-        self.pipe.on_odometry(t, R, p, v)
+            fn(text)
 
     def on_cloud(self, msg):
-        scan = scan_from_msg(msg, self.time_field, self.time_mode,
-                             noise_tag_mask=self.noise_tag_mask).shifted(self.lidar_time_offset)
-        out = self.pipe.on_scan(scan)
+        out = self.inputs.on_cloud(msg)
         if out is None:
-            self.get_logger().warn("no pose for scan yet (waiting for odometry / IMU)", throttle_duration_sec=2.0)
             return
         self.publish(out, msg.header.stamp)
         self.get_logger().info(

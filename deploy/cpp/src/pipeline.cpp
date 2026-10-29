@@ -51,10 +51,14 @@ void PerceptionPipeline::to_local(const PipelineOutput& out, std::vector<LocalTr
   const Mat4 T = inv_T(out.frame.T_world_det);
   const Mat3 R = T.topLeftCorner<3, 3>();
   const double dyaw = std::atan2(R(1, 0), R(0, 0));
+  Eigen::Matrix4d B = Eigen::Matrix4d::Zero();      // both blocks of [px, py, vx, vy] rotate with the frame
+  B.topLeftCorner<2, 2>() = B.bottomRightCorner<2, 2>() = R.topLeftCorner<2, 2>();
   tracks.clear();
-  for (const auto& s : out.tracks)
+  for (const auto& s : out.tracks) {
+    const Eigen::Matrix4d C = (B * s.covariance) * B.transpose();
     tracks.push_back({s.track_id, s.label, R * s.position + T.topRightCorner<3, 1>(), R.topLeftCorner<2, 2>() * s.velocity,
-                      s.yaw + dyaw, s.size, s.score, s.coasting, s.motion});
+                      s.yaw + dyaw, s.size, s.score, s.coasting, s.motion, C, s.age});
+  }
   preds.clear();
   for (const auto& p : out.predictions) preds.push_back(p.transform(T, "det"));
 }

@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <filesystem>
 
+#include "dogperc/online.hpp"
 #include "dogperc/parallel.hpp"
 #include "dogperc/pipeline.hpp"
 #include "dogperc/sequence.hpp"
@@ -137,6 +138,51 @@ TEST(Pipeline, MatchesPythonOnTheGoldenRecording) {
   RecordProperty("max_prediction_diff", std::to_string(worst_pred));
   std::printf("pipeline parity: %zu frames, max diff points %.2e m, tracks %.2e, predictions %.2e, poses %.2e\n",
               run.frames.size(), worst_pt, worst_trk, worst_pred, worst_pose);
+}
+
+TEST(Pipeline, PlannerFrameMatchesPython) {
+  REQUIRE_GOLDEN();
+  const Npz py = load("pipeline.npz");
+  const Npz dets = load("dets.npz");
+  const PipelineConfig cfg = load_config(golden("config.yaml"));
+  const CppRun run = run_cpp(dets, member(py, "odom_latency").scalar());
+  PerceptionPipeline pipe(cfg);          // to_local uses the frame only
+  const auto toff = member(py, "trk_offsets").to<int64_t>();
+  const auto qoff = member(py, "pred_offsets").to<int64_t>();
+  const NpyArray &pos = member(py, "local_position"), &vel = member(py, "local_velocity");
+  const NpyArray &cov = member(py, "local_covariance"), &pm = member(py, "local_pred_modes");
+  const int64_t T = pm.dim(2);
+  double worst = 0.0;
+  size_t paths = 0;
+  for (size_t f = 0; f < run.frames.size(); ++f) {
+    std::vector<LocalTrack> tracks;
+    std::vector<Prediction> preds;
+    pipe.to_local(run.frames[f], tracks, preds);
+    ASSERT_EQ(static_cast<int64_t>(tracks.size()), toff[f + 1] - toff[f]);
+    for (size_t j = 0; j < tracks.size(); ++j) {
+      const int64_t r = toff[f] + j;
+      EXPECT_EQ(tracks[j].id, member(py, "local_id").at<int>(r));
+      worst = std::max(worst, (tracks[j].position - vec3(pos, r)).cwiseAbs().maxCoeff());
+      for (int c = 0; c < 2; ++c) worst = std::max(worst, std::abs(tracks[j].velocity[c] - vel.at<double>(2 * r + c)));
+      worst = std::max(worst, std::abs(wrap_angle(tracks[j].yaw - member(py, "local_yaw").at<double>(r))));
+      for (int k = 0; k < 16; ++k) worst = std::max(worst, std::abs(tracks[j].covariance(k / 4, k % 4) - cov.at<double>(16 * r + k)));
+    }
+    ASSERT_EQ(static_cast<int64_t>(preds.size()), qoff[f + 1] - qoff[f]);
+    for (size_t j = 0; j < preds.size(); ++j) {
+      const int64_t r = qoff[f] + j;
+      for (size_t k = 0; k < preds[j].probs.size(); ++k, ++paths)
+        for (int64_t s = 0; s < T; ++s)
+          for (int c = 0; c < 2; ++c)
+            worst = std::max(worst, std::abs(preds[j].modes[k][s][c] - pm.at<double>(((r * 2 + k) * T + s) * 2 + c)));
+    }
+    // the ObjectArray content: one object per track, its paths most likely first
+    const auto objects = planner_objects(pipe, run.frames[f]);
+    ASSERT_EQ(objects.size(), tracks.size());
+    for (const auto& o : objects)
+      for (size_t k = 1; k < o.paths.size(); ++k) EXPECT_GE(o.paths[k - 1].probability, o.paths[k].probability);
+  }
+  EXPECT_GT(paths, 0u);
+  EXPECT_LT(worst, 1e-9);
 }
 
 TEST(Pipeline, ThreadCountDoesNotChangeTheOutput) {

@@ -220,7 +220,7 @@ LidarScan(XT32, 逐点时间) ─┐        IMU 400Hz ─┐   LIO 10Hz ─┐
 | `tools/dog/export_pillar_onnx.py` | 导出给 TensorRT 用的两段 ONNX，逐段校验，并打印上板建引擎的 `trtexec` 命令 |
 | `tools/dog/profile_detector.py` | 在一帧上测网络逐层的 shape、参数量、计算量（稀疏卷积按实际邻接对计）和各段耗时 |
 | `tools/dog/train_predictor.py` | 第二档训练，与 CV/IMM 对比 |
-| `tools/dog/ros2_node.py`（参数在 `dog_perception/node_config.py`） | 在线 ROS 2 节点（MarkerArray 可视化）。`-p robot:=kygi` 一次设好 kygi 的话题、INSPVAX 定位、外参、离地高度 0.72 m、`auto_ground` / `auto_level`，和训练序列的处理一致；`robot:=kygi_mid360` 是换成前置 Livox Mid-360 的版本（纳秒时间戳、噪点 tag、暂定的倒装外参、机身遮挡框，天线已改好，见 BAG_SPLIT.md 3.6） |
+| `tools/dog/ros2_node.py`（参数在 `dog_perception/node_config.py`，消息处理在 `dog_perception/online.py`） | 在线 ROS 2 节点（MarkerArray 可视化；Orin 上用 C++ 节点 `deploy/ros2`，见 DEPLOY_ORIN.md 第 8 节）。`-p robot:=kygi` 一次设好 kygi 的话题、INSPVAX 定位、外参、离地高度 0.72 m、`auto_ground` / `auto_level`，和训练序列的处理一致；`robot:=kygi_mid360` 是换成前置 Livox Mid-360 的版本（纳秒时间戳、噪点 tag、暂定的倒装外参、机身遮挡框，天线已改好，见 BAG_SPLIT.md 3.6） |
 | `tools/dog/run_sim_demo.py` | 仿真端到端演示，输出各段指标 |
 | `tools/dog/nusc_clip_eval.py`（`dog_perception/nuscenes_clip.py`、`clip_viz.py`、`foxglove.py`） | 在 nuScenes 片段上跑检测、跟踪、预测，与真值对比，输出 Foxglove MCAP 和指标报告，见 [NUSC_CLIP_EVAL.md](NUSC_CLIP_EVAL.md) |
 

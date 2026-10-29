@@ -8,6 +8,7 @@ FROM nvcr.io/nvidia/tensorrt:24.08-py3
 RUN apt-get update && apt-get install -y --no-install-recommends \
         cmake ninja-build libeigen3-dev libyaml-cpp-dev libgtest-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
-# the golden data of the parity tests (tools/deploy/dump_golden.py): NumPy 1.x like the project environment
-RUN python3 -m pip install --no-cache-dir "numpy==1.26.4" "scipy>=1.8"
+# the golden data of the parity tests (tools/deploy/dump_golden.py): NumPy 1.x like the project environment;
+# rosbags for its online part (the sample bag through the node's message handling)
+RUN python3 -m pip install --no-cache-dir "numpy==1.26.4" "scipy>=1.8" "rosbags>=0.9"
 ENV HOME=/tmp

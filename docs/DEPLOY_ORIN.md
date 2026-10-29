@@ -14,8 +14,8 @@ Python 流水线是唯一的参考实现。每换一样东西（运行时、精�
 | P3 | C++ 核心库，不依赖 ROS：预处理、检测、跟踪、预测（第 7 节） | — | 完成 |
 | P4 | Python 和 C++ 逐段对齐（golden 数据加 GoogleTest），GPU 部分和 TensorRT | T28 | 完成：服务器、板上测试全过 |
 | P5 | C++ 全链路离线评估：同一批检测时跟踪对齐，各自检测时 `pipeline_eval.py` 打分 | T28 | 完成：10 个验证场景 ID 每帧相同，标签指标逐项相同 |
-| P6 | ROS 2 节点和 `ObjectArray` 消息，bag 回放对比 | T29 | |
-| P7 | 板上性能和稳定性 | T28B、T30 | T28：端到端 27.7 ms，网络以外 21.8 ms（超 15 ms）；预处理、后处理已提速，T28B 复测 |
+| P6 | ROS 2 节点和 `ObjectArray` 消息，bag 回放对比（第 8 节） | T29 | 已写：ROS 以外的部分本机和 Python 对上，节点本身待 T29 在板上编译、跑 |
+| P7 | 板上性能和稳定性 | T28B、T30 | 延迟达标（T28B，4 线程）：端到端 17.3 ms（p99 18.2），网络以外 11.4 ms；稳定性（长时间、10 Hz 不丢帧、和别的进程抢资源）待测 |
 
 已定（2026-10-28）：
 - 板上存储不够，只放 2–3 个验证场景的小子集，全量评估在服务器上做；
@@ -204,6 +204,7 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 | TRT FP16 对 PyTorch，标签上 | AP@2 / AP@4 掉 ≤ 0.005；`pipeline_eval.py` 的主要指标差值在 90% 区间之内 |
 | INT8 对 FP32 | AP 掉 ≤ 0.01；流水线指标不显著变差；板上延迟比 FP16 降 ≥ 30% 才值得用，否则用 FP16（人定） |
 | C++ 对 Python（P4） | 点 1e-4 m；体素集合相同；喂相同检测时跟踪 ID 完全一致、状态 1e-6；预测 1e-4 |
+| ROS 2 节点（P6） | `dogperc_bag_replay` 和 `dogperc_replay --messages` 逐位相同，对 Python 节点的 bag 回放同上一行（喂相同检测时 ID 每帧一致）；在线回放 bag 不丢帧（`objects_bag.py`） |
 | 板上（P7） | 网络以外 < 15 ms，端到端 < 50 ms，p99 < 100 ms，10 Hz 不丢帧 |
 
 `compare_backends.py` 的检测比较分两层：
@@ -238,7 +239,7 @@ deploy/cpp/
   tests/             GoogleTest，读 tools/deploy/dump_golden.py 写的 golden 数据，逐段和 Python 比
   tools/dogperc_replay.cpp   序列进，逐帧结果 npz 出（格式同 golden 的 pipeline.npz）
 deploy/docker/Dockerfile.dev 服务器上编译测试用的镜像（TensorRT 10.3、CUDA 12.6，同板子）
-deploy/ros2/       P6：dog_perception_msgs（Object、PredictedPath、ObjectArray）、rclcpp 节点（还没写）
+deploy/ros2/       P6：dog_perception_msgs（Object、PredictedPath、ObjectArray）、dogperc_ros（节点、bag 回放，第 8 节）
 ```
 
 **模块对应**：
@@ -247,7 +248,8 @@ deploy/ros2/       P6：dog_perception_msgs（Object、PredictedPath、ObjectArr
 |---|---|
 | `geometry`、`pose_buffer` | `geometry.py`、`pose_buffer.py`（PoseBuffer、ImuPropagator） |
 | `preprocess` | `preprocess/`：去重、自身滤除、去畸变、多帧累积、检测系、地面估计 |
-| `localization` | `inspvax.py`：ENU、航向、杠杆臂、航向检查（ROS 消息解析留给 P6 节点） |
+| `localization` | `inspvax.py`：ENU、航向、杠杆臂、航向检查 |
+| `online`、`message_log` | `online.py`、`ros_utils.py`：节点的消息处理（PointCloud2 字节、INSPVAX、IMU、里程计），不依赖 ROS（第 8 节） |
 | `detections` | `detection/boxes.py`、`frame_adapter.py` |
 | `detection/model_meta`、`pillars`、`decode`、`filters`、`detector` | `model_meta.py`、`voxelize.py`、`pillar_host.py`、`decode.py`、`filters.py`、`exported.py` |
 | `detection/trt_engine`、`gpu_detector`（CUDA） | `exported.py` 的 TensorRT 后端 |
@@ -314,17 +316,82 @@ cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUIL
 - 解码先用 logit 筛格子 0.64 → 0.24 ms；过滤的点网格改 CSR；head 图移动、不拷贝；
 - thrust 临时显存用缓存分配器，设备缓冲区按 1.5 倍增长（只编译过）；
 - `parallel_for` 线程池（`include/dogperc/parallel.hpp`，`dogperc_replay --threads`），逐点的循环都可以分给几个线程，结果和线程数无关。本机没有收益，板上 T28B 测；
-- 预处理本机 12.9 → 8.4 ms，估计板上网络以外降到 14 ms 左右，T28B 实测。
+- 预处理本机 12.9 → 8.4 ms。
+
+**板上提速后**（T28B，同样 150 帧，中位数 / p99）：
+
+| | T28 | 1 线程 | 4 线程 |
+|---|---|---|---|
+| 预处理 | 14.75 / 15.12 | 7.64 / 7.98 | 6.21 / 6.67 |
+| 其中去重 / 自身滤除 / 去畸变 / 拼帧 | — | 2.58 / 1.68 / 0.55 / 2.82 | 2.57 / 1.29 / 0.38 / 1.96 |
+| 检测的 CPU 后处理 | 3.26 | 1.73 | 1.70 |
+| 端到端 | 27.71 / 30.16 | 18.70 / 19.65 | 17.26 / 18.19 |
+| 网络以外 | 21.79 / 24.25 | 12.87 / 13.75 | 11.41 / 12.28 |
+
+- 板上用 4 个线程（`dogperc_replay --threads 4`，节点的 `threads` 参数，launch 默认 4）；服务器的共享 vCPU 上 4 线程反而慢，用 1 个；
+- 输出和线程数无关，和 T28 逐位相同；
+- 剩下较长的：去重 2.6 ms（顺序的哈希，没法分线程）、拼帧 2.0 ms、后处理 1.7 ms、体素化 1.6 ms、head 图拷回 1.1 ms；网络 PFN 0.8 ms 加 RPN 4.7 ms。
 
 **还没做 / 下一步**：
-- P6 ROS 2 节点：消息、rclcpp 组件、INSPVAX 和点云消息解析，bag 回放对比；
-- 性能（P7），看 T28B 的结果再定：
-  - 拼帧（5 帧共 50 万点，float64 变换）受内存带宽限制，要么多线程，要么把各帧的世界坐标留在 GPU 上、在 GPU 上变换；
-  - 点云上传用锁页内存，或让拼帧直接写进 GPU 能读的内存（Orin 的 CPU 和 GPU 共用内存）；
-  - 解码搬到 GPU，可以省掉 head 图的拷贝（1.1 ms）。
+- P6 ROS 2 节点见第 8 节，T29 在板上编译、跑；
+- 性能（P7）：延迟已经达标，下面这些等稳定性测完、确实需要时再做：
+  - 把各帧的世界坐标留在 GPU 上、在 GPU 上拼帧；
+  - 解码搬到 GPU，省掉 head 图的拷贝（1.1 ms）；
+  - INT8 的 RPN（再省 2.4 ms，要先修校准，第 5 节）。
 - C++ 统一用 C++17：板上是 gcc 11。
 
-## 8. 文件一览
+## 8. ROS 2 节点（P6）
+
+```text
+deploy/ros2/
+  dog_perception_msgs/   Object、PredictedPath、ObjectArray：给规划的消息
+  dogperc_ros/
+    src/ros_convert.*    ROS 消息和 libdogperc 的结构互转（点云不拷贝）；ObjectArray、MarkerArray、调试点云
+    src/node.cpp         dogperc_node：在线节点
+    src/bag_replay.cpp   dogperc_bag_replay：rosbag2 直接读进节点的同一套处理，离线、逐帧确定
+    launch/dogperc.launch.py
+```
+
+**分层**，为了在没有 ROS 的机器上也能测：
+- 节点的消息处理在 libdogperc 里，不依赖 ROS（`dogperc/online.hpp`）：
+  - PointCloud2 的字节按字段表解析，规则同 Python 的 `ros_utils.scan_from_msg`：xyz 转 float32，丢掉原点和非有限的点，Livox 的噪点 tag，四种时间格式（absolute、absolute_ns、relative、relative_ns）；字段可以不对齐（XT32 的 float64 时间戳在偏移 18）；
+  - INSPVAX：第一个好解定 ENU 原点，杠杆臂，航向检查；RTK IMU 的单位；LIO 里程计和 twist；
+  - 这些在 Python 那边是 `dog_perception/online.py`，Python 节点 `tools/dog/ros2_node.py` 也改成用它；
+- `dogperc_ros` 只把 ROS 消息拷进这些结构，再把结果拷回消息。
+
+**参数**：
+- `config`：`tools/deploy/export_cpp_config.py --robot kygi` 写的 YAML，流水线各段加 `node:` 一节（话题、定位方式、时间格式、杠杆臂）。和 Python 节点的 `robot:=kygi` 是同一份预设；
+- `model_dir`：导出的模型目录，引擎在这台机器上建（上线是 `nusc_pp_dyn`）；`precision` 默认 fp16，`gpu` 默认 true；
+- `threads`：预处理逐点循环的线程数（参数默认 1，launch 默认 4，板上 T28B 定的）；`local_frame`：`~/objects` 的 frame_id，默认 `dog_det`；
+- 话题照 config 订阅，要换就用 ROS 的 `-r` 重映射。
+
+**发布**：
+- `~/objects`（`dog_perception_msgs/ObjectArray`），给规划：
+  - 坐标系是这一帧的检测系：重力对齐，yaw 跟车体，原点在车下的地面上（`PerceptionPipeline::to_local`）；
+  - `world_pose` 是这个坐标系在定位系里的位姿，要回到世界系就用它；
+  - 每个目标：id、类别、运动状态（静止 / 在动 / 停下）、分数、是否这一帧没检测到（coasting）、年龄、框、速度、[x, y, vx, vy] 的协方差，以及预测：时刻表和每种模式的路径、概率、协方差，最可能的在前；
+- `~/tracks`、`~/predictions`（MarkerArray，世界系）：和 Python 节点画的一样；
+- `~/cloud`：检测器的输入点云（`node.publish_cloud`）。
+
+**线程**：回调在一个线程里按到达顺序执行，和 Python 节点一样。所以 Python 节点对一个 bag 的回放（`cpp_parity.py python --bag`）可以当参考。
+
+**怎么验**（T29）：
+1. 不用 ROS：`cpp_parity.py python --bag` 用 Python 的消息处理按到达顺序回放 bag，存结果，`--messages` 再把这些消息存成普通数组（`msgs.npz`）。`dogperc_replay --messages` 用 C++ 的消息处理跑同一批消息；
+   - 本机：样例 bag 27 帧，点逐位相同，位姿差 9e-16；
+   - golden 数据里带样例 bag 的前 8 帧，`Online.MessageLogMatchesPythonBagReplay` 每次都测；另有四种点云字节布局逐点对 Python；
+2. 有 ROS（板上）：`dogperc_bag_replay` 从 bag 读消息、反序列化，走同一套处理，结果应和 `dogperc_replay --messages` 逐位相同。这一步验的是 ROS 消息到结构体的拷贝；
+3. 在线：板上 `ros2 bag play` 样例 bag，节点照常订阅、发布，看帧数（不丢帧）、`~/objects` 的内容和每帧的耗时。
+
+```bash
+# 板上编译（kygi665_msgs 在仓库根目录）
+source /opt/ros/humble/setup.bash
+colcon build --base-paths deploy/ros2 kygi665_msgs --build-base deploy/ros2/build --install-base deploy/ros2/install \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87
+source deploy/ros2/install/setup.bash
+ros2 launch dogperc_ros dogperc.launch.py config:=$HOME/dogperc/kygi.yaml model_dir:=$HOME/dogperc/models/nusc_pp_dyn
+```
+
+## 9. 文件一览
 
 | 文件 | 作用 |
 |---|---|
@@ -343,5 +410,8 @@ cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUIL
 | `tools/deploy/dump_golden.py` | C++ 对齐测试用的 golden 数据（模拟器序列加每一段的 Python 输出） |
 | `tools/deploy/cpp_parity.py` | 真实录制上 Python 和 C++ 比：参考运行、比较、转 results.pkl、延迟汇总 |
 | `deploy/docker/Dockerfile.dev` | 服务器上编译测试 C++ 的镜像 |
+| `deploy/ros2/` | ROS 2 消息包和节点包（第 8 节） |
+| `dog_perception/online.py` | 节点的消息处理，不依赖 ROS；Python 节点和 `cpp_parity.py python --bag` 共用 |
+| `tools/deploy/message_log.py` | 读 bag（到达顺序），把节点的输入消息存成普通数组，给 `dogperc_replay --messages` |
 | `deploy/scripts/orin_check.sh` | 环境报告 |
-| `deploy/scripts/sync_to_orin.sh` | 代码、模型、帧、参考检测同步到板上 |
+| `deploy/scripts/sync_to_orin.sh` | 代码、模型、帧、参考检测、原始录制、bag 同步到板上 |

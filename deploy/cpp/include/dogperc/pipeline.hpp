@@ -40,6 +40,8 @@ struct LocalTrack {
   double score;
   bool coasting;
   Motion motion;
+  Eigen::Matrix4d covariance;     // [px, py, vx, vy], rotated into the frame
+  double age;                     // [s] since the track started
 };
 
 class PerceptionPipeline {

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>dogperc_ros</name>
+  <version>0.1.0</version>
+  <description>Dog perception on the Orin: lidar preprocessing, the TensorRT pillar detector, tracking and
+    prediction (libdogperc, deploy/cpp) as a ROS 2 node, and its offline bag replay.</description>
+  <maintainer email="moujunyong360@gmail.com">junyongmou</maintainer>
+  <license>Proprietary</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>rosbag2_cpp</depend>
+  <depend>builtin_interfaces</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>dog_perception_msgs</depend>
+  <depend>kygi665_msgs</depend>
+  <depend>eigen</depend>
+  <depend>yaml-cpp</depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
