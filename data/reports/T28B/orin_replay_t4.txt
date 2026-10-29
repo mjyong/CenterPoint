@@ -1,0 +1,1 @@
+150 frames, 1670 tracks, 7.5 s -> /home/seres/dogperc/data/orin_t4.npz

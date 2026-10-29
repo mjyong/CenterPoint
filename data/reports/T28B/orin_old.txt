@@ -1,0 +1,20 @@
+| run | stage | median ms | p90 | p99 | max |
+|---|---|---|---|---|---|
+| orin_cpp | accumulate_ms | 2.78 | 2.83 | 3.12 | 3.46 |
+| orin_cpp | deskew_ms | 11.94 | 12.15 | 12.30 | 12.35 |
+| orin_cpp | det_d2h_ms | 1.08 | 1.11 | 1.13 | 1.14 |
+| orin_cpp | det_gpu_ms | 9.34 | 9.58 | 11.02 | 11.23 |
+| orin_cpp | det_network_ms | 5.91 | 5.93 | 5.94 | 5.95 |
+| orin_cpp | det_pfn_ms | 0.80 | 0.82 | 0.83 | 0.84 |
+| orin_cpp | det_pillars | 5059.00 | 5182.60 | 5272.48 | 5278.00 |
+| orin_cpp | det_post_ms | 3.26 | 3.29 | 3.31 | 3.31 |
+| orin_cpp | det_rpn_ms | 4.78 | 4.78 | 4.79 | 4.79 |
+| orin_cpp | det_scatter_ms | 0.33 | 0.33 | 0.33 | 0.33 |
+| orin_cpp | det_total_ms | 12.66 | 12.87 | 15.11 | 15.17 |
+| orin_cpp | det_voxelize_ms | 2.34 | 2.58 | 3.99 | 4.23 |
+| orin_cpp | det_voxels | 5059.00 | 5182.60 | 5272.48 | 5278.00 |
+| orin_cpp | detect_ms | 12.69 | 12.92 | 15.14 | 15.21 |
+| orin_cpp | predict_ms | 0.08 | 0.09 | 0.09 | 0.10 |
+| orin_cpp | preprocess_ms | 14.75 | 14.97 | 15.12 | 15.37 |
+| orin_cpp | total_ms | 27.71 | 28.21 | 30.16 | 30.28 |
+| orin_cpp | track_ms | 0.18 | 0.19 | 0.21 | 0.21 |

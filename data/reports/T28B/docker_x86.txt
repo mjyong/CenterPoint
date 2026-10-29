@@ -1,0 +1,65 @@
+
+=====================
+== NVIDIA TensorRT ==
+=====================
+
+NVIDIA Release 24.08 (build 106933332)
+NVIDIA TensorRT Version 10.3.0
+Copyright (c) 2016-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Container image Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+https://developer.nvidia.com/tensorrt
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+To install Python sample dependencies, run /opt/tensorrt/python/python_setup.sh
+
+To install the open-source samples corresponding to this TensorRT release version
+run /opt/tensorrt/install_opensource.sh.  To build the open source parsers,
+plugins, and samples for current top-of-tree on master or a different branch,
+run /opt/tensorrt/install_opensource.sh -b <branch>
+See https://github.com/NVIDIA/TensorRT for more information.
+
+build_begin
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda
+[1/19] Building CXX object CMakeFiles/dogperc.dir/src/parallel.cpp.o
+[2/19] Building CXX object CMakeFiles/dogperc.dir/src/detection/decode.cpp.o
+[3/19] Building CXX object CMakeFiles/dogperc.dir/src/detection/detector.cpp.o
+[4/19] Building CXX object CMakeFiles/dogperc.dir/src/detection/filters.cpp.o
+[5/19] Building CXX object CMakeFiles/dogperc.dir/src/cuda/gpu_detector.cpp.o
+[6/19] Building CXX object CMakeFiles/dogperc.dir/src/cuda/trt_engine.cpp.o
+[7/19] Building CXX object CMakeFiles/dogperc.dir/src/pipeline.cpp.o
+[8/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_gpu.cpp.o
+[9/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_preprocess.cpp.o
+[10/19] Building CXX object CMakeFiles/dogperc.dir/src/sequence.cpp.o
+[11/19] Building CXX object CMakeFiles/dogperc_replay.dir/tools/dogperc_replay.cpp.o
+[12/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_detection.cpp.o
+[13/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_pipeline.cpp.o
+[14/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_io_geometry.cpp.o
+[15/19] Building CXX object CMakeFiles/dogperc.dir/src/preprocess.cpp.o
+[16/19] Building CUDA object CMakeFiles/dogperc.dir/src/cuda/pillars.cu.o
+[17/19] Linking CXX static library libdogperc.a
+[18/19] Linking CXX executable dogperc_replay
+[19/19] Linking CXX executable dogperc_tests
+build_ok
+ctest_exit=0
+gtest_static_exit=0
+== 0921_164127_s000 dets
+288 frames, 3061 tracks, 12.8 s -> data/deploy/T28B/0921_164127_s000/cpp_dets.npz
+== 0921_164127_s000 threads 1
+288 frames, 3061 tracks, 15.3 s -> data/deploy/T28B/0921_164127_s000/cpp_t1.npz
+== 0921_164127_s000 threads 4
+288 frames, 3061 tracks, 17.0 s -> data/deploy/T28B/0921_164127_s000/cpp_t4.npz
+== 0921_165659_s004 dets
+276 frames, 6 tracks, 13.6 s -> data/deploy/T28B/0921_165659_s004/cpp_dets.npz
+== 0921_165659_s004 threads 1
+276 frames, 6 tracks, 16.8 s -> data/deploy/T28B/0921_165659_s004/cpp_t1.npz
+== 0921_165659_s004 threads 4
+276 frames, 6 tracks, 16.1 s -> data/deploy/T28B/0921_165659_s004/cpp_t4.npz
+replay_ok

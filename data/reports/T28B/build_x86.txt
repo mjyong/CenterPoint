@@ -1,0 +1,20 @@
+-- Build files have been written to: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda
+[1/19] Building CXX object CMakeFiles/dogperc.dir/src/parallel.cpp.o
+[2/19] Building CXX object CMakeFiles/dogperc.dir/src/detection/decode.cpp.o
+[3/19] Building CXX object CMakeFiles/dogperc.dir/src/detection/detector.cpp.o
+[4/19] Building CXX object CMakeFiles/dogperc.dir/src/detection/filters.cpp.o
+[5/19] Building CXX object CMakeFiles/dogperc.dir/src/cuda/gpu_detector.cpp.o
+[6/19] Building CXX object CMakeFiles/dogperc.dir/src/cuda/trt_engine.cpp.o
+[7/19] Building CXX object CMakeFiles/dogperc.dir/src/pipeline.cpp.o
+[8/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_gpu.cpp.o
+[9/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_preprocess.cpp.o
+[10/19] Building CXX object CMakeFiles/dogperc.dir/src/sequence.cpp.o
+[11/19] Building CXX object CMakeFiles/dogperc_replay.dir/tools/dogperc_replay.cpp.o
+[12/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_detection.cpp.o
+[13/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_pipeline.cpp.o
+[14/19] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_io_geometry.cpp.o
+[15/19] Building CXX object CMakeFiles/dogperc.dir/src/preprocess.cpp.o
+[16/19] Building CUDA object CMakeFiles/dogperc.dir/src/cuda/pillars.cu.o
+[17/19] Linking CXX static library libdogperc.a
+[18/19] Linking CXX executable dogperc_replay
+[19/19] Linking CXX executable dogperc_tests

@@ -1,0 +1,99 @@
+bringing up nodes...
+bringing up nodes...
+
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0mFatal Python error: Aborted
+
+Thread 0x00007f8fd5e10640 (most recent call first):
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 534 in read
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 567 in from_io
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 1160 in _thread_receiver
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 341 in run
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 411 in _perform_spawn
+
+Current thread 0x00007f8fd6e2a740 (most recent call first):
+  File "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/tools/deploy/build_engines.py", line 56 in build
+  File "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/tests/dog/test_deploy.py", line 249 in test_trt_runner_on_a_tiny_engine
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/python.py", line 167 in pytest_pyfunc_call
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_execution.py", line 147 in _multicall
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 183 in _hookexec
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_caller.py", line 197 in __call__
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/python.py", line 1707 in runtest
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 184 in pytest_runtest_call
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_execution.py", line 147 in _multicall
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 183 in _hookexec
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_caller.py", line 197 in __call__
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 250 in <lambda>
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 361 in from_call
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 249 in call_and_report
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 139 in runtestprotocol
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/runner.py", line 118 in pytest_runtest_protocol
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_execution.py", line 147 in _multicall
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 183 in _hookexec
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_caller.py", line 197 in __call__
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/xdist/remote.py", line 227 in run_one_test
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/xdist/remote.py", line 206 in pytest_runtestloop
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_execution.py", line 147 in _multicall
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 183 in _hookexec
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_caller.py", line 197 in __call__
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/main.py", line 384 in _main
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/main.py", line 330 in wrap_session
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/_pytest/main.py", line 377 in pytest_cmdline_main
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_execution.py", line 147 in _multicall
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_manager.py", line 183 in _hookexec
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/pluggy/_caller.py", line 197 in __call__
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/xdist/remote.py", line 427 in <module>
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 1291 in executetask
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 341 in run
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 411 in _perform_spawn
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 389 in integrate_as_primary_thread
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 1273 in serve
+  File "/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/execnet/gateway_base.py", line 1806 in serve
+  File "<string>", line 8 in <module>
+  File "<string>", line 1 in <module>
+
+Extension modules: numpy.core._multiarray_umath, numpy.core._multiarray_tests, numpy.linalg._umath_linalg, numpy.fft._pocketfft_internal, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._mt19937, numpy.random.mtrand, numpy.random._philox, numpy.random._pcg64, numpy.random._sfc64, numpy.random._generator, regex._regex, torch._C, torch._C._dynamo.autograd_compiler, torch._C._dynamo.eval_frame, torch._C._dynamo.guards, torch._C._dynamo.utils, torch._C._fft, torch._C._linalg, torch._C._nested, torch._C._nn, torch._C._sparse, torch._C._special, cuda.bindings._bindings.cydriver, cuda.bindings.cydriver, cuda.bindings.driver, cuda.bindings._bindings.cyruntime_ptds, cuda.bindings._bindings.cyruntime, cuda.bindings.cyruntime, cuda.bindings.runtime, PIL._imaging, PIL._imagingft, charset_normalizer.md, charset_normalizer.cd, requests.packages.charset_normalizer.md, requests.packages.chardet.md, requests.packages.charset_normalizer.cd, requests.packages.chardet.cd, yaml._yaml, scipy._lib._ccallback_c, numba.core.typeconv._typeconv, numba._helperlib, numba._dynfunc, numba._dispatcher, numba.core.runtime._nrt_python, numba.np.ufunc._internal, numba.experimental.jitclass._box, pycocotools._mask, scipy.sparse._sparsetools, _csparsetools, scipy.sparse._csparsetools, scipy.linalg._fblas, scipy.linalg._flapack, scipy.linalg.cython_lapack, scipy.linalg._cythonized_array_utils, scipy.linalg._solve_toeplitz, scipy.linalg._decomp_lu_cython, scipy.linalg._matfuncs_sqrtm_triu, scipy.linalg._matfuncs_expm, scipy.linalg._linalg_pythran, scipy.linalg.cython_blas, scipy.linalg._decomp_update, scipy.sparse.linalg._dsolve._superlu, scipy.sparse.linalg._eigen.arpack._arpack, scipy.sparse.linalg._propack._spropack, scipy.sparse.linalg._propack._dpropack, scipy.sparse.linalg._propack._cpropack, scipy.sparse.linalg._propack._zpropack, scipy.sparse.csgraph._tools, scipy.sparse.csgraph._shortest_path, scipy.sparse.csgraph._traversal, scipy.sparse.csgraph._min_spanning_tree, scipy.sparse.csgraph._flow, scipy.sparse.csgraph._matching, scipy.sparse.csgraph._reordering, scipy.spatial._ckdtree, scipy._lib.messagestream, scipy.spatial._qhull, scipy.spatial._voronoi, scipy.spatial._distance_wrap, scipy.spatial._hausdorff, scipy.special._ufuncs_cxx, scipy.special._ufuncs, scipy.special._specfun, scipy.special._comb, scipy.special._ellip_harm_2, scipy.spatial.transform._rotation, scipy.optimize._group_columns, scipy.optimize._trlib._trlib, scipy.optimize._lbfgsb, _moduleTNC, scipy.optimize._moduleTNC, scipy.optimize._cobyla, scipy.optimize._slsqp, scipy.optimize._minpack, scipy.optimize._lsq.givens_elimination, scipy.optimize._zeros, scipy.optimize._cython_nnls, scipy._lib._uarray._uarray, scipy.linalg._decomp_interpolative, scipy.optimize._bglu_dense, scipy.optimize._lsap, scipy.optimize._direct, google._upb._message (total: 106)
+[32m.[0m[gw7] node down: Not properly terminated
+[31mF[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[31m [ 49%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[33ms[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[31m [ 92%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[31m                                                             [100%][0m
+=================================== FAILURES ===================================
+[31m[1m_____________ d20car_predict/CenterPoint/tests/dog/test_deploy.py ______________[0m
+[gw7] linux -- Python 3.10.12 /home/engineers/junyongmou/robot/ultralytics/.venv/bin/python
+worker 'gw7' crashed while running 'd20car_predict/CenterPoint/tests/dog/test_deploy.py::test_trt_runner_on_a_tiny_engine'
+[33m=============================== warnings summary ===============================[0m
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/numba/core/decorators.py:159: NumbaDeprecationWarning: [1mThe keyword argument 'nopython=False' was supplied. From Numba 0.59.0 the default is True and supplying this argument has no effect.[0m
+    warnings.warn(msg, NumbaDeprecationWarning)
+
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488: 30 warnings
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488: DeprecationWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159: 18 warnings
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/numba/core/decorators.py:159: NumbaDeprecationWarning: [1m[1mThe keyword argument 'nopython=False' was supplied. From Numba 0.59.0 the default is True and supplying this argument has no effect.[0m[0m
+    warnings.warn(msg, NumbaDeprecationWarning)
+
+d20car_predict/CenterPoint/tests/dog/test_detection.py::test_decoder_matches_det3d_predict[configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py-102]
+d20car_predict/CenterPoint/tests/dog/test_detection.py::test_tta_batches_four_flips
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+    return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 10 durations =============================
+7.87s call     d20car_predict/CenterPoint/tests/dog/test_detection.py::test_tta_batches_four_flips
+7.26s call     d20car_predict/CenterPoint/tests/dog/test_det3d_integration.py::test_vehicle_only_dataset_with_ignore_boxes
+6.27s setup    d20car_predict/CenterPoint/tests/dog/test_prediction.py::test_mirror_and_moving_windows
+5.95s call     d20car_predict/CenterPoint/tests/dog/test_data_speed.py::test_voxel_lookup_buffer_reuse_matches_a_fresh_one
+4.84s call     d20car_predict/CenterPoint/tests/dog/test_pipeline_eval.py::test_learned_predictor_and_track_logs
+4.67s call     d20car_predict/CenterPoint/tests/dog/test_detection.py::test_pillar_export_parity_and_detector
+4.28s setup    d20car_predict/CenterPoint/tests/dog/test_bag_split.py::test_one_pass_split_matches_the_whole_bag
+4.14s call     d20car_predict/CenterPoint/tests/dog/test_split_check.py::test_whole_recordings_held_out_as_test_and_val
+3.99s setup    d20car_predict/CenterPoint/tests/dog/test_time_offset.py::test_meta_offset_is_applied_when_reading
+3.93s call     d20car_predict/CenterPoint/tests/dog/test_pipeline_eval.py::test_sources_raw_and_labels
+[36m[1m=========================== short test summary info ============================[0m
+[31mFAILED[0m tests/dog/test_deploy.py::[1mtest_trt_runner_on_a_tiny_engine[0m - worker 'gw7' crashed while running 'd20car_predict/CenterPoint/tests/dog/te...
+[31m[31m[1m1 failed[0m, [32m163 passed[0m, [33m1 skipped[0m, [33m52 warnings[0m[31m in 30.76s[0m[0m
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
