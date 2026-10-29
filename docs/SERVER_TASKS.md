@@ -118,8 +118,9 @@
 | T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 完成，已复核。保持现状。在动判断漏报增加、领先不到 90%；速度外推的 FDE 没同时过端到端和标签当检测。复核发现网络估的速度系统性偏慢，原始检测输入有用；人定不在 0921 上继续调，厂区数据来了先修速度目标 |
 | T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 完成，已复核。通道通；板上补了 trtexec（libnvinfer-bin 10.3.0.30）。服务器项目环境 TensorRT 10.3.0。小引擎测试失败是建引擎工具没按模型目录找外部权重，已修 |
 | T26 | Orin 部署 P1：导出上线 Pillar（含原 T8），定 P_max，建 TensorRT FP32 / FP16 引擎，在服务器和板上与 PyTorch 比，测引擎延迟 | Agent | T25 | 2 小时 | 完成，已复核。P_max 24000。FP32、FP16 都能用，上线先用 FP16。FP16 有 8 个场景匹配率低于 0.99，判断是阈值附近的框来回翻，门槛改为不计这类（T27 重算确认）；标签上 AP 只掉 0.001。板上 FP16 的 GPU 时间：PFN 3.4 ms、RPN 4.7 ms。服务器 C++ 用 TensorRT 容器 |
-| T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟；动态柱数的 PFN | Agent | T26 | 2.5 小时 | 完成，已复核。上线用 FP16 加动态 PFN（`nusc_pp_dyn`）。FP16 剩下的漏报多是过滤器的阈值翻转（过滤前 10 个场景都 ≥ 0.991），比较工具加了 filter 一类、heads rel 不再卡门槛。INT8 差得不正常（有个 head 余弦为负），多半是稀疏 BEV 上 entropy 校准截断太狠，现在不追。两个 INT8 的 AP@2 掉 0.124 / 0.099，不上。板上 RPN：FP16 5.05 ms，INT8 2.65 ms。PFN：动态 10000 柱 1.50 ms，静态 3.52 ms |
-| T28 | Orin 部署 P4 / P5：C++ 核心库在服务器容器里编译、跑对齐测试（含 GPU、TensorRT）；10 个验证场景上 Python 和 C++ 比（同一批检测、各自检测）并打分；板上原生编译、测试、测延迟 | Agent（锁频掉了才要人） | T27 | 3 小时 | 完成。C++ 可以替代 Python：10 个场景同一批检测 ID 全同，各自检测匹配率都是 1。标签上 AP@2 / AP@4 都是 0.832 / 0.852。板上锁频还在。端到端中位数 27.7 ms（p99 30.2 ms），网络以外 21.8 ms，比 15 ms 多 6.8 ms，多在去畸变。INT8 最差的 head 是 height（余弦 −0.85） |
+| T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟；动态柱数的 PFN | Agent | T26 | 2.5 小时 | 完成，已复核。上线用 FP16 加动态 PFN（`nusc_pp_dyn`）。FP16 剩下的漏报多是过滤器的阈值翻转（过滤前 10 个场景都 ≥ 0.991），比较工具加了 filter 一类、heads rel 不再卡门槛。INT8 差得不正常（有个 head 余弦为负），多半是稀疏 BEV 上 entropy 校准截断太狠，现在不追。两个 INT8 的 AP@2 掉 0.124 / 0.099，不上（人定，2026-10-29）。板上 RPN：FP16 5.05 ms，INT8 2.65 ms。PFN：动态 10000 柱 1.50 ms，静态 3.52 ms |
+| T28 | Orin 部署 P4 / P5：C++ 核心库在服务器容器里编译、跑对齐测试（含 GPU、TensorRT）；10 个验证场景上 Python 和 C++ 比（同一批检测、各自检测）并打分；板上原生编译、测试、测延迟 | Agent（锁频掉了才要人） | T27 | 3 小时 | 完成，已复核。复核在样例 bag 的真实扫描上拆开计时：慢的是去重（逐点 unordered_map），不是去畸变；预处理和后处理已提速，输出逐位不变，T28B 复测。C++ 可以替代 Python：10 个场景同一批检测 ID 全同，各自检测匹配率都是 1。标签上 AP@2 / AP@4 都是 0.832 / 0.852。板上锁频还在。端到端中位数 27.7 ms（p99 30.2 ms），网络以外 21.8 ms，比 15 ms 多 6.8 ms，多在去畸变。INT8 最差的 head 是 height（余弦 −0.85） |
+| T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5202,3 +5203,114 @@ frame 25:  7 boxes, gpu 12.01 ms (voxelize 3.74, pfn 1.98, rpn 4.80)
 **结论。** C++ 可以替代 Python。同一批检测时跟踪和预测对齐；各自用 GPU 检测时，10 个验证场景的框和标签分数都一样。
 
 板上（DEPLOY_ORIN.md 第 6 节，P7）：端到端中位数 27.7 ms，低于 50 ms，还剩约 22 ms；p99 30.2 ms，低于 100 ms。网络以外是 27.7 − 5.9 = 21.8 ms，比 15 ms 多 6.8 ms。多出来的主要在预处理，去畸变中位数 11.9 ms，预处理合计 14.8 ms；后面是过滤后处理 3.3 ms、体素化 2.3 ms、把结果拷回主机 1.1 ms。网络本身（PFN 0.80 ms + RPN 4.78 ms）不是这块缺口。回放 150 帧墙钟 9.2 s，含读盘；流水线里记的端到端是 27.7 ms，10 Hz 的 100 ms 帧预算装得下。做完删了板上的 `~/dogperc/seq` 和 `deploy/cpp/build_cuda/golden`，根分区仍是 4.6 GB。
+
+### T28 复核
+
+2026-10-29。结论同意：C++ 可以替代 Python。
+- 同一批检测时，10 个场景的跟踪 ID 每帧相同，状态差 2.5e-11；
+- 各自检测时，C++ GPU 检测器和 Python 的 TensorRT FP16 逐框相同（分数 p99 6e-8），标签上的指标逐项相同；
+- 板上对服务器也过了。
+
+1. **s005 的 FP16 过滤后是 0.9898**（门槛 0.99）。392 个上报框里错了 4 个，都是 none，过滤前也有。多半是 NMS 在同一个物体的两个峰之间换了一个，框挪了 0.5 m 以上。
+   - 标签上 FP16 和 PyTorch 只差 0.001（T26、T27），上线 FP16 不变；
+   - 门槛不再放宽：前两次改的是确定的阈值翻转，这一类要看到框才能下结论。以后再碰到，用 `compare_backends.py --dump` 存下框来看。
+2. **INT8 每种 head 都坏了**：hm 0.61、reg 0.71、dim 0.33，height、rot、vel 是负的。不是某一个 head 的问题，是整个主干，和"输入被截断"的猜测一致。记进 DEPLOY_ORIN.md 第 5 节，INT8 继续不追。
+3. **预处理慢在去重，不在去畸变。** T28 的 `deskew_ms` 其实把去重、自身滤除、去畸变三步一起算了。复核把样例 bag（`samples/rosbag2_2026_09_21-16_41_27_moving`，27 帧真实 XT32，每帧 10.6 万点，一半是双回波的重复点）转成序列，在本机 x86 上逐步计时：
+
+   | 步骤 | 改前 | 改后 | 改了什么 |
+   |---|---|---|---|
+   | 去重 | 6.1 ms | 2.4 ms | 逐点 `std::unordered_map` 换成开放寻址的扁平哈希集合，跨帧复用内存；四舍六入五成双改成内联（x86 上 `nearbyintf` 是函数调用） |
+   | 去畸变 | 1.4 ms | 0.4 ms | 时间格的排名从排序加二分换成稠密数组 |
+   | 一帧扫描合计（`sweep_ms`） | 8.4 ms | 3.9 ms | 外加只收集一次点，不再先拷出一份扫描 |
+   | 解码 | 0.64 ms | 0.24 ms | 先用 logit 筛掉够不到分数阈值的格子，再算 sigmoid |
+   | 过滤（数框内点、取当前帧） | 约 1.6 ms | 约 1.1 ms | 点网格从 `unordered_map<int64, vector>` 换成 CSR 稠密网格 |
+
+   - GPU 检测器里的 head 图改成移动，不再拷贝，约 0.3 ms；
+   - 拼帧（5 帧共 50 万点从 float64 世界坐标变到检测系）没变，本机约 3–4 ms，板上 2.8 ms，受内存带宽限制。加了线程池（`dogperc_replay --threads N`，默认 1），本机 4 个共享 vCPU 上没有收益，T28B 在板上测；
+   - 只编译过、没跑过：thrust 排序的临时显存改用缓存分配器（原来每次 cudaMalloc / cudaFree，会同步整个设备），设备缓冲区按 1.5 倍增长。服务器上体素化 p99 有 215 ms 的尖峰，可能和这个有关；
+   - 新的计时项：`sweep_ms`（就是 T28 的 `deskew_ms`），`dedup_ms`、`self_filter_ms`、`deskew_ms`（只算去畸变），`det_h2d_ms`（点云上传，原来算在 `det_voxelize_ms` 里）。
+
+   这些改动输出都不变：
+   - golden 对齐测试照样全过，加了一个"1 个线程和 4 个线程输出逐位相同"的测试；
+   - 27 帧真实扫描上，改前、改后的 `dogperc_replay --save-points` 输出逐位相同（473 万点，1 个线程和 4 个线程都是）。
+
+   本机 x86 的预处理中位数从 12.9 ms 降到 8.4 ms。按 T28 板上和本机的比例估，板上预处理会从 14.8 ms 降到 8 ms 左右，后处理从 3.3 ms 降到 2 ms 左右，网络以外大约 14 ms，刚好在 15 ms 以内。T28B 实测。
+4. `cpp_parity.py timings`：输入文件同名时，改用目录名区分（T28 的 JSON 只剩最后一个场景）；输入多个文件时，另加一行 `all`，把所有帧合在一起算。
+5. 板子时间停在 1970 年，make 会报 clock skew，只是每次都全量重编，结果没错。要修得有人在板上 `sudo date -s` 设一次时间。
+6. 人已经加了免密 sudo（2026-10-29）。锁频掉了，Agent 自己执行 `sudo -n jetson_clocks`；`-n` 报要密码，就停下问人。
+7. golden 的点差值：DEPLOY_ORIN.md 里写的 9.3e-10 m 是旧数，改前的代码现在也是 0（逐位相同），已更正。
+
+## T28B C++ 提速后的复测
+
+T28 复核改了 `deploy/cpp` 的预处理、后处理和 GPU 体素化的内存分配，计时项也拆细了。照理输出一位都不变，这次确认这一点，并在板上量新的每段延迟。本任务可以改的范围同 T28。
+
+```text
+任务 T28B：C++ 提速后的复测。服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟。
+先按通用约定做。前置：T28 完成（data/deploy/T28 下的 py_dets.npz、cpp_dets.npz、cpp.npz 还在）。
+
+0. mkdir -p data/reports/T28B data/deploy/T28B；O=data/deploy/T28；N=data/deploy/T28B；M=data/deploy/nusc_pp_dyn；G、dk 同 T28 第 0 步。
+   S="0921_164127_s000 0921_165659_s004"
+1. 服务器容器里重编、测试（同 T28 第 2 步，含静态 PFN 的 Gpu.*）：
+     输出 data/reports/T28B/build_x86.txt、ctest_x86.txt、gtest_gpu_static.txt。
+   - 新加的 Pipeline.ThreadCountDoesNotChangeTheOutput 要过；
+   - Gpu.* 打印的每帧行里多了 h2d。
+2. 输出和 T28 比（每个场景）：
+     for s in $S; do
+       mkdir -p $N/$s
+       dk "deploy/cpp/build_cuda/dogperc_replay --seq data/seq/$s --config $O/$s/config.yaml \
+           --detections $O/$s/py_dets.npz --out $N/$s/cpp_dets.npz"
+       for th in 1 4; do
+         dk "deploy/cpp/build_cuda/dogperc_replay --seq data/seq/$s --config $O/$s/config.yaml \
+             --model-dir $M --precision fp16 --gpu --threads $th --out $N/$s/cpp_t$th.npz"
+       done
+       python tools/deploy/cpp_parity.py compare --ref $O/$s/cpp_dets.npz --cpp $N/$s/cpp_dets.npz --same-detections \
+           --out data/reports/T28B/same_dets_$s.json | tail -1 | tee data/reports/T28B/same_dets_$s.txt
+       python tools/deploy/cpp_parity.py compare --ref $O/$s/cpp.npz --cpp $N/$s/cpp_t1.npz --same-detections \
+           --out data/reports/T28B/same_gpu_$s.json | tail -1 | tee data/reports/T28B/same_gpu_$s.txt
+       python tools/deploy/cpp_parity.py compare --ref $N/$s/cpp_t1.npz --cpp $N/$s/cpp_t4.npz --same-detections \
+           --out data/reports/T28B/threads_$s.json | tail -1 | tee data/reports/T28B/threads_$s.txt
+     done
+     python tools/deploy/cpp_parity.py timings $O/*/cpp.npz --out data/reports/T28B/x86_old.json > data/reports/T28B/x86_old.txt
+     python tools/deploy/cpp_parity.py timings $N/*/cpp_t1.npz --out data/reports/T28B/x86_t1.json > data/reports/T28B/x86_t1.txt
+     python tools/deploy/cpp_parity.py timings $N/*/cpp_t4.npz --out data/reports/T28B/x86_t4.json > data/reports/T28B/x86_t4.txt
+   - same_dets（喂同一批检测）和 threads（1 对 4 线程）必须 pass：提速不能改结果。不过就停下，报告第一个不同的帧；
+   - same_gpu（GPU 检测器，新对旧）：应该也 pass。只有 detections_identical 不过、而且分数最大差 < 1e-6 的话，
+     是 TensorRT 两次运行不逐位一致，写进报告，接着做；别的不过就停下。
+3. 板上（同 T28 第 6 步，模型 ~/dogperc/models/nusc_pp_dyn）：
+   a. sync_to_orin.sh --seq data/seq/0921_164127_s000 --limit 150；拷 config.yaml；看剩余空间；
+   b. 重编（同 T28 第 6b 步），ctest（同 6c），输出 build_orin.txt、ctest_orin.txt；
+   c. 锁频：先查（同 T28 第 6d 步，输出 orin_power.txt），不在就 ssh orin 'sudo -n jetson_clocks'，再查一次；
+      sudo -n 报要密码就停下问人；
+   d. 板上 1 和 4 线程各跑一次：
+        for th in 1 4; do
+          ssh orin "cd ~/dogperc/repo && deploy/cpp/build_cuda/dogperc_replay --seq ~/dogperc/seq/0921_164127_s000 \
+              --config ~/dogperc/seq/0921_164127_s000/config.yaml --model-dir ~/dogperc/models/nusc_pp_dyn --precision fp16 \
+              --gpu --threads $th --out ~/dogperc/data/orin_t$th.npz" 2>&1 | tail -1
+          scp orin:dogperc/data/orin_t$th.npz $N/orin_t$th.npz
+        done
+        python tools/deploy/cpp_parity.py compare --ref $N/0921_164127_s000/cpp_t1.npz --cpp $N/orin_t1.npz --subset \
+            --out data/reports/T28B/orin_parity.json | tail -1 | tee data/reports/T28B/orin_parity.txt
+        python tools/deploy/cpp_parity.py compare --ref $N/orin_t1.npz --cpp $N/orin_t4.npz --same-detections \
+            --out data/reports/T28B/orin_threads.json | tail -1 | tee data/reports/T28B/orin_threads.txt
+        for th in 1 4; do
+          python tools/deploy/cpp_parity.py timings $N/orin_t$th.npz --out data/reports/T28B/orin_t$th.json \
+              | tee data/reports/T28B/orin_t$th.txt
+        done
+      T28 板上的旧结果在 data/deploy/T28/orin_cpp.npz，也用 timings 汇总一次（orin_old.txt）。
+   e. 做完删掉板上的 ~/dogperc/seq、~/dogperc/data/orin_t*.npz 和 deploy/cpp/build_cuda/golden，记下剩余空间。
+
+停止条件：编译或测试按约定 9 修不好；第 2 步 same_dets、threads 不过；板上 orin_threads 不过。
+提交：data/reports/T28B/、本文档，以及按约定 9 改的代码。不提交 data/deploy/T28B/。
+报告（写进"T28B 结果"）：
+- 代码改动（约定 9）；两边编译、测试的结果；
+- 第 2 步每个场景三次 compare 的结果；
+- 每段延迟一张表，列：服务器旧（T28）/ 新 1 线程 / 新 4 线程，板上旧（T28）/ 新 1 线程 / 新 4 线程，都是中位数 / p99。
+  行：preprocess、sweep（旧的叫 deskew）、dedup、self_filter、deskew、accumulate、det_h2d、det_voxelize、det_pfn、det_rpn、
+  det_d2h、det_post、track、predict、total；外加"网络以外"= total − det_network；
+- 服务器上 det_voxelize 的 p99 尖峰还在不在；
+- 结论：板上网络以外的中位数到没到 15 ms，用几个线程，还差在哪一段。
+```
+
+### T28B 结果
+
+（待填）

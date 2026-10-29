@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <filesystem>
 
+#include "dogperc/parallel.hpp"
 #include "dogperc/pipeline.hpp"
 #include "dogperc/sequence.hpp"
 #include "golden.hpp"
@@ -136,6 +137,25 @@ TEST(Pipeline, MatchesPythonOnTheGoldenRecording) {
   RecordProperty("max_prediction_diff", std::to_string(worst_pred));
   std::printf("pipeline parity: %zu frames, max diff points %.2e m, tracks %.2e, predictions %.2e, poses %.2e\n",
               run.frames.size(), worst_pt, worst_trk, worst_pred, worst_pose);
+}
+
+TEST(Pipeline, ThreadCountDoesNotChangeTheOutput) {
+  REQUIRE_GOLDEN();
+  const Npz py = load("pipeline.npz");
+  const Npz dets = load("dets.npz");
+  const double latency = member(py, "odom_latency").scalar();
+  set_num_threads(1);
+  const CppRun one = run_cpp(dets, latency);
+  set_num_threads(4);
+  const CppRun four = run_cpp(dets, latency);
+  set_num_threads(1);
+  ASSERT_EQ(one.frames.size(), four.frames.size());
+  for (size_t f = 0; f < one.frames.size(); ++f) {
+    EXPECT_EQ(one.frames[f].frame.points, four.frames[f].frame.points) << "frame " << f;
+    ASSERT_EQ(one.frames[f].tracks.size(), four.frames[f].tracks.size());
+    for (size_t j = 0; j < one.frames[f].tracks.size(); ++j)
+      EXPECT_EQ(one.frames[f].tracks[j].position, four.frames[f].tracks[j].position);
+  }
 }
 
 TEST(Pipeline, ReplayToolWritesOneRowPerFrame) {

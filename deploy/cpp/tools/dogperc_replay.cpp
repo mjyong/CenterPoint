@@ -1,10 +1,11 @@
 // Replay a recorded sequence through the C++ pipeline; per-frame results to one .npz
-// (the layout of tools/deploy/dump_golden.py's pipeline.npz; tools/deploy/cpp_results.py reads it).
+// (the layout of tools/deploy/dump_golden.py's pipeline.npz; tools/deploy/cpp_parity.py reads it).
 //
 //   dogperc_replay --seq data/seq/0921_164127_s000 --config seq.yaml --out cpp.npz
 //       [--detections dets.npz]                                      the detections of another run, frame by frame
 //       [--model-dir data/deploy/nusc_pp --precision fp16 [--gpu]]   TensorRT engines (DOGPERC_WITH_CUDA)
 //       [--odom-latency 0.0] [--save-points] [--max-frames N]
+//       [--threads 1]                                                  per-point preprocessing loops (same results)
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -16,6 +17,7 @@
 
 #include "dogperc/detection/filters.hpp"
 #include "dogperc/npz.hpp"
+#include "dogperc/parallel.hpp"
 #include "dogperc/pipeline.hpp"
 #include "dogperc/sequence.hpp"
 #ifdef DOGPERC_WITH_CUDA
@@ -29,7 +31,8 @@ namespace {
 
 void usage() {
   std::cerr << "usage: dogperc_replay --seq DIR --config YAML --out OUT.npz [--detections DETS.npz] "
-               "[--model-dir DIR --precision fp16 [--gpu]] [--odom-latency S] [--save-points] [--max-frames N]\n";
+               "[--model-dir DIR --precision fp16 [--gpu]] [--odom-latency S] [--save-points] [--max-frames N] "
+               "[--threads N]\n";
 }
 
 struct Writer {
@@ -200,6 +203,7 @@ int main(int argc, char** argv) {
   double odom_latency = 0.0;
   bool save_points = false, gpu = false;
   long max_frames = -1;
+  int threads = 1;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     auto next = [&]() -> std::string {
@@ -219,6 +223,7 @@ int main(int argc, char** argv) {
     else if (a == "--odom-latency") odom_latency = std::stod(next());
     else if (a == "--save-points") save_points = true;
     else if (a == "--max-frames") max_frames = std::stol(next());
+    else if (a == "--threads") threads = std::stoi(next());
     else {
       usage();
       return 2;
@@ -229,6 +234,7 @@ int main(int argc, char** argv) {
     std::cerr << "exactly one of --detections / --model-dir\n";
     return 2;
   }
+  set_num_threads(threads);
   try {
     const PipelineConfig cfg = load_config(config);
     std::unique_ptr<Detector> detector;

@@ -17,7 +17,7 @@ struct HeadMap {
 // per task, in head_keys order
 using TaskMaps = std::vector<std::vector<HeadMap>>;
 // the RPN engine's outputs (meta.rpn_outputs order) -> per task maps
-TaskMaps split_head_outputs(const std::vector<std::vector<float>>& outputs, const ModelMeta& meta);
+TaskMaps split_head_outputs(std::vector<std::vector<float>> outputs, const ModelMeta& meta);   // moves in rvalues
 
 struct RawBoxes {                    // decode output, model frame
   std::vector<std::array<double, 9>> box9;   // det3d [x, y, z, w, l, h, vx, vy, r]

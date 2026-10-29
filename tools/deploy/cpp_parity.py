@@ -25,6 +25,7 @@ import json
 import os
 import pickle
 import sys
+from collections import defaultdict
 
 import numpy as np
 
@@ -120,7 +121,6 @@ def run_python(args):
 # ------------------------------------------------------------------ compare
 def compare(args):
     from compare_backends import KINDS, det_stats, summarize_dets
-    from collections import defaultdict
 
     ref, cpp = np.load(args.ref), np.load(args.cpp)
     rs, cs = ref["stamp"], cpp["stamp"]
@@ -248,22 +248,31 @@ def to_results(args):
 # ------------------------------------------------------------------ timings
 def timings(args):
     """Per-stage latency of dogperc_replay runs (median, p90, p99, max over the frames, the first frames left
-    out as warm-up)."""
+    out as warm-up); with several runs also ``all``, their frames pooled."""
     print("| run | stage | median ms | p90 | p99 | max |")
     print("|---|---|---|---|---|---|")
-    out = {}
-    for path in args.runs:
+    names = [os.path.splitext(os.path.basename(p))[0] for p in args.runs]
+    if len(set(names)) < len(names):          # data/deploy/T28/<scene>/cpp.npz: name them by their directory
+        names = [os.path.join(os.path.basename(os.path.dirname(os.path.abspath(p))), n)
+                 for p, n in zip(args.runs, names)]
+    out, pooled = {}, defaultdict(list)
+
+    def row(name, k, v):
+        q = [float(np.median(v)), float(np.percentile(v, 90)), float(np.percentile(v, 99)), float(v.max())]
+        out.setdefault(name, {})[k] = q
+        print("| %s | %s | %.2f | %.2f | %.2f | %.2f |" % (name, k, *q))
+
+    for path, name in zip(args.runs, names):
         z = np.load(path)
-        name = os.path.splitext(os.path.basename(path))[0]
-        out[name] = {}
         for k in sorted(f for f in z.files if f.startswith("timing_")):
             v = z[k][args.skip:]
             v = v[np.isfinite(v)]
-            if not len(v):
-                continue
-            q = [float(np.median(v)), float(np.percentile(v, 90)), float(np.percentile(v, 99)), float(v.max())]
-            out[name][k[7:]] = q
-            print("| %s | %s | %.2f | %.2f | %.2f | %.2f |" % (name, k[7:], *q))
+            if len(v):
+                row(name, k[7:], v)
+                pooled[k[7:]].append(v)
+    if len(args.runs) > 1:
+        for k in sorted(pooled):
+            row("all", k, np.concatenate(pooled[k]))
     if args.out:
         with open(args.out, "w") as f:
             json.dump(out, f, indent=1)

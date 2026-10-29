@@ -11,11 +11,11 @@ Python 流水线是唯一的参考实现。每换一样东西（运行时、精�
 | P0 | 环境和通道：服务器经本机的反向隧道连到 Orin，查清两边的版本 | T25 | 完成 |
 | P1 | 上线的 Pillar 导出为 ONNX，建 TensorRT FP32 / FP16 引擎，和 PyTorch 比（含原 T8） | T26 | 完成，FP16 可用 |
 | P2 | INT8 量化（ModelOpt 显式 Q/DQ），和 FP16 比精度和延迟；动态柱数的 PFN | T27 | 完成：INT8 不上；动态 PFN 上线（`nusc_pp_dyn`，FP16） |
-| P3 | C++ 核心库，不依赖 ROS：预处理、检测、跟踪、预测（第 7 节） | — | 已写，本机 CPU 部分全部对上 |
-| P4 | Python 和 C++ 逐段对齐（golden 数据加 GoogleTest），GPU 部分和 TensorRT | T28 | 待做 |
-| P5 | C++ 全链路离线评估：同一批检测时跟踪对齐，各自检测时 `pipeline_eval.py` 打分 | T28 | 待做 |
+| P3 | C++ 核心库，不依赖 ROS：预处理、检测、跟踪、预测（第 7 节） | — | 完成 |
+| P4 | Python 和 C++ 逐段对齐（golden 数据加 GoogleTest），GPU 部分和 TensorRT | T28 | 完成：服务器、板上测试全过 |
+| P5 | C++ 全链路离线评估：同一批检测时跟踪对齐，各自检测时 `pipeline_eval.py` 打分 | T28 | 完成：10 个验证场景 ID 每帧相同，标签指标逐项相同 |
 | P6 | ROS 2 节点和 `ObjectArray` 消息，bag 回放对比 | T29 | |
-| P7 | 板上性能和稳定性 | T30 | |
+| P7 | 板上性能和稳定性 | T28B、T30 | T28：端到端 27.7 ms，网络以外 21.8 ms（超 15 ms）；预处理、后处理已提速，T28B 复测 |
 
 已定（2026-10-28）：
 - 板上存储不够，只放 2–3 个验证场景的小子集，全量评估在服务器上做；
@@ -90,7 +90,7 @@ sudo apt install python3-libnvinfer        # 若没有 TensorRT 的 Python 绑�
 ```
 
 - 板上没有 det3d：导出的检测器（`dog_perception/detection/exported.py`）只要 numpy、scipy 和 TensorRT。
-- 测性能前：功耗模式确认是 MAXN（`nvpmodel -q`）；`sudo jetson_clocks` 锁频，重启后失效，由人在板上执行。
+- 测性能前：功耗模式确认是 MAXN（`nvpmodel -q`）；`sudo jetson_clocks` 锁频，重启后失效。人已加免密 sudo（2026-10-29），Agent 用 `sudo -n jetson_clocks`；还要密码时 `-n` 直接报错，就问人。
 
 **服务器**：
 - 在项目环境里加 `tensorrt==10.3.*`，和板上同一个大版本、小版本，保证数值可比；
@@ -189,6 +189,7 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 - 板上 RPN 的 GPU 时间：FP16 5.05 ms，INT8 2.65 ms（低 47%），热力图保持 FP16 的 2.90 ms；
 - 精度两版都不行：AP@2 比 PyTorch 掉 0.124 / 0.099（门槛 0.01），逐框匹配率 0.25–0.35，yaw p99 3.1 rad；
 - 有一个非热力图的 head 余弦是 −0.58，两版一样。多半是校准的问题：BEV 画布 95% 以上是 0，entropy 给输入取的截断值太小，柱子的特征被截掉了；
+- T28 复核：每种 head 都坏了（余弦 hm 0.61、reg 0.71、dim 0.33，height、rot、vel 为负），是整个主干的问题，不是某个 head；
 - 网络合计约 6.6 ms（动态 PFN 加 FP16 RPN），离预算还远，现在不追。P7 时间不够再试：
   - `--method max`；
   - 第一层卷积和各 head 的最后一层不量化；
@@ -270,8 +271,8 @@ deploy/ros2/       P6：dog_perception_msgs（Object、PredictedPath、ObjectArr
 **本机结果**（模拟器序列，26 帧，用真值加噪声的模拟检测 OracleDetector）：
 - 体素、PFN 输入、BEV 画布和 Python 逐位相同；
 - 解码、NMS、过滤原因完全一致；框差在 float32 的 1 ulp 以内（NumPy 的 exp 和 glibc 的 expf 会差 1 ulp）；
-- 整条流水线：点最大差 9.3e-10 m，跟踪状态 2e-14，预测 1.5e-10，位姿 8e-16；每帧的跟踪 ID 和顺序都完全一样；
-- CUDA 部分在本机只编译过（CUDA 12.0，`sm_87` / `sm_89`），没有 GPU、也没有 TensorRT 头文件，GPU 测试和 TensorRT 都留给 T28。
+- 整条流水线：点逐位相同，跟踪状态 2e-14，预测 1.5e-10，位姿 8e-16；每帧的跟踪 ID 和顺序都完全一样；
+- T28：服务器容器和板上，CPU、GPU、TensorRT 的测试全过；真实录制上的结果见 SERVER_TASKS.md T28。
 
 **编译和测试**：
 
@@ -291,7 +292,8 @@ cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUIL
 - 点云拷到 GPU，体素化、decorate、scatter 都在 GPU 上；
 - 两个引擎直接读写 GPU 缓冲区；
 - 只有 head 图拷回主机（约 2.7 MB），解码、NMS、过滤在 CPU 上；
-- 每段用 CUDA event 计时：voxelize、pfn、scatter、rpn、d2h，写进 `dogperc_replay` 的 `timing_*`。
+- 每段用 CUDA event 计时：h2d（点云上传）、voxelize（含 decorate）、pfn、scatter、rpn、d2h，写进 `dogperc_replay` 的 `timing_det_*`；
+- 预处理的计时：`sweep_ms` = `dedup_ms` + `self_filter_ms` + `deskew_ms`，再加 `accumulate_ms`（多帧拼接和地面估计）。T28 的 `deskew_ms` 是现在的 `sweep_ms`。
 
 **Python 和 C++ 在真实录制上比**（`tools/deploy/cpp_parity.py` 加 `dogperc_replay`）：
 1. `cpp_parity.py python`：Python 流水线照 `run_sequence.py` 的方式跑一段录制，存逐帧结果、它用的检测、这次的 C++ 配置；
@@ -300,13 +302,26 @@ cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUIL
 4. `cpp_parity.py to-results`：转成 `results.pkl`，用 `pipeline_eval.py` 和 Python 并排打分；
 5. `cpp_parity.py timings`：每段延迟的中位数、p90、p99。
 
+**板上延迟**（T28，锁频，s000 前 150 帧，中位数）：端到端 27.7 ms（p99 30.2），其中
+- 预处理 14.8 ms：一帧扫描 11.9 ms（去重占大头）、拼帧和地面 2.8 ms；
+- 检测 12.7 ms：GPU 9.3 ms（体素化含上传 2.3、PFN 0.8、scatter 0.3、RPN 4.8、拷回 1.1），CPU 后处理 3.3 ms；
+- 跟踪 0.2 ms，预测 0.1 ms；
+- 网络以外 21.8 ms，超过 15 ms 的目标。
+
+**提速**（T28 复核，输出逐位不变；本机 x86，样例 bag 的 27 帧真实 XT32 扫描）：
+- 去重：逐点 `std::unordered_map` 换成扁平哈希集合（`src/flat_map.hpp`），6.1 → 2.4 ms；
+- 去畸变的时间格稠密排名 1.4 → 0.4 ms；一帧扫描合计 8.4 → 3.9 ms；
+- 解码先用 logit 筛格子 0.64 → 0.24 ms；过滤的点网格改 CSR；head 图移动、不拷贝；
+- thrust 临时显存用缓存分配器，设备缓冲区按 1.5 倍增长（只编译过）；
+- `parallel_for` 线程池（`include/dogperc/parallel.hpp`，`dogperc_replay --threads`），逐点的循环都可以分给几个线程，结果和线程数无关。本机没有收益，板上 T28B 测；
+- 预处理本机 12.9 → 8.4 ms，估计板上网络以外降到 14 ms 左右，T28B 实测。
+
 **还没做 / 下一步**：
 - P6 ROS 2 节点：消息、rclcpp 组件、INSPVAX 和点云消息解析，bag 回放对比；
-- 性能（P7）：
-  - CPU 预处理在本机 x86 约 12 ms 一帧（去畸变 7 ms，累积和地面 4 ms，约 20 万点），板上 A78 会更慢；
-  - 要优化，或把去畸变和累积搬到 GPU；
-  - 解码搬到 GPU，可以省掉 head 图的拷贝；
-  - 用 cub 并预分配临时内存，代替 thrust 每帧的临时分配；用锁页内存。
+- 性能（P7），看 T28B 的结果再定：
+  - 拼帧（5 帧共 50 万点，float64 变换）受内存带宽限制，要么多线程，要么把各帧的世界坐标留在 GPU 上、在 GPU 上变换；
+  - 点云上传用锁页内存，或让拼帧直接写进 GPU 能读的内存（Orin 的 CPU 和 GPU 共用内存）；
+  - 解码搬到 GPU，可以省掉 head 图的拷贝（1.1 ms）。
 - C++ 统一用 C++17：板上是 gcc 11。
 
 ## 8. 文件一览

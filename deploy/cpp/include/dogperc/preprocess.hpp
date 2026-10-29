@@ -31,6 +31,8 @@ struct LidarScan {
 
 // repeated returns (same xyz on a 1 mm grid, the first kept) and non-finite points removed
 LidarScan dedup_returns(const LidarScan& scan, double resolution = 1e-3);
+// the same as indices of the kept points, in order
+std::vector<size_t> dedup_indices(const LidarScan& scan, double resolution = 1e-3);
 
 // points within `radius`-sized voxels of the 3x3x3 block around each point, minus itself
 std::vector<int64_t> neighbor_counts(const float* xyz, size_t n, double radius);
@@ -104,8 +106,10 @@ class Preprocessor {
   Preprocessor(PreprocessConfig cfg, const PoseBuffer& poses);
   void reset() { accumulator_.reset(); }
   // self filter + deskew one sweep: body-frame points at the scan stamp (float64) and their intensity
+  // timings: dedup_ms, self_filter_ms, deskew_ms
   void sweep_to_body(const LidarScan& scan, std::vector<double>& xyz_body, std::vector<float>& intensity,
-                     const std::vector<std::array<double, 7>>* dynamic_boxes = nullptr) const;
+                     const std::vector<std::array<double, 7>>* dynamic_boxes = nullptr,
+                     std::map<std::string, double>* timings = nullptr) const;
   // none while no pose covers the scan
   std::optional<PreprocessedFrame> process(const LidarScan& scan,
                                            const std::vector<std::array<double, 7>>* dynamic_boxes = nullptr);

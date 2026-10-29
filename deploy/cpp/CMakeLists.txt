@@ -58,6 +58,7 @@ set(DOGPERC_SOURCES
   src/tracking/association.cpp
   src/tracking/tracker.cpp
   src/prediction/imm_predictor.cpp
+  src/parallel.cpp
 )
 
 if(DOGPERC_WITH_CUDA)

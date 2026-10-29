@@ -3,39 +3,74 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
-#include <unordered_map>
 
 namespace dogperc {
 
 namespace {
 
-// current-sweep points binned on a 2D grid, to visit only the points near a box
+// radius of the disk around a box center that contains the box grown by `margin` (and a little more)
+double visit_radius(const Box& b, double margin) {
+  return 0.5 * std::hypot(b[3] * (1 + margin), b[4] * (1 + margin)) + 1e-3;
+}
+
+// the points under the boxes' disks binned on a dense 2D grid (CSR), to visit only the points near a box;
+// a point inside a box lies in its disk, so the cells overlapping the disk hold every candidate
 class PointGrid {
  public:
-  PointGrid(const std::vector<float>& xyz, double cell) : xyz_(xyz), cell_(cell) {
+  PointGrid(const std::vector<float>& xyz, const std::vector<Box>& boxes, double margin) {
+    for (const Box& b : boxes) {
+      const double r = visit_radius(b, margin);
+      for (int k = 0; k < 2; ++k) {
+        lo_[k] = std::min(lo_[k], b[k] - r);
+        hi_[k] = std::max(hi_[k], b[k] + r);
+      }
+    }
+    if (!(hi_[0] >= lo_[0] && hi_[1] >= lo_[1])) {   // no finite box: an empty grid
+      start_.assign(2, 0);
+      return;
+    }
+    cell_ = std::max(2.0, std::max(hi_[0] - lo_[0], hi_[1] - lo_[1]) / 1024.0);
+    nx_ = static_cast<long>(std::floor((hi_[0] - lo_[0]) / cell_)) + 1;
+    ny_ = static_cast<long>(std::floor((hi_[1] - lo_[1]) / cell_)) + 1;
     const size_t n = xyz.size() / 3;
-    for (size_t i = 0; i < n; ++i) cells_[key(xyz[3 * i], xyz[3 * i + 1])].push_back(static_cast<int>(i));
+    std::vector<long> of(n, -1);
+    start_.assign(static_cast<size_t>(nx_ * ny_) + 1, 0);
+    for (size_t i = 0; i < n; ++i) {
+      const double x = xyz[3 * i], y = xyz[3 * i + 1];
+      if (!(x >= lo_[0] && x <= hi_[0] && y >= lo_[1] && y <= hi_[1])) continue;
+      of[i] = cell(x, y);
+      ++start_[of[i] + 1];
+    }
+    for (size_t c = 1; c < start_.size(); ++c) start_[c] += start_[c - 1];
+    idx_.resize(start_.back());
+    std::vector<int> fill(start_.begin(), start_.end() - 1);
+    for (size_t i = 0; i < n; ++i)
+      if (of[i] >= 0) idx_[fill[of[i]]++] = static_cast<int>(i);
   }
   template <class F>
   void visit(double cx, double cy, double radius, F&& f) const {
-    const long x0 = static_cast<long>(std::floor((cx - radius) / cell_)), x1 = static_cast<long>(std::floor((cx + radius) / cell_));
-    const long y0 = static_cast<long>(std::floor((cy - radius) / cell_)), y1 = static_cast<long>(std::floor((cy + radius) / cell_));
+    if (idx_.empty() || !(std::isfinite(cx) && std::isfinite(cy) && std::isfinite(radius))) return;
+    const long x0 = clampx(std::floor((cx - radius - lo_[0]) / cell_));
+    const long x1 = clampx(std::floor((cx + radius - lo_[0]) / cell_));
+    const long y0 = clampy(std::floor((cy - radius - lo_[1]) / cell_));
+    const long y1 = clampy(std::floor((cy + radius - lo_[1]) / cell_));
     for (long x = x0; x <= x1; ++x)
       for (long y = y0; y <= y1; ++y) {
-        auto it = cells_.find(pack(x, y));
-        if (it == cells_.end()) continue;
-        for (int i : it->second) f(i);
+        const long c = x * ny_ + y;
+        for (int k = start_[c]; k < start_[c + 1]; ++k) f(idx_[k]);
       }
   }
 
  private:
-  static int64_t pack(long x, long y) { return (static_cast<int64_t>(x) << 32) ^ (static_cast<int64_t>(y) & 0xffffffff); }
-  int64_t key(double x, double y) const {
-    return pack(static_cast<long>(std::floor(x / cell_)), static_cast<long>(std::floor(y / cell_)));
+  long cell(double x, double y) const {
+    return clampx(std::floor((x - lo_[0]) / cell_)) * ny_ + clampy(std::floor((y - lo_[1]) / cell_));
   }
-  const std::vector<float>& xyz_;
-  double cell_;
-  std::unordered_map<int64_t, std::vector<int>> cells_;
+  long clampx(double v) const { return std::clamp(static_cast<long>(v), 0L, nx_ - 1); }
+  long clampy(double v) const { return std::clamp(static_cast<long>(v), 0L, ny_ - 1); }
+  double lo_[2] = {kInf, kInf}, hi_[2] = {-kInf, -kInf};
+  double cell_ = 2.0;
+  long nx_ = 1, ny_ = 1;
+  std::vector<int> start_, idx_;
 };
 
 std::vector<int64_t> box_counts(const std::vector<float>& xyz, const PointGrid& grid, const std::vector<Box>& boxes,
@@ -47,7 +82,7 @@ std::vector<int64_t> box_counts(const std::vector<float>& xyz, const PointGrid& 
     const double c = std::cos(bx[6]), s = std::sin(bx[6]);
     int64_t n = 0;
     // the ball around the center that cKDTree queries contains the box; the box test decides
-    grid.visit(bx[0], bx[1], 0.5 * std::hypot(l, w), [&](int i) {
+    grid.visit(bx[0], bx[1], visit_radius(bx, margin), [&](int i) {
       const double dx = static_cast<double>(xyz[3 * i]) - bx[0], dy = static_cast<double>(xyz[3 * i + 1]) - bx[1];
       const double lx = c * dx + s * dy, ly = -s * dx + c * dy;
       if (std::abs(lx) <= l / 2 && std::abs(ly) <= w / 2 && std::abs(static_cast<double>(xyz[3 * i + 2]) - bx[2]) <= h / 2) ++n;
@@ -61,7 +96,7 @@ std::vector<int64_t> box_counts(const std::vector<float>& xyz, const PointGrid& 
 
 std::vector<int64_t> points_in_box_counts(const std::vector<float>& xyz, const std::vector<Box>& boxes, double margin) {
   if (xyz.empty() || boxes.empty()) return std::vector<int64_t>(boxes.size(), 0);
-  const PointGrid grid(xyz, 2.0);
+  const PointGrid grid(xyz, boxes, margin);
   return box_counts(xyz, grid, boxes, margin);
 }
 
@@ -154,10 +189,15 @@ std::vector<char> cross_class_suppress(const Detections& d, double margin) {
 namespace {
 
 std::vector<float> current_sweep(const float* pts, size_t n, int stride) {
-  std::vector<float> cur;                         // lag <= 1e-6 (float32 compare)
-  const float lag_max = 1e-6f;
-  for (size_t i = 0; i < n; ++i)
-    if (pts[i * stride + stride - 1] <= lag_max) cur.insert(cur.end(), pts + i * stride, pts + i * stride + 3);
+  const float lag_max = 1e-6f;                    // lag <= 1e-6 (float32 compare)
+  size_t m = 0;
+  for (size_t i = 0; i < n; ++i) m += pts[i * stride + stride - 1] <= lag_max;
+  std::vector<float> cur(3 * m);
+  for (size_t i = 0, j = 0; i < n; ++i)
+    if (pts[i * stride + stride - 1] <= lag_max) {
+      for (int c = 0; c < 3; ++c) cur[3 * j + c] = pts[i * stride + c];
+      ++j;
+    }
   return cur;
 }
 

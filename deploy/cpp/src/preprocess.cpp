@@ -4,7 +4,9 @@
 #include <chrono>
 #include <cmath>
 #include <numeric>
-#include <unordered_map>
+
+#include "dogperc/parallel.hpp"
+#include "flat_map.hpp"
 
 namespace dogperc {
 
@@ -12,6 +14,14 @@ namespace {
 
 double ms_since(std::chrono::steady_clock::time_point t0) {
   return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+}
+
+// np.round / np.rint (half to even) inline: std::nearbyint is a libm call on x86-64 (one instruction on
+// aarch64), three per point in dedup_returns. Adding and subtracting 1.5 * 2^52 rounds in the default
+// round-to-nearest-even mode, exactly for |x| < 2^51.
+inline double round_half_even(double x) {
+  constexpr double k = 6755399441055744.0;
+  return std::abs(x) < 2251799813685248.0 ? (x + k) - k : std::nearbyint(x);
 }
 
 // transform_points(T, xyz) for one point: xyz @ T[:3, :3].T + T[:3, 3] in float64
@@ -44,12 +54,12 @@ LidarScan LidarScan::make(std::vector<float> xyz, std::vector<float> intensity, 
   return s;
 }
 
-LidarScan dedup_returns(const LidarScan& scan, double resolution) {
+std::vector<size_t> dedup_indices(const LidarScan& scan, double resolution) {
   const size_t n = scan.size();
   const float res = static_cast<float>(resolution);   // float32 points / Python float: float32 arithmetic
   const int64_t lim = (int64_t(1) << 20) - 1;
-  std::unordered_map<int64_t, size_t> first;
-  first.reserve(n * 2);
+  thread_local FlatSet seen;
+  seen.reset(n);
   std::vector<size_t> keep;
   keep.reserve(n);
   for (size_t i = 0; i < n; ++i) {
@@ -57,19 +67,29 @@ LidarScan dedup_returns(const LidarScan& scan, double resolution) {
     if (!(std::isfinite(p[0]) && std::isfinite(p[1]) && std::isfinite(p[2]))) continue;
     int64_t q[3];
     for (int k = 0; k < 3; ++k) {
-      const double r = std::nearbyint(static_cast<double>(p[k] / res));   // np.round: half to even
+      const double r = round_half_even(static_cast<double>(p[k] / res));   // np.round: half to even
       q[k] = std::clamp(static_cast<int64_t>(r), -lim, lim) + lim;
     }
-    const int64_t key = (q[0] << 42) | (q[1] << 21) | q[2];
-    if (first.emplace(key, i).second) keep.push_back(i);
+    const int64_t key = (q[0] << 42) | (q[1] << 21) | q[2];   // 3 x 21 bits, >= 0
+    if (seen.insert(key)) keep.push_back(i);
   }
-  if (keep.size() == n) return scan;
+  return keep;
+}
+
+LidarScan dedup_returns(const LidarScan& scan, double resolution) {
+  const std::vector<size_t> keep = dedup_indices(scan, resolution);
+  if (keep.size() == scan.size()) return scan;
   LidarScan out;
   out.stamp = scan.stamp;
-  for (size_t i : keep) {
-    out.xyz.insert(out.xyz.end(), &scan.xyz[3 * i], &scan.xyz[3 * i] + 3);
-    out.intensity.push_back(scan.intensity[i]);
-    if (!scan.point_times.empty()) out.point_times.push_back(scan.point_times[i]);
+  const bool timed = !scan.point_times.empty();
+  out.xyz.resize(3 * keep.size());
+  out.intensity.resize(keep.size());
+  if (timed) out.point_times.resize(keep.size());
+  for (size_t k = 0; k < keep.size(); ++k) {
+    const size_t i = keep[k];
+    for (int c = 0; c < 3; ++c) out.xyz[3 * k + c] = scan.xyz[3 * i + c];
+    out.intensity[k] = scan.intensity[i];
+    if (timed) out.point_times[k] = scan.point_times[i];
   }
   return out;
 }
@@ -92,26 +112,31 @@ std::vector<int64_t> neighbor_counts(const float* xyz, size_t n, double radius) 
       dims[k] = std::max(dims[k], keys[i][k] + 2);
     }
   const int64_t s1 = dims[1] * dims[2], s2 = dims[2];
-  std::unordered_map<int64_t, int64_t> counts;
-  counts.reserve(n * 2);
-  std::vector<int64_t> code(n);
+  // voxel code -> index among the occupied voxels (codes >= 0: every key is >= 1)
+  FlatMap index(n);
+  std::vector<int64_t> codes, counts, of(n);
+  bool inserted = false;
   for (size_t i = 0; i < n; ++i) {
-    code[i] = keys[i][0] * s1 + keys[i][1] * s2 + keys[i][2];
-    ++counts[code[i]];
+    const int64_t c = keys[i][0] * s1 + keys[i][1] * s2 + keys[i][2];
+    int64_t& v = index.at(c, inserted);
+    if (inserted) {
+      v = static_cast<int64_t>(codes.size());
+      codes.push_back(c);
+      counts.push_back(0);
+    }
+    ++counts[v];
+    of[i] = v;
   }
-  std::unordered_map<int64_t, int64_t> total;
-  total.reserve(counts.size() * 2);
-  for (const auto& [c, _] : counts) {
+  std::vector<int64_t> total(codes.size());
+  for (size_t v = 0; v < codes.size(); ++v) {
     int64_t sum = 0;
     for (int dx = -1; dx <= 1; ++dx)
       for (int dy = -1; dy <= 1; ++dy)
-        for (int dz = -1; dz <= 1; ++dz) {
-          auto it = counts.find(c + dx * s1 + dy * s2 + dz);
-          if (it != counts.end()) sum += it->second;
-        }
-    total[c] = sum;
+        for (int dz = -1; dz <= 1; ++dz)
+          if (const int64_t* w = index.find(codes[v] + dx * s1 + dy * s2 + dz)) sum += counts[*w];
+    total[v] = sum;
   }
-  for (size_t i = 0; i < n; ++i) out[i] = total[code[i]] - 1;
+  for (size_t i = 0; i < n; ++i) out[i] = total[of[i]] - 1;
   return out;
 }
 
@@ -121,23 +146,25 @@ std::vector<char> SelfFilter::operator()(const float* xyz, size_t n,
   std::vector<char> keep(n);
   std::vector<float> rng(n);
   const float min_r = static_cast<float>(c.min_range), max_r = static_cast<float>(c.max_range);
-  for (size_t i = 0; i < n; ++i) {
-    const float x = xyz[3 * i], y = xyz[3 * i + 1], z = xyz[3 * i + 2];
-    rng[i] = std::sqrt((x * x + y * y) + z * z);   // np.linalg.norm of float32 rows
-    keep[i] = rng[i] >= min_r && rng[i] <= max_r;
-    double b[3];
-    apply(T_bl_, x, y, z, b);
-    for (const auto& box : c.body_boxes)
-      if (b[0] >= box[0] && b[0] <= box[1] && b[1] >= box[2] && b[1] <= box[3] && b[2] >= box[4] && b[2] <= box[5])
-        keep[i] = 0;
-    if (dyn)
-      for (const auto& o : *dyn) {
-        const double cy = std::cos(o[6]), sy = std::sin(o[6]);
-        const double rx = b[0] - o[0], ry = b[1] - o[1], rz = b[2] - o[2];
-        const double lx = cy * rx + sy * ry, ly = -sy * rx + cy * ry;
-        if (std::abs(lx) <= o[3] / 2 && std::abs(ly) <= o[4] / 2 && std::abs(rz) <= o[5] / 2) keep[i] = 0;
-      }
-  }
+  parallel_for(n, [&](size_t i0, size_t i1) {
+    for (size_t i = i0; i < i1; ++i) {
+      const float x = xyz[3 * i], y = xyz[3 * i + 1], z = xyz[3 * i + 2];
+      rng[i] = std::sqrt((x * x + y * y) + z * z);   // np.linalg.norm of float32 rows
+      keep[i] = rng[i] >= min_r && rng[i] <= max_r;
+      double b[3];
+      apply(T_bl_, x, y, z, b);
+      for (const auto& box : c.body_boxes)
+        if (b[0] >= box[0] && b[0] <= box[1] && b[1] >= box[2] && b[1] <= box[3] && b[2] >= box[4] && b[2] <= box[5])
+          keep[i] = 0;
+      if (dyn)
+        for (const auto& o : *dyn) {
+          const double cy = std::cos(o[6]), sy = std::sin(o[6]);
+          const double rx = b[0] - o[0], ry = b[1] - o[1], rz = b[2] - o[2];
+          const double lx = cy * rx + sy * ry, ly = -sy * rx + cy * ry;
+          if (std::abs(lx) <= o[3] / 2 && std::abs(ly) <= o[4] / 2 && std::abs(rz) <= o[5] / 2) keep[i] = 0;
+        }
+    }
+  });
   if (c.outlier_min_neighbors > 0 && c.outlier_max_range > 0) {
     const float near_r = static_cast<float>(c.outlier_max_range);
     std::vector<size_t> idx;
@@ -162,14 +189,31 @@ std::vector<double> deskew_points(const float* xyz, const double* times, size_t 
   std::vector<int64_t> bins(n);
   std::vector<double> query;
   std::vector<int64_t> inv(n);
-  if (res > 0) {
-    for (size_t i = 0; i < n; ++i) bins[i] = static_cast<int64_t>(std::nearbyint((times[i] - t_ref) / res));
-    std::vector<int64_t> u(bins);
-    std::sort(u.begin(), u.end());
-    u.erase(std::unique(u.begin(), u.end()), u.end());
-    for (int64_t b : u) query.push_back(t_ref + static_cast<double>(b) * res);
-    for (size_t i = 0; i < n; ++i) inv[i] = std::lower_bound(u.begin(), u.end(), bins[i]) - u.begin();
-  } else {
+  if (res > 0 && n > 0) {
+    int64_t lo = INT64_MAX, hi = INT64_MIN;
+    for (size_t i = 0; i < n; ++i) {
+      bins[i] = static_cast<int64_t>(round_half_even((times[i] - t_ref) / res));
+      lo = std::min(lo, bins[i]);
+      hi = std::max(hi, bins[i]);
+    }
+    // np.unique(bins, return_inverse=True): sorted distinct bins and each point's rank among them
+    if (static_cast<uint64_t>(hi - lo) < 4 * n + 4096) {   // a sweep spans ~1000 bins: rank them densely
+      std::vector<int64_t> rank(static_cast<size_t>(hi - lo) + 1, -1);
+      for (size_t i = 0; i < n; ++i) rank[bins[i] - lo] = 0;
+      for (size_t b = 0; b < rank.size(); ++b)
+        if (rank[b] == 0) {
+          rank[b] = static_cast<int64_t>(query.size());
+          query.push_back(t_ref + static_cast<double>(lo + static_cast<int64_t>(b)) * res);
+        }
+      for (size_t i = 0; i < n; ++i) inv[i] = rank[bins[i] - lo];
+    } else {
+      std::vector<int64_t> u(bins);
+      std::sort(u.begin(), u.end());
+      u.erase(std::unique(u.begin(), u.end()), u.end());
+      for (int64_t b : u) query.push_back(t_ref + static_cast<double>(b) * res);
+      for (size_t i = 0; i < n; ++i) inv[i] = std::lower_bound(u.begin(), u.end(), bins[i]) - u.begin();
+    }
+  } else if (n > 0) {
     query.assign(times, times + n);
     std::iota(inv.begin(), inv.end(), 0);
   }
@@ -190,12 +234,14 @@ std::vector<double> deskew_points(const float* xyz, const double* times, size_t 
     t_full[q] = R_rel * tbl + t_rel;
   }
   std::vector<double> out(3 * n);
-  for (size_t i = 0; i < n; ++i) {
-    const Mat3& Rf = R_full[inv[i]];
-    const Vec3& tf = t_full[inv[i]];
-    const double x = xyz[3 * i], y = xyz[3 * i + 1], z = xyz[3 * i + 2];
-    for (int r = 0; r < 3; ++r) out[3 * i + r] = ((Rf(r, 0) * x + Rf(r, 1) * y) + Rf(r, 2) * z) + tf[r];
-  }
+  parallel_for(n, [&](size_t i0, size_t i1) {
+    for (size_t i = i0; i < i1; ++i) {
+      const Mat3& Rf = R_full[inv[i]];
+      const Vec3& tf = t_full[inv[i]];
+      const double x = xyz[3 * i], y = xyz[3 * i + 1], z = xyz[3 * i + 2];
+      for (int r = 0; r < 3; ++r) out[3 * i + r] = ((Rf(r, 0) * x + Rf(r, 1) * y) + Rf(r, 2) * z) + tf[r];
+    }
+  });
   return out;
 }
 
@@ -206,29 +252,39 @@ void SweepAccumulator::push(double stamp, std::vector<double> xyz_world, std::ve
 
 std::vector<float> SweepAccumulator::build(const Mat4& T_world_det, double stamp) const {
   const Mat4 T = inv_T(T_world_det);
-  size_t total = 0;
-  for (const auto& s : sweeps_) {
-    const double dt = stamp - s.stamp;
-    if (!(dt < -1e-6 || dt > max_time_span_)) total += s.intensity.size();
-  }
-  std::vector<float> out(total * 5);
-  float* o = out.data();
   // newest first: when a pillar overflows max_points the voxelizer keeps the earliest points, the freshest
+  struct Part {
+    const Sweep* sweep;
+    size_t begin;                                  // first output row
+    float lag;
+  };
+  std::vector<Part> parts;
+  size_t total = 0;
   for (auto it = sweeps_.rbegin(); it != sweeps_.rend(); ++it) {
     const double dt = stamp - it->stamp;
     if (dt < -1e-6 || dt > max_time_span_) continue;
-    const float lag = static_cast<float>(std::max(dt, 0.0));
-    const double* x = it->xyz.data();
-    for (size_t i = 0; i < it->intensity.size(); ++i, o += 5, x += 3) {
-      double d[3];
-      apply(T, x[0], x[1], x[2], d);
-      o[0] = static_cast<float>(d[0]);
-      o[1] = static_cast<float>(d[1]);
-      o[2] = static_cast<float>(d[2]);
-      o[3] = it->intensity[i];
-      o[4] = lag;
-    }
+    parts.push_back({&*it, total, static_cast<float>(std::max(dt, 0.0))});
+    total += it->intensity.size();
   }
+  std::vector<float> out(total * 5);
+  parallel_for(total, [&](size_t r0, size_t r1) {
+    for (const Part& p : parts) {
+      const size_t n = p.sweep->intensity.size();
+      const size_t a = std::max(r0, p.begin), b = std::min(r1, p.begin + n);
+      for (size_t r = a; r < b; ++r) {
+        const size_t i = r - p.begin;
+        const double* x = &p.sweep->xyz[3 * i];
+        float* o = &out[5 * r];
+        double d[3];
+        apply(T, x[0], x[1], x[2], d);
+        o[0] = static_cast<float>(d[0]);
+        o[1] = static_cast<float>(d[1]);
+        o[2] = static_cast<float>(d[2]);
+        o[3] = p.sweep->intensity[i];
+        o[4] = p.lag;
+      }
+    }
+  });
   return out;
 }
 
@@ -314,38 +370,53 @@ Preprocessor::Preprocessor(PreprocessConfig cfg, const PoseBuffer& poses)
   if (cfg_.det_frame.auto_ground || cfg_.det_frame.auto_level) ground_.emplace(cfg_.det_frame);
 }
 
-void Preprocessor::sweep_to_body(const LidarScan& raw, std::vector<double>& xyz_b, std::vector<float>& inten,
-                                 const std::vector<std::array<double, 7>>* dyn) const {
-  const LidarScan scan = cfg_.dedup_returns ? dedup_returns(raw) : raw;
-  const size_t n = scan.size();
+void Preprocessor::sweep_to_body(const LidarScan& scan, std::vector<double>& xyz_b, std::vector<float>& inten,
+                                 const std::vector<std::array<double, 7>>* dyn,
+                                 std::map<std::string, double>* timings) const {
+  auto t = std::chrono::steady_clock::now();
+  auto lap = [&](const char* key) {
+    if (timings) (*timings)[key] = ms_since(t);
+    t = std::chrono::steady_clock::now();
+  };
+  // indices into the raw sweep: dedup (drops non-finite points too), else the finite points
   std::vector<size_t> fin;
-  std::vector<float> fin_xyz;
-  for (size_t i = 0; i < n; ++i) {
-    const float* p = &scan.xyz[3 * i];
-    if (std::isfinite(p[0]) && std::isfinite(p[1]) && std::isfinite(p[2])) {
-      fin.push_back(i);
-      fin_xyz.insert(fin_xyz.end(), p, p + 3);
+  if (cfg_.dedup_returns) {
+    fin = dedup_indices(scan);
+  } else {
+    fin.reserve(scan.size());
+    for (size_t i = 0; i < scan.size(); ++i) {
+      const float* p = &scan.xyz[3 * i];
+      if (std::isfinite(p[0]) && std::isfinite(p[1]) && std::isfinite(p[2])) fin.push_back(i);
     }
   }
+  lap("dedup_ms");
+  std::vector<float> fin_xyz(3 * fin.size());
+  for (size_t k = 0; k < fin.size(); ++k)
+    for (int c = 0; c < 3; ++c) fin_xyz[3 * k + c] = scan.xyz[3 * fin[k] + c];
   const auto keep = self_filter_(fin_xyz.data(), fin.size(), dyn);
-  std::vector<float> xyz;
-  std::vector<double> times;
-  inten.clear();
+  size_t m = 0;
+  for (char k : keep) m += k != 0;
+  const bool timed = !scan.point_times.empty();
+  std::vector<float> xyz(3 * m);
+  std::vector<double> times(timed ? m : 0);
+  inten.resize(m);
   const float scale = static_cast<float>(cfg_.intensity_scale);
-  for (size_t k = 0; k < fin.size(); ++k) {
+  for (size_t k = 0, j = 0; k < fin.size(); ++k) {
     if (!keep[k]) continue;
     const size_t i = fin[k];
-    xyz.insert(xyz.end(), &scan.xyz[3 * i], &scan.xyz[3 * i] + 3);
-    inten.push_back(scan.intensity[i] * scale);
-    if (!scan.point_times.empty()) times.push_back(scan.point_times[i]);
+    for (int c = 0; c < 3; ++c) xyz[3 * j + c] = fin_xyz[3 * k + c];
+    inten[j] = scan.intensity[i] * scale;
+    if (timed) times[j] = scan.point_times[i];
+    ++j;
   }
-  const size_t m = inten.size();
-  if (cfg_.deskew && !scan.point_times.empty()) {
+  lap("self_filter_ms");
+  if (cfg_.deskew && timed) {
     xyz_b = deskew_points(xyz.data(), times.data(), m, poses_, scan.stamp, cfg_.T_body_lidar, cfg_.time_resolution);
   } else {
     xyz_b.resize(3 * m);
     for (size_t i = 0; i < m; ++i) apply(cfg_.T_body_lidar, xyz[3 * i], xyz[3 * i + 1], xyz[3 * i + 2], &xyz_b[3 * i]);
   }
+  lap("deskew_ms");
 }
 
 std::optional<PreprocessedFrame> Preprocessor::process(const LidarScan& scan,
@@ -353,18 +424,21 @@ std::optional<PreprocessedFrame> Preprocessor::process(const LidarScan& scan,
   const auto t0 = std::chrono::steady_clock::now();
   std::vector<double> xyz_b;
   std::vector<float> inten;
+  std::map<std::string, double> timings;
   Mat4 T_wb;
   try {
-    sweep_to_body(scan, xyz_b, inten, dyn);
+    sweep_to_body(scan, xyz_b, inten, dyn, &timings);
     T_wb = poses_.pose_at(scan.stamp);
   } catch (const PoseOutOfRange&) {
     return std::nullopt;
   }
-  const double deskew_ms = ms_since(t0);
+  const double sweep_ms = ms_since(t0);
   const auto t1 = std::chrono::steady_clock::now();
   const size_t m = inten.size();
   std::vector<double> xyz_w(3 * m);
-  for (size_t i = 0; i < m; ++i) apply(T_wb, xyz_b[3 * i], xyz_b[3 * i + 1], xyz_b[3 * i + 2], &xyz_w[3 * i]);
+  parallel_for(m, [&](size_t i0, size_t i1) {
+    for (size_t i = i0; i < i1; ++i) apply(T_wb, xyz_b[3 * i], xyz_b[3 * i + 1], xyz_b[3 * i + 2], &xyz_w[3 * i]);
+  });
   accumulator_.push(scan.stamp, std::move(xyz_w), std::move(inten));
 
   const double offset = ground_ ? ground_->offset : 0.0;
@@ -382,7 +456,9 @@ std::optional<PreprocessedFrame> Preprocessor::process(const LidarScan& scan,
   }
   f.num_raw = scan.size();
   f.num_kept = m;
-  f.timings["deskew_ms"] = deskew_ms;
+  // sweep_ms = dedup_ms + self_filter_ms + deskew_ms (T28 called the sum deskew_ms)
+  f.timings = std::move(timings);
+  f.timings["sweep_ms"] = sweep_ms;
   f.timings["accumulate_ms"] = ms_since(t1);
   return f;
 }

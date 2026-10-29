@@ -209,7 +209,7 @@ int PillarPreprocessor::voxelize(const float* d_points, size_t n, cudaStream_t s
   k_prepare<<<blocks(n), kBlock, 0, s>>>(d_points, static_cast<int>(n), P, model_.get(), lin_.get(), idx_.get());
   check(cudaGetLastError(), "k_prepare");
   check(cudaMemcpyAsync(lin_sorted_.get(), lin_.get(), n * sizeof(int64_t), cudaMemcpyDeviceToDevice, s), "copy");
-  const auto pol = thrust::cuda::par.on(s);
+  const auto pol = thrust::cuda::par(alloc_).on(s);
   thrust::stable_sort_by_key(pol, lin_sorted_.get(), lin_sorted_.get() + n, idx_.get());
   const int nv = static_cast<int>(thrust::lower_bound(pol, lin_sorted_.get(), lin_sorted_.get() + n, kInvalid) - lin_sorted_.get());
   if (nv == 0) return 0;

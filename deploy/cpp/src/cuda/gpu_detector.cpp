@@ -53,6 +53,7 @@ class GpuPillarDetector : public Detector {
     points_.resize(points_det.size());
     cudaEventRecord(ev_[0], stream_);
     check(cudaMemcpyAsync(points_.get(), points_det.data(), points_det.size() * sizeof(float), cudaMemcpyHostToDevice, stream_), "h2d");
+    cudaEventRecord(ev_[7], stream_);
     const int V = pre_.voxelize(points_.get(), n, stream_);      // waits for the cell count
     cudaEventRecord(ev_[1], stream_);
     const int used = pre_.used_pillars();
@@ -79,7 +80,7 @@ class GpuPillarDetector : public Detector {
     cudaEventRecord(ev_[6], stream_);
     check(cudaStreamSynchronize(stream_), "detect");
     const auto t1 = std::chrono::steady_clock::now();
-    RawBoxes raw = decode_centerpoint(split_head_outputs(heads, meta_), meta_);
+    RawBoxes raw = decode_centerpoint(split_head_outputs(std::move(heads), meta_), meta_);
     Detections dets = postprocess(raw, meta_, stamp);
     last_raw_ = dets;
     if (filter_.enabled) dets = filter_detections(dets, points_det.data(), n, 5, filter_);
@@ -89,8 +90,10 @@ class GpuPillarDetector : public Detector {
       cudaEventElapsedTime(&ms, ev_[a], ev_[b]);
       return static_cast<double>(ms);
     };
-    last_timing_ = {{"voxelize_ms", el(0, 2)}, {"pfn_ms", el(2, 3)}, {"scatter_ms", el(3, 4)}, {"rpn_ms", el(4, 5)},
-                    {"d2h_ms", el(5, 6)}, {"network_ms", el(2, 5)}, {"gpu_ms", el(0, 6)},
+    // voxelize_ms: voxels and the PFN input; h2d_ms: the point cloud upload before it (pageable memory)
+    last_timing_ = {{"h2d_ms", el(0, 7)}, {"voxelize_ms", el(7, 2)}, {"pfn_ms", el(2, 3)},
+                    {"scatter_ms", el(3, 4)}, {"rpn_ms", el(4, 5)}, {"d2h_ms", el(5, 6)},
+                    {"network_ms", el(2, 5)}, {"gpu_ms", el(0, 6)},
                     {"post_ms", std::chrono::duration<double, std::milli>(t2 - t1).count()},
                     {"total_ms", std::chrono::duration<double, std::milli>(t2 - t0).count()},
                     {"pillars", static_cast<double>(used)}, {"voxels", static_cast<double>(V)}};
@@ -104,7 +107,7 @@ class GpuPillarDetector : public Detector {
   TrtEngine pfn_, rpn_;
   bool dynamic_ = false;
   cudaStream_t stream_{};
-  cudaEvent_t ev_[7]{};
+  cudaEvent_t ev_[8]{};
   DeviceBuffer<float> points_, pfn_in_, pfn_out_, bev_;
   std::vector<std::unique_ptr<DeviceBuffer<float>>> heads_;
 };

@@ -23,10 +23,21 @@ void decode_task(const std::vector<HeadMap>& maps, const ModelMeta& meta, int ta
   if (i_vel < 0) throw Error("decode: the deployed models have a velocity head; this one has none");
   const HeadMap& hm = maps[i_hm];
   const int C = hm.channels, W = hm.width, HW = hm.height * hm.width;
+  const float thr = static_cast<float>(d.score_threshold);
+  // only cells whose largest logit can reach the threshold get their sigmoids: the float32 sigmoid is
+  // monotonic, and below logit(thr) - 0.01 it is far under thr, so the others are never candidates
+  const bool prefilter = d.score_threshold > 0.0 && d.score_threshold < 1.0;
+  const float min_logit = prefilter ? static_cast<float>(std::log(d.score_threshold / (1.0 - d.score_threshold)) - 0.01)
+                                    : 0.0f;
   // sigmoid of the clipped logits, float32
-  std::vector<float> scores(HW);
-  std::vector<int> labels(HW);
+  std::vector<float> scores(HW, 0.0f);
+  std::vector<int> labels(HW, 0);
   for (int i = 0; i < HW; ++i) {
+    if (prefilter) {
+      bool reach = false;
+      for (int c = 0; c < C && !reach; ++c) reach = hm.at(c, i) > min_logit;
+      if (!reach) continue;
+    }
     float best = 0.0f;
     int arg = 0;
     for (int c = 0; c < C; ++c) {
@@ -40,7 +51,6 @@ void decode_task(const std::vector<HeadMap>& maps, const ModelMeta& meta, int ta
     scores[i] = best;
     labels[i] = arg;
   }
-  const float thr = static_cast<float>(d.score_threshold);
   std::vector<int> cand;
   for (int i = 0; i < HW; ++i)
     if (scores[i] > thr) cand.push_back(i);
@@ -83,7 +93,7 @@ void decode_task(const std::vector<HeadMap>& maps, const ModelMeta& meta, int ta
 
 }  // namespace
 
-TaskMaps split_head_outputs(const std::vector<std::vector<float>>& outputs, const ModelMeta& meta) {
+TaskMaps split_head_outputs(std::vector<std::vector<float>> outputs, const ModelMeta& meta) {
   const int K = static_cast<int>(meta.head_keys.size());
   if (static_cast<int>(outputs.size()) != meta.num_tasks() * K) throw Error("split_head_outputs: wrong number of maps");
   TaskMaps maps(meta.num_tasks());
@@ -94,7 +104,7 @@ TaskMaps split_head_outputs(const std::vector<std::vector<float>>& outputs, cons
       m.channels = meta.head_channels(t, meta.head_keys[k]);
       m.height = H;
       m.width = W;
-      m.data = outputs[t * K + k];
+      m.data = std::move(outputs[t * K + k]);
       if (m.data.size() != static_cast<size_t>(m.channels) * H * W)
         throw Error("split_head_outputs: " + meta.rpn_outputs[t * K + k] + " has the wrong size");
       maps[t].push_back(std::move(m));
