@@ -1,0 +1,8 @@
+40 / 92 frames
+60 / 92 frames
+80 / 92 frames
+
+reference: dump:/home/seres/dogperc/data/dumps/0921_165659_s004/torch, 92 frames; stages against trt:fp16; near = score within 0.020 across the threshold
+| backend | reported match | match w/o near | missed (near/score/class/none) | extra (same) | score p99 | center p99 m | yaw p99 rad | heads rel (max) | network ms | gates |
+|---|---|---|---|---|---|---|---|---|---|---|
+| trt:fp16 | 0.9922 | 0.9961 | 1 (1/0/0/0) | 1 (0/0/0/1) | 4.36e-03 | 2.79e-03 | 0.081 | - | 26.4 | pass |

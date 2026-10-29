@@ -1,0 +1,6 @@
+/usr/lib/python3/dist-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.17.3 and <1.25.0 is required for this version of SciPy (detected version 1.26.4
+  warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
+building rpn_head.int8.engine from rpn_head.int8.onnx ...
+  {"trt": "10.3.0", "seconds": 27.5, "bytes": 7003932, "graph": "rpn_head", "precision": "int8", "engine": "rpn_head.int8.engine", "onnx": "rpn_head.int8.onnx", "dla": null, "built": "1970-01-02 04:11:56", "host": "ubuntu", "arch": "aarch64", "model": "NVIDIA Jetson AGX Orin Developer Kit", "runs": 50, "shapes": {"bev": [1, 64, 408, 408]}, "gpu_median_ms": 2.63, "gpu_p99_ms": 2.636, "gpu_mean_ms": 2.63, "gpu_min_ms": 2.624, "gpu_max_ms": 2.636, "host_median_ms": 10.131}
+building rpn_head.int8_hmfp16.engine from rpn_head.int8_hmfp16.onnx ...
+  {"trt": "10.3.0", "seconds": 37.1, "bytes": 7249596, "graph": "rpn_head", "precision": "int8_hmfp16", "engine": "rpn_head.int8_hmfp16.engine", "onnx": "rpn_head.int8_hmfp16.onnx", "dla": null, "built": "1970-01-02 04:12:36", "host": "ubuntu", "arch": "aarch64", "model": "NVIDIA Jetson AGX Orin Developer Kit", "runs": 50, "shapes": {"bev": [1, 64, 408, 408]}, "gpu_median_ms": 2.86, "gpu_p99_ms": 2.871, "gpu_mean_ms": 2.861, "gpu_min_ms": 2.851, "gpu_max_ms": 2.873, "host_median_ms": 10.364}

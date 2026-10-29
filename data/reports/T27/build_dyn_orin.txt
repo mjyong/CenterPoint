@@ -1,0 +1,7 @@
+/usr/lib/python3/dist-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.17.3 and <1.25.0 is required for this version of SciPy (detected version 1.26.4
+  warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
+building pfn.fp16.engine from pfn.onnx ...
+[01/02/1970-04:19:35] [TRT] [W] DLA requests all profiles have same min, max, and opt value. All dla layers are falling back to GPU
+  {"trt": "10.3.0", "seconds": 58.4, "bytes": 69212, "profile": {"pillars": [[1, 10, 1, 20], [1, 10, 10000, 20], [1, 10, 24000, 20]]}, "graph": "pfn", "precision": "fp16", "engine": "pfn.fp16.engine", "onnx": "pfn.onnx", "dla": null, "built": "1970-01-02 04:20:34", "host": "ubuntu", "arch": "aarch64", "model": "NVIDIA Jetson AGX Orin Developer Kit"}
+building rpn_head.fp16.engine from rpn_head.onnx ...
+  {"trt": "10.3.0", "seconds": 62.8, "bytes": 12880772, "graph": "rpn_head", "precision": "fp16", "engine": "rpn_head.fp16.engine", "onnx": "rpn_head.onnx", "dla": null, "built": "1970-01-02 04:21:38", "host": "ubuntu", "arch": "aarch64", "model": "NVIDIA Jetson AGX Orin Developer Kit"}

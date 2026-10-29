@@ -1,0 +1,8 @@
+
+reference: torch, 96 frames; stages against onnx; near = score within 0.020 across the threshold
+| backend | reported match | match w/o near | missed (near/score/class/none) | extra (same) | score p99 | center p99 m | yaw p99 rad | heads rel (max) | network ms | gates |
+|---|---|---|---|---|---|---|---|---|---|---|
+| onnx | 0.9982 | 1.0000 | 1 (1/0/0/0) | 0 (0/0/0/0) | 1.02e-03 | 7.42e-04 | 0.016 | - | 390.6 | pass |
+| trt:fp16 | 0.9700 | 0.9859 | 5 (1/0/0/4) | 12 (8/0/0/4) | 5.66e-03 | 3.57e-03 | 0.095 | 3.49e-01 | 37.5 | FAIL |
+| trt:int8 | 0.1199 | 0.1217 | 318 (0/145/4/169) | 181 (1/66/11/103) | 3.75e-01 | 4.75e-01 | 3.099 | 2.74e+00 | 36.5 | FAIL |
+| trt:int8_hmfp16 | 0.1728 | 0.1781 | 310 (1/138/3/168) | 159 (2/63/7/87) | 3.83e-01 | 4.71e-01 | 3.098 | 2.74e+00 | 35.5 | FAIL |

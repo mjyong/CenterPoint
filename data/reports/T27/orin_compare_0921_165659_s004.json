@@ -1,0 +1,252 @@
+{
+ "model_dir": "/home/seres/dogperc/models/nusc_pp",
+ "frames": 92,
+ "skipped": 0,
+ "reference": "dump:/home/seres/dogperc/data/dumps/0921_165659_s004/torch",
+ "stage_reference": "trt:fp16",
+ "flip_tol": 0.02,
+ "backends": {
+  "dump:/home/seres/dogperc/data/dumps/0921_165659_s004/torch": {
+   "timing_ms": {}
+  },
+  "trt:fp16": {
+   "timing_ms": {
+    "voxelize_ms": 91.45489600632573,
+    "network_ms": 41.86228349863086,
+    "post_ms": 35.03588250168832,
+    "pfn_ms": 22.191237003426068,
+    "scatter_ms": 7.284772502316628,
+    "rpn_ms": 12.254260989720933
+   },
+   "raw": {
+    "n_ref": 6847,
+    "n_got": 6845,
+    "matched": 6788,
+    "score_max": 0.013803839683532715,
+    "score_p99": 0.00525476008653641,
+    "center_max": 0.490269806784115,
+    "center_p99": 0.0047049777442163005,
+    "yaw_p99": 0.09107031583786052,
+    "size_p99": 0.03589962959289557,
+    "reported_ref": 314,
+    "reported_missed": 2,
+    "reported_extra": 0,
+    "missed_by": {
+     "near": 2,
+     "score": 0,
+     "class": 0,
+     "none": 0
+    },
+    "extra_by": {
+     "near": 0,
+     "score": 0,
+     "class": 0,
+     "none": 0
+    },
+    "reported_match": 0.9936305732484076,
+    "reported_match_tol": 1.0
+   },
+   "final": {
+    "n_ref": 3866,
+    "n_got": 3864,
+    "matched": 3814,
+    "score_max": 0.013803839683532715,
+    "score_p99": 0.004103043675422665,
+    "center_max": 0.490269806784115,
+    "center_p99": 0.0029913117602519417,
+    "yaw_p99": 0.0781173688173293,
+    "size_p99": 0.02722942352294921,
+    "reported_ref": 258,
+    "reported_missed": 1,
+    "reported_extra": 1,
+    "missed_by": {
+     "near": 1,
+     "score": 0,
+     "class": 0,
+     "none": 0
+    },
+    "extra_by": {
+     "near": 0,
+     "score": 0,
+     "class": 0,
+     "none": 1
+    },
+    "reported_match": 0.9922480620155039,
+    "reported_match_tol": 0.9961240310077519
+   },
+   "stages": {},
+   "gates": {
+    "reported_match_tol": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  },
+  "trt:int8": {
+   "timing_ms": {
+    "voxelize_ms": 91.86080549261533,
+    "network_ms": 41.71731100359466,
+    "post_ms": 38.810698002635036,
+    "pfn_ms": 22.231092494621407,
+    "scatter_ms": 9.264114007237367,
+    "rpn_ms": 10.133451505680569
+   },
+   "raw": {
+    "n_ref": 6847,
+    "n_got": 9832,
+    "matched": 4100,
+    "score_max": 0.4933021739125252,
+    "score_p99": 0.265245361924171,
+    "center_max": 0.49942541804764823,
+    "center_p99": 0.4793510271445072,
+    "yaw_p99": 3.0943414477057742,
+    "size_p99": 1.310363287925719,
+    "reported_ref": 314,
+    "reported_missed": 110,
+    "reported_extra": 243,
+    "missed_by": {
+     "near": 0,
+     "score": 93,
+     "class": 4,
+     "none": 13
+    },
+    "extra_by": {
+     "near": 3,
+     "score": 151,
+     "class": 8,
+     "none": 81
+    },
+    "reported_match": -0.12420382165605104,
+    "reported_match_tol": -0.1146496815286624
+   },
+   "final": {
+    "n_ref": 3866,
+    "n_got": 4563,
+    "matched": 1929,
+    "score_max": 0.34043146669864655,
+    "score_p99": 0.24139685392379773,
+    "center_max": 0.49915356403942257,
+    "center_p99": 0.471955872935546,
+    "yaw_p99": 3.092159765239737,
+    "size_p99": 1.1801109695434622,
+    "reported_ref": 258,
+    "reported_missed": 94,
+    "reported_extra": 137,
+    "missed_by": {
+     "near": 0,
+     "score": 53,
+     "class": 4,
+     "none": 37
+    },
+    "extra_by": {
+     "near": 3,
+     "score": 68,
+     "class": 14,
+     "none": 52
+    },
+    "reported_match": 0.10465116279069764,
+    "reported_match_tol": 0.11627906976744184
+   },
+   "stages": {
+    "pfn_out_rel": 0.0,
+    "pfn_out_cos": 0.9999999999999999,
+    "bev_rel": 0.0,
+    "bev_cos": 0.9999999999999999,
+    "heads_rel": 2.5759681279040634,
+    "heads_cos": -0.3467913133677866
+   },
+   "gates": {
+    "reported_match_tol": false,
+    "score_p99": false,
+    "center_p99": false,
+    "head_rel": false,
+    "passed": false
+   }
+  },
+  "trt:int8_hmfp16": {
+   "timing_ms": {
+    "voxelize_ms": 92.09139098675223,
+    "network_ms": 41.83433250000235,
+    "post_ms": 37.577545997919515,
+    "pfn_ms": 22.189556999364868,
+    "scatter_ms": 9.298017001128756,
+    "rpn_ms": 10.365605492552277
+   },
+   "raw": {
+    "n_ref": 6847,
+    "n_got": 9437,
+    "matched": 4160,
+    "score_max": 0.4799751192331314,
+    "score_p99": 0.2632670945674181,
+    "center_max": 0.4993509066472518,
+    "center_p99": 0.4750271797712385,
+    "yaw_p99": 3.096806512867109,
+    "size_p99": 1.3710348725318904,
+    "reported_ref": 314,
+    "reported_missed": 104,
+    "reported_extra": 226,
+    "missed_by": {
+     "near": 2,
+     "score": 90,
+     "class": 2,
+     "none": 10
+    },
+    "extra_by": {
+     "near": 1,
+     "score": 143,
+     "class": 9,
+     "none": 73
+    },
+    "reported_match": -0.05095541401273884,
+    "reported_match_tol": -0.04140127388535042
+   },
+   "final": {
+    "n_ref": 3866,
+    "n_got": 4246,
+    "matched": 1976,
+    "score_max": 0.3696696311235428,
+    "score_p99": 0.22828376665711403,
+    "center_max": 0.49915356403942257,
+    "center_p99": 0.4689315942490965,
+    "yaw_p99": 3.0874727527287344,
+    "size_p99": 1.6233153343200684,
+    "reported_ref": 258,
+    "reported_missed": 92,
+    "reported_extra": 121,
+    "missed_by": {
+     "near": 2,
+     "score": 57,
+     "class": 5,
+     "none": 28
+    },
+    "extra_by": {
+     "near": 1,
+     "score": 59,
+     "class": 14,
+     "none": 47
+    },
+    "reported_match": 0.17441860465116277,
+    "reported_match_tol": 0.18604651162790697
+   },
+   "stages": {
+    "pfn_out_rel": 0.0,
+    "pfn_out_cos": 0.9999999999999999,
+    "bev_rel": 0.0,
+    "bev_cos": 0.9999999999999999,
+    "heads_rel": 2.5759681279040634,
+    "heads_cos": -0.34671018899420936
+   },
+   "gates": {
+    "reported_match_tol": false,
+    "score_p99": false,
+    "center_p99": false,
+    "head_rel": false,
+    "passed": false
+   }
+  }
+ },
+ "pillars": {
+  "max": 14445,
+  "truncated_frames": 0
+ }
+}

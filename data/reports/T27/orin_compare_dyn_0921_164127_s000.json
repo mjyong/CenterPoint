@@ -1,0 +1,90 @@
+{
+ "model_dir": "/home/seres/dogperc/models/nusc_pp_dyn",
+ "frames": 96,
+ "skipped": 0,
+ "reference": "dump:/home/seres/dogperc/data/dumps/0921_164127_s000/torch",
+ "stage_reference": "trt:fp16",
+ "flip_tol": 0.02,
+ "backends": {
+  "dump:/home/seres/dogperc/data/dumps/0921_164127_s000/torch": {
+   "timing_ms": {}
+  },
+  "trt:fp16": {
+   "timing_ms": {
+    "voxelize_ms": 62.11734699172666,
+    "network_ms": 21.23438199487282,
+    "post_ms": 35.30569999566069,
+    "pfn_ms": 2.3544834984932095,
+    "scatter_ms": 6.661348998022731,
+    "rpn_ms": 12.221174001751933
+   },
+   "raw": {
+    "n_ref": 8580,
+    "n_got": 8560,
+    "matched": 8458,
+    "score_max": 0.06697290390729904,
+    "score_p99": 0.008409265726804735,
+    "center_max": 0.4921256479004569,
+    "center_p99": 0.009811752083913538,
+    "yaw_p99": 0.1620338070392615,
+    "size_p99": 0.05554622650146486,
+    "reported_ref": 1316,
+    "reported_missed": 2,
+    "reported_extra": 3,
+    "missed_by": {
+     "near": 2,
+     "score": 0,
+     "class": 0,
+     "none": 0
+    },
+    "extra_by": {
+     "near": 3,
+     "score": 0,
+     "class": 0,
+     "none": 0
+    },
+    "reported_match": 0.9962006079027356,
+    "reported_match_tol": 1.0
+   },
+   "final": {
+    "n_ref": 5145,
+    "n_got": 5136,
+    "matched": 5065,
+    "score_max": 0.05202142894268036,
+    "score_p99": 0.008007043600082378,
+    "center_max": 0.4821561602674726,
+    "center_p99": 0.004835876245292306,
+    "yaw_p99": 0.13242891788482658,
+    "size_p99": 0.0346778869628905,
+    "reported_ref": 1222,
+    "reported_missed": 6,
+    "reported_extra": 6,
+    "missed_by": {
+     "near": 1,
+     "score": 0,
+     "class": 0,
+     "none": 5
+    },
+    "extra_by": {
+     "near": 3,
+     "score": 0,
+     "class": 0,
+     "none": 3
+    },
+    "reported_match": 0.9901800327332242,
+    "reported_match_tol": 0.9934533551554828
+   },
+   "stages": {},
+   "gates": {
+    "reported_match_tol": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  }
+ },
+ "pillars": {
+  "max": 5276,
+  "truncated_frames": 0
+ }
+}

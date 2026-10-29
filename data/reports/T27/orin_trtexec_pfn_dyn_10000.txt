@@ -1,0 +1,2 @@
+[01/02/1970-04:22:22] [I] GPU Compute Time: min = 1.48364 ms, max = 1.51416 ms, mean = 1.50066 ms, median = 1.50067 ms, percentile(90%) = 1.50232 ms, percentile(95%) = 1.50281 ms, percentile(99%) = 1.50391 ms
+[01/02/1970-04:22:22] [I] Total GPU Compute Time: 2.99832 s

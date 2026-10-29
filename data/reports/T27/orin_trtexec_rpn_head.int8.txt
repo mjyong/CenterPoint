@@ -1,0 +1,3 @@
+[01/02/1970-04:19:15] [I] Throughput: 376.485 qps
+[01/02/1970-04:19:15] [I] GPU Compute Time: min = 2.61743 ms, max = 2.66711 ms, mean = 2.65158 ms, median = 2.65137 ms, percentile(90%) = 2.65552 ms, percentile(95%) = 2.65723 ms, percentile(99%) = 2.66064 ms
+[01/02/1970-04:19:15] [I] Total GPU Compute Time: 3.00159 s

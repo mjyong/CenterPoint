@@ -1,0 +1,175 @@
+{
+ "model_dir": "data/deploy/nusc_pp_dyn",
+ "frames": 92,
+ "skipped": 0,
+ "reference": "torch",
+ "stage_reference": "onnx",
+ "flip_tol": 0.02,
+ "backends": {
+  "torch": {
+   "timing_ms": {
+    "voxelize_ms": 31.66080266237259,
+    "network_ms": 20.984016358852386,
+    "post_ms": 34.576013684272766
+   }
+  },
+  "onnx": {
+   "timing_ms": {
+    "voxelize_ms": 117.5063457340002,
+    "network_ms": 316.4579030126333,
+    "post_ms": 36.10137850046158,
+    "pfn_ms": 93.83659437298775,
+    "scatter_ms": 17.800968140363693,
+    "rpn_ms": 205.29578067362309
+   },
+   "raw": {
+    "n_ref": 6847,
+    "n_got": 6837,
+    "matched": 6831,
+    "score_max": 0.003540635108947754,
+    "score_p99": 0.0010008886456489563,
+    "center_max": 0.4167821206279994,
+    "center_p99": 0.0009318672123665523,
+    "yaw_p99": 0.01875122487545011,
+    "size_p99": 0.006622838973999009,
+    "reported_ref": 314,
+    "reported_missed": 1,
+    "reported_extra": 1,
+    "missed_by": {
+     "near": 1,
+     "score": 0,
+     "class": 0,
+     "none": 0
+    },
+    "extra_by": {
+     "near": 1,
+     "score": 0,
+     "class": 0,
+     "none": 0
+    },
+    "reported_match": 0.9936305732484076,
+    "reported_match_tol": 1.0
+   },
+   "final": {
+    "n_ref": 3866,
+    "n_got": 3858,
+    "matched": 3852,
+    "score_max": 0.002348959445953369,
+    "score_p99": 0.0008007083833217612,
+    "center_max": 0.0017367728240906398,
+    "center_p99": 0.0005890098490640655,
+    "yaw_p99": 0.014120364487171022,
+    "size_p99": 0.005175008773803688,
+    "reported_ref": 258,
+    "reported_missed": 2,
+    "reported_extra": 0,
+    "missed_by": {
+     "near": 1,
+     "score": 0,
+     "class": 0,
+     "none": 1
+    },
+    "extra_by": {
+     "near": 0,
+     "score": 0,
+     "class": 0,
+     "none": 0
+    },
+    "reported_match": 0.9922480620155039,
+    "reported_match_tol": 0.9961240310077519
+   },
+   "stages": {},
+   "gates": {
+    "reported_match_tol": true,
+    "score_p99": true,
+    "center_p99": true,
+    "passed": true
+   }
+  },
+  "trt:fp16": {
+   "timing_ms": {
+    "voxelize_ms": 188.78252431750298,
+    "network_ms": 23.67822825908661,
+    "post_ms": 26.51231177151203,
+    "pfn_ms": 1.969810575246811,
+    "scatter_ms": 14.315837994217873,
+    "rpn_ms": 7.4335504323244095
+   },
+   "raw": {
+    "n_ref": 6847,
+    "n_got": 6855,
+    "matched": 6790,
+    "score_max": 0.015139967203140259,
+    "score_p99": 0.0053095197677612135,
+    "center_max": 0.4898573833965839,
+    "center_p99": 0.004434340456418428,
+    "yaw_p99": 0.09935738205909704,
+    "size_p99": 0.03268245220184311,
+    "reported_ref": 314,
+    "reported_missed": 3,
+    "reported_extra": 0,
+    "missed_by": {
+     "near": 2,
+     "score": 0,
+     "class": 0,
+     "none": 1
+    },
+    "extra_by": {
+     "near": 0,
+     "score": 0,
+     "class": 0,
+     "none": 0
+    },
+    "reported_match": 0.9904458598726115,
+    "reported_match_tol": 0.9968152866242038
+   },
+   "final": {
+    "n_ref": 3866,
+    "n_got": 3875,
+    "matched": 3817,
+    "score_max": 0.015139967203140259,
+    "score_p99": 0.0044651591777801645,
+    "center_max": 0.4898573833965839,
+    "center_p99": 0.0030160846134101187,
+    "yaw_p99": 0.08610860347747892,
+    "size_p99": 0.028880605697631845,
+    "reported_ref": 258,
+    "reported_missed": 2,
+    "reported_extra": 1,
+    "missed_by": {
+     "near": 1,
+     "score": 0,
+     "class": 0,
+     "none": 1
+    },
+    "extra_by": {
+     "near": 0,
+     "score": 0,
+     "class": 0,
+     "none": 1
+    },
+    "reported_match": 0.9883720930232558,
+    "reported_match_tol": 0.9922480620155039
+   },
+   "stages": {
+    "pfn_out_rel": 0.0015836853029912545,
+    "pfn_out_cos": 0.9999996271174068,
+    "bev_rel": 0.0015836853029912545,
+    "bev_cos": 0.9999996271174069,
+    "heads_rel": 0.24556342678125315,
+    "heads_cos": 0.99443502980406
+   },
+   "gates": {
+    "reported_match_tol": true,
+    "score_p99": true,
+    "center_p99": true,
+    "head_rel": false,
+    "passed": false
+   }
+  }
+ },
+ "pillars": {
+  "max": 14445,
+  "truncated_frames": 0
+ }
+}
