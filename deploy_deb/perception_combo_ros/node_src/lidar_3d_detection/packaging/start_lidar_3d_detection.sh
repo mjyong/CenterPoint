@@ -10,6 +10,7 @@
 #   LIDAR3D_MODEL_DIR   default node.model_dir of the config (<install>/lidar_3d_detection/model)
 #   LIDAR3D_THREADS     threads of the per-point preprocessing, default 4 (the Orin, T28B)
 #   LIDAR3D_LOG_DIR     glog files, default /tmp/lidar_3d_detection_logs
+#   LIDAR3D_ARGS        more node parameters, e.g. "-p publish_tf:=true -p publish_cloud:=true" (a viewer, README)
 #   ROS_SETUP           default /opt/ros/humble/setup.bash
 HERE=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)    # <install>/lidar_3d_detection/bin
 PKG=$(dirname "$HERE")
@@ -27,4 +28,6 @@ export SERES_PERCEPTION_INSTALL_DIR=$ROOT
 args=(--ros-args -p "threads:=${LIDAR3D_THREADS:-4}")
 if [ -n "${LIDAR3D_CONFIG:-}" ]; then args+=(-p "config:=$LIDAR3D_CONFIG"); fi
 if [ -n "${LIDAR3D_MODEL_DIR:-}" ]; then args+=(-p "model_dir:=$LIDAR3D_MODEL_DIR"); fi
+read -ra extra <<< "${LIDAR3D_ARGS:-}"
+args+=("${extra[@]}")
 exec "$PKG/lib/lidar_3d_detection/lidar_3d_detection" "${args[@]}" "$@"

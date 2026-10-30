@@ -38,6 +38,7 @@ slam/interface/kygi665_msgs/              RTK 组合导航的 INSPVAX（定位�
 - 话题名都在配置的 `node:` 一节里。
 - `LidarObjectArray` 的坐标系是这一帧的检测系（frame_id `lidar_det`）：重力对齐，航向跟着车体，原点在车体正下方的地面上。`world_pose` 是它在定位系（`camera_init`）里的位姿。字段说明见消息文件。
 - 某个话题的时间戳倒退 1 s 以上（bag 再播一遍、时钟回跳），节点会整个重来，日志里有一行 warn。
+- 参数 `publish_cloud`：发 `/perception/lidar_3d/cloud`（检测器的输入点云，检测系），默认取配置里的 `node.publish_cloud`（false）；
 - 参数 `publish_tf`（默认关）：发 TF `camera_init → lidar_det` 和 `camera_init → hesai_lidar`（点云自己的 frame_id，取点云时间戳那一刻的位姿）。查看器靠它把原始点云、检测框和轨迹放进同一个 3D 视图。车上不要开：车上自己的 TF 树里已经有雷达的 frame，再发就有两个父节点。
 
 ## 在板上打 deb
@@ -68,17 +69,21 @@ node_src/lidar_3d_detection/scripts/build_deb.sh --model ~/dogperc/models/nusc_p
 
 ```bash
 sudo apt install ./lidar-3d-detection_*_arm64.deb      # 或 sudo dpkg -i
-# 手动跑（前台）：
-/opt/seres/perception/lidar_3d_detection/bin/start_lidar_3d_detection.sh
-# 当服务跑：
-sudo systemctl start lidar-3d-detection        # enable：开机自启
+# 装上就启用并启动了服务（开机自启；打包时 --no-enable-service 就只装不启用）：
+systemctl status lidar-3d-detection
 journalctl -u lidar-3d-detection -f            # 输出；glog 文件在 /tmp/lidar_3d_detection_logs
+# 手动跑（前台），先停服务，不然两个节点抢 GPU：
+sudo systemctl stop lidar-3d-detection
+/opt/seres/perception/lidar_3d_detection/bin/start_lidar_3d_detection.sh
 ```
+
+- 升级（装新的 deb）时先停服务，装完只要服务是启用的就再起来，不管是装的时候启用的还是人手动启用的；
+- `scripts/orin_foxglove.sh`、`scripts/orin_soak.sh` 会自己停掉正在跑的服务（`sudo -n systemctl stop`），结束时再起来；没有免密 sudo 时会提示先手动停；
 
 - 装到 `/opt/seres/perception`：四个接口包、本包、模型（`lidar_3d_detection/model`）、配置（`lidar_3d_detection/config`）；
 - 另外两个文件：
   - `/lib/systemd/system/lidar-3d-detection.service`；
-  - `/etc/default/lidar-3d-detection`：`ROS_DOMAIN_ID`、`RMW_IMPLEMENTATION`、`LIDAR3D_THREADS`（默认 4）、`LIDAR3D_CONFIG`、`LIDAR3D_MODEL_DIR`、`LIDAR3D_LOG_DIR`；
+  - `/etc/default/lidar-3d-detection`：`ROS_DOMAIN_ID`、`RMW_IMPLEMENTATION`、`LIDAR3D_THREADS`（默认 4）、`LIDAR3D_CONFIG`、`LIDAR3D_MODEL_DIR`、`LIDAR3D_LOG_DIR`、`LIDAR3D_ARGS`（更多节点参数，比如 `-p publish_tf:=true -p publish_cloud:=true` 让服务本身也能给查看器看）；
 - 配置和 `/etc/default` 那个文件是 conffile：升级时保留你改过的；`dpkg -r` 卸载时也留着，`dpkg -P` 才删掉；
 - 起来以后日志里有一行 "lidar_3d_detection up: ..."，之后每秒一行：框数、轨迹数、各段耗时（ms）；
 - 不经过 deb，直接用 colcon 的安装目录也行：`source install/setup.bash && ros2 launch lidar_3d_detection lidar_3d_detection.launch.py`。
@@ -93,25 +98,25 @@ journalctl -u lidar-3d-detection -f            # 输出；glog 文件在 /tmp/li
    ~/dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_foxglove.sh bags/<bag>
    ```
    这个脚本：
-   - 起装好的节点，打开 `publish_tf`；
+   - 服务在跑就先停掉，结束时再起来；
+   - 起装好的节点，打开 `publish_tf` 和 `publish_cloud`（检测器的输入点云 `/perception/lidar_3d/cloud`，布局里画的是它）；
    - 起 bridge，端口 8765；
    - 1× 循环播 bag，第二个参数可以改倍速；
    - `ROS_DOMAIN_ID` 默认 77；
    - Ctrl-C 全部停掉。
 
-   服务开着的话先 `sudo systemctl stop lidar-3d-detection`；
 3. 本机打开 Foxglove（桌面版；不想登录账号可以用开源的 Lichtblick，协议一样）：
    - Open connection → Foxglove WebSocket → `ws://192.168.123.100:8765`；
    - Layout → Import from file → `foxglove/lidar_3d_detection.json`。
 
    布局里有：
-   - **3D**：跟着 `lidar_det`，原始点云按强度上色，轨迹的框、ID、速度，预测路径；
-   - **Raw Messages**：`/perception/lidar_3d/objects` 的内容，即给规划的 `LidarObjectArray`；
-   - **Plot**：每帧的目标数；
-   - **Log**：节点日志。
+   - **3D**：显示系是 `camera_init`（世界系，机器人在里面走）；检测器的输入点云（5 帧拼起来的，按强度上色）、轨迹的框、ID、速度、预测路径；
+   - **Raw Messages**：`/perception/lidar_3d/objects` 的内容，即给规划的 `LidarObjectArray`。
+
+   想看原始点云（`/robot/topic/rdap/top_point_cloud2`，单帧，靠 `camera_init → hesai_lidar` 那条 TF），在 3D 面板的话题列表里勾上就行；
 
 - 连不上 8765（防火墙），就在本机开端口转发 `ssh -N -L 8765:localhost:8765 seres@192.168.123.100`，再连 `ws://localhost:8765`；
-- 原始点云每帧约 3.3 MB，10 Hz 下约 30 MB/s，直连的网口够用。卡的话在 3D 面板里关掉点云，只看框；
+- 点云流量：原始点云每帧约 3.3 MB，检测器的输入点云是 5 帧拼起来的，每帧几 MB，10 Hz 下都要几十 MB/s。直连的网口一般够用，卡的话在 3D 面板里关掉点云，只看框；
 - 每遍循环开头，节点会重来（日志 warn "jumped back"），时间戳往回跳，Foxglove 里可能闪一下；
 - 不起 GUI 也能查 bridge：`python3 ~/dogperc/repo/tools/deploy/foxglove_probe.py`，列出 bridge 发布的话题，订几秒、数消息条数（Foxglove 会看的那几个话题都要有）。
 

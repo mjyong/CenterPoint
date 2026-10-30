@@ -1,5 +1,8 @@
 #!/bin/sh
 set -e
+if [ "$1" = purge ]; then
+  rm -f /etc/systemd/system/multi-user.target.wants/lidar-3d-detection.service
+fi
 if [ -d /run/systemd/system ]; then
   systemctl daemon-reload 2>/dev/null || true
 fi

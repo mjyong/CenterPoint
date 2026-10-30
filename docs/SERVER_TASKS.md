@@ -5899,6 +5899,26 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
 
    T32 在板上把这些准备好，人在本机看。
 
+### 77a8738 复核（服务默认启用、Foxglove 布局）
+
+2026-10-30。人让服务器上的 Agent 改的、合并进来的提交：deb 装上默认启用并启动服务（`--no-enable-service` 关掉）；Foxglove 布局改成显示系 `camera_init`，点云用检测器的输入点云 `/perception/lidar_3d/cloud`。两处都保留。跟着补了几处，否则这两处改动用起来会出问题：
+
+1. **`/perception/lidar_3d/cloud` 默认没有**：
+   - 节点只在配置里 `node.publish_cloud: true` 时才发这个话题，仓库里的配置是 false，`orin_foxglove.sh` 也没打开，新装的板子上布局里看不到点云；
+   - 已改：两个节点加 ROS 参数 `publish_cloud`（默认取配置里的值），`orin_foxglove.sh` 传 `-p publish_cloud:=true`；`foxglove_probe.py` 默认也查这个话题。
+2. **服务一直开着，和板上脚本冲突**：
+   - `orin_foxglove.sh` 看到节点在跑就退出；
+   - `orin_soak.sh` 不查，两个节点会抢 GPU、拉高延迟，最后的 `pkill` 还会把服务的节点也停掉（SIGINT 退出码是 0，`Restart=on-failure` 不会拉起来）；
+   - 已改：两个脚本先 `sudo -n systemctl stop`，结束时（trap）再 `start`；没有免密就提示先手动停。
+3. **安装脚本**：
+   - **自启**：原来启用服务要先确认 systemd 在跑，做系统镜像时就不会开机自启。改成只要有 systemctl 就启用（只是建个链接），systemd 在跑才启动；
+   - **升级**：升级时 prerm 会停服务，postinst 原来只在 ENABLE=yes 时重启，人手动启用的服务升级后就停着了。改成只要服务是启用的就重启；
+   - **卸载**：没有运行中的 systemd 时，`remove` 原来不会取消启用，`purge` 以后留下一个指向空文件的链接。改成 `remove` 时总是取消启用，`purge` 再删一次链接；
+   - **提示**：没有运行中的 systemd 时，不再说"已启动"；
+   - 本机演练过：装上建了开机链接；`remove` 删了链接、留下配置；`purge` 全删干净。
+4. **`LIDAR3D_ARGS`**：启动脚本加了环境变量 `LIDAR3D_ARGS`，可以写在 `/etc/default/lidar-3d-detection` 里，比如 `-p publish_tf:=true -p publish_cloud:=true`，让服务本身也能给查看器看。
+5. **流量**：检测器的输入点云是 5 帧拼起来的，比原始点云大，每帧几 MB，10 Hz 下要几十 MB/s。直连的网口一般够用，卡的话在 3D 面板里关掉点云。
+
 ## T32 Orin：Foxglove 实时看的准备
 
 人要在连着板子的本机（192.168.123.55）上用 Foxglove 看板上循环播包的检测结果（deploy_deb README"用 Foxglove 看"）。T31 复核改了：打包脚本（patchelf、RPATH、版本号）、两个节点的 `publish_tf`、新脚本 `orin_foxglove.sh`。这次：
@@ -5936,10 +5956,11 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
 4. 升级安装：
      ssh orin 'sudo -n apt-get install -y ~/dogperc/deb/lidar-3d-detection_0.1.0+*_arm64.deb 2>&1 | tail -3; \
          dpkg -s lidar-3d-detection | grep Version; systemctl is-enabled lidar-3d-detection' | tee data/reports/T32/install.txt
-   - 从 0.1.0 升上来，不用先卸；服务仍是 disabled。
+   - 从 0.1.0 升上来，不用先卸；装完服务是 enabled、active（77a8738 起默认启用并启动）。journal 里有 "lidar_3d_detection up"。
 5. 离线逐位比（同 T31 第 3、5a 步，装好的 lidar_3d_bag_replay 对 deploy 的 dogperc_bag_replay，样例 bag）：
    keys differing 必须是空的。输出 inst_replay.txt。
 6. TF：装好的节点开 publish_tf，录 objects 和 /tf：
+     先 sudo -n systemctl stop lidar-3d-detection（服务的节点也在发，会混进来），做完 start 回来；
      同 T31 第 5b 步，但启动脚本加 -p publish_tf:=true，录 /perception/lidar_3d/objects /tf；先空播一遍再 --rate 0.5 正式播。
      python tools/deploy/objects_bag.py --bag data/deploy/T32/live_tf --replay data/deploy/T32/inst_gpu.npz \
          --out data/reports/T32/live_tf.json | tee data/reports/T32/live_tf.txt
@@ -5951,13 +5972,15 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
          bags/$c > data/foxglove.out 2>&1 &"
      （等 20 s）
      ssh orin 'python3 ~/dogperc/repo/tools/deploy/foxglove_probe.py --seconds 10 --topics /perception/lidar_3d/tracks \
-         /perception/lidar_3d/predictions /perception/lidar_3d/objects /tf /robot/topic/rdap/top_point_cloud2' \
-         2>&1 | tee data/reports/T32/foxglove_probe.txt
+         /perception/lidar_3d/predictions /perception/lidar_3d/objects /perception/lidar_3d/cloud /tf \
+         /robot/topic/rdap/top_point_cloud2' 2>&1 | tee data/reports/T32/foxglove_probe.txt
      ssh orin 'pkill -INT -f orin_foxglove.sh; sleep 4; cat ~/dogperc/data/foxglove.out; tail -3 /tmp/lidar3d_foxglove/bridge.log; \
-         pgrep -fa "foxglove_bridge|lidar_3d_detection|bag play" || echo "all stopped"' 2>&1 | tee -a data/reports/T32/foxglove_probe.txt
-   - probe 的 passed 为 true：五个话题都 advertised，10 s 里 tracks、predictions、objects、/tf 约 100 条，点云也有；
+         pgrep -fa "foxglove_bridge|bag play" || echo "bridge and player stopped"; systemctl is-active lidar-3d-detection' \
+         2>&1 | tee -a data/reports/T32/foxglove_probe.txt
+   - 脚本先停掉服务（foxglove.out 里没有报错），结束时再起来（"started again"，最后 is-active 是 active）；
+   - probe 的 passed 为 true：六个话题都 advertised，10 s 里 tracks、predictions、objects、/tf 约 100 条，两个点云也有；
      channels 里 objects 的 schema 是 perception_interface/msg/LidarObjectArray（bridge 拿到了消息定义）；
-   - 停下以后进程都没了（all stopped）；
+   - 停下以后 bridge 和播放器都没了；剩下的 lidar_3d_detection 是服务起回来的那个；
    - bags/$c 留在板上给人看（约 1.9 GB），根分区剩不到 1.5 GB 就停下问人。
 8. 做完删掉 /tmp/debx、data/*.npz、data/live_tf、bags/$n；bags/$c、~/dogperc/deb 留着。记下根分区剩余空间。
 

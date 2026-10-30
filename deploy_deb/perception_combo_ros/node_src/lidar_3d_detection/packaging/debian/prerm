@@ -2,8 +2,9 @@
 set -e
 if [ -d /run/systemd/system ]; then
   systemctl stop lidar-3d-detection.service 2>/dev/null || true
-  if [ "$1" = remove ]; then
-    systemctl disable lidar-3d-detection.service 2>/dev/null || true
-  fi
+fi
+# disabling only removes the boot symlink, so it also works where systemd is not running
+if [ "$1" = remove ] && command -v systemctl > /dev/null; then
+  systemctl disable lidar-3d-detection.service 2>/dev/null || true
 fi
 exit 0

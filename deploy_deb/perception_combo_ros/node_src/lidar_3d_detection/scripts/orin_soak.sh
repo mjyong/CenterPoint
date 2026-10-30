@@ -36,6 +36,24 @@ if [ -e "$OUT/live" ]; then
   echo "$OUT/live exists" >&2
   exit 1
 fi
+# the .deb enables the service: the same node would share the GPU (and pkill below would stop it). Stop it for the
+# run, start it again at the end
+service=0
+if systemctl is-active --quiet lidar-3d-detection 2> /dev/null; then
+  if ! sudo -n systemctl stop lidar-3d-detection; then
+    echo "lidar-3d-detection.service is running: sudo systemctl stop lidar-3d-detection, then run this again" >&2
+    exit 1
+  fi
+  service=1
+fi
+restore() {
+  if [ $service = 1 ]; then sudo -n systemctl start lidar-3d-detection && echo "lidar-3d-detection.service started again"; fi
+}
+trap restore EXIT
+if pgrep -f "$NODE_RE" > /dev/null; then
+  echo "lidar_3d_detection is already running (orin_foxglove.sh, or a manual start)" >&2
+  exit 1
+fi
 mkdir -p "$OUT"
 half=$((MINUTES * 30))
 

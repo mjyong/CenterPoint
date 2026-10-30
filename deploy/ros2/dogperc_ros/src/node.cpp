@@ -9,7 +9,7 @@
 //   ~/objects       dog_perception_msgs/ObjectArray  tracks and predicted paths in the det frame, for the planner
 //   ~/tracks        visualization_msgs/MarkerArray   boxes, ids, speed (world frame), as tools/dog/ros2_node.py
 //   ~/predictions   visualization_msgs/MarkerArray   one line per predicted mode
-//   ~/cloud         sensor_msgs/PointCloud2          the detector's input (node.publish_cloud)
+//   ~/cloud         sensor_msgs/PointCloud2          the detector's input (node.publish_cloud, or the parameter)
 //   /tf             world_frame -> local_frame, world_frame -> the lidar frame, only with publish_tf (viewers on a
 //                   replayed bag: Foxglove, RViz; off on the robot, whose own TF tree has the lidar frame)
 // Callbacks run on one thread in arrival order, like the Python node, so its replay of a bag
@@ -61,7 +61,8 @@ class DogPerceptionNode : public rclcpp::Node {
       else RCLCPP_INFO(get_logger(), "%s", text.c_str());
     });
     world_frame_ = nc.world_frame;
-    publish_cloud_ = nc.publish_cloud;
+    // node.publish_cloud of the config, or the parameter (a viewer on a replayed bag: orin_foxglove.sh)
+    publish_cloud_ = declare_parameter<bool>("publish_cloud", nc.publish_cloud);
 
     imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(nc.imu_topic, rclcpp::QoS(400), [this](sensor_msgs::msg::Imu::ConstSharedPtr m) {
       inputs_->on_imu(seconds(m->header.stamp), angular_velocity(*m));

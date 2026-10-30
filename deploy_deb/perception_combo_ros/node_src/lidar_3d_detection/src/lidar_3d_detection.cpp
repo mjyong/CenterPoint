@@ -87,7 +87,8 @@ bool Lidar3dDetection::Init() {
     return false;
   }
   world_frame_ = nc.world_frame;
-  publish_cloud_ = nc.publish_cloud;
+  // node.publish_cloud of the config, or the parameter (a viewer on a replayed bag: orin_foxglove.sh)
+  publish_cloud_ = declare_parameter<bool>("publish_cloud", nc.publish_cloud);
 
 #ifndef LIDAR3D_WITH_CUDA
   (void)gpu_;

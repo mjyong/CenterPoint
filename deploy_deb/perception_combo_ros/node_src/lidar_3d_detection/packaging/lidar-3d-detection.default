@@ -5,3 +5,5 @@ LIDAR3D_THREADS=4
 #LIDAR3D_CONFIG=@PREFIX@/lidar_3d_detection/config/lidar_3d_detection.yaml
 #LIDAR3D_MODEL_DIR=@PREFIX@/lidar_3d_detection/model
 #LIDAR3D_LOG_DIR=/tmp/lidar_3d_detection_logs
+# a viewer (Foxglove, RViz) on this node: TF and the detector's input cloud; not with the vehicle's own TF tree
+#LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true

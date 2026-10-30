@@ -449,7 +449,7 @@ ros2 launch dogperc_ros dogperc.launch.py config:=$HOME/dogperc/kygi.yaml model_
    - 文本文件里的编译路径（colcon、ament 的 setup 脚本，CMake 配置）改成最终路径；
    - 删掉 `__pycache__`；
    - 二进制里还有编译路径就用 patchelf 改 RPATH，改不了就停；
-3. 加上 `/lib/systemd/system/lidar-3d-detection.service`（默认不启用，`--enable-service` 装上就启用）和 `/etc/default/lidar-3d-detection`；
+3. 加上 `/lib/systemd/system/lidar-3d-detection.service`（装上就启用并启动，77a8738 起是默认；`--no-enable-service` 只装不启用）和 `/etc/default/lidar-3d-detection`；
 4. Depends：节点和各个库加载的每个动态库，查出由哪个系统包提供，写成 `>=` 板上的版本。两个例外：
    - `libnvinfer10` 写成 `=`，因为引擎只能在建它的 TensorRT 上加载；
    - dlopen 加载的 RMW 单独加进去；
@@ -478,11 +478,10 @@ colcon 那一步和真机运行要在板上做（T31）。
 - **读文件**：`sync_deploy_deb.py`、`soak_report.py`、`cut_bag.py` 读文件都指定 UTF-8（T31 碰到 C locale 读中文注释崩溃）。
 
 **Foxglove 实时看**：板上循环播 bag，连着板子的本机（192.168.123.55，直连板子的 192.168.123.100）用 Foxglove 看检测结果。步骤见 [README](../deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/README.md) 的"用 Foxglove 看"：
-- 板上 `scripts/orin_foxglove.sh <bag>`：节点开 `publish_tf`，加 foxglove_bridge（端口 8765），循环播放；
+- 板上 `scripts/orin_foxglove.sh <bag>`：先停掉在跑的服务；节点开 `publish_tf`、`publish_cloud`；加 foxglove_bridge（端口 8765）；循环播放；结束时把服务起回来；
 - 本机 Foxglove 连 `ws://192.168.123.100:8765`，导入布局 `foxglove/lidar_3d_detection.json`：
-  - 3D：原始点云、框、ID、预测路径；
+  - 3D：显示系 `camera_init`，检测器的输入点云、框、ID、预测路径（原始点云可以勾上）；
   - Raw Messages：`LidarObjectArray`；
-  - 目标数曲线和日志；
 - `tools/deploy/foxglove_probe.py` 在板上不开 GUI 也能查 bridge 发了哪些话题、各收到多少条；`objects_bag.py` 录到 `/tf` 时，会核对 TF 和消息里的 `world_pose`。
 
 ## 10. 文件一览

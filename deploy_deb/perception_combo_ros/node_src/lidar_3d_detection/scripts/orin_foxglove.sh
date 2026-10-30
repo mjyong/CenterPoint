@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Live view of the board in Foxglove (README.md): the installed node (with TF for the viewer) on a bag played in a
-# loop, and foxglove_bridge (WebSocket). On the PC wired to the board: Foxglove -> Open connection -> Foxglove
+# Live view of the board in Foxglove (README.md): the installed node (with TF and the detector's input cloud for
+# the viewer) on a bag played in a loop, and foxglove_bridge (WebSocket). A running lidar-3d-detection.service is
+# stopped for the view (sudo -n) and started again at the end. On the PC wired to the board: Foxglove -> Open connection -> Foxglove
 # WebSocket -> ws://192.168.123.100:8765, then Layout -> Import foxglove/lidar_3d_detection.json.
 #
 #   orin_foxglove.sh BAG [RATE]          run on the board (ssh from the PC); Ctrl-C stops everything
@@ -30,8 +31,17 @@ if ! ros2 pkg prefix foxglove_bridge > /dev/null 2>&1; then
   echo "foxglove_bridge is not installed: sudo apt install ros-humble-foxglove-bridge" >&2
   exit 1
 fi
+# the .deb enables the service: it runs the same node (on the robot's ROS_DOMAIN_ID)
+service=0
+if systemctl is-active --quiet lidar-3d-detection 2> /dev/null; then
+  if ! sudo -n systemctl stop lidar-3d-detection; then
+    echo "lidar-3d-detection.service is running: sudo systemctl stop lidar-3d-detection, then run this again" >&2
+    exit 1
+  fi
+  service=1
+fi
 if pgrep -f "$NODE_RE" > /dev/null; then
-  echo "lidar_3d_detection is already running (the service? sudo systemctl stop lidar-3d-detection)" >&2
+  echo "lidar_3d_detection is already running (another orin_foxglove.sh, orin_soak.sh or a manual start)" >&2
   exit 1
 fi
 mkdir -p "$LOG"
@@ -41,11 +51,13 @@ cleanup() {
   for p in "ros2 bag play" "$NODE_RE" "lib/foxglove_bridge/foxglove_bridge"; do pkill -INT -f "$p"; done
   sleep 2
   for p in "ros2 bag play" "$NODE_RE" "lib/foxglove_bridge/foxglove_bridge"; do pkill -TERM -f "$p"; done
+  if [ $service = 1 ]; then sudo -n systemctl start lidar-3d-detection && echo "lidar-3d-detection.service started again"; fi
   echo "stopped (logs in $LOG)"
 }
 trap cleanup EXIT INT TERM
 
-"$PKG/bin/start_lidar_3d_detection.sh" -p publish_tf:=true > "$LOG/node.log" 2>&1 &
+# the layout shows the detector's input cloud (/perception/lidar_3d/cloud, 5 sweeps, a few MB a frame)
+"$PKG/bin/start_lidar_3d_detection.sh" -p publish_tf:=true -p publish_cloud:=true > "$LOG/node.log" 2>&1 &
 for _ in $(seq 120); do
   grep -q "lidar_3d_detection up" "$LOG/node.log" && break
   sleep 1

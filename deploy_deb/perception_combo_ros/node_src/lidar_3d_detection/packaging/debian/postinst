@@ -1,13 +1,28 @@
 #!/bin/sh
 set -e
-if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
-  systemctl daemon-reload || true
-  if [ "@ENABLE@" = yes ]; then
+if [ "$1" = configure ]; then
+  # enabling only makes the boot symlink, so it also works in an image build where systemd is not running
+  if [ "@ENABLE@" = yes ] && command -v systemctl > /dev/null; then
     systemctl enable lidar-3d-detection.service || true
-    systemctl restart lidar-3d-detection.service || true
+  fi
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+    # prerm stopped it for the upgrade: start it again whenever it is enabled (by this package or by hand)
+    if systemctl is-enabled --quiet lidar-3d-detection.service 2> /dev/null; then
+      systemctl restart lidar-3d-detection.service || true
+    fi
   fi
 fi
 echo "lidar-3d-detection: installed in @PREFIX@"
-echo "  run by hand:  @PREFIX@/lidar_3d_detection/bin/start_lidar_3d_detection.sh"
-echo "  as a service: sudo systemctl start lidar-3d-detection (enable: at boot); settings /etc/default/lidar-3d-detection"
+if systemctl is-enabled --quiet lidar-3d-detection.service 2> /dev/null; then
+  if [ -d /run/systemd/system ]; then
+    echo "  the service is enabled (at boot) and started: systemctl status lidar-3d-detection"
+  else
+    echo "  the service is enabled: it starts at the next boot"
+  fi
+else
+  echo "  as a service: sudo systemctl enable --now lidar-3d-detection"
+fi
+echo "  by hand:      @PREFIX@/lidar_3d_detection/bin/start_lidar_3d_detection.sh (stop the service first)"
+echo "  settings:     /etc/default/lidar-3d-detection"
 exit 0

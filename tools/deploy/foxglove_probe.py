@@ -3,7 +3,7 @@ foxglove.websocket.v1), lists the advertised channels, subscribes to some topics
 their messages. Standard library only, so it runs on the board (deploy_deb's scripts/orin_foxglove.sh).
 
     python3 tools/deploy/foxglove_probe.py --url ws://localhost:8765 --seconds 5 \\
-        --topics /perception/lidar_3d/tracks /perception/lidar_3d/predictions /tf
+        --topics /perception/lidar_3d/tracks /perception/lidar_3d/predictions /perception/lidar_3d/cloud /tf
 
 Exit 1 when a topic is not advertised or sent nothing.
 """
@@ -123,7 +123,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="ws://localhost:8765")
     ap.add_argument("--topics", nargs="*", default=["/perception/lidar_3d/tracks", "/perception/lidar_3d/predictions",
-                                                    "/tf"])
+                                                    "/perception/lidar_3d/cloud", "/tf"],
+                    help="default: what deploy_deb's Foxglove layout shows")
     ap.add_argument("--seconds", type=float, default=5.0)
     args = ap.parse_args()
     report = probe(args.url, args.topics, args.seconds)
