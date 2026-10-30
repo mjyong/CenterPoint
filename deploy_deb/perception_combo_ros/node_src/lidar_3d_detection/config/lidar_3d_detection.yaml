@@ -1,0 +1,155 @@
+version: 1
+source:
+  robot: "kygi"
+preprocess:
+  T_body_lidar: [-1.0, -1.2246467991473532e-16, 0.0, 0.0, 1.2246467991473532e-16, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+  num_sweeps: 5
+  max_time_span: 0.55
+  deskew: true
+  time_resolution: 0.0001
+  dedup_returns: true
+  intensity_scale: 1.0
+  self_filter:
+    body_boxes: [[-0.6, 0.6, -0.4, 0.4, -0.8, 0.3]]
+    min_range: 0.4
+    max_range: 120.0
+    outlier_radius: 0.2
+    outlier_min_neighbors: 2
+    outlier_max_range: 3.0
+  det_frame:
+    base_height: 0.72
+    auto_ground: true
+    auto_level: true
+    ground_ring: [1.5, 8.0]
+    ground_band: 0.35
+    ground_min_points: 200
+    ground_alpha: 0.2
+    ground_max_correction: 0.3
+    ground_max_tilt: 0.08726646259971647
+pose_buffer:
+  max_age: 3.0
+  max_extrapolation: 0.05
+  extrapolation_window: 0.02
+imu:
+  gyro_bias: [0.0, 0.0, 0.0]
+  imu_history: 1.0
+detection_filter:
+  enabled: true
+  min_points:
+    vehicle: 5.0
+    pedestrian: 3.0
+    cyclist: 3.0
+  box_margin: 0.1
+  max_float: 0.7
+  max_sink: 1.2
+  local_ground: true
+  ground_cell: 2.0
+  ground_ring: 4.0
+  ground_percentile: 10.0
+  ground_min_cells: 5
+  cross_class_nms: true
+  cross_class_margin: 0.2
+score_thresholds:
+  vehicle: 0.4
+  pedestrian: 0.3
+  cyclist: 0.4
+tracker:
+  class_params:
+    vehicle:
+      gate: 3.0
+      max_age: 1.5
+      min_hits: 3
+      pos_std: 0.3
+      vel_std: 0.8
+      models: [["cv", 1.5, 0.001], ["ct", 1.5, 0.25]]
+      stay_prob: 0.95
+      init_omega_std: 0.3
+    pedestrian:
+      gate: 1.5
+      max_age: 1.5
+      min_hits: 2
+      pos_std: 0.15
+      vel_std: 0.5
+      models: [["cv", 0.4, 0.001], ["cv", 2.0, 0.001]]
+      stay_prob: 0.95
+      init_omega_std: 0.3
+    cyclist:
+      gate: 2.5
+      max_age: 1.0
+      min_hits: 2
+      pos_std: 0.2
+      vel_std: 0.6
+      models: [["cv", 1.5, 0.001], ["ct", 1.5, 0.4]]
+      stay_prob: 0.95
+      init_omega_std: 0.3
+  classes: ["vehicle"]
+  high_score:
+    vehicle: 0.4
+    pedestrian: 0.3
+    cyclist: 0.4
+  low_score: 0.2
+  matching: "greedy"
+  use_velocity: true
+  tentative_max_age: 0.15
+  output_coasting: true
+  output_min_score:
+    vehicle: 0.35
+    pedestrian: 0.25
+    cyclist: 0.3
+  history: 3.0
+  size_alpha: 0.2
+  z_alpha: 0.3
+  yaw_alpha: 0.4
+  heading_from_velocity: 1.0
+  motion_on_speed:
+    vehicle: 0.7
+    pedestrian: 0.5
+    cyclist: 0.7
+  motion_off_speed:
+    vehicle: 0.3
+    pedestrian: 0.2
+    cyclist: 0.3
+  motion_window: 5
+  motion_traj_window: 1.0
+  motion_on_frames: 3
+  motion_off_time: 1.0
+  stop_memory: 10.0
+predictor:
+  enabled: true
+  horizon: 3.0
+  step: 0.5
+  merge_dist: 0.25
+node:
+  detector: "pillar"
+  config: ""
+  checkpoint: ""
+  device: ""
+  predictor_model: ""
+  lidar_topic: "/robot/topic/rdap/top_point_cloud2"
+  time_field: "timestamp"
+  time_mode: "absolute"
+  noise_tag_mask: 0
+  self_filter_boxes: [-0.6, 0.6, -0.4, 0.4, -0.8, 0.3]
+  self_filter_min_range: 0.4
+  lidar_time_offset: 0.0
+  imu_topic: "/rte/rdap/rtk/imus/data_raw"
+  imu_convention: "kygi"
+  localization: "inspvax"
+  odom_topic: "/Odometry"
+  odom_twist: "none"
+  inspvax_topic: "/rte/rdap/rtk/inspvax"
+  ins_lever_arm: [-0.06, -0.54, 0.0]
+  ins_azimuth_offset_deg: 180.0
+  extrinsic_t: [0.0, 0.0, 0.0]
+  extrinsic_rpy: [0.0, 0.0, 3.141592653589793]
+  base_height: 0.72
+  auto_ground: true
+  auto_level: true
+  num_sweeps: 5
+  world_frame: "camera_init"
+  publish_cloud: false
+  model_dir: "model"
+  objects_topic: "/perception/lidar_3d/objects"
+  tracks_topic: "/perception/lidar_3d/tracks"
+  predictions_topic: "/perception/lidar_3d/predictions"
+  cloud_topic: "/perception/lidar_3d/cloud"

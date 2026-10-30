@@ -1,0 +1,8 @@
+
+---
+# Result
+string message               # 结果描述
+
+---
+# Feedback
+uint32 state                  # 详见 nav2_interface/msg/NavState.msg

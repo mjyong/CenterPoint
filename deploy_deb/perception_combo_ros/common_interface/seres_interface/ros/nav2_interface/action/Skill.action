@@ -1,0 +1,15 @@
+# Goal
+
+uint8 SKILL_ID_ROTATE = 1    #原地旋转, parm转角度[-pi,+pi]
+uint8 SKILL_ID_MOVE_DIS = 2  #移动距离, parm:角度[-pi,+pi],距离(m)
+
+uint8 skill_id
+float32[] para               #根据技能解析参数含义
+
+---
+# Result
+string message               # 结果描述
+
+---
+# Feedback
+uint32 state                  # 详见 nav2_interface/msg/NavState.msg

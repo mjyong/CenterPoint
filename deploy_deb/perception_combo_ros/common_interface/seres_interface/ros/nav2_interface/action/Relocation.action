@@ -1,0 +1,11 @@
+# Goal
+geometry_msgs/Pose pose   # 初始位姿， 用户下发或下电前位姿（不一定准确）
+string map_uuid           # 地图ID
+
+---
+#Result
+string message            # 结果描述
+
+---
+#Feedback 中间状态反馈
+uint32 state               # 详见 nav2_interface/msg/NavState.msg

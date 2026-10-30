@@ -1,0 +1,10 @@
+# Request
+
+---
+# Response
+uint32 state             # 详见 nav2_interface/msg/NavState.msg
+string message          # 结果描述
+
+string map_uuid
+geometry_msgs/Point[] points
+

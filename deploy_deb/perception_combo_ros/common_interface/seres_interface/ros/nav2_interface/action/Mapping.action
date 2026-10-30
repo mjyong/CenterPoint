@@ -1,0 +1,13 @@
+# Goal
+string map_name            # 新建地图名称
+string map_uuid            # null:新建；非null,重建已有地图。map_uuid由建图服务端生成
+---
+# Result
+string message            # 结果描述
+string map_path           # 建图完成后，返回地图存放路径
+---
+# Feedback
+uint32 state               # 详见 nav2_interface/msg/NavState.msg
+string map_uuid
+geometry_msgs/Pose origin # 地图原点
+uint8[] map               # 实时2D地图，png图，以左上角为坐标原点，变更发送

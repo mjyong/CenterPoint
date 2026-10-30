@@ -1,0 +1,14 @@
+# C++ development image of the server (docs/DEPLOY_ORIN.md section 3): TensorRT 10.3.0 and CUDA 12.6 like the
+# Orin, plus what deploy/cpp builds and tests with. The repository is mounted, not copied:
+#   docker build -t lidar3d-dev -f node_src/lidar_3d_detection/docker/Dockerfile.dev node_src/lidar_3d_detection/docker
+#   docker run --rm --gpus '"device=5"' -u $(id -u):$(id -g) -v $PWD:/repo -w /repo lidar3d-dev \
+#       bash -c "cmake -S node_src/lidar_3d_detection -B /tmp/lidar3d-build -G Ninja -DLIDAR3D_WITH_CUDA=ON && \
+#                cmake --build /tmp/lidar3d-build -j"
+FROM nvcr.io/nvidia/tensorrt:24.08-py3
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cmake ninja-build libeigen3-dev libyaml-cpp-dev libgtest-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+# the golden data of the parity tests (tools/deploy/dump_golden.py): NumPy 1.x like the project environment;
+# rosbags for its online part (the sample bag through the node's message handling)
+RUN python3 -m pip install --no-cache-dir "numpy==1.26.4" "scipy>=1.8" "rosbags>=0.9"
+ENV HOME=/tmp

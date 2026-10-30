@@ -1,0 +1,16 @@
+# Goal
+uint8 TASK_POINT_TO_STAKE = 0     # 点位回桩，桩前配置点位
+uint8 TASK_POINT_BACK_STAKE = 1   # 点位退桩，退到指定点位
+uint8 TASK_EXPLORE_TO_STAKE = 2   # 从当前点位探索回桩
+uint8 TASK_EXPLORE_BACK_STAKE = 3 # 自动探索退桩
+
+uint8 task_id
+geometry_msgs/Pose pose           # 退桩目标点，TASK_POINT_BACK_STAKE 有效
+
+---
+# Result
+string message          # 结果描述
+
+---
+# Feedback
+uint32 state             # 详见 nav2_interface/msg/NavState.msg
