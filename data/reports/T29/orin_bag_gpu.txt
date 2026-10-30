@@ -1,0 +1,8 @@
+[TensorRT] Using an engine plan file across different models of devices is not recommended and is likely to affect performance or even cause errors.
+[TensorRT] Using an engine plan file across different models of devices is not recommended and is likely to affect performance or even cause errors.
+[INFO] [0000003401.287943473] [rosbag2_storage]: Opened database 'bags/rosbag2_2026_09_21-16_41_27_moving/rosbag2_2026_09_21-16_41_27_moving.db3' for READ_ONLY.
+info: ENU origin 29.73325161 106.78497842 217.10
+647 messages, 27 clouds, 27 frames, 110 tracks, 0.8 s -> data/bag_gpu.npz
+| frames ref / cpp / common | pose max | det match w/o flips | missed (near/filter/score/class/none) | extra | track IDs same | track max diff | motion agree | pred max diff | gates |
+|---|---|---|---|---|---|---|---|---|---|
+| 27 / 27 / 27 | 8.9e-16 | 1.0000 | 2 (2/0/0/0/0) | 0 | 27 / 27 | 8.1e-02 | 1.0000 | 3.1e-01 | pass |

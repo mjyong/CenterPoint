@@ -1,0 +1,128 @@
+Starting >>> dog_perception_msgs
+Starting >>> kygi665_msgs
+Finished <<< dog_perception_msgs [13.7s]
+--- stderr: dog_perception_msgs
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_CUDA_COMPILER
+
+
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244177 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244177 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244177 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244176 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244176 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244176 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244176 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244175 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244175 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244175 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244175 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244175 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244175 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244173 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244173 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244173 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/home/seres/dogperc/repo/deploy/ros2/dog_perception_msgs/msg/PredictedPath.msg' has modification time 1793253001 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/geometry_msgs/msg/WrenchStamped.idl' has modification time 1784244171 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/usr/lib/aarch64-linux-gnu/libpython3.10.so' has modification time 1782151366 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/usr/lib/aarch64-linux-gnu/libpython3.10.so' has modification time 1782151366 s in the future
+gmake[2]: Warning: File '/usr/lib/aarch64-linux-gnu/libpython3.10.so' has modification time 1782151366 s in the future
+gmake[2]: Warning: File '/usr/lib/aarch64-linux-gnu/libpython3.10.so' has modification time 1782151366 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+---
+Finished <<< kygi665_msgs [14.1s]
+Starting >>> dogperc_ros
+--- stderr: kygi665_msgs
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_CUDA_COMPILER
+
+
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225929 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225929 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225929 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225928 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225928 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225928 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225928 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225927 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225927 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225927 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225927 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225927 s in the future
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225927 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225925 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225925 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225925 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/home/seres/dogperc/repo/kygi665_msgs/msg/Kygi665Header.msg' has modification time 1790747026 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/opt/ros/humble/share/builtin_interfaces/msg/Time.idl' has modification time 1784225923 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/usr/lib/aarch64-linux-gnu/libpython3.10.so' has modification time 1782151366 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/usr/lib/aarch64-linux-gnu/libpython3.10.so' has modification time 1782151365 s in the future
+gmake[2]: Warning: File '/usr/lib/aarch64-linux-gnu/libpython3.10.so' has modification time 1782151365 s in the future
+gmake[2]: Warning: File '/usr/lib/aarch64-linux-gnu/libpython3.10.so' has modification time 1782151365 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+---
+[Processing: dogperc_ros]
+[Processing: dogperc_ros]
+[Processing: dogperc_ros]
+Finished <<< dogperc_ros [1min 33s]
+--- stderr: dogperc_ros
+gmake[2]: Warning: File '/home/seres/dogperc/repo/deploy/cpp/src/common.cpp' has modification time 1793238325 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/home/seres/dogperc/repo/deploy/ros2/dogperc_ros/src/ros_convert.cpp' has modification time 1793252950 s in the future
+gmake[2]: Warning: File '/home/seres/dogperc/repo/deploy/cpp/tools/dogperc_replay.cpp' has modification time 1793252950 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: Warning: File '/home/seres/dogperc/repo/deploy/ros2/dogperc_ros/src/node.cpp' has modification time 1793252945 s in the future
+gmake[2]: Warning: File '/home/seres/dogperc/repo/deploy/ros2/dogperc_ros/src/bag_replay.cpp' has modification time 1793252945 s in the future
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+---
+
+Summary: 3 packages finished [1min 48s]
+  3 packages had stderr output: dog_perception_msgs dogperc_ros kygi665_msgs

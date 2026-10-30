@@ -1,0 +1,2 @@
+647 messages (310 imu, 0 odom, 310 inspvax, 27 cloud) -> data/deploy/T29/rosbag2_2026_09_21-16_41_27_moving/msgs.npz
+python: 27 frames, 110 tracks -> data/deploy/T29/rosbag2_2026_09_21-16_41_27_moving/py.npz

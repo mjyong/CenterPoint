@@ -1,0 +1,16 @@
+[INFO] [launch]: All log files can be found below /home/seres/.ros/log/1970-01-01-09-02-05-356465-ubuntu-7758
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [dogperc_node-1]: process started with pid [7762]
+[dogperc_node-1] [TensorRT] Using an engine plan file across different models of devices is not recommended and is likely to affect performance or even cause errors.
+[dogperc_node-1] [TensorRT] Using an engine plan file across different models of devices is not recommended and is likely to affect performance or even cause errors.
+[dogperc_node-1] [INFO] [0000003725.615966676] [dog_perception]: dog perception up: data/kygi.yaml, model models/nusc_pp_dyn (fp16, GPU pre-processing), lidar /robot/topic/rdap/top_point_cloud2, localization inspvax
+[dogperc_node-1] [INFO] [0000003746.536183932] [dog_perception]: ENU origin 29.73325161 106.78497842 217.10
+[dogperc_node-1] [INFO] [0000003746.774712358] [dog_perception]: 39 dets, 0 tracks | preprocess_ms 7.0 det_gpu_ms 22.3 det_post_ms 1.4 track_ms 0.0 predict_ms 0.0 total_ms 31.0
+[dogperc_node-1] [INFO] [0000003747.811338881] [dog_perception]: 65 dets, 4 tracks | preprocess_ms 6.4 det_gpu_ms 11.3 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 19.6
+[dogperc_node-1] [INFO] [0000003760.949878576] [dog_perception]: 40 dets, 3 tracks | preprocess_ms 6.3 det_gpu_ms 8.2 det_post_ms 1.3 track_ms 0.1 predict_ms 0.0 total_ms 16.0
+[dogperc_node-1] [INFO] [0000003762.152001355] [dog_perception]: 43 dets, 5 tracks | preprocess_ms 6.2 det_gpu_ms 10.5 det_post_ms 1.6 track_ms 0.1 predict_ms 0.0 total_ms 18.6
+[dogperc_node-1] [INFO] [0000003763.349050504] [dog_perception]: 32 dets, 5 tracks | preprocess_ms 6.2 det_gpu_ms 10.4 det_post_ms 1.6 track_ms 0.2 predict_ms 0.0 total_ms 18.4
+[dogperc_node-1] [INFO] [0000003764.351444020] [dog_perception]: 58 dets, 6 tracks | preprocess_ms 6.3 det_gpu_ms 10.6 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 18.9
+[dogperc_node-1] [INFO] [0000003765.353204272] [dog_perception]: 61 dets, 4 tracks | preprocess_ms 6.6 det_gpu_ms 11.2 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 19.8
+[dogperc_node-1] [INFO] [0000003773.331815969] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[INFO] [dogperc_node-1]: process has finished cleanly [pid 7762]

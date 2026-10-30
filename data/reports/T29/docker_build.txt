@@ -1,0 +1,20 @@
+#6 289.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 125.8 MB/s eta 0:00:00
+#6 289.2 Downloading ruamel_yaml-0.19.1-py3-none-any.whl (118 kB)
+#6 289.4 Installing collected packages: ruamel.yaml, numpy, lz4, backports.zstd, apsw, scipy, rosbags
+#6 290.3   Attempting uninstall: numpy
+#6 290.3     Found existing installation: numpy 1.23.5
+#6 291.3     Uninstalling numpy-1.23.5:
+#6 291.9       Successfully uninstalled numpy-1.23.5
+#6 329.1 Successfully installed apsw-3.54.0.0 backports.zstd-1.8.0 lz4-4.4.5 numpy-1.26.4 rosbags-0.11.9 ruamel.yaml-0.19.1 scipy-1.15.3
+#6 329.1 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable.It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#6 329.7 
+#6 329.7 [notice] A new release of pip is available: 24.2 -> 26.2.2
+#6 329.7 [notice] To update, run: python3 -m pip install --upgrade pip
+#6 DONE 330.1s
+
+#7 exporting to image
+#7 exporting layers
+#7 exporting layers 34.7s done
+#7 writing image sha256:e4426b283b5128cceaf9647085ccd06ffbccd7cbb20fe9a568f6710be9807239 0.0s done
+#7 naming to docker.io/library/dogperc-dev 0.0s done
+#7 DONE 35.0s

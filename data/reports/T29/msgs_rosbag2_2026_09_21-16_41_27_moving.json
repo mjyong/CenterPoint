@@ -1,0 +1,87 @@
+{
+ "frames_ref": 27,
+ "frames_cpp": 27,
+ "frames_common": 27,
+ "pose_max": 8.881784197001252e-16,
+ "detections": {
+  "n_ref": 1263,
+  "n_got": 1263,
+  "matched": 1263,
+  "score_max": 1.1920928955078125e-07,
+  "score_p99": 5.960464477539063e-08,
+  "center_max": 0.0,
+  "center_p99": 0.0,
+  "yaw_p99": 2.384185791015625e-07,
+  "size_p99": 4.76837158203125e-07,
+  "reported_ref": 260,
+  "reported_missed": 0,
+  "reported_extra": 0,
+  "missed_by": {
+   "near": 0,
+   "filter": 0,
+   "score": 0,
+   "class": 0,
+   "none": 0
+  },
+  "extra_by": {
+   "near": 0,
+   "filter": 0,
+   "score": 0,
+   "class": 0,
+   "none": 0
+  },
+  "reported_match": 1.0,
+  "reported_match_tol": 1.0
+ },
+ "raw_detections": {
+  "n_ref": 2513,
+  "n_got": 2513,
+  "matched": 2513,
+  "score_max": 1.1920928955078125e-07,
+  "score_p99": 5.960464477539063e-08,
+  "center_max": 0.0,
+  "center_p99": 0.0,
+  "yaw_p99": 2.384185791015625e-07,
+  "size_p99": 4.76837158203125e-07,
+  "reported_ref": 292,
+  "reported_missed": 0,
+  "reported_extra": 0,
+  "missed_by": {
+   "near": 0,
+   "filter": 0,
+   "score": 0,
+   "class": 0,
+   "none": 0
+  },
+  "extra_by": {
+   "near": 0,
+   "filter": 0,
+   "score": 0,
+   "class": 0,
+   "none": 0
+  },
+  "reported_match": 1.0,
+  "reported_match_tol": 1.0
+ },
+ "track_ids_identical_frames": 27,
+ "track_pairs": 110,
+ "track_max_diff": {
+  "trk_position": 3.241851231905457e-14,
+  "trk_velocity": 1.3600232051658168e-14,
+  "trk_size": 3.8146972691777137e-07,
+  "trk_score": 3.572881546176632e-08,
+  "trk_covariance": 3.608224830031759e-15,
+  "trk_age": 0.0,
+  "trk_yaw": 1.4376747836664094e-07
+ },
+ "motion_agreement": 1.0,
+ "prediction_max_diff": 2.7000623958883807e-13,
+ "gates": {
+  "frames": true,
+  "reported_match_tol": true,
+  "score_p99": true,
+  "center_p99": true,
+  "raw_match_tol": true,
+  "passed": true
+ }
+}

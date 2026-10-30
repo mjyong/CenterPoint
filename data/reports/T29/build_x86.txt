@@ -1,0 +1,15 @@
+build_begin
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda
+[1/10] Building CXX object CMakeFiles/dogperc.dir/src/message_log.cpp.o
+[2/10] Building CXX object CMakeFiles/dogperc_replay.dir/tools/dogperc_replay.cpp.o
+[3/10] Building CXX object CMakeFiles/dogperc.dir/src/replay_writer.cpp.o
+[4/10] Building CXX object CMakeFiles/dogperc.dir/src/pipeline.cpp.o
+[5/10] Building CXX object CMakeFiles/dogperc.dir/src/online.cpp.o
+[6/10] Linking CXX static library libdogperc.a
+[7/10] Linking CXX executable dogperc_replay
+[8/10] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_pipeline.cpp.o
+[9/10] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_online.cpp.o
+[10/10] Linking CXX executable dogperc_tests
+build_ok

@@ -1,0 +1,60 @@
+node_up_at_2
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [0000003756.928697035] [rosbag2_storage]: Opened database 'bags/rosbag2_2026_09_21-16_41_27_moving/rosbag2_2026_09_21-16_41_27_moving.db3' for READ_ONLY.
+[INFO] [0000003756.928769929] [rosbag2_player]: Set rate to 0.5
+[INFO] [0000003756.936383781] [rosbag2_player]: Adding keyboard callbacks.
+[INFO] [0000003756.936438532] [rosbag2_player]: Press SPACE for Pause/Resume
+[INFO] [0000003756.936453891] [rosbag2_player]: Press CURSOR_RIGHT for Play Next Message
+[INFO] [0000003756.936464387] [rosbag2_player]: Press CURSOR_UP for Increase Rate 10%
+[INFO] [0000003756.936473155] [rosbag2_player]: Press CURSOR_DOWN for Decrease Rate 10%
+[INFO] [0000003756.936588032] [rosbag2_player]: Sleep 3000000000 ns
+[INFO] [0000003759.937237547] [rosbag2_storage]: Opened database 'bags/rosbag2_2026_09_21-16_41_27_moving/rosbag2_2026_09_21-16_41_27_moving.db3' for READ_ONLY.
+
+Files:             live_0.db3
+Bag size:          137.0 KiB
+Storage id:        sqlite3
+Duration:          5.198834773s
+Start:             Jan  1 1970 09:02:40.949968397 (3760.949968397)
+End:               Jan  1 1970 09:02:46.148803170 (3766.148803170)
+Messages:          27
+Topic information: Topic: /dog_perception/objects | Type: dog_perception_msgs/msg/ObjectArray | Count: 27 | Serialization Format: cdr
+
+{
+ "messages": 27,
+ "objects": 120,
+ "paths": 150,
+ "frame_ids": [
+  "dog_det"
+ ],
+ "example": {
+  "id": 1,
+  "label": "vehicle",
+  "motion": 0,
+  "score": 0.6570444107055664,
+  "position": [
+   -40.189598627495364,
+   22.435169062969813,
+   2.059756942359909
+  ],
+  "yaw": 3.1533639931898896,
+  "size": [
+   5.549962501181278,
+   2.0423461162087375,
+   2.3849744958117745
+  ],
+  "prediction_times": [
+   0.5,
+   1.0,
+   1.5,
+   2.0,
+   2.5,
+   3.0
+  ],
+  "paths": 2
+ },
+ "replay_frames": 27,
+ "matched_frames": 27,
+ "unmatched_messages": 0,
+ "missing_frames": 0,
+ "same_ids_frames": 0,
+ "passed": true
+}

@@ -121,7 +121,7 @@
 | T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟；动态柱数的 PFN | Agent | T26 | 2.5 小时 | 完成，已复核。上线用 FP16 加动态 PFN（`nusc_pp_dyn`）。FP16 剩下的漏报多是过滤器的阈值翻转（过滤前 10 个场景都 ≥ 0.991），比较工具加了 filter 一类、heads rel 不再卡门槛。INT8 差得不正常（有个 head 余弦为负），多半是稀疏 BEV 上 entropy 校准截断太狠，现在不追。两个 INT8 的 AP@2 掉 0.124 / 0.099，不上（人定，2026-10-29）。板上 RPN：FP16 5.05 ms，INT8 2.65 ms。PFN：动态 10000 柱 1.50 ms，静态 3.52 ms |
 | T28 | Orin 部署 P4 / P5：C++ 核心库在服务器容器里编译、跑对齐测试（含 GPU、TensorRT）；10 个验证场景上 Python 和 C++ 比（同一批检测、各自检测）并打分；板上原生编译、测试、测延迟 | Agent（锁频掉了才要人） | T27 | 3 小时 | 完成，已复核。复核在样例 bag 的真实扫描上拆开计时：慢的是去重（逐点 unordered_map），不是去畸变；预处理和后处理已提速，输出逐位不变，T28B 复测。C++ 可以替代 Python：10 个场景同一批检测 ID 全同，各自检测匹配率都是 1。标签上 AP@2 / AP@4 都是 0.832 / 0.852。板上锁频还在。端到端中位数 27.7 ms（p99 30.2 ms），网络以外 21.8 ms，比 15 ms 多 6.8 ms，多在去畸变。INT8 最差的 head 是 height（余弦 −0.85） |
 | T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 完成，已复核。输出和 T28 逐位相同，1 线程和 4 线程也相同。板上网络以外：1 线程 12.9 ms，4 线程 11.4 ms，都低于 15 ms。用 4 个线程。服务器上 4 线程更慢，体素化 p99 尖峰从 215 ms 降到 19 ms（1 线程），还没消失 |
-| T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 待做 |
+| T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成。服务器两段 msgs_dets / msgs 都 pass。板上 colcon 3 个包编过；ROS 读 bag 和读消息日志逐位相同；bag_dets、bag_gpu 都 pass。在线 27 帧不丢（先热身后 0.5× 播放）。节点可以上车做 bag 回放和在线订阅 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5484,4 +5484,48 @@ ROS 2 节点写好了（`deploy/ros2`，DEPLOY_ORIN.md 第 8 节）。节点的�
 
 ### T29 结果
 
-（待填）
+（2026-10-30）GPU 用物理卡 4。拉到 `f177be1`。没有再改代码。
+
+**代码改动（约定 9）：** 没有。
+
+**第 0 步。** `tests/dog/test_ros2_node.py` + `test_deploy.py`：11 passed（含慢测试，没有 skipped）。快速测试：166 passed。
+
+**镜像、ctest、colcon。** 重建 `dogperc-dev`（加了 rosbags 0.11.9，numpy 1.26.4），镜像 `e4426b283b51`。服务器容器 Release、sm_89 重编，没有警告。ctest 2/2 通过，26 个测试。Online.* 五个都跑了：
+
+```text
+Online.CloudLayoutsMatchPython
+Online.CloudErrors
+Online.NodeConfigOfTheKygiPreset
+Online.InspvaxWaitsForAGoodFix
+Online.MessageLogMatchesPythonBagReplay
+online parity: 8 frames from 268 messages, max diff poses 3.61e-16, points 0.00e+00 m
+```
+
+板上：锁频（`sudo -n jetson_clocks`），MAXN，GPU 最低、最高都是 1300500000。colcon 3 个包（`dog_perception_msgs`、`kygi665_msgs`、`dogperc_ros`）1 分 48 秒编完，只有 clock skew 警告（系统时间停在 1970）。`deploy/cpp` 清掉后 sm_87 重编、ctest 通过。板上没有 rosbags / samples，golden 生成时 `Online.MessageLogMatchesPythonBagReplay` 先是 SKIPPED；把服务器 `build_cuda/golden/online*` 拷过去再跑，通过（同样打印 8 frames）。
+
+**第 2 步。** Python 节点 bag 回放对 C++ 消息处理：
+
+| 段 | msgs_dets（同一批检测） | msgs（各自检测） |
+|---|---|---|
+| moving（27 帧） | pass，ID 27/27，状态 3.2e-14，预测 2.7e-13 | pass，匹配 1.0000，状态 3.8e-07，预测 2.7e-13 |
+| 0921 前 600 云（599 帧） | pass，ID 599/599，状态 2.2e-10，预测 5.2e-10 | pass，匹配 1.0000，状态 7.9e-04，预测 4.6e-03 |
+
+**第 3c 步。** 样例 bag 在板上：ROS `dogperc_bag_replay` 对 `dogperc_replay --messages`，非 timing 键差是 `[]`。bag_dets 对 Python：pass（状态 3.2e-14）。bag_gpu 对服务器 cpp.npz：pass（漏 2 个 near，匹配 1.0000）。TensorRT 有一句 "engine plan file across different models of devices"；板上引擎文件大小是 aarch64 那次建的（pfn 69212、rpn 12.8 MB），`engines.json` 里还留着以前 x86 的记录。
+
+板上 bag_gpu 每段延迟（跳过前 3 帧，中位数 / p99，ms）：preprocess 6.27 / 7.22，sweep 3.82 / 4.39，dedup 2.46 / 2.98，self_filter 0.98 / 1.05，deskew 0.33 / 0.37，accumulate 2.44 / 3.13，det_h2d 0.40 / 0.45，det_voxelize 2.43 / 4.00，det_pfn 1.51 / 1.89，det_rpn 4.77 / 4.78，det_d2h 1.07 / 1.10，det_post 1.64 / 1.75，track 0.11 / 0.15，predict 0.04 / 0.05，total 18.86 / 20.96，网络以外 12.15 / 14.17。
+
+**第 3d 步。** `ROS_DOMAIN_ID=77`。第一次 1× 播放缺第 1 帧（26/27，DDS 发现期）。先热身播一遍，再 `--delay 3 --rate 0.5` 正式播：`ros2 bag info` 27 条 `/dog_perception/objects`。`objects_bag.py`：messages 27，matched 27，missing 0，unmatched 0，`passed` true；`same_ids_frames` 0（在线到达顺序和离线回放不同，任务不要求 ID 全同）。
+
+node.log 摘录：
+
+```text
+dog perception up: data/kygi.yaml, model models/nusc_pp_dyn (fp16, GPU pre-processing), lidar /robot/topic/rdap/top_point_cloud2, localization inspvax
+ENU origin 29.73325161 106.78497842 217.10
+41 dets, 0 tracks | preprocess_ms 7.3 det_gpu_ms 22.2 det_post_ms 1.4 track_ms 0.0 predict_ms 0.0 total_ms 31.3
+41 dets, 5 tracks | preprocess_ms 6.1 det_gpu_ms 10.3 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 18.4
+63 dets, 3 tracks | preprocess_ms 6.8 det_gpu_ms 11.4 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 20.1
+```
+
+warn / error：只有上面那句 TensorRT device 提示；没有别的 warn / error。进程 SIGINT 后干净退出。
+
+**结论。** 节点可以上车：离线 `dogperc_bag_replay` 和消息日志逐位相同，对 Python 同一批检测对齐；GPU 回放对服务器过门槛；在线订阅 bag 不丢帧（正式播前要先让 DDS 发现好，或放慢播放）。还缺的：和规划约定话题名 / `ObjectArray` 字段是否够用（这次消息里有 id、label、motion、score、position、yaw、size、prediction_times、paths）；长时间 10 Hz 稳定性和和别的进程抢资源是 T30；上车实时跑之前要人校时（板子时钟仍停在 1970）。做完删了板上的 live、`data/*.npz`、bags、golden；`deploy/ros2/build` 和 `install` 留着。根分区 4.4 GB。

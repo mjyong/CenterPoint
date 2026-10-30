@@ -1,0 +1,136 @@
+ctest_begin
+Internal ctest changing into directory: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda
+UpdateCTestConfiguration  from :/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda/DartConfiguration.tcl
+Test project /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: golden
+
+1: Test command: /usr/bin/python3.10 "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/tools/deploy/dump_golden.py" "--out" "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda/golden"
+1: Working Directory: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint
+1: Environment variables: 
+1:  PYTHONPATH=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint
+1: Test timeout computed to be: 10000000
+1: 268 messages (130 imu, 0 odom, 130 inspvax, 8 cloud) -> /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda/golden/online_msgs.npz
+1: python: 8 frames, 0 tracks -> /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda/golden/online.npz
+1: golden: {"frames": 26, "points": 5085364, "tracks": 210, "predictions": 210}
+1/2 Test #1: golden ...........................   Passed   18.78 sec
+test 2
+    Start 2: parity
+
+2: Test command: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda/dogperc_tests
+2: Working Directory: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/deploy/cpp/build_cuda
+2: Test timeout computed to be: 10000000
+2: [==========] Running 26 tests from 12 test suites.
+2: [----------] Global test environment set-up.
+2: [----------] 2 tests from Npz
+2: [ RUN      ] Npz.RoundTrip
+2: [       OK ] Npz.RoundTrip (3 ms)
+2: [ RUN      ] Npz.CompressedSequenceScan
+2: [       OK ] Npz.CompressedSequenceScan (18 ms)
+2: [----------] 2 tests from Npz (21 ms total)
+2: 
+2: [----------] 1 test from Geometry
+2: [ RUN      ] Geometry.MatchesScipyAndNumpy
+2: [       OK ] Geometry.MatchesScipyAndNumpy (0 ms)
+2: [----------] 1 test from Geometry (0 ms total)
+2: 
+2: [----------] 2 tests from Config
+2: [ RUN      ] Config.CppDefaultsEqualThePythonDataclasses
+2: [       OK ] Config.CppDefaultsEqualThePythonDataclasses (0 ms)
+2: [ RUN      ] Config.MissingKeysAreErrors
+2: [       OK ] Config.MissingKeysAreErrors (0 ms)
+2: [----------] 2 tests from Config (0 ms total)
+2: 
+2: [----------] 1 test from Localization
+2: [ RUN      ] Localization.InspvaxMatchesPython
+2: [       OK ] Localization.InspvaxMatchesPython (0 ms)
+2: [----------] 1 test from Localization (0 ms total)
+2: 
+2: [----------] 2 tests from Association
+2: [ RUN      ] Association.LinearSumAssignmentMatchesScipy
+2: [       OK ] Association.LinearSumAssignmentMatchesScipy (0 ms)
+2: [ RUN      ] Association.GreedyTakesTheCheapestPairsFirst
+2: [       OK ] Association.GreedyTakesTheCheapestPairsFirst (0 ms)
+2: [----------] 2 tests from Association (0 ms total)
+2: 
+2: [----------] 1 test from IMM
+2: [ RUN      ] IMM.PredictUpdateRolloutMatchPython
+2: [       OK ] IMM.PredictUpdateRolloutMatchPython (0 ms)
+2: [----------] 1 test from IMM (0 ms total)
+2: 
+2: [----------] 4 tests from Detection
+2: [ RUN      ] Detection.ModelMetaLoads
+2: [       OK ] Detection.ModelMetaLoads (0 ms)
+2: [ RUN      ] Detection.VoxelsAreIdentical
+2: [       OK ] Detection.VoxelsAreIdentical (656 ms)
+2: [ RUN      ] Detection.DecodePostprocessFiltersMatchPython
+2: [       OK ] Detection.DecodePostprocessFiltersMatchPython (94 ms)
+2: [ RUN      ] Detection.PillarDetectorAroundAReplayedNetwork
+2: [       OK ] Detection.PillarDetectorAroundAReplayedNetwork (510 ms)
+2: [----------] 4 tests from Detection (1261 ms total)
+2: 
+2: [----------] 1 test from PoseBuffer
+2: [ RUN      ] PoseBuffer.InterpolationAndExtrapolationMatchPython
+2: [       OK ] PoseBuffer.InterpolationAndExtrapolationMatchPython (0 ms)
+2: [----------] 1 test from PoseBuffer (0 ms total)
+2: 
+2: [----------] 1 test from Preprocess
+2: [ RUN      ] Preprocess.DedupSelfFilterNeighborsDeskewMatchPython
+2: [       OK ] Preprocess.DedupSelfFilterNeighborsDeskewMatchPython (66 ms)
+2: [----------] 1 test from Preprocess (66 ms total)
+2: 
+2: [----------] 4 tests from Pipeline
+2: [ RUN      ] Pipeline.MatchesPythonOnTheGoldenRecording
+2: pipeline parity: 26 frames, max diff points 0.00e+00 m, tracks 4.69e-14, predictions 2.42e-10, poses 7.77e-16
+2: [       OK ] Pipeline.MatchesPythonOnTheGoldenRecording (1210 ms)
+2: [ RUN      ] Pipeline.PlannerFrameMatchesPython
+2: [       OK ] Pipeline.PlannerFrameMatchesPython (1059 ms)
+2: [ RUN      ] Pipeline.ThreadCountDoesNotChangeTheOutput
+2: [       OK ] Pipeline.ThreadCountDoesNotChangeTheOutput (1846 ms)
+2: [ RUN      ] Pipeline.ReplayToolWritesOneRowPerFrame
+2: [       OK ] Pipeline.ReplayToolWritesOneRowPerFrame (1041 ms)
+2: [----------] 4 tests from Pipeline (5157 ms total)
+2: 
+2: [----------] 5 tests from Online
+2: [ RUN      ] Online.CloudLayoutsMatchPython
+2: [       OK ] Online.CloudLayoutsMatchPython (1 ms)
+2: [ RUN      ] Online.CloudErrors
+2: [       OK ] Online.CloudErrors (0 ms)
+2: [ RUN      ] Online.NodeConfigOfTheKygiPreset
+2: [       OK ] Online.NodeConfigOfTheKygiPreset (2 ms)
+2: [ RUN      ] Online.InspvaxWaitsForAGoodFix
+2: [       OK ] Online.InspvaxWaitsForAGoodFix (0 ms)
+2: [ RUN      ] Online.MessageLogMatchesPythonBagReplay
+2: online parity: 8 frames from 268 messages, max diff poses 3.61e-16, points 0.00e+00 m
+2: [       OK ] Online.MessageLogMatchesPythonBagReplay (477 ms)
+2: [----------] 5 tests from Online (480 ms total)
+2: 
+2: [----------] 2 tests from Gpu
+2: [ RUN      ] Gpu.PillarPreprocessingMatchesTheCpu
+2: [       OK ] Gpu.PillarPreprocessingMatchesTheCpu (549 ms)
+2: [ RUN      ] Gpu.GpuDetectorMatchesTheHostCopyDetector
+2: frame 0: 15 boxes, gpu 2.45 ms (voxelize 0.46, pfn 0.09, rpn 0.83), host-copy network 14.46 ms
+2: frame 5: 10 boxes, gpu 3.14 ms (voxelize 0.89, pfn 0.15, rpn 0.81), host-copy network 13.70 ms
+2: frame 10: 8 boxes, gpu 3.48 ms (voxelize 1.23, pfn 0.15, rpn 0.81), host-copy network 12.89 ms
+2: frame 15: 10 boxes, gpu 2.74 ms (voxelize 0.46, pfn 0.17, rpn 0.81), host-copy network 13.97 ms
+2: frame 20: 9 boxes, gpu 2.64 ms (voxelize 0.35, pfn 0.16, rpn 0.81), host-copy network 14.24 ms
+2: frame 25: 7 boxes, gpu 2.63 ms (voxelize 0.35, pfn 0.17, rpn 0.81), host-copy network 14.42 ms
+2: [       OK ] Gpu.GpuDetectorMatchesTheHostCopyDetector (760 ms)
+2: [----------] 2 tests from Gpu (1309 ms total)
+2: 
+2: [----------] Global test environment tear-down
+2: [==========] 26 tests from 12 test suites ran. (8300 ms total)
+2: [  PASSED  ] 26 tests.
+2/2 Test #2: parity ...........................   Passed    8.42 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Total Test time (real) =  27.20 sec
+ctest_exit=0

@@ -1,0 +1,58 @@
+{
+ "frames_ref": 599,
+ "frames_cpp": 599,
+ "frames_common": 599,
+ "pose_max": 4.043572143785923e-10,
+ "detections": {
+  "n_ref": 34551,
+  "n_got": 34551,
+  "matched": 34551,
+  "score_max": 0.0,
+  "score_p99": 0.0,
+  "center_max": 0.0,
+  "center_p99": 0.0,
+  "yaw_p99": 0.0,
+  "size_p99": 0.0,
+  "reported_ref": 8062,
+  "reported_missed": 0,
+  "reported_extra": 0,
+  "missed_by": {
+   "near": 0,
+   "filter": 0,
+   "score": 0,
+   "class": 0,
+   "none": 0
+  },
+  "extra_by": {
+   "near": 0,
+   "filter": 0,
+   "score": 0,
+   "class": 0,
+   "none": 0
+  },
+  "reported_match": 1.0,
+  "reported_match_tol": 1.0
+ },
+ "raw_detections": null,
+ "track_ids_identical_frames": 599,
+ "track_pairs": 6045,
+ "track_max_diff": {
+  "trk_position": 2.1603852040641414e-10,
+  "trk_velocity": 1.0079914680716229e-10,
+  "trk_size": 0.0,
+  "trk_score": 0.0,
+  "trk_covariance": 1.4959880556553173e-11,
+  "trk_age": 0.0,
+  "trk_yaw": 1.7763568394002505e-15
+ },
+ "motion_agreement": 1.0,
+ "prediction_max_diff": 5.181854945135456e-10,
+ "gates": {
+  "frames": true,
+  "detections_identical": true,
+  "track_ids": true,
+  "track_states": true,
+  "predictions": true,
+  "passed": true
+ }
+}

@@ -1,0 +1,12 @@
+Note: Google Test filter = Online.MessageLogMatchesPythonBagReplay
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Online
+[ RUN      ] Online.MessageLogMatchesPythonBagReplay
+online parity: 8 frames from 268 messages, max diff poses 3.61e-16, points 0.00e+00 m
+[       OK ] Online.MessageLogMatchesPythonBagReplay (469 ms)
+[----------] 1 test from Online (469 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (469 ms total)
+[  PASSED  ] 1 test.

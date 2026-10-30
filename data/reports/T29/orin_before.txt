@@ -1,0 +1,19 @@
+NV Power Mode: MAXN
+0
+cat: '/sys/devices/gpu.0/devfreq/*/min_freq'/sys/devices/gpu.0/devfreq/*/min_freq
+: No such file or directory
+cat: '/sys/devices/gpu.0/devfreq/*/max_freq': No such file or directory
+/sys/devices/gpu.0/devfreq/*/max_freq
+/dev/mmcblk0p1   54G   47G  4.5G  92% /
+total 20
+drwxrwxr-x  5 seres seres 4096 Jan  2  1970 .
+drwxr-x--- 47 seres seres 4096 Jan  1 08:00 ..
+drwxrwxr-x  5 seres seres 4096 Jan  2  1970 data
+drwxrwxr-x  4 seres seres 4096 Jan  2  1970 models
+drwxrwxr-x  8 seres seres 4096 Jan  1  1970 repo
+engines.json
+model_meta.json
+pfn.fp16.engine
+pfn.onnx
+rpn_head.fp16.engine
+rpn_head.onnx
