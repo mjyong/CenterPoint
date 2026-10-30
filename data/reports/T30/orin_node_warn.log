@@ -1,0 +1,56 @@
+[dogperc_node-1] [WARN] [0000011666.693963266] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000011729.641788941] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000011729.657019110] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000011792.653320146] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000011792.668267090] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000011855.566450713] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000011855.580160057] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000011918.577934239] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000011918.591615743] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000011981.589459652] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000011981.603690422] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012044.600987881] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012044.614596395] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012107.612636907] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012107.626351658] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012170.624200174] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012170.637633301] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012233.635552759] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012233.649360820] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012296.647208761] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012296.660828827] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012359.658650592] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012359.672884914] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012422.670281090] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012422.683837285] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012485.681756712] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012485.696215444] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012548.793511899] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012548.807690766] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012611.805318392] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012611.820553521] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012674.824467129] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012674.838727626] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012737.836436754] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012737.850023381] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012800.848153970] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012800.862218760] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012863.859784532] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012863.874368061] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012926.871605233] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012926.886351126] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000012989.887852701] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000012989.901645050] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000013052.899584668] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000013052.913991401] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000013115.811257033] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000013115.827096305] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000013178.822970441] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000013241.834820677] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000013241.849389230] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000013304.952665755] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000013304.966453977] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000013367.964600310] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000013367.979158431] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)
+[dogperc_node-1] [WARN] [0000013430.976211320] [dog_perception]: imu stamps jumped back 60.0 s (bag played again or clock reset): starting over
+[dogperc_node-1] [WARN] [0000013430.990179857] [dog_perception]: no pose for scan yet (waiting for odometry / IMU)

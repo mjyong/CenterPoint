@@ -1,0 +1,16 @@
+0921_164127_s000
+0921_165659_s004
+bench_orin.json
+compare_0921_164127_s000.json
+compare_0921_165659_s004.json
+compare_dyn_0921_164127_s000.json
+compare_dyn_0921_165659_s004.json
+compare_t27_0921_164127_s000.json
+compare_t27_0921_165659_s004.json
+dumps
+kygi.yaml
+moving_0921.npz
+orin_cpp.npz
+pfn.fp16.engine
+rpn_head.fp16.engine
+/dev/mmcblk0p1   54G   47G  4.3G  92% /

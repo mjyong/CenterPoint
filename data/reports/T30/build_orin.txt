@@ -1,0 +1,30 @@
+[ 44%] Building CXX object CMakeFiles/dogperc.dir/src/tracking/association.cpp.o
+[ 47%] Building CXX object CMakeFiles/dogperc.dir/src/tracking/tracker.cpp.o
+[ 50%] Building CXX object CMakeFiles/dogperc.dir/src/prediction/imm_predictor.cpp.o
+[ 52%] Building CXX object CMakeFiles/dogperc.dir/src/parallel.cpp.o
+[ 55%] Building CXX object CMakeFiles/dogperc.dir/src/online.cpp.o
+[ 57%] Building CXX object CMakeFiles/dogperc.dir/src/message_log.cpp.o
+[ 60%] Building CXX object CMakeFiles/dogperc.dir/src/replay_writer.cpp.o
+[ 63%] Building CUDA object CMakeFiles/dogperc.dir/src/cuda/pillars.cu.o
+[ 65%] Building CXX object CMakeFiles/dogperc.dir/src/cuda/trt_engine.cpp.o
+[ 68%] Building CXX object CMakeFiles/dogperc.dir/src/cuda/gpu_detector.cpp.o
+[ 71%] Linking CXX static library libdogperc.a
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 71%] Built target dogperc
+gmake[2]: Warning: File '../tools/dogperc_replay.cpp' has modification time 1793318173 s in the future
+gmake[2]: Warning: File '../tests/test_main.cpp' has modification time 1793230086 s in the future
+[ 89%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_tracking.cpp.o
+[ 89%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_pipeline.cpp.o
+[ 89%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_io_geometry.cpp.o
+[ 89%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_detection.cpp.o
+[ 89%] Building CXX object CMakeFiles/dogperc_replay.dir/tools/dogperc_replay.cpp.o
+[ 92%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_online.cpp.o
+[ 92%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_preprocess.cpp.o
+[ 92%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_main.cpp.o
+[ 94%] Building CXX object CMakeFiles/dogperc_tests.dir/tests/test_gpu.cpp.o
+[ 97%] Linking CXX executable dogperc_replay
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 97%] Built target dogperc_replay
+[100%] Linking CXX executable dogperc_tests
+gmake[2]: warning:  Clock skew detected.  Your build may be incomplete.
+[100%] Built target dogperc_tests

@@ -1,0 +1,88 @@
+{
+ "frames_logged": 1626,
+ "windows": [
+  {
+   "start_min": 0.0,
+   "load": false,
+   "frames": 274,
+   "total_median": 16.7,
+   "total_p99": 21.853999999999996,
+   "total_max": 33.9,
+   "dets_median": 55.0,
+   "tracks_median": 10.0
+  },
+  {
+   "start_min": 5.0,
+   "load": false,
+   "frames": 271,
+   "total_median": 16.6,
+   "total_p99": 21.090000000000003,
+   "total_max": 22.1,
+   "dets_median": 54.0,
+   "tracks_median": 10.0
+  },
+  {
+   "start_min": 10.0,
+   "load": false,
+   "frames": 270,
+   "total_median": 17.2,
+   "total_p99": 21.331,
+   "total_max": 22.0,
+   "dets_median": 55.0,
+   "tracks_median": 10.0
+  },
+  {
+   "start_min": 15.0,
+   "load": true,
+   "frames": 270,
+   "total_median": 20.8,
+   "total_p99": 31.893,
+   "total_max": 33.2,
+   "dets_median": 56.5,
+   "tracks_median": 10.0
+  },
+  {
+   "start_min": 20.0,
+   "load": true,
+   "frames": 274,
+   "total_median": 20.2,
+   "total_p99": 29.926999999999996,
+   "total_max": 31.8,
+   "dets_median": 55.0,
+   "tracks_median": 10.0
+  },
+  {
+   "start_min": 25.0,
+   "load": true,
+   "frames": 267,
+   "total_median": 21.0,
+   "total_p99": 30.23599999999999,
+   "total_max": 35.2,
+   "dets_median": 54.0,
+   "tracks_median": 10.0
+  }
+ ],
+ "warnings": {
+  "WARN: no pose for scan yet (waiting for odometry / IMU)": 28,
+  "WARN: imu stamps jumped back # s (bag played again or clock reset): starting over": 28
+ },
+ "rss_mb": {
+  "first": 202.46875,
+  "last": 221.984375,
+  "max": 221.984375
+ },
+ "tegrastats": {
+  "samples": 361,
+  "gr3d_mean": 19.878116343490305,
+  "ram_mb_min": 10128,
+  "ram_mb_max": 11255,
+  "temp_max_c": {
+   "cpu": 62.218,
+   "soc2": 57.187,
+   "soc0": 56.031,
+   "gpu": 57.5,
+   "tj": 62.218,
+   "soc1": 56.968
+  }
+ }
+}

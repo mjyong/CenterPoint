@@ -1,0 +1,12 @@
+total 12656
+drwxrwxr-x 2 seres seres     4096 Jan  1 11:10 .
+drwxr-xr-x 3 seres seres     4096 Jan  1 11:10 ..
+-rw-rw-r-- 1 seres seres    69212 Jan  2  1970 pfn.fp16.engine
+-rw-rw-r-- 1 seres seres 12880772 Jan  2  1970 rpn_head.fp16.engine
+/usr/lib/python3/dist-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.17.3 and <1.25.0 is required for this version of SciPy (detected version 1.26.4
+  warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
+building pfn.fp16.engine from pfn.onnx ...
+[01/01/1970-11:10:55] [TRT] [W] DLA requests all profiles have same min, max, and opt value. All dla layers are falling back to GPU
+  {"trt": "10.3.0", "seconds": 36.7, "bytes": 68148, "profile": {"pillars": [[1, 10, 1, 20], [1, 10, 10000, 20], [1, 10, 24000, 20]]}, "graph": "pfn", "precision": "fp16", "engine": "pfn.fp16.engine", "onnx": "pfn.onnx", "dla": null, "built": "1970-01-01 11:11:32", "host": "ubuntu", "arch": "aarch64", "model": "NVIDIA Jetson AGX Orin Developer Kit", "runs": 50, "shapes": {"pillars": [1, 10, 10000, 20]}, "gpu_median_ms": 1.479, "gpu_p99_ms": 1.486, "gpu_mean_ms": 1.479, "gpu_min_ms": 1.476, "gpu_max_ms": 1.49, "host_median_ms": 3.495}
+building rpn_head.fp16.engine from rpn_head.onnx ...
+  {"trt": "10.3.0", "seconds": 61.3, "bytes": 12875444, "graph": "rpn_head", "precision": "fp16", "engine": "rpn_head.fp16.engine", "onnx": "rpn_head.onnx", "dla": null, "built": "1970-01-01 11:12:36", "host": "ubuntu", "arch": "aarch64", "model": "NVIDIA Jetson AGX Orin Developer Kit", "runs": 50, "shapes": {"bev": [1, 64, 408, 408]}, "gpu_median_ms": 4.747, "gpu_p99_ms": 4.758, "gpu_mean_ms": 4.747, "gpu_min_ms": 4.735, "gpu_max_ms": 4.76, "host_median_ms": 12.221}

@@ -1,0 +1,3 @@
+/dev/mmcblk0p1   54G   47G  4.4G  92% /
+994M	dogperc
+rosbag2_0921_600: 1.9G

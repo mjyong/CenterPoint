@@ -1,0 +1,7 @@
+[INFO] [0000011565.546987926] [rosbag2_storage]: Opened database 'bags/rosbag2_0921_600/rosbag2_0921_600_0.db3' for READ_ONLY.
+info: ENU origin 29.73248019 106.78469809 216.91
+warn: no pose for scan yet (waiting for odometry / IMU)
+12608 messages, 600 clouds, 599 frames, 6037 tracks, 17.9 s -> data/bag_gpu.npz
+| frames ref / cpp / common | pose max | det match w/o flips | missed (near/filter/score/class/none) | extra | track IDs same | track max diff | motion agree | pred max diff | gates |
+|---|---|---|---|---|---|---|---|---|---|
+| 599 / 599 / 599 | 4.0e-10 | 0.9994 | 12 (8/1/0/0/3) | 18 | 14 / 599 | 6.2e+01 | 1.0000 | 6.2e+01 | pass |

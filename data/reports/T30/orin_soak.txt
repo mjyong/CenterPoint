@@ -1,0 +1,10 @@
+
+Files:             live_0.db3
+Bag size:          124.7 MiB
+Storage id:        sqlite3
+Duration:          1796.332520724s
+Start:             Jan  1 1970 11:14:26.681057614 (11666.681057614)
+End:               Jan  1 1970 11:44:23.013578338 (13463.013578338)
+Messages:          17013
+Topic information: Topic: /dog_perception/objects | Type: dog_perception_msgs/msg/ObjectArray | Count: 17013 | Serialization Format: cdr
+

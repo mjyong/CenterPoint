@@ -1,0 +1,305 @@
+{
+ "messages": 17013,
+ "objects": 171866,
+ "paths": 183112,
+ "frame_ids": [
+  "dog_det"
+ ],
+ "example": {
+  "id": 1,
+  "label": "vehicle",
+  "motion": 0,
+  "score": 0.8224563002586365,
+  "position": [
+   15.842339804666278,
+   7.748608672775604,
+   1.7206660571523749
+  ],
+  "yaw": 1.622660160540047,
+  "size": [
+   4.74770902633667,
+   1.9648677539825439,
+   1.816477961540222
+  ],
+  "prediction_times": [
+   0.5,
+   1.0,
+   1.5,
+   2.0,
+   2.5,
+   3.0
+  ],
+  "paths": 1
+ },
+ "replay_frames": 599,
+ "passes": 29,
+ "matched_frames": 17013,
+ "unmatched_messages": 0,
+ "missing_frames": 81,
+ "same_ids_frames": 1060,
+ "received_gap_max": 0.40133626999886474,
+ "per_pass": [
+  {
+   "messages": 598,
+   "matched_frames": 598,
+   "received_gap_max": 0.13630091099912534,
+   "unmatched_messages": 0,
+   "missing_frames": 1,
+   "same_ids_frames": 63,
+   "partial": false
+  },
+  {
+   "messages": 597,
+   "matched_frames": 597,
+   "received_gap_max": 0.1365739280008711,
+   "unmatched_messages": 0,
+   "missing_frames": 2,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 597,
+   "matched_frames": 597,
+   "received_gap_max": 0.13645194699893182,
+   "unmatched_messages": 0,
+   "missing_frames": 2,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13642180399983772,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13635684499968193,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13634468500094954,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13640615500116837,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13645137099956628,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.136265295001067,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 79,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.1364119789996039,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13632670100014366,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13640471599865123,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 67,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13640081199991982,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 72,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13631499099938083,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 594,
+   "matched_frames": 594,
+   "received_gap_max": 0.20455029099866806,
+   "unmatched_messages": 0,
+   "missing_frames": 5,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 595,
+   "matched_frames": 595,
+   "received_gap_max": 0.20307141700141074,
+   "unmatched_messages": 0,
+   "missing_frames": 4,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 591,
+   "matched_frames": 591,
+   "received_gap_max": 0.40133626999886474,
+   "unmatched_messages": 0,
+   "missing_frames": 8,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 593,
+   "matched_frames": 593,
+   "received_gap_max": 0.21536550100063323,
+   "unmatched_messages": 0,
+   "missing_frames": 6,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 596,
+   "matched_frames": 596,
+   "received_gap_max": 0.20631555799991474,
+   "unmatched_messages": 0,
+   "missing_frames": 3,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 594,
+   "matched_frames": 594,
+   "received_gap_max": 0.20705860999987635,
+   "unmatched_messages": 0,
+   "missing_frames": 5,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 589,
+   "matched_frames": 589,
+   "received_gap_max": 0.20642889900045702,
+   "unmatched_messages": 0,
+   "missing_frames": 10,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 595,
+   "matched_frames": 595,
+   "received_gap_max": 0.22315826100020786,
+   "unmatched_messages": 0,
+   "missing_frames": 4,
+   "same_ids_frames": 4,
+   "partial": false
+  },
+  {
+   "messages": 591,
+   "matched_frames": 591,
+   "received_gap_max": 0.2055425529997592,
+   "unmatched_messages": 0,
+   "missing_frames": 8,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 599,
+   "matched_frames": 599,
+   "received_gap_max": 0.13216917700083286,
+   "unmatched_messages": 0,
+   "missing_frames": 0,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 594,
+   "matched_frames": 594,
+   "received_gap_max": 0.20246013700125332,
+   "unmatched_messages": 0,
+   "missing_frames": 5,
+   "same_ids_frames": 73,
+   "partial": false
+  },
+  {
+   "messages": 597,
+   "matched_frames": 597,
+   "received_gap_max": 0.19693960699987656,
+   "unmatched_messages": 0,
+   "missing_frames": 2,
+   "same_ids_frames": 69,
+   "partial": false
+  },
+  {
+   "messages": 593,
+   "matched_frames": 593,
+   "received_gap_max": 0.21047983500102418,
+   "unmatched_messages": 0,
+   "missing_frames": 6,
+   "same_ids_frames": 1,
+   "partial": false
+  },
+  {
+   "messages": 592,
+   "matched_frames": 592,
+   "received_gap_max": 0.2051422119984636,
+   "unmatched_messages": 0,
+   "missing_frames": 7,
+   "same_ids_frames": 0,
+   "partial": false
+  },
+  {
+   "messages": 319,
+   "matched_frames": 319,
+   "received_gap_max": 0.19281513699934294,
+   "unmatched_messages": 0,
+   "missing_frames": 3,
+   "same_ids_frames": 1,
+   "partial": true
+  }
+ ],
+ "passed": false
+}

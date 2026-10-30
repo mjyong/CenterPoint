@@ -1,0 +1,22 @@
+Note: Google Test filter = Online.*
+[==========] Running 6 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 6 tests from Online
+[ RUN      ] Online.CloudLayoutsMatchPython
+[       OK ] Online.CloudLayoutsMatchPython (1 ms)
+[ RUN      ] Online.CloudErrors
+[       OK ] Online.CloudErrors (0 ms)
+[ RUN      ] Online.NodeConfigOfTheKygiPreset
+[       OK ] Online.NodeConfigOfTheKygiPreset (2 ms)
+[ RUN      ] Online.InspvaxWaitsForAGoodFix
+[       OK ] Online.InspvaxWaitsForAGoodFix (0 ms)
+[ RUN      ] Online.MessageLogMatchesPythonBagReplay
+online parity: 8 frames from 268 messages, max diff poses 3.61e-16, points 0.00e+00 m
+[       OK ] Online.MessageLogMatchesPythonBagReplay (474 ms)
+[ RUN      ] Online.ReplayedBagStartsOver
+[       OK ] Online.ReplayedBagStartsOver (322 ms)
+[----------] 6 tests from Online (801 ms total)
+
+[----------] Global test environment tear-down
+[==========] 6 tests from 1 test suite ran. (801 ms total)
+[  PASSED  ] 6 tests.

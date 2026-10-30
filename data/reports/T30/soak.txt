@@ -1,0 +1,12 @@
+| from min | load | frames logged | total ms median | p99 | max | boxes | tracks |
+|---|---|---|---|---|---|---|---|
+| 0 | no | 274 | 16.7 | 21.9 | 33.9 | 55 | 10 |
+| 5 | no | 271 | 16.6 | 21.1 | 22.1 | 54 | 10 |
+| 10 | no | 270 | 17.2 | 21.3 | 22.0 | 55 | 10 |
+| 15 | yes | 270 | 20.8 | 31.9 | 33.2 | 56 | 10 |
+| 20 | yes | 274 | 20.2 | 29.9 | 31.8 | 55 | 10 |
+| 25 | yes | 267 | 21.0 | 30.2 | 35.2 | 54 | 10 |
+
+    28  WARN: no pose for scan yet (waiting for odometry / IMU)
+    28  WARN: imu stamps jumped back # s (bag played again or clock reset): starting over
+{"rss_mb": {"first": 202.46875, "last": 221.984375, "max": 221.984375}, "tegrastats": {"samples": 361, "gr3d_mean": 19.878116343490305, "ram_mb_min": 10128, "ram_mb_max": 11255, "temp_max_c": {"cpu": 62.218, "soc2": 57.187, "soc0": 56.031, "gpu": 57.5, "tj": 62.218, "soc1": 56.968}}}

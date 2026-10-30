@@ -122,7 +122,7 @@
 | T28 | Orin 部署 P4 / P5：C++ 核心库在服务器容器里编译、跑对齐测试（含 GPU、TensorRT）；10 个验证场景上 Python 和 C++ 比（同一批检测、各自检测）并打分；板上原生编译、测试、测延迟 | Agent（锁频掉了才要人） | T27 | 3 小时 | 完成，已复核。复核在样例 bag 的真实扫描上拆开计时：慢的是去重（逐点 unordered_map），不是去畸变；预处理和后处理已提速，输出逐位不变，T28B 复测。C++ 可以替代 Python：10 个场景同一批检测 ID 全同，各自检测匹配率都是 1。标签上 AP@2 / AP@4 都是 0.832 / 0.852。板上锁频还在。端到端中位数 27.7 ms（p99 30.2 ms），网络以外 21.8 ms，比 15 ms 多 6.8 ms，多在去畸变。INT8 最差的 head 是 height（余弦 −0.85） |
 | T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 完成，已复核。输出和 T28 逐位相同，1 线程和 4 线程也相同。板上网络以外：1 线程 12.9 ms，4 线程 11.4 ms，都低于 15 ms。用 4 个线程。服务器上 4 线程更慢，体素化 p99 尖峰从 215 ms 降到 19 ms（1 线程），还没消失 |
 | T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成，已复核。对齐都过：服务器两段同一批检测 ID 每帧相同；板上 ROS 读 bag 和读消息日志逐位相同；板上 GPU 对服务器过门槛。板上端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（样例 bag）。复核查出节点在时间戳倒退（bag 重播、时钟回跳）时不会重来，bag 长于 3 s 时重播后基本没有输出，已修（两边一样，加了测试）；在线 `same_ids_frames 0` 是热身那遍的状态带进了正式播放。TensorRT 新出现一句设备提示，T30 查 |
-| T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 待做 |
+| T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5662,4 +5662,40 @@ T29 复核改了节点：某个话题的时间戳倒退 1 s 以上，节点整�
 
 ### T30 结果
 
-（待填）
+（2026-10-30）GPU 用物理卡 4。拉到 `a7ea977`。没有再改代码。
+
+**代码改动（约定 9）：** 没有。
+
+**第 0 步。** `test_ros2_node` + `test_deploy`：14 passed（含 `test_a_bag_played_again_starts_over`、`test_cut_bag_keeps_the_node_messages`）。快速测试 168 passed。容器里重编 ctest：27 个测试全过，`Online.ReplayedBagStartsOver` 通过（不是 SKIPPED）。
+
+**截 bag 和对齐。** `cut_bag.py` 写出 `rosbag2_0921_600`（sqlite3，1.9 GB）：inspvax 6004、imu 6004、cloud 600。和 T29 的 `msgs.npz` 逐键比：`keys differing: []`。Python 599 帧。msgs_dets / msgs 都 pass，和 T29 的 0921 那一行一样（状态 / 预测同量级）。`cpp_replay` 没有 "jumped back"；开头有一次 "no pose for scan yet"。
+
+**板上身份与引擎。** L4T R36.4.4，Jetson AGX Orin Developer Kit，`libnvinfer10` 10.3.0.30-1+cuda12.5，`nvidia-l4t-core` 36.4.4。旧引擎挪到 `models/nusc_pp_dyn/t27/`，板上重建 FP16：PFN GPU 中位数 1.479 ms（p99 1.486），RPN 4.747 ms（p99 4.758）。同步后根分区剩 2.5 GB（> 1.5 GB）。colcon 3 包通过（仅 clock skew）。Online.* 六个（拷了服务器 `online*` golden）全过。锁频还在。
+
+**第 3 步离线。** `dogperc_bag_replay` 599 帧。重建后日志里**没有** "across different models of devices"。对服务器 `cpp.npz`：pass（匹配 0.9994，漏 12：near 8 / filter 1 / none 3，多 18；跟踪 ID 14/599，是新引擎对旧引擎，不是同一批检测）。延迟（跳过前 3 帧，中位数 / p99 ms）：preprocess 5.37 / 6.48，sweep 4.03 / 4.22，dedup 2.42 / 2.72，accumulate 1.23 / 2.59，det_voxelize 1.68 / 3.58，det_pfn 0.81 / 2.19，det_rpn 4.72 / 4.79，det_post 1.74 / 1.97，total 16.89 / 20.87，网络以外 11.06 / 13.78。
+
+**第 4 步浸泡。** `orin_soak.sh` 30 分钟，`--loop --delay 3`。`ros2 bag info`：17013 条 `/dog_perception/objects`，时长 1796 s。`objects_bag.py`：passes 29（最后一遍 partial），`passed` false，missing 合计 81，`received_gap_max` 0.401 s，`same_ids_frames` 1060 / 17013。
+
+| 遍 | 情况 |
+|---|---|
+| 0–2 | 开头热身，各缺 1–2 帧 |
+| 3–13 | 无负载，每遍 599，不丢 |
+| 14–22 | 有负载，每遍缺 3–10 帧，gap 约 0.20–0.40 s |
+| 23 | 有负载仍 599 |
+| 24–27 | 有负载，缺 2–7 帧 |
+| 28 | 停下时的半遍，319 条，缺 3（partial） |
+
+`soak.txt`（每 5 分钟，节点每秒一行里的 total_ms）：
+
+| from min | load | frames | median | p99 | max | boxes | tracks |
+|---|---|---|---|---|---|---|---|
+| 0 | no | 274 | 16.7 | 21.9 | 33.9 | 55 | 10 |
+| 5 | no | 271 | 16.6 | 21.1 | 22.1 | 54 | 10 |
+| 10 | no | 270 | 17.2 | 21.3 | 22.0 | 55 | 10 |
+| 15 | yes | 270 | 20.8 | 31.9 | 33.2 | 56 | 10 |
+| 20 | yes | 274 | 20.2 | 29.9 | 31.8 | 55 | 10 |
+| 25 | yes | 267 | 21.0 | 30.2 | 35.2 | 54 | 10 |
+
+warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍开头一次，对），没有 "from before the restart dropped"，没有 TensorRT 提示，没有 ERROR。rss：首 202 MB，尾 / 最大 222 MB（涨 19 MB，< 50）。tegrastats：GR3D 平均 19.9%，最高温度 tj/cpu 62.2 °C，gpu 57.5 °C。节点没有崩、没有卡住。
+
+**结论。** 时间戳倒退重来可用（28 次 jump back 都拉起来了）。无负载时端到端约 17 ms，中间连续 11 遍不丢帧，能维持 10 Hz。加了「同 bag GPU 离线循环 + 4 个忙 CPU」之后，多数遍会丢几帧（BEST_EFFORT 点云队列深度 5，和负载抢 GPU/CPU），gap 最大 0.40 s；延迟仍远低于 100 ms（有负载中位数 21 ms、p99 32 ms）。`objects_bag` 的 passed 因此是 false——这块人工负载比车上只跑感知更狠，真车上还要再测。TensorRT 设备提示是旧引擎留下的，板上重建后消失。还缺：和规划联调；车上长时间实车（人校时）。做完删了 soak、bags、`data/*.npz`；`t27/` 留着。根分区 4.3 GB。

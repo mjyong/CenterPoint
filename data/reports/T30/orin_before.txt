@@ -1,0 +1,2 @@
+bash: line 1: rg: command not found
+/dev/mmcblk0p1   54G   47G  4.4G  92% /
