@@ -1,0 +1,49 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages were automatically installed and are no longer required:
+  libfwupdplugin5 libgcab-1.0-0 libslirp0 ros-humble-ros2-control-test-assets
+  slirp4netns
+Use 'sudo apt autoremove' to remove them.
+The following packages will be REMOVED:
+  lidar-3d-detection
+0 upgraded, 0 newly installed, 1 to remove and 102 not upgraded.
+After this operation, 64.2 MB disk space will be freed.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 331935 files and directories currently installed.)
+Removing lidar-3d-detection (0.1.0) ...
+=== after remove ===
+/opt/seres:
+perception
+
+/opt/seres/perception:
+lidar_3d_detection
+
+/opt/seres/perception/lidar_3d_detection:
+config
+
+/opt/seres/perception/lidar_3d_detection/config:
+=== purge ===
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages were automatically installed and are no longer required:
+  libfwupdplugin5 libgcab-1.0-0 libslirp0 ros-humble-ros2-control-test-assets
+  slirp4netns
+Use 'sudo apt autoremove' to remove them.
+The following packages will be REMOVED:
+  lidar-3d-detection*
+0 upgraded, 0 newly installed, 1 to remove and 102 not upgraded.
+After this operation, 0 B of additional disk space will be used.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 330450 files and directories currently installed.)
+Purging configuration files for lidar-3d-detection (0.1.0) ...
+=== after purge ===
+ls: cannot access '/opt/seres': No such file or directory
+ls: cannot access '/etc/default/lidar-3d-detection': No such file or directory
+=== reinstall ===
+debconf: delaying package configuration, since apt-utils is not installed
+lidar-3d-detection: installed in /opt/seres/perception
+  run by hand:  /opt/seres/perception/lidar_3d_detection/bin/start_lidar_3d_detection.sh
+  as a service: sudo systemctl start lidar-3d-detection (enable: at boot); settings /etc/default/lidar-3d-detection
+=== service ===
+disabled
+inactive

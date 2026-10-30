@@ -1,0 +1,42 @@
+{
+ "messages": 27,
+ "objects": 109,
+ "paths": 112,
+ "frame_ids": [
+  "lidar_det"
+ ],
+ "example": {
+  "id": 1,
+  "label": "vehicle",
+  "motion": 0,
+  "score": 0.6894916892051697,
+  "position": [
+   -40.42014769518545,
+   21.78943254284228,
+   0.8652905277199163
+  ],
+  "yaw": 3.1401886481214505,
+  "size": [
+   5.252410488128662,
+   1.9416407060623169,
+   2.259297332763672
+  ],
+  "prediction_times": [
+   0.5,
+   1.0,
+   1.5,
+   2.0,
+   2.5,
+   3.0
+  ],
+  "paths": 2
+ },
+ "replay_frames": 27,
+ "passes": 1,
+ "matched_frames": 27,
+ "unmatched_messages": 0,
+ "missing_frames": 0,
+ "same_ids_frames": 26,
+ "received_gap_max": 0.21621245499773067,
+ "passed": true
+}

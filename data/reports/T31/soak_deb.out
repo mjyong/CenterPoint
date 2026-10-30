@@ -1,0 +1,10 @@
+
+Files:             live_0.db3
+Bag size:          5.5 MiB
+Storage id:        sqlite3
+Duration:          355.933858119s
+Start:             Jan  1 1970 14:54:24.855242561 (24864.855242561)
+End:               Jan  1 1970 15:00:20.789100680 (25220.789100680)
+Messages:          1587
+Topic information: Topic: /perception/lidar_3d/objects | Type: perception_interface/msg/LidarObjectArray | Count: 1587 | Serialization Format: cdr
+

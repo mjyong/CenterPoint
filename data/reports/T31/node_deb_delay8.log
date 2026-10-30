@@ -1,0 +1,7 @@
+I0101 14:49:53.210222 31570 logging.h:30] Lidar 3D detection logger initialized. Log directory: /tmp/lidar_3d_detection_logs
+I0101 14:49:53.416810 31570 lidar_3d_detection.cpp:141] lidar_3d_detection up: config /opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml, model /opt/seres/perception/lidar_3d_detection/model (fp16, GPU), lidar /robot/topic/rdap/top_point_cloud2, inspvax /rte/rdap/rtk/inspvax, imu /rte/rdap/rtk/imus/data_raw, objects /perception/lidar_3d/objects
+I0101 14:50:05.784400 31570 lidar_3d_detection.cpp:109] ENU origin 29.73325161 106.78497842 217.10
+I0101 14:50:06.320274 31570 lidar_3d_detection.cpp:179] 41 dets, 0 tracks | preprocess_ms 7.3 det_gpu_ms 22.9 det_post_ms 1.4 track_ms 0.0 predict_ms 0.0 total_ms 32.0
+I0101 14:50:07.403791 31570 lidar_3d_detection.cpp:179] 41 dets, 5 tracks | preprocess_ms 6.2 det_gpu_ms 10.4 det_post_ms 1.6 track_ms 0.1 predict_ms 0.0 total_ms 18.5
+I0101 14:50:08.407154 31570 lidar_3d_detection.cpp:179] 66 dets, 3 tracks | preprocess_ms 6.3 det_gpu_ms 12.2 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 20.4
+[INFO] [0000024613.984149762] [rclcpp]: signal_handler(SIGINT/SIGTERM)

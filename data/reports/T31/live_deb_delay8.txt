@@ -1,0 +1,19 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [0000024597.674701955] [rosbag2_storage]: Opened database 'bags/rosbag2_2026_09_21-16_41_27_moving/rosbag2_2026_09_21-16_41_27_moving.db3' for READ_ONLY.
+[INFO] [0000024597.674773665] [rosbag2_player]: Set rate to 1
+[INFO] [0000024597.682731796] [rosbag2_player]: Adding keyboard callbacks.
+[INFO] [0000024597.682793843] [rosbag2_player]: Press SPACE for Pause/Resume
+[INFO] [0000024597.682813042] [rosbag2_player]: Press CURSOR_RIGHT for Play Next Message
+[INFO] [0000024597.682828274] [rosbag2_player]: Press CURSOR_UP for Increase Rate 10%
+[INFO] [0000024597.682841905] [rosbag2_player]: Press CURSOR_DOWN for Decrease Rate 10%
+[INFO] [0000024597.682973550] [rosbag2_player]: Sleep 8000000000 ns
+[INFO] [0000024605.683668839] [rosbag2_storage]: Opened database 'bags/rosbag2_2026_09_21-16_41_27_moving/rosbag2_2026_09_21-16_41_27_moving.db3' for READ_ONLY.
+
+Files:             live_deb_0.db3
+Bag size:          117.0 KiB
+Storage id:        sqlite3
+Duration:          2.484530021s
+Start:             Jan  1 1970 14:50:06.320321681 (24606.320321681)
+End:               Jan  1 1970 14:50:08.804851702 (24608.804851702)
+Messages:          26
+Topic information: Topic: /perception/lidar_3d/objects | Type: perception_interface/msg/LidarObjectArray | Count: 26 | Serialization Format: cdr
+

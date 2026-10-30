@@ -1,0 +1,30 @@
+[INFO] [0000024510.970191781] [rosbag2_storage]: Opened database 'bags/rosbag2_2026_09_21-16_41_27_moving/rosbag2_2026_09_21-16_41_27_moving.db3' for READ_ONLY.
+info: ENU origin 29.73325161 106.78497842 217.10
+cloud 1 stamp 1789980190.998 points_in 105492 points_out 37567 preprocess 7.0 ms
+cloud 2 stamp 1789980191.098 points_in 105578 points_out 75125 preprocess 5.9 ms
+cloud 3 stamp 1789980191.198 points_in 105556 points_out 112625 preprocess 6.4 ms
+cloud 4 stamp 1789980191.298 points_in 105634 points_out 150102 preprocess 6.6 ms
+cloud 5 stamp 1789980191.398 points_in 105676 points_out 187659 preprocess 6.2 ms
+cloud 6 stamp 1789980191.498 points_in 105932 points_out 187676 preprocess 6.4 ms
+cloud 7 stamp 1789980191.599 points_in 105932 points_out 187677 preprocess 5.9 ms
+cloud 8 stamp 1789980191.697 points_in 105984 points_out 187721 preprocess 6.4 ms
+cloud 9 stamp 1789980191.798 points_in 105988 points_out 187779 preprocess 6.6 ms
+cloud 10 stamp 1789980191.898 points_in 105856 points_out 187674 preprocess 6.0 ms
+cloud 11 stamp 1789980191.998 points_in 105880 points_out 187533 preprocess 6.0 ms
+cloud 12 stamp 1789980192.097 points_in 105896 points_out 187443 preprocess 6.6 ms
+cloud 13 stamp 1789980192.198 points_in 105942 points_out 187419 preprocess 6.0 ms
+cloud 14 stamp 1789980192.299 points_in 106018 points_out 187434 preprocess 6.2 ms
+cloud 15 stamp 1789980192.398 points_in 106242 points_out 187741 preprocess 7.7 ms
+cloud 16 stamp 1789980192.498 points_in 106304 points_out 188170 preprocess 6.1 ms
+cloud 17 stamp 1789980192.598 points_in 106372 points_out 188767 preprocess 6.5 ms
+cloud 18 stamp 1789980192.698 points_in 106438 points_out 189444 preprocess 6.2 ms
+cloud 19 stamp 1789980192.798 points_in 106518 points_out 190166 preprocess 6.5 ms
+cloud 20 stamp 1789980192.897 points_in 107294 points_out 191019 preprocess 6.2 ms
+cloud 21 stamp 1789980192.998 points_in 107468 points_out 191770 preprocess 6.2 ms
+cloud 22 stamp 1789980193.098 points_in 107470 points_out 192250 preprocess 6.2 ms
+cloud 23 stamp 1789980193.198 points_in 107448 points_out 192563 preprocess 6.5 ms
+cloud 24 stamp 1789980193.297 points_in 107356 points_out 192796 preprocess 6.2 ms
+cloud 25 stamp 1789980193.398 points_in 107382 points_out 192673 preprocess 6.1 ms
+cloud 26 stamp 1789980193.498 points_in 107488 points_out 192573 preprocess 6.2 ms
+cloud 27 stamp 1789980193.597 points_in 107606 points_out 192925 preprocess 6.5 ms
+647 messages, 27 clouds, 27 frames, 110 tracks, 0.9 s -> data/inst_gpu.npz

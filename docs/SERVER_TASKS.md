@@ -123,7 +123,7 @@
 | T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 完成，已复核。输出和 T28 逐位相同，1 线程和 4 线程也相同。板上网络以外：1 线程 12.9 ms，4 线程 11.4 ms，都低于 15 ms。用 4 个线程。服务器上 4 线程更慢，体素化 p99 尖峰从 215 ms 降到 19 ms（1 线程），还没消失 |
 | T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成，已复核。对齐都过：服务器两段同一批检测 ID 每帧相同；板上 ROS 读 bag 和读消息日志逐位相同；板上 GPU 对服务器过门槛。板上端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（样例 bag）。复核查出节点在时间戳倒退（bag 重播、时钟回跳）时不会重来，bag 长于 3 s 时重播后基本没有输出，已修（两边一样，加了测试）；在线 `same_ids_frames 0` 是热身那遍的状态带进了正式播放。TensorRT 新出现一句设备提示，T30 查 |
 | T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
-| T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 停在第 4 步（apt 要密码）。deb 已打好，解开跑和 deploy/ 逐位相同 |
+| T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成。deb 已装上再装回，和 deploy/ 逐位相同；在线第一帧要等 DDS 对上；服务不启用 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5814,9 +5814,12 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
 
 ### T31 结果
 
-（2026-10-30）拉到 `b902d0e`。GPU 用物理卡 4。停在第 4 步：`sudo -n apt-get install` 要密码。deb 已经打好，不装解开跑和 `deploy/` 逐位相同。第 5–7 步还没做。
+（2026-10-30）拉到 `b902d0e`。GPU 用物理卡 4。人给 `seres` 加了 `apt-get`、`dpkg`、`systemctl`、`sed` 免密之后，安装、服务和卸载都做完了。deb 可以交给车上装。服务装上但不启用。
 
-**代码改动（约定 9）：** `88222c5`，`tools/deploy/objects_bag.py`。整文件跑 `test_deploy.py` 时，前面的测试把进程 locale 改成了 C，`open()` 按 ascii 读 `perception_interface` 的 `.msg`，中文注释（字节 0xe4）崩溃。改为 `encoding="utf-8"`。验证：`LC_ALL=C` 下 `test_deploy.py` 14 passed（含 `test_deploy_deb_mirrors_deploy`、`test_objects_bag_reads_the_vehicle_messages`、`test_soak_report_reads_glog_lines`、`test_objects_bag_against_a_replay`）；快速测试 171 passed。没改镜像文件。
+**代码改动（约定 9）：**
+
+- `88222c5`，`tools/deploy/objects_bag.py`。整文件跑 `test_deploy.py` 时，前面的测试把进程 locale 改成了 C，`open()` 按 ascii 读 `perception_interface` 的 `.msg`，中文注释（字节 0xe4）崩溃。改为 `encoding="utf-8"`。验证：`LC_ALL=C` 下 `test_deploy.py` 14 passed（含 `test_deploy_deb_mirrors_deploy`、`test_objects_bag_reads_the_vehicle_messages`、`test_soak_report_reads_glog_lines`、`test_objects_bag_against_a_replay`）；快速测试 171 passed。没改镜像文件。
+- `2cf1216`，`deploy_deb/.../scripts/orin_soak.sh` 从 644 改成 755。板上 `nohup` 直接跑它是 Permission denied（同目录的 `orin_check.sh`、`sync_to_orin.sh` 也是 644，这次没改）。chmod 之后 6 分钟浸泡跑完。
 
 **第 0–1 步。** `sync_deploy_deb.py`：68 mirrored，0 stale，0 extra，0 interface problems。同步样例 bag 后根分区 4.0 GB（> 3 GB）。`deploy/ros2` colcon 3 包通过（仅 clock skew，板上时钟仍是 1970）。`deploy/cpp` 没重编。锁频还在（MAXN，GPU 1300500000）。
 
@@ -5830,4 +5833,37 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
 
 **第 3 步。** 解开到 `/tmp/debx`，不安装。`lidar_3d_bag_replay` 和 `dogperc_bag_replay` 都是 647 messages、27 clouds、27 frames、110 tracks。`keys differing: []`。
 
-**第 4 步。** `sudo -n apt-get install -y ~/dogperc/deb/lidar-3d-detection_*_arm64.deb` 返回 `sudo: a password is required`。按任务停下。板上根分区还剩 3.8 GB。`~/dogperc/deb/` 留着。
+**第 4 步。** 免密加上之后 `apt-get install` 成功。`dpkg -s` 版本 0.1.0，文件在 `/opt/seres/perception`。`systemctl is-enabled` disabled，`is-active` inactive。
+
+**第 5a 步。** 安装目录里的 `lidar_3d_bag_replay`：647 messages、27 clouds、27 frames、110 tracks。和 `deploy_gpu.npz` 比，`keys differing: []`。
+
+**第 5b 步。** 任务里的 `--delay 3` 录到 26 条，缺第一帧 `1789980190.998071`。`--delay 8` 还是这 26 条（播放器在 delay 结束之后才建 publisher，多等没用）。按 T29 先空播一遍，再 `--delay 3 --rate 0.5` 录：27 条，`passed` true，`missing_frames` 0，`same_ids_frames` 26，`frame_ids` 是 `lidar_det`，`received_gap_max` 0.216 s（0.5 倍速）。example：id 1，vehicle，score 0.689。warn 只有一行 `imu stamps jumped back 3.1 s ... starting over`（空播把状态带进去，重来了）。没有 ERROR。节点日志（每秒一行，正式那遍）：
+
+```text
+38 dets, 0 tracks | preprocess_ms 5.7 det_gpu_ms 8.2 det_post_ms 1.3 track_ms 0.0 predict_ms 0.0 total_ms 15.3
+36 dets, 5 tracks | preprocess_ms 6.3 det_gpu_ms 10.5 det_post_ms 1.6 track_ms 0.1 predict_ms 0.0 total_ms 18.6
+41 dets, 5 tracks | preprocess_ms 6.2 det_gpu_ms 10.4 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 18.5
+55 dets, 7 tracks | preprocess_ms 6.4 det_gpu_ms 10.7 det_post_ms 1.7 track_ms 0.1 predict_ms 0.1 total_ms 19.0
+65 dets, 3 tracks | preprocess_ms 6.4 det_gpu_ms 11.3 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 19.6
+```
+
+**第 5c 步。** `/etc/default/lidar-3d-detection` 写成 `ROS_DOMAIN_ID=77`，`systemctl start` 后 active，journal 有 `lidar_3d_detection up`。同样先空播再 0.5 倍速录（不手动起节点）：27 条，`passed` true，`same_ids_frames` 26，`frame_ids` 是 `lidar_det`。`systemctl stop` 之后 inactive，journal：`signal_handler(SIGINT/SIGTERM)`，`Deactivated successfully`。
+
+**第 5d 步。** 6 分钟，59 遍（不是约 130：`ros2 bag play --loop --delay 3` 每一遍都先睡 3 s，一遍约 6 s）。`passed` false，`missing_frames` 6，`unmatched_messages` 0，`same_ids_frames` 426 / 1587，`received_gap_max` 0.202 s。缺帧：第 0 遍 1 帧（起来时的第一朵点云，和 5b 一样）；第 33、34、41、51 遍各 1 帧（有负载）；最后一遍 partial，26 条、缺 1（停下时切在 delay 上）。第 1–32 遍无负载，不丢。`jumped back` 58 次（imu 56、inspvax 2），约等于遍数。没有 ERROR，节点没崩。rss 200.5 → 203.6 MB（最大 203.6）。tegrastats：GR3D 平均 17.2%，最高温度 cpu/tj 58.4 °C，gpu 53.1 °C。
+
+`soak_deb.txt`（每分钟，glog 的时间；第 5 分钟标成 no，是因为这一窗的末尾超过了 load off，负载实际从约 176 s 到 356 s）：
+
+| from min | load | frames logged | total ms median | p99 | max | boxes | tracks |
+|---|---|---|---|---|---|---|---|
+| 0 | no | 30 | 18.2 | 29.0 | 32.5 | 38 | 3 |
+| 1 | no | 30 | 18.1 | 19.6 | 19.6 | 38 | 3 |
+| 2 | no | 30 | 18.2 | 26.5 | 29.1 | 38 | 3 |
+| 3 | yes | 30 | 20.4 | 30.6 | 30.9 | 38 | 3 |
+| 4 | yes | 29 | 20.3 | 29.4 | 29.9 | 38 | 3 |
+| 5 | no | 28 | 20.6 | 31.0 | 31.9 | 38 | 4 |
+
+**第 6 步。** `apt-get remove` 之后 `ls -R /opt/seres | head` 停在 `.../config:`（默认 head 10 行，yaml 文件名在下一行）；接着 purge 打了 `Purging configuration files`，之后 `/opt/seres` 和 `/etc/default/lidar-3d-detection` 都不在了。再装回去：disabled、inactive。
+
+**第 7 步。** 删了 `/tmp/debx`、`data/*.npz`、`data/live_deb`、`data/soak_deb*`、`bags/`，以及这次多录的 `live_svc`、`live_deb_delay3`。`~/dogperc/deb/` 留着（35 MB 的 deb 和 txt）。根分区 3.8 GB，`build_deb/build` 69 MB，没删。引擎没动。
+
+**结论。** deb 可以交给车上 `apt install`。装好后服务不启用，`/etc/default` 里 `ROS_DOMAIN_ID` 仍是注释（这次测过写成 77，purge 之后的新安装又是注释）。服务用户是打包时的 `seres`。在线播放若不等 DDS 对上，第一朵点云会丢；空播一遍再放，或者放慢，27 帧能齐，跟踪 id 26/27 帧和离线回放相同。6 分钟里无负载除了起来的第一帧都不丢；合成负载下少数遍丢 1 帧，和 T30 一样。重新打包还要 `patchelf`（现在只在 `~/bin`，没装进系统）。板上时钟仍是 1970。

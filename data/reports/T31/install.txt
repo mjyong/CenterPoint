@@ -1,1 +1,55 @@
-sudo: a password is required
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages were automatically installed and are no longer required:
+  libfwupdplugin5 libgcab-1.0-0 libslirp0 ros-humble-ros2-control-test-assets
+  slirp4netns
+Use 'sudo apt autoremove' to remove them.
+The following NEW packages will be installed:
+  lidar-3d-detection
+0 upgraded, 1 newly installed, 0 to remove and 102 not upgraded.
+Need to get 0 B/35.8 MB of archives.
+After this operation, 64.2 MB of additional disk space will be used.
+Get:1 /home/seres/dogperc/deb/lidar-3d-detection_0.1.0_arm64.deb lidar-3d-detection arm64 0.1.0 [35.8 MB]
+debconf: delaying package configuration, since apt-utils is not installed
+Selecting previously unselected package lidar-3d-detection.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 330445 files and directories currently installed.)
+Preparing to unpack .../lidar-3d-detection_0.1.0_arm64.deb ...
+Unpacking lidar-3d-detection (0.1.0) ...
+Setting up lidar-3d-detection (0.1.0) ...
+lidar-3d-detection: installed in /opt/seres/perception
+  run by hand:  /opt/seres/perception/lidar_3d_detection/bin/start_lidar_3d_detection.sh
+  as a service: sudo systemctl start lidar-3d-detection (enable: at boot); settings /etc/default/lidar-3d-detection
+Package: lidar-3d-detection
+Status: install ok installed
+Priority: optional
+Section: misc
+Installed-Size: 62668
+Maintainer: junyong.mou <junyong.mou@seres.cn>
+Architecture: arm64
+Version: 0.1.0
+Depends: python3, ros-humble-rmw-fastrtps-cpp (>= 6.2.10-1jammy.20260725.133410), cuda-cudart-12-6 (>= 12.6.68-1), libc6 (>= 2.35-0ubuntu3.14), libconsole-bridge1.0 (>= 1.0.1+dfsg2-3), libcudla-12-6 (>= 12.6.68-1), libexpat1 (>= 2.4.7-1ubuntu0.7), libfmt8 (>= 8.1.1+ds1-2), libgcc-s1 (>= 12.3.0-1ubuntu1~22.04.3), libgflags2.2 (>= 2.2.2-2), libgoogle-glog0v5 (>= 0.5.0+really0.4.0-2), libnvinfer10 (= 10.3.0.30-1+cuda12.5), libpython3.10 (>= 3.10.12-1~22.04.16), libspdlog1 (>= 1:1.9.2+ds-0.2), libstdc++6 (>= 12.3.0-1ubuntu1~22.04.3), libtinyxml2-9 (>= 9.0.0+dfsg-3), libyaml-cpp0.7 (>= 0.7.0+dfsg-8build1), nvidia-l4t-core (>= 36.4.4-20250616085344), nvidia-l4t-cuda (>= 36.4.4-20250616085344), nvidia-l4t-dla-compiler (>= 36.4.4-20250616085344), ros-humble-action-msgs (>= 1.2.3-1jammy.20260716.194213), ros-humble-ament-index-cpp (>= 1.4.1-1jammy.20260307.154947), ros-humble-builtin-interfaces (>= 1.2.3-1jammy.20260716.191122), ros-humble-class-loader (>= 2.2.0-3jammy.20260716.053815), ros-humble-fastcdr (>= 1.0.29-1jammy.20260306.224949), ros-humble-geometry-msgs (>= 4.9.2-1jammy.20260717.001529), ros-humble-libstatistics-collector (>= 1.3.4-1jammy.20260725.135650), ros-humble-libyaml-vendor (>= 1.2.2-2jammy.20260716.053814), ros-humble-nav-msgs (>= 4.9.2-1jammy.20260717.003239), ros-humble-rcl (>= 5.3.13-1jammy.20260725.134226), ros-humble-rcl-interfaces (>= 1.2.3-1jammy.20260716.234636), ros-humble-rcl-logging-interface (>= 2.3.2-1jammy.20260716.054036), ros-humble-rcl-logging-spdlog (>= 2.3.2-1jammy.20260716.054138), ros-humble-rcl-yaml-param-parser (>= 5.3.13-1jammy.20260716.054637), ros-humble-rclcpp (>= 16.0.19-1jammy.20260725.145505), ros-humble-rcpputils (>= 2.4.7-1jammy.20260716.053429), ros-humble-rcutils (>= 5.1.9-1jammy.20260716.052648), ros-humble-rmw (>= 6.1.3-1jammy.20260716.054257), ros-humble-rmw-implementation (>= 2.8.5-1jammy.20260725.133928), ros-humble-rosbag2-cpp (>= 0.15.16-1jammy.20260725.204629), ros-humble-rosbag2-storage (>= 0.15.16-1jammy.20260725.203531), ros-humble-rosgraph-msgs (>= 1.2.3-1jammy.20260716.235304), ros-humble-rosidl-runtime-c (>= 3.1.9-1jammy.20260716.053432), ros-humble-rosidl-typesupport-c (>= 2.0.2-1jammy.20260716.054203), ros-humble-rosidl-typesupport-cpp (>= 2.0.2-1jammy.20260716.054443), ros-humble-rosidl-typesupport-fastrtps-c (>= 2.2.4-1jammy.20260716.055043), ros-humble-rosidl-typesupport-fastrtps-cpp (>= 2.2.4-1jammy.20260716.054717), ros-humble-rosidl-typesupport-introspection-c (>= 3.1.9-1jammy.20260716.053737), ros-humble-rosidl-typesupport-introspection-cpp (>= 3.1.9-1jammy.20260716.054141), ros-humble-sensor-msgs (>= 4.9.2-1jammy.20260717.003956), ros-humble-statistics-msgs (>= 1.2.3-1jammy.20260716.235105), ros-humble-std-msgs (>= 4.9.2-1jammy.20260716.235138), ros-humble-tracetools (>= 4.1.2-1jammy.20260307.160235), ros-humble-unique-identifier-msgs (>= 2.2.1-3jammy.20260716.190531), ros-humble-visualization-msgs (>= 4.9.2-1jammy.20260717.005824), zlib1g (>= 1:1.2.11.dfsg-2ubuntu9.2)
+Recommends: ros-humble-ros2launch, ros-humble-ros2bag, ros-humble-rosbag2-storage-default-plugins
+Conffiles:
+ /etc/default/lidar-3d-detection 50184885752700267bfbf22a93f6b9fd
+--- ls ---
+COLCON_IGNORE
+_local_setup_util_ps1.py
+_local_setup_util_sh.py
+common_interface
+kygi665_msgs
+lidar_3d_detection
+local_setup.bash
+local_setup.ps1
+local_setup.sh
+local_setup.zsh
+nav2_interface
+perception_interface
+setup.bash
+setup.ps1
+setup.sh
+setup.zsh
+--- enabled ---
+disabled
+--- active ---
+inactive

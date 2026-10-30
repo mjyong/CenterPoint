@@ -1,0 +1,367 @@
+{
+ "messages": 27,
+ "objects": 109,
+ "paths": 112,
+ "frame_ids": [
+  "lidar_det"
+ ],
+ "example": {
+  "id": 1,
+  "label": "vehicle",
+  "motion": 0,
+  "score": 0.6893270015716553,
+  "position": [
+   -40.42194558273612,
+   21.789701545267466,
+   0.862779013663896
+  ],
+  "yaw": 3.140339869433876,
+  "size": [
+   5.252410488128662,
+   1.9418670225143433,
+   2.258820543289185
+  ],
+  "prediction_times": [
+   0.5,
+   1.0,
+   1.5,
+   2.0,
+   2.5,
+   3.0
+  ],
+  "paths": 2
+ },
+ "replay_frames": 27,
+ "passes": 1,
+ "matched_frames": 27,
+ "unmatched_messages": 0,
+ "missing_frames": 0,
+ "same_ids_frames": 26,
+ "received_gap_max": 0.21671810599946184,
+ "passed": true,
+ "rows": [
+  {
+   "stamp": 1789980190.998071,
+   "received": 24767.741817723003,
+   "frame": "lidar_det",
+   "ids": [],
+   "paths": 0
+  },
+  {
+   "stamp": 1789980191.097975,
+   "received": 24767.940341641002,
+   "frame": "lidar_det",
+   "ids": [],
+   "paths": 0
+  },
+  {
+   "stamp": 1789980191.197662,
+   "received": 24768.144308587,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2
+   ],
+   "paths": 3
+  },
+  {
+   "stamp": 1789980191.297552,
+   "received": 24768.341047175003,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "paths": 5
+  },
+  {
+   "stamp": 1789980191.39822,
+   "received": 24768.549333658,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "paths": 5
+  },
+  {
+   "stamp": 1789980191.497536,
+   "received": 24768.741372047003,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "paths": 4
+  },
+  {
+   "stamp": 1789980191.598555,
+   "received": 24768.944360875,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    7
+   ],
+   "paths": 5
+  },
+  {
+   "stamp": 1789980191.69747,
+   "received": 24769.14306722,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    4,
+    7
+   ],
+   "paths": 4
+  },
+  {
+   "stamp": 1789980191.798183,
+   "received": 24769.342117397002,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    4,
+    7
+   ],
+   "paths": 4
+  },
+  {
+   "stamp": 1789980191.89765,
+   "received": 24769.542788524002,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    4,
+    7
+   ],
+   "paths": 4
+  },
+  {
+   "stamp": 1789980191.99789,
+   "received": 24769.748105132003,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    7
+   ],
+   "paths": 5
+  },
+  {
+   "stamp": 1789980192.097183,
+   "received": 24769.94025187,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    7
+   ],
+   "paths": 5
+  },
+  {
+   "stamp": 1789980192.19764,
+   "received": 24770.141631235,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    7
+   ],
+   "paths": 5
+  },
+  {
+   "stamp": 1789980192.298542,
+   "received": 24770.358349341,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    7
+   ],
+   "paths": 5
+  },
+  {
+   "stamp": 1789980192.397691,
+   "received": 24770.544886367003,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    7
+   ],
+   "paths": 5
+  },
+  {
+   "stamp": 1789980192.497682,
+   "received": 24770.744214873,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    7,
+    12
+   ],
+   "paths": 6
+  },
+  {
+   "stamp": 1789980192.597927,
+   "received": 24770.942676777002,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    7,
+    12
+   ],
+   "paths": 6
+  },
+  {
+   "stamp": 1789980192.697684,
+   "received": 24771.144123116002,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    7,
+    12,
+    13
+   ],
+   "paths": 7
+  },
+  {
+   "stamp": 1789980192.79797,
+   "received": 24771.343460197,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    12,
+    13
+   ],
+   "paths": 6
+  },
+  {
+   "stamp": 1789980192.897468,
+   "received": 24771.546213191003,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    12
+   ],
+   "paths": 5
+  },
+  {
+   "stamp": 1789980192.997892,
+   "received": 24771.744518459003,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "paths": 4
+  },
+  {
+   "stamp": 1789980193.097763,
+   "received": 24771.957212796002,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    4
+   ],
+   "paths": 3
+  },
+  {
+   "stamp": 1789980193.198248,
+   "received": 24772.145548273,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    4
+   ],
+   "paths": 3
+  },
+  {
+   "stamp": 1789980193.297263,
+   "received": 24772.344110974,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    4
+   ],
+   "paths": 3
+  },
+  {
+   "stamp": 1789980193.397716,
+   "received": 24772.546501929002,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    4
+   ],
+   "paths": 3
+  },
+  {
+   "stamp": 1789980193.497848,
+   "received": 24772.747844334,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    4,
+    7
+   ],
+   "paths": 4
+  },
+  {
+   "stamp": 1789980193.59716,
+   "received": 24772.941418652,
+   "frame": "lidar_det",
+   "ids": [
+    1,
+    2,
+    4
+   ],
+   "paths": 3
+  }
+ ]
+}

@@ -1,0 +1,12 @@
+| from min | load | frames logged | total ms median | p99 | max | boxes | tracks |
+|---|---|---|---|---|---|---|---|
+| 0 | no | 30 | 18.2 | 29.0 | 32.5 | 38 | 3 |
+| 1 | no | 30 | 18.1 | 19.6 | 19.6 | 38 | 3 |
+| 2 | no | 30 | 18.2 | 26.5 | 29.1 | 38 | 3 |
+| 3 | yes | 30 | 20.4 | 30.6 | 30.9 | 38 | 3 |
+| 4 | yes | 29 | 20.3 | 29.4 | 29.9 | 38 | 3 |
+| 5 | no | 28 | 20.6 | 31.0 | 31.9 | 38 | 4 |
+
+    56  WARN: imu stamps jumped back # s (bag played again or clock reset): starting over
+     2  WARN: inspvax stamps jumped back # s (bag played again or clock reset): starting over
+{"rss_mb": {"first": 200.4609375, "last": 203.5546875, "max": 203.5546875}, "tegrastats": {"samples": 73, "gr3d_mean": 17.246575342465754, "ram_mb_min": 10112, "ram_mb_max": 10868, "temp_max_c": {"cpu": 58.437, "soc2": 52.812, "soc0": 52.437, "gpu": 53.125, "tj": 58.437, "soc1": 53.281}}}

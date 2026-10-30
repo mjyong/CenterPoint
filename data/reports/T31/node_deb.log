@@ -1,0 +1,14 @@
+I0101 14:51:19.999143 31985 logging.h:30] Lidar 3D detection logger initialized. Log directory: /tmp/lidar_3d_detection_logs
+I0101 14:51:20.205761 31985 lidar_3d_detection.cpp:141] lidar_3d_detection up: config /opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml, model /opt/seres/perception/lidar_3d_detection/model (fp16, GPU), lidar /robot/topic/rdap/top_point_cloud2, inspvax /rte/rdap/rtk/inspvax, imu /rte/rdap/rtk/imus/data_raw, objects /perception/lidar_3d/objects
+I0101 14:51:24.257171 31985 lidar_3d_detection.cpp:109] ENU origin 29.73325161 106.78497842 217.10
+I0101 14:51:24.792599 31985 lidar_3d_detection.cpp:179] 41 dets, 0 tracks | preprocess_ms 7.2 det_gpu_ms 22.8 det_post_ms 1.4 track_ms 0.0 predict_ms 0.0 total_ms 31.8
+I0101 14:51:25.876617 31985 lidar_3d_detection.cpp:179] 41 dets, 5 tracks | preprocess_ms 6.3 det_gpu_ms 10.4 det_post_ms 1.6 track_ms 0.1 predict_ms 0.0 total_ms 18.5
+I0101 14:51:26.880228 31985 lidar_3d_detection.cpp:179] 67 dets, 3 tracks | preprocess_ms 6.8 det_gpu_ms 12.1 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 20.8
+W0101 14:51:33.974538 31985 lidar_3d_detection.cpp:108] imu stamps jumped back 3.1 s (bag played again or clock reset): starting over
+I0101 14:51:33.974861 31985 lidar_3d_detection.cpp:109] ENU origin 29.73325161 106.78497842 217.10
+I0101 14:51:34.885843 31985 lidar_3d_detection.cpp:179] 38 dets, 0 tracks | preprocess_ms 5.7 det_gpu_ms 8.2 det_post_ms 1.3 track_ms 0.0 predict_ms 0.0 total_ms 15.3
+I0101 14:51:36.088501 31985 lidar_3d_detection.cpp:179] 36 dets, 5 tracks | preprocess_ms 6.3 det_gpu_ms 10.5 det_post_ms 1.6 track_ms 0.1 predict_ms 0.0 total_ms 18.6
+I0101 14:51:37.285761 31985 lidar_3d_detection.cpp:179] 41 dets, 5 tracks | preprocess_ms 6.2 det_gpu_ms 10.4 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 18.5
+I0101 14:51:38.288413 31985 lidar_3d_detection.cpp:179] 55 dets, 7 tracks | preprocess_ms 6.4 det_gpu_ms 10.7 det_post_ms 1.7 track_ms 0.1 predict_ms 0.1 total_ms 19.0
+I0101 14:51:39.289611 31985 lidar_3d_detection.cpp:179] 65 dets, 3 tracks | preprocess_ms 6.4 det_gpu_ms 11.3 det_post_ms 1.7 track_ms 0.1 predict_ms 0.0 total_ms 19.6
+[INFO] [0000024705.268852027] [rclcpp]: signal_handler(SIGINT/SIGTERM)
