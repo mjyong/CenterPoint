@@ -39,7 +39,7 @@ def typestore():
         if not os.path.isdir(msg_dir):
             continue
         for name in names:
-            with open(os.path.join(msg_dir, name + ".msg")) as f:
+            with open(os.path.join(msg_dir, name + ".msg"), encoding="utf-8") as f:
                 types.update(get_types_from_msg(f.read(), "%s/msg/%s" % (package, name)))
     ts.register(types)
     return ts
