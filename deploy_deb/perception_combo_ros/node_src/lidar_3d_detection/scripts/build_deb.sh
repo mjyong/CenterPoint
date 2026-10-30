@@ -4,14 +4,16 @@
 # (/opt/seres/perception) and dpkg-deb packs it with the start script, the systemd unit and its settings.
 #
 #   node_src/lidar_3d_detection/scripts/build_deb.sh --model ~/dogperc/models/nusc_pp_dyn [--out DIR]
-#       [--prefix /opt/seres/perception] [--version V] [--service-user USER] [--enable-service]
+#       [--prefix /opt/seres/perception] [--version V] [--service-user USER]
 #       [--precision fp16] [--cuda-arch 87] [--jobs N] [--work DIR] [--skip-build]
+#       [--no-enable-service]
 #
 #   --model           model_meta.json, pfn.onnx, rpn_head.onnx and the <precision> engines built on this board
 #                     (tools/deploy/build_engines.py). Engines only load on the TensorRT that built them, so the
 #                     .deb depends on exactly this board's libnvinfer version
 #   --service-user    User= of lidar-3d-detection.service (default: who runs this script)
-#   --enable-service  postinst enables and starts the service (default: installed, not enabled)
+#   --enable-service  postinst enables and starts the service (the default)
+#   --no-enable-service  install the unit, do not enable or start it
 #   --skip-build      package <work>/install as it is
 #
 # No root needed (dpkg-deb --root-owner-group); installing is `sudo apt install ./lidar-3d-detection_*.deb`.
@@ -23,7 +25,7 @@ set -euo pipefail
 NODE=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)        # node_src/lidar_3d_detection
 WS=$(dirname "$(dirname "$NODE")")                               # perception_combo_ros
 SLAM=$(dirname "$WS")/slam/interface                             # kygi665_msgs
-MODEL="" OUT=$PWD PREFIX=/opt/seres/perception VERSION="" SERVICE_USER=$(id -un) ENABLE=no PRECISION=fp16
+MODEL="" OUT=$PWD PREFIX=/opt/seres/perception VERSION="" SERVICE_USER=$(id -un) ENABLE=yes PRECISION=fp16
 CUDA_ARCH=87 JOBS=$(nproc) WORK=$WS/build_deb SKIP_BUILD=0
 while [ $# -gt 0 ]; do
   case $1 in
@@ -33,12 +35,13 @@ while [ $# -gt 0 ]; do
     --version) VERSION=$2; shift 2 ;;
     --service-user) SERVICE_USER=$2; shift 2 ;;
     --enable-service) ENABLE=yes; shift ;;
+    --no-enable-service) ENABLE=no; shift ;;
     --precision) PRECISION=$2; shift 2 ;;
     --cuda-arch) CUDA_ARCH=$2; shift 2 ;;
     --jobs) JOBS=$2; shift 2 ;;
     --work) WORK=$2; shift 2 ;;
     --skip-build) SKIP_BUILD=1; shift ;;
-    *) sed -n '2,18p' "$0"; exit 2 ;;
+    *) sed -n '2,19p' "$0"; exit 2 ;;
   esac
 done
 die() { echo "build_deb.sh: $*" >&2; exit 1; }

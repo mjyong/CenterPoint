@@ -60,7 +60,7 @@ node_src/lidar_3d_detection/scripts/build_deb.sh --model ~/dogperc/models/nusc_p
 - **选项**：
   - `--prefix`：安装位置；
   - `--service-user`：服务用哪个用户跑，默认是打包的人；
-  - `--enable-service`：装上就开机自启并启动，默认只装不启用；
+  - `--no-enable-service`：只装不启用。默认装上就开机自启并启动；
   - `--skip-build`：直接打包已有的安装目录；
 - 不需要 root。
 
