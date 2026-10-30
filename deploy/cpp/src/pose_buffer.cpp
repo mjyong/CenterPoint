@@ -37,6 +37,13 @@ void PoseBuffer::truncate_from(double t) {
   }
 }
 
+void PoseBuffer::clear() {
+  t_.clear();
+  R_.clear();
+  p_.clear();
+  seg_valid_ = false;
+}
+
 void PoseBuffer::prune(double t_old) {
   long n = static_cast<long>(search_left(t_, t_old));
   n = std::min(n, static_cast<long>(t_.size()) - 2);
@@ -114,6 +121,13 @@ Mat4 PoseBuffer::pose_at(double t) const {
   std::vector<Vec3> p;
   interpolate({t}, R, p);
   return make_T(R[0], p[0]);
+}
+
+void ImuPropagator::reset() {
+  bias_ = cfg_.gyro_bias;
+  imu_.clear();
+  have_anchor_ = false;
+  v_est_.reset();
 }
 
 void ImuPropagator::on_odometry(double t, const Mat3& R_wb, const Vec3& p_wb, const std::optional<Vec3>& v_w) {

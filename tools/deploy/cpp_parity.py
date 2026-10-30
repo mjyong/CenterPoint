@@ -120,9 +120,9 @@ def run_python(args):
         from dog_perception.online import OnlineInputs
         inputs = OnlineInputs(params, pipe)
         log = MessageLog() if args.messages else None
-        scans = bag_scans(args, inputs, log)
+        scans, on_scan = bag_scans(args, inputs, log), inputs.on_scan
     else:
-        scans = seq_scans(args, pipe)
+        scans, on_scan = seq_scans(args, pipe), pipe.on_scan
     from dog_perception.detection.filters import DetectionFilterConfig, filter_measurements
     rec = dict(stamp=[], T_world_det=[], T_world_body=[], num_raw=[], num_kept=[], points=[], ground_offset=[],
                ground_tilt=[], dets=[], raw=[], tracks=[], preds=[])
@@ -135,7 +135,7 @@ def run_python(args):
             dets = frame_dets(given, "", k) if match else Detections()
         elif det is None:              # --no-detector
             dets = Detections()
-        out = pipe.on_scan(scan, detections=dets)
+        out = on_scan(scan, detections=dets)
         if out is None:
             continue
         k += match

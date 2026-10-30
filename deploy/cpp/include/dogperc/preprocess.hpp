@@ -104,7 +104,7 @@ struct PreprocessedFrame {
 class Preprocessor {
  public:
   Preprocessor(PreprocessConfig cfg, const PoseBuffer& poses);
-  void reset() { accumulator_.reset(); }
+  void reset();                               // forget the past sweeps and the ground fit
   // self filter + deskew one sweep: body-frame points at the scan stamp (float64) and their intensity
   // timings: dedup_ms, self_filter_ms, deskew_ms
   void sweep_to_body(const LidarScan& scan, std::vector<double>& xyz_body, std::vector<float>& intensity,

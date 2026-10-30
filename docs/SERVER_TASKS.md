@@ -121,7 +121,8 @@
 | T27 | Orin 部署 P2：INT8 量化（ModelOpt Q/DQ，训练场景校准），和 FP16 比精度和板上延迟；动态柱数的 PFN | Agent | T26 | 2.5 小时 | 完成，已复核。上线用 FP16 加动态 PFN（`nusc_pp_dyn`）。FP16 剩下的漏报多是过滤器的阈值翻转（过滤前 10 个场景都 ≥ 0.991），比较工具加了 filter 一类、heads rel 不再卡门槛。INT8 差得不正常（有个 head 余弦为负），多半是稀疏 BEV 上 entropy 校准截断太狠，现在不追。两个 INT8 的 AP@2 掉 0.124 / 0.099，不上（人定，2026-10-29）。板上 RPN：FP16 5.05 ms，INT8 2.65 ms。PFN：动态 10000 柱 1.50 ms，静态 3.52 ms |
 | T28 | Orin 部署 P4 / P5：C++ 核心库在服务器容器里编译、跑对齐测试（含 GPU、TensorRT）；10 个验证场景上 Python 和 C++ 比（同一批检测、各自检测）并打分；板上原生编译、测试、测延迟 | Agent（锁频掉了才要人） | T27 | 3 小时 | 完成，已复核。复核在样例 bag 的真实扫描上拆开计时：慢的是去重（逐点 unordered_map），不是去畸变；预处理和后处理已提速，输出逐位不变，T28B 复测。C++ 可以替代 Python：10 个场景同一批检测 ID 全同，各自检测匹配率都是 1。标签上 AP@2 / AP@4 都是 0.832 / 0.852。板上锁频还在。端到端中位数 27.7 ms（p99 30.2 ms），网络以外 21.8 ms，比 15 ms 多 6.8 ms，多在去畸变。INT8 最差的 head 是 height（余弦 −0.85） |
 | T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 完成，已复核。输出和 T28 逐位相同，1 线程和 4 线程也相同。板上网络以外：1 线程 12.9 ms，4 线程 11.4 ms，都低于 15 ms。用 4 个线程。服务器上 4 线程更慢，体素化 p99 尖峰从 215 ms 降到 19 ms（1 线程），还没消失 |
-| T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成。服务器两段 msgs_dets / msgs 都 pass。板上 colcon 3 个包编过；ROS 读 bag 和读消息日志逐位相同；bag_dets、bag_gpu 都 pass。在线 27 帧不丢（先热身后 0.5× 播放）。节点可以上车做 bag 回放和在线订阅 |
+| T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成，已复核。对齐都过：服务器两段同一批检测 ID 每帧相同；板上 ROS 读 bag 和读消息日志逐位相同；板上 GPU 对服务器过门槛。板上端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（样例 bag）。复核查出节点在时间戳倒退（bag 重播、时钟回跳）时不会重来，bag 长于 3 s 时重播后基本没有输出，已修（两边一样，加了测试）；在线 `same_ids_frames 0` 是热身那遍的状态带进了正式播放。TensorRT 新出现一句设备提示，T30 查 |
+| T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5529,3 +5530,136 @@ ENU origin 29.73325161 106.78497842 217.10
 warn / error：只有上面那句 TensorRT device 提示；没有别的 warn / error。进程 SIGINT 后干净退出。
 
 **结论。** 节点可以上车：离线 `dogperc_bag_replay` 和消息日志逐位相同，对 Python 同一批检测对齐；GPU 回放对服务器过门槛；在线订阅 bag 不丢帧（正式播前要先让 DDS 发现好，或放慢播放）。还缺的：和规划约定话题名 / `ObjectArray` 字段是否够用（这次消息里有 id、label、motion、score、position、yaw、size、prediction_times、paths）；长时间 10 Hz 稳定性和和别的进程抢资源是 T30；上车实时跑之前要人校时（板子时钟仍停在 1970）。做完删了板上的 live、`data/*.npz`、bags、golden；`deploy/ros2/build` 和 `install` 留着。根分区 4.4 GB。
+
+### T29 复核
+
+2026-10-30。对齐、编译、延迟这几项的结论同意。在线那一步的解释不对，往下查出节点的一个真问题，已修。
+- 消息处理：服务器两段 msgs_dets 都过（0921 前 600 云，599 帧 ID 每帧相同，状态差 2.2e-10）；板上 ROS 读 bag 和读消息日志逐位相同，说明 ROS 消息到结构体的拷贝没问题；
+- 板上 GPU 对服务器的引擎：漏 2 个 near，匹配率 1，过门槛。轨迹差最大 8 cm、预测差 0.31 m，是两块卡上 FP16 的差；
+- 板上延迟（样例 bag 27 帧，4 线程）：端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（p99 14.2）。比 T28B 的 17.3 / 11.4 ms 略高，因为输入不同（样例 bag 是走动中的，约 1 万柱），不是变慢了。节点日志里每帧 16–20 ms，和离线一致。
+
+1. **在线 `same_ids_frames 0` 不是因为到达顺序**：热身和正式播放用的是同一个节点进程，正式播放时节点还带着热身那一遍的轨迹和点云。证据：node.log 里节点刚起来的第一帧是 "0 tracks"（3746 s），正式播放的第一帧已经是 "3 tracks"（3760 s）；在线录到 120 个目标，回放是 110 行。
+2. 往下查是节点的真问题：**时间戳倒退时节点不会重来**：
+   - 位姿缓存把比最新一条还旧的位姿当乱序丢掉。bag 再播一遍（或者时钟往回跳）以后，新来的位姿全被丢掉，扫描只能用缓存里上一遍最后 3 s 的位姿；
+   - 样例 bag 只有 2.6 s，正好全落在这 3 s 里，所以才"没丢帧"。bag 长于 3 s 时，重播后除了最后 3 s 都没有输出，要等时间戳超过上一遍的最后一条才恢复，时钟回跳也一样；
+   - 本机复现：位姿缓存设成 1 s，第二遍只出 10/27 帧，没有一帧和第一遍相同。
+   已修，Python 和 C++ 一样（`dog_perception/online.py`、`dogperc/online.hpp`）：
+   - 某个话题的时间戳比它的上一条早 1 s 以上，节点整个重来，和新起的一样：位姿、IMU、点云累积、地面估计、跟踪、ENU 原点、航向检查都清掉，日志里一行 warn；
+   - 重来以后，别的话题如果还有旧时间线上迟到的消息，直接丢掉，不当成第二次倒退。循环播放时，上一遍的最后一帧点云常常在下一遍的第一条 INS 之后才被处理：rclcpp 的执行器在同时有几条在等时按订阅创建的顺序取，IMU、INS 排在点云前面。DEPLOY_ORIN 第 8 节"线程"那条原来写"按到达顺序"，不对，已改；
+   - 测试：`Online.ReplayedBagStartsOver`（C++）和 `test_a_bag_played_again_starts_over`（Python）。golden 数据 / 样例 bag 播两遍，中间插一帧上一遍的点云；第二遍的位姿、点、轨迹 ID、年龄逐位等于第一遍。把重来关掉，两个测试都失败；
+   - 顺手修了一处：`PerceptionPipeline(pose_buffer=...)` 传进空的缓存会被换成默认的（空缓存判为假）。现在没有调用方传这个参数。
+3. 1× 播放丢第一帧，是 DDS 发现期的问题，`--delay 3` 就够了，不用 0.5× 播放：节点每帧 20 ms 左右，10 Hz 下余量有 5 倍。T30 用 1×、`--delay 3`、新起的节点。
+4. TensorRT 提示 "engine plan file across different models of devices"：
+   - T28B 用的是同一块板、同样的引擎文件（T27 在板上建的，pfn 69212 字节），没有这句，T29 才有；
+   - 打印 TensorRT 日志的代码从 T28 起没改过，所以是板子那边变了。板子停用的那两天有没有刷机、升级 JetPack、换板，要人确认；
+   - 延迟没变（RPN 4.77 ms，T28B 4.80 ms），对齐也过了；
+   - T30 记下板子的版本信息，在板上重建引擎。
+5. `engines.json` 里有 x86 的记录，是以前 `sync_to_orin.sh --model` 把服务器的 `engines.json` 盖过去了（规则里有 `--include '*.json'`）。已改：同步模型时不带 `engines.json`，板上留自己的。
+6. 要人的两件事：
+   - 话题名、`ObjectArray` 字段够不够，要和做规划的人对；
+   - 板子时钟停在 1970，上车跑实时之前要校时。节点只用消息里的时间戳，不看系统时钟，所以回放不受影响。
+7. 下一步 T30：长时间循环回放（每遍节点重来一次）、负载下的延迟、TensorRT 提示。新工具：
+   - `tools/deploy/cut_bag.py`：从原始 bag 截出节点的三个话题，保持源 bag 的 rosbag2 版本；rosbags 只能写 8 / 9 版，Humble 读不读不确定；
+   - `deploy/scripts/orin_soak.sh`：板上的长时间回放；
+   - `tools/deploy/soak_report.py`：汇总回放结果；
+   - `objects_bag.py`：按遍检查（循环播放时在时间戳倒退处分遍）。
+
+## T30 Orin 部署 P7：长时间循环回放、负载、TensorRT 提示
+
+T29 复核改了节点：某个话题的时间戳倒退 1 s 以上，节点整个重来（DEPLOY_ORIN.md 第 8 节）。T30 在板上验这个改动和长时间稳定性：
+- 服务器：从 0921 原始 bag 截一段，只留节点的三个话题（前 600 云，约 60 s，`cut_bag.py`），跑 Python 参考，和 C++ 对齐（带这次的改动）；
+- 板上：重编、测试；TensorRT 的设备提示：记版本，重建引擎；
+- 板上：这段 bag 离线回放（在线的参考）、测延迟；在线 1× 循环播 30 分钟（约 30 遍，每遍节点重来一次），后 15 分钟加负载。查每遍不丢帧，看延迟、内存、温度。
+
+本任务可以改的范围（通用约定 9）：`deploy/ros2/`、`deploy/cpp/`、`deploy/scripts/`、`tools/deploy/`。`dog_perception/` 不改。
+
+```text
+任务 T30：节点长时间循环回放（每遍重来）、负载下的延迟、TensorRT 设备提示。
+先按通用约定做（第 9 条：可以改代码，范围见本节开头）。前置：T29 复核的改动已经 git pull 到。
+
+0. mkdir -p data/reports/T30 data/deploy/T30；TASK=T30；N=data/deploy/T30；M=data/deploy/nusc_pp_dyn；G、dk 同 T28 第 0 步。
+   python -m pytest tests/dog/test_ros2_node.py tests/dog/test_deploy.py -q 2>&1 | tee data/reports/T30/pytest.txt
+   （test_a_bag_played_again_starts_over、test_cut_bag_keeps_the_node_messages 要跑到，不能是 skipped）
+   快速测试（约定 7）：python -m pytest tests/dog -m "not slow" -n 8 -q 2>&1 | tail -3 | tee data/reports/T30/pytest_fast.txt
+   服务器容器里重编、ctest（同 T28 第 2 步，输出 build_x86.txt、ctest_x86.txt）：Online.ReplayedBagStartsOver 通过，不能是 SKIPPED。
+1. 服务器：截 bag，跑 Python 参考，和 C++ 对齐。
+     B=/zjst/robot/rosbag0921/rosbag2_2026_09_21-16_41_27；n=rosbag2_0921_600
+     python tools/deploy/cut_bag.py --bag $B --robot kygi --max-clouds 600 --out $N/bags/$n | tee data/reports/T30/cut.txt
+     du -sh $N/bags/$n | tee -a data/reports/T30/cut.txt
+     python tools/deploy/cpp_parity.py python --bag $N/bags/$n --robot kygi --exported $M:trt:fp16 \
+         --out $N/py.npz --dets $N/py_dets.npz --config $N/kygi.yaml --messages $N/msgs.npz \
+         2>&1 | tail -3 | tee data/reports/T30/python.txt
+     dk "deploy/cpp/build_cuda/dogperc_replay --messages $N/msgs.npz --config $N/kygi.yaml \
+         --detections $N/py_dets.npz --out $N/cpp_dets.npz" 2>&1 | tail -3 | tee data/reports/T30/cpp_replay.txt
+     dk "deploy/cpp/build_cuda/dogperc_replay --messages $N/msgs.npz --config $N/kygi.yaml \
+         --model-dir $M --precision fp16 --gpu --out $N/cpp.npz" 2>&1 | tail -3 | tee -a data/reports/T30/cpp_replay.txt
+     python tools/deploy/cpp_parity.py compare --ref $N/py.npz --cpp $N/cpp_dets.npz --same-detections \
+         --out data/reports/T30/msgs_dets.json | tail -1 | tee data/reports/T30/msgs_dets.txt
+     python tools/deploy/cpp_parity.py compare --ref $N/py.npz --cpp $N/cpp.npz \
+         --out data/reports/T30/msgs.json | tail -1 | tee data/reports/T30/msgs.txt
+   - cut_bag.py 只认没压缩的 sqlite3 bag。0921 原始 bag 不是这种就按约定 9 改 cut_bag.py；写出来的 bag 要能被板上 Humble 的 ros2 bag play 读；
+   - T29 的 data/deploy/T29/rosbag2_2026_09_21-16_41_27/msgs.npz 还在的话，和这次的 msgs.npz 逐键比，必须全同（截出来的就是 T29 回放的那 600 云）：
+       python -c "import numpy as np, sys; a, b = np.load(sys.argv[1]), np.load(sys.argv[2]); \
+           print('keys differing:', [k for k in a.files if not np.array_equal(a[k], b[k])])" \
+           data/deploy/T29/rosbag2_2026_09_21-16_41_27/msgs.npz $N/msgs.npz | tee -a data/reports/T30/cut.txt
+   - cpp_replay.txt 里不应该有 "jumped back"（这段 bag 的时间戳一直往前）。有就抄下来；
+   - msgs_dets、msgs 的门槛同 T29 第 2 步，结果应和 T29 的 0921 那一行一样。
+2. 板上：同步、编译、测试。
+   a. 先看 df -h /（T29 剩 4.4 GB；这段 bag 约 2 GB，大小看 cut.txt）。同步后剩不到 1.5 GB 就停下问人：
+        deploy/scripts/sync_to_orin.sh --bag $N/bags/$n
+        scp $N/kygi.yaml orin:dogperc/data/
+   b. colcon 编译、deploy/cpp 板上编译、ctest：同 T29 第 3b 步，输出 colcon_orin.txt、ctest_orin.txt。
+      板上没有 rosbags / samples，生成不了 golden 的 online*：和 T29 一样，把服务器 build_cuda/golden/online* 拷过去，
+      再跑 --gtest_filter='Online.*'，输出 gtest_online_orin.txt（6 个都通过）。
+   c. TensorRT 的设备提示（T29 复核第 4 条）。先记下板子：
+        ssh orin 'cat /etc/nv_tegra_release; cat /proc/device-tree/model; echo; \
+            dpkg -l | grep -E "nvidia-l4t-core|nvidia-jetpack|libnvinfer10|tensorrt" | awk "{print \$2, \$3}"; \
+            ls -l --time-style=+%F_%T ~/dogperc/models/nusc_pp_dyn/; uptime' 2>&1 | tee data/reports/T30/orin_identity.txt
+      旧引擎挪到 models/nusc_pp_dyn/t27/，在板上重建（同 T27）：
+        ssh orin 'cd ~/dogperc/models/nusc_pp_dyn && mkdir -p t27 && mv *.engine t27/ && cd ~/dogperc/repo && \
+            python3 tools/deploy/build_engines.py --model-dir ~/dogperc/models/nusc_pp_dyn --precision fp16 \
+            --opt-pillars 10000 --benchmark 50' 2>&1 | tail -8 | tee data/reports/T30/build_engines_orin.txt
+      第 3 步的回放里看这句提示还在不在。
+3. 板上离线回放（在线的参考）和延迟：
+        R='source /opt/ros/humble/setup.bash && source ~/dogperc/repo/deploy/ros2/install/setup.bash && cd ~/dogperc'
+        ssh orin "$R && ros2 run dogperc_ros dogperc_bag_replay --bag bags/$n --config data/kygi.yaml \
+            --model-dir models/nusc_pp_dyn --precision fp16 --gpu --threads 4 --out data/bag_gpu.npz" \
+            2>&1 | tail -4 | tee data/reports/T30/orin_bag_gpu.txt
+        scp orin:dogperc/data/bag_gpu.npz $N/
+        python tools/deploy/cpp_parity.py compare --ref $N/cpp.npz --cpp $N/bag_gpu.npz \
+            --out data/reports/T30/orin_bag_gpu.json | tail -1 | tee -a data/reports/T30/orin_bag_gpu.txt
+        python tools/deploy/cpp_parity.py timings $N/bag_gpu.npz --skip 3 | tee data/reports/T30/orin_bag_timings.txt
+   - 门槛同 T28 第 6d 步；
+   - 重建引擎以后 "across different models of devices" 还在不在，写进报告。
+4. 板上在线：1× 循环播 30 分钟（约 30 遍），后 15 分钟加负载（同一段 bag 在 GPU 上离线回放、循环跑，再加 4 个满载的 CPU 核）。
+   脚本约 31 分钟，用 nohup 在板上跑，免得 ssh 断了：
+        ssh orin "cd ~/dogperc && nohup repo/deploy/scripts/orin_soak.sh bags/$n data/kygi.yaml models/nusc_pp_dyn 30 \
+            data/soak > data/soak.out 2>&1 &"
+        （约 32 分钟后）ssh orin 'tail -20 dogperc/data/soak.out' | tee data/reports/T30/orin_soak.txt
+        scp -r orin:dogperc/data/soak $N/soak
+        python tools/deploy/objects_bag.py --bag $N/soak/live --replay $N/bag_gpu.npz \
+            --out data/reports/T30/orin_live.json > data/reports/T30/orin_live.txt
+        python tools/deploy/soak_report.py $N/soak --window 300 --out data/reports/T30/soak.json | tee data/reports/T30/soak.txt
+        grep -E "WARN|ERROR|TensorRT" $N/soak/node.log | head -100 > data/reports/T30/orin_node_warn.log
+   - orin_live.txt：passes 应该在 30 左右；passed 要是 true，也就是每一遍都不丢帧（最后一遍只算到停下的地方）；
+     received_gap_max 记下（10 Hz 应在 0.1 s 左右，超过 0.3 s 就是卡了一下）；same_ids_frames / matched_frames 记下（每遍都是新起的节点，应该大多相同）；
+   - soak.txt：每 5 分钟一行，有负载和没负载时 total_ms 的中位数 / p99 / 最大值；
+   - warn 计数："jumped back" 每遍一次是对的，"from before the restart dropped" 可以有，"no pose" 每遍最多一两次（在开头）。别的 warn / error 全部抄下；
+   - 内存（rss_mb）记首、尾、最大，涨了 50 MB 以上要说；tegrastats 记 GR3D 平均值和最高温度；
+   - 节点崩溃或卡住（node.log 不再更新）就抄下最后的日志，停下。
+5. 做完删掉板上的 data/soak、data/soak.out、data/*.npz、bags/，models/nusc_pp_dyn/t27/ 留着；记下根分区剩余空间。
+
+停止条件（按约定 9 修不好的时候）：第 1 步 msgs_dets 不过；板上 colcon 编译失败；第 4 步节点崩溃或卡住。
+提交：data/reports/T30/、本文档，以及按约定 9 改的代码。不提交 data/deploy/T30/、bag、build、install、引擎。
+报告（写进"T30 结果"）：
+- 代码改动（约定 9）：每条写提交号、文件、原因、怎么验证的；
+- cut.txt：每个话题的条数、大小，和 T29 msgs.npz 比的结果；第 1 步两个 compare 表；
+- orin_identity.txt 的要点；重建引擎前后提示还在不在，RPN / PFN 的 GPU 时间；
+- 第 3 步的 compare 表、每段延迟（中位数 / p99）；
+- 第 4 步：passes、passed、哪一遍的 missing / unmatched 不是 0、received_gap_max、same_ids；soak.txt 的表、warn 计数、内存、温度；
+- 结论：长时间跑、有负载时能不能保持 10 Hz；还缺什么。
+```
+
+### T30 结果
+
+（待填）

@@ -370,6 +370,11 @@ Preprocessor::Preprocessor(PreprocessConfig cfg, const PoseBuffer& poses)
   if (cfg_.det_frame.auto_ground || cfg_.det_frame.auto_level) ground_.emplace(cfg_.det_frame);
 }
 
+void Preprocessor::reset() {
+  accumulator_.reset();
+  if (ground_) ground_.emplace(cfg_.det_frame);
+}
+
 void Preprocessor::sweep_to_body(const LidarScan& scan, std::vector<double>& xyz_b, std::vector<float>& inten,
                                  const std::vector<std::array<double, 7>>* dyn,
                                  std::map<std::string, double>* timings) const {

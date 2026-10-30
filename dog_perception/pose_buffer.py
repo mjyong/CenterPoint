@@ -58,6 +58,10 @@ class PoseBuffer:
     def add_T(self, t, T):
         return self.add(t, T[:3, :3], T[:3, 3])
 
+    def clear(self):
+        self._t, self._R, self._p = [], [], []
+        self._cache = None
+
     def truncate_from(self, t):
         """Drop every sample with time >= t (used when re-propagating)."""
         n = int(np.searchsorted(np.asarray(self._t), t, side="left"))
@@ -150,8 +154,13 @@ class ImuPropagator:
 
     def __init__(self, buffer, gyro_bias=(0.0, 0.0, 0.0), imu_history=1.0):
         self.buffer = buffer
-        self.gyro_bias = np.asarray(gyro_bias, dtype=np.float64)
+        self._gyro_bias0 = np.asarray(gyro_bias, dtype=np.float64)
         self.imu_history = imu_history
+        self.reset()
+
+    def reset(self):
+        """Forget the IMU samples and the odometry anchor (the buffer is the caller's)."""
+        self.gyro_bias = self._gyro_bias0.copy()
         self._imu = deque()
         self._anchor = None
         self._last = None

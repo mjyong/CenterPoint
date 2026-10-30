@@ -185,11 +185,48 @@ void OnlineInputs::log(LogLevel level, const std::string& key, double every_s, c
   log_(level, text);
 }
 
+void OnlineInputs::reset() {
+  pipe_.reset();
+  origin_.reset();
+  heading_ = HeadingCheck();
+  heading_warned_ = false;
+  last_stamp_.clear();
+  restart_.reset();
+  before_.clear();
+}
+
+bool OnlineInputs::stamp(const char* kind, double t) {
+  char buf[160];
+  auto it = last_stamp_.find(kind);
+  if (it != last_stamp_.end() && t < it->second - kTimeJumpBack) {
+    std::snprintf(buf, sizeof(buf), "%s stamps jumped back %.1f s (bag played again or clock reset): starting over",
+                  kind, it->second - t);
+    log(LogLevel::Warn, "jump", 0.0, buf);
+    std::map<std::string, double> before = std::move(last_stamp_);
+    reset();
+    restart_ = t;
+    before_ = std::move(before);
+    it = last_stamp_.end();
+  } else if (it == last_stamp_.end() && restart_) {
+    const auto b = before_.find(kind);
+    if (t > *restart_ + kTimeJumpBack && b != before_.end() && t > b->second - kTimeJumpBack) {
+      std::snprintf(buf, sizeof(buf), "%s message from before the restart dropped", kind);
+      log(LogLevel::Warn, "before restart", 2.0, buf);
+      return false;
+    }
+  }
+  if (it == last_stamp_.end()) last_stamp_[kind] = t;
+  else it->second = std::max(it->second, t);
+  return true;
+}
+
 void OnlineInputs::on_imu(double t, const Vec3& w) {
+  if (!stamp("imu", t)) return;
   pipe_.on_imu(t, cfg_.imu_convention == "kygi" ? gyro_from_kygi_imu(w) : w);
 }
 
 void OnlineInputs::on_odom(const OdomMsg& m) {
+  if (!stamp("odom", m.t)) return;
   const Mat3 R = quat_to_R(m.q_xyzw[0], m.q_xyzw[1], m.q_xyzw[2], m.q_xyzw[3]);
   std::optional<Vec3> v;
   if (cfg_.odom_twist != "none") v = cfg_.odom_twist == "body" ? Vec3(R * m.v_linear) : m.v_linear;
@@ -197,6 +234,7 @@ void OnlineInputs::on_odom(const OdomMsg& m) {
 }
 
 void OnlineInputs::on_inspvax(const InsSample& s) {
+  if (!stamp("inspvax", s.stamp)) return;
   char buf[256];
   if (!origin_) {
     if (s.ins_status != kInsSolutionGood) {
@@ -233,7 +271,12 @@ LidarScan OnlineInputs::scan(const CloudView& cloud) const {
 }
 
 std::optional<PipelineOutput> OnlineInputs::on_cloud(const CloudView& cloud, const Detections* detections) {
-  auto out = pipe_.on_scan(scan(cloud), detections);
+  return on_scan(scan(cloud), detections);
+}
+
+std::optional<PipelineOutput> OnlineInputs::on_scan(const LidarScan& s, const Detections* detections) {
+  if (!stamp("cloud", s.stamp)) return std::nullopt;
+  auto out = pipe_.on_scan(s, detections);
   if (!out) log(LogLevel::Warn, "no pose", 2.0, "no pose for scan yet (waiting for odometry / IMU)");
   return out;
 }

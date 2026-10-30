@@ -125,11 +125,11 @@ int main(int argc, char** argv) {
         if (given) {
           Detections d;
           const bool match = given->lookup(scan.stamp, d);
-          o = pipe.on_scan(scan, &d);
+          o = inputs.on_scan(scan, &d);
           if (o && match) given->advance();
           if (o && !match) std::fprintf(stderr, "warning: frame at %.6f has no detections in %s\n", scan.stamp, dets_path.c_str());
         } else {
-          o = pipe.on_scan(scan);
+          o = inputs.on_scan(scan);
         }
         if (o) {
           const Detections raw = detector ? detector->last_raw() : Detections{};

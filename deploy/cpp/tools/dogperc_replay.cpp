@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
         }
         const CloudView cloud = log.cloud(log.index(i));
         const LidarScan scan = inputs.scan(cloud);
-        if (!frame(scan.stamp, [&](const Detections* d) { return pipe.on_scan(scan, d); })) break;
+        if (!frame(scan.stamp, [&](const Detections* d) { return inputs.on_scan(scan, d); })) break;
       }
     }
     w.write(out);

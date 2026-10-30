@@ -173,3 +173,46 @@ def test_kygi_node_matches_the_training_sequences(monkeypatch, tmp_path):
     assert np.mean(err < 0.005) >= 0.6 and err.max() < 0.1, err.round(4)
     print(json.dumps(dict(frames=len(common), base_height_sequence=meta["base_height"],
                           frames_within_5mm=float(np.mean(err < 0.005)))))
+
+
+@pytest.mark.slow
+def test_a_bag_played_again_starts_over():
+    """The stamps jump back: the online inputs start over as a new node, and the second pass gives the
+    first pass's frames and tracks again (otherwise the pose buffer drops the new poses as out of order).
+    The first pass's last cloud arriving after the second pass's first message is dropped."""
+    pytest.importorskip("rosbags")
+    if not os.path.isdir(BAG):
+        pytest.skip("sample bag not checked out")
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools", "deploy"))
+    from message_log import bag_messages
+    from dog_perception.detection.boxes import Detections
+    from dog_perception.online import OnlineInputs
+    from dog_perception.pipeline import PerceptionPipeline
+
+    params = node_parameters("kygi")
+    msgs = list(bag_messages(BAG, params))
+    pipe = PerceptionPipeline(preprocess_config(params), None, predictor="imm")
+    warned = []
+    inputs = OnlineInputs(params, pipe, lambda level, text, throttle=0.0: level == "warn" and warned.append(text))
+    car = Detections(np.array([[8.0, 0.0, 0.8, 4.5, 1.9, 1.6, 0.0]]), np.zeros((1, 2)), np.array([0.9]),
+                     np.array([0]), frame="det")          # one car 8 m ahead in every frame: a track to carry over
+    last_cloud = [m for k, m in msgs if k == "cloud"][-1]
+    assert msgs[0][0] != "cloud"
+    passes = []
+    for p in range(2):
+        frames = []
+        for i, (kind, m) in enumerate(msgs):
+            if p == 1 and i == 1:                                 # late, from before the jump
+                assert inputs.on_cloud(last_cloud, detections=car) is None
+            if kind == "cloud":
+                out = inputs.on_cloud(m, detections=car)
+                if out is not None:
+                    frames.append((out.stamp, out.frame.T_world_det, out.frame.points,
+                                   [(s.track_id, s.age, tuple(s.position)) for s in out.tracks]))
+            else:
+                getattr(inputs, "on_" + kind)(m)
+        passes.append(frames)
+    assert [w.split(" ")[1] for w in warned] == ["stamps", "message"], warned
+    assert len(passes[0]) == len(passes[1]) == 27 and passes[0][-1][3]
+    for a, b in zip(*passes):
+        assert a[0] == b[0] and np.array_equal(a[1], b[1]) and np.array_equal(a[2], b[2]) and a[3] == b[3]

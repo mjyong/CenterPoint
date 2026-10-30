@@ -28,6 +28,7 @@ class PoseBuffer {
   double t_max() const { return t_.back(); }
   bool add(double t, const Mat3& R, const Vec3& p);   // false for out-of-order samples
   void truncate_from(double t);                      // drop every sample at time >= t
+  void clear();
   // T_world_body at each time; throws PoseOutOfRange outside the buffer (+ max_extrapolation)
   void interpolate(const std::vector<double>& times, std::vector<Mat3>& R, std::vector<Vec3>& p) const;
   Mat4 pose_at(double t) const;
@@ -52,6 +53,7 @@ class ImuPropagator {
   void on_odometry(double t, const Mat3& R_wb, const Vec3& p_wb, const std::optional<Vec3>& v_w = std::nullopt);
   void on_imu(double t, const Vec3& gyro);
   void set_gyro_bias(const Vec3& b) { bias_ = b; }
+  void reset();                                      // forget the IMU samples and the anchor (not the buffer)
 
  private:
   void propagate(double t, const Vec3& gyro);

@@ -14,6 +14,13 @@ PerceptionPipeline::PerceptionPipeline(PipelineConfig cfg, Detector* detector)
     : cfg_(std::move(cfg)), poses_(cfg_.pose_buffer), imu_(poses_, cfg_.imu), pre_(cfg_.preprocess, poses_),
       detector_(detector), tracker_(cfg_.tracker), predictor_(cfg_.predictor) {}
 
+void PerceptionPipeline::reset() {
+  poses_.clear();
+  imu_.reset();
+  pre_.reset();
+  tracker_.reset();
+}
+
 std::optional<PipelineOutput> PerceptionPipeline::on_scan(const LidarScan& scan, const Detections* detections) {
   const auto t0 = Clock::now();
   auto frame = pre_.process(scan);

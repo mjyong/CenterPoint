@@ -101,7 +101,10 @@ class Preprocessor:
         self.ground = GroundHeightEstimator(dfc) if (dfc.auto_ground or dfc.auto_level) else None
 
     def reset(self):
+        """Forget the past sweeps and the ground fit."""
         self.accumulator.reset()
+        if self.ground is not None:
+            self.ground = GroundHeightEstimator(self.cfg.det_frame)
 
     def sweep_to_body(self, scan, dynamic_boxes=None):
         """Self-filter + deskew one sweep. Returns (xyz_body@stamp, intensity)."""

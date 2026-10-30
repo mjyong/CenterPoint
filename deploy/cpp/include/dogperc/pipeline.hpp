@@ -54,6 +54,8 @@ class PerceptionPipeline {
   // none while no pose covers the scan; `detections` (det frame) bypass the detector
   std::optional<PipelineOutput> on_scan(const LidarScan& scan, const Detections* detections = nullptr);
   void to_local(const PipelineOutput& out, std::vector<LocalTrack>& tracks, std::vector<Prediction>& preds) const;
+  // back to a newly constructed pipeline, same configuration and detector (OnlineInputs: the stamps jumped back)
+  void reset();
 
   const PoseBuffer& poses() const { return poses_; }
   const Preprocessor& preprocessor() const { return pre_; }

@@ -345,3 +345,86 @@ def test_objects_bag_against_a_replay(tmp_path):
                         "--replay", str(replay)], capture_output=True, text=True)
     rep = json.loads(r.stdout)
     assert r.returncode == 1 and rep["missing_frames"] == 1 and rep["same_ids_frames"] == 2 and not rep["passed"]
+
+    # ros2 bag play --loop: three passes (the stamps jump back 4 s), the recording stopped during the third one
+    loop = [(100.0 + 2 * k, ids) for k, (_, ids) in enumerate(frames)]
+    replay_loop = tmp_path / "replay_loop.npz"
+    np.savez(replay_loop, stamp=np.array([f[0] for f in loop]), trk_offsets=np.array([0, 2, 3, 5]),
+             trk_id=np.array([3, 5, 3, 3, 7]))
+
+    def looped(name, drop=None):
+        path = tmp_path / name
+        with Writer(path, version=8) as w:
+            c = w.add_connection("/dog_perception/objects", Arr.__msgtype__, typestore=ts)
+            for k, (stamp, ids) in enumerate(loop * 2 + loop[:1]):
+                if k != drop:
+                    w.write(c, int((10 * k + 0.03) * 1e9), ts.serialize_cdr(message(stamp, ids), Arr.__msgtype__))
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "objects_bag.py"), "--bag",
+                            str(path), "--replay", str(replay_loop)], capture_output=True, text=True)
+        return r.returncode, json.loads(r.stdout)
+
+    code, rep = looped("loop")
+    assert code == 0 and rep["passes"] == 3 and rep["passed"] and rep["matched_frames"] == 7
+    assert rep["received_gap_max"] == pytest.approx(10.0)
+    assert [p["partial"] for p in rep["per_pass"]] == [False, False, True]
+    code, rep = looped("loop_drop", drop=5)                    # the second pass's last frame
+    assert code == 1 and rep["missing_frames"] == 1 and rep["per_pass"][1]["missing_frames"] == 1
+
+
+def test_cut_bag_keeps_the_node_messages(tmp_path):
+    """tools/deploy/cut_bag.py: the node's topics up to N clouds, in the source's rosbag2 version (5 here, what
+    ROS 2 Humble writes), the messages a replay of the source with --max-clouds N reads."""
+    pytest.importorskip("rosbags")
+    bag = os.path.join(ROOT, "samples", "rosbag2_2026_09_21-16_41_27_moving")
+    if not os.path.isdir(bag):
+        pytest.skip("sample bag not checked out")
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    import yaml
+    from cut_bag import cut
+    from message_log import bag_messages, node_topics
+    from dog_perception.node_config import node_parameters
+
+    params = node_parameters("kygi")
+    out = str(tmp_path / "cut")
+    counts = cut(bag, out, node_topics(params), params["lidar_topic"], 5)
+    assert counts[params["lidar_topic"]] == 5
+    with open(os.path.join(out, "metadata.yaml")) as f:
+        info = yaml.safe_load(f)["rosbag2_bagfile_information"]
+    assert info["version"] == 5 and info["message_count"] == sum(counts.values())
+    assert info["topics_with_message_count"][0]["topic_metadata"]["offered_qos_profiles"].startswith("- history")
+    ref = []
+    for kind, m in bag_messages(bag, params):
+        if kind == "cloud" and sum(k == "cloud" for k, _ in ref) == 5:
+            break
+        ref.append((kind, m))
+    got = list(bag_messages(out, params))
+    assert [k for k, _ in got] == [k for k, _ in ref]
+    assert all(m.header.stamp == r.header.stamp for (_, m), (_, r) in zip(got, ref))
+    clouds = [(m, r) for (k, m), (_, r) in zip(got, ref) if k == "cloud"]
+    assert all(np.array_equal(m.data, r.data) for m, r in clouds)
+
+
+def test_soak_report_windows_and_warnings(tmp_path):
+    """tools/deploy/soak_report.py on made-up orin_soak.sh logs: windows with and without the load."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from soak_report import read_load, read_node_log, read_tegrastats, windows
+
+    lines = ["[dogperc_node-1] [INFO] [0000001000.000000000] [dog_perception]: dog perception up: data/kygi.yaml"]
+    for k in range(20):
+        t = 1000.0 + 30 * k
+        lines.append("[dogperc_node-1] [INFO] [%013.9f] [dog_perception]: %d dets, %d tracks | preprocess_ms 6.0 "
+                     "det_gpu_ms 10.0 total_ms %.1f" % (t, 40 + k, 5, 18.0 if t < 1300 else 25.0))
+    lines += ["[dogperc_node-1] [WARN] [0000001100.500000000] [dog_perception]: inspvax stamps jumped back 59.9 s "
+              "(bag played again or clock reset): starting over"] * 3
+    (tmp_path / "node.log").write_text("\n".join(lines) + "\n")
+    (tmp_path / "load.log").write_text("load on 1300\nwarn: something\nload off 1700\n")
+    (tmp_path / "tegrastats.log").write_text(
+        "RAM 5000/30000MB CPU [5%@2201] GR3D_FREQ 40% gpu@45.5C tj@50C\n"
+        "RAM 5100/30000MB CPU [9%@2201] GR3D_FREQ 60% gpu@47C tj@52.5C\n")
+    frames, warnings = read_node_log(tmp_path / "node.log")
+    assert len(frames) == 20 and frames[0]["dets"] == 40 and frames[0]["det_gpu_ms"] == 10.0
+    assert warnings == {"WARN: inspvax stamps jumped back # s (bag played again or clock reset): starting over": 3}
+    rows = windows(frames, 300.0, read_load(tmp_path / "load.log"))
+    assert [(r["load"], r["frames"], r["total_median"]) for r in rows] == [(False, 10, 18.0), (True, 10, 25.0)]
+    teg = read_tegrastats(tmp_path / "tegrastats.log")
+    assert teg["gr3d_mean"] == 50 and teg["ram_mb_max"] == 5100 and teg["temp_max_c"] == dict(gpu=47.0, tj=52.5)

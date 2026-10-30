@@ -72,6 +72,12 @@ struct OdomMsg {
 enum class LogLevel { Info, Warn, Error };
 using LogFn = std::function<void(LogLevel, const std::string&)>;
 
+// a topic whose stamps jump back more than this (a bag played again, a clock reset) restarts everything, as a
+// new node: the pose buffer would drop every new pose as out of order, and past its 3 s no scan gets a pose. A
+// message of another topic still from before the jump (the last cloud of a loop arriving after the next loop's
+// first INS) is dropped, not taken as a second jump
+constexpr double kTimeJumpBack = 1.0;       // [s]
+
 class OnlineInputs {
  public:
   // log: messages already throttled (each kind of warning at most every 2 or 5 s, as the Python node)
@@ -82,11 +88,15 @@ class OnlineInputs {
   LidarScan scan(const CloudView& cloud) const;   // with the lidar time offset
   // none while no pose covers the scan; `detections` (det frame) bypass the detector
   std::optional<PipelineOutput> on_cloud(const CloudView& cloud, const Detections* detections = nullptr);
+  // on_cloud after scan(): the replays look up the given detections by the scan's stamp
+  std::optional<PipelineOutput> on_scan(const LidarScan& scan, const Detections* detections = nullptr);
+  void reset();                               // the pipeline, the ENU origin, the heading check
   bool have_origin() const { return origin_.has_value(); }
   const NodeConfig& config() const { return cfg_; }
 
  private:
   void log(LogLevel level, const std::string& key, double every_s, const std::string& text);
+  bool stamp(const char* kind, double t);     // resets on a jump back; false: from before the restart, dropped
 
   NodeConfig cfg_;
   PerceptionPipeline& pipe_;
@@ -94,6 +104,9 @@ class OnlineInputs {
   std::optional<EnuOrigin> origin_;
   HeadingCheck heading_;
   bool heading_warned_ = false;
+  std::map<std::string, double> last_stamp_;  // kind -> latest stamp
+  std::optional<double> restart_;             // the stamp that jumped back
+  std::map<std::string, double> before_;      // last_stamp_ before it
   std::map<std::string, std::chrono::steady_clock::time_point> last_log_;
 };
 

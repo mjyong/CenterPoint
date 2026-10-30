@@ -1,6 +1,6 @@
 // The online node's input handling against Python: PointCloud2 layouts (ros_utils.scan_from_msg), the
-// node configuration, INSPVAX handling, and the sample bag's messages through OnlineInputs against
-// dog_perception/online.py on the same messages (cpp_parity.py python --bag).
+// node configuration, INSPVAX handling, the sample bag's messages through OnlineInputs against
+// dog_perception/online.py on the same messages (cpp_parity.py python --bag), and a bag played twice.
 #include <filesystem>
 #include <sstream>
 
@@ -153,6 +153,52 @@ TEST(Online, MessageLogMatchesPythonBagReplay) {
   EXPECT_LT(worst_pt, 1e-4);
   std::printf("online parity: %zu frames from %zu messages, max diff poses %.2e, points %.2e m\n", frames.size(),
               log.size(), worst_pose, worst_pt);
+}
+
+// a bag played again: the stamps jump back, the inputs start over and the second pass is the first one again;
+// the first pass's last cloud arriving after the second pass's first message is dropped
+TEST(Online, ReplayedBagStartsOver) {
+  REQUIRE_GOLDEN();
+  if (!std::filesystem::exists(golden("online_msgs.npz")))
+    GTEST_SKIP() << "no online_msgs.npz (dump_golden.py writes it with rosbags and samples/ present)";
+  const PipelineConfig cfg = load_config(golden("online_config.yaml"));
+  PerceptionPipeline pipe(cfg);
+  std::vector<std::string> warned;
+  OnlineInputs in(load_node_config(golden("online_config.yaml")), pipe, [&](LogLevel level, const std::string& t) {
+    if (level == LogLevel::Warn && t.find("no pose") == std::string::npos) warned.push_back(t);
+  });
+  const MessageLog log(golden("online_msgs.npz"));
+  ASSERT_NE(log.kind(0), MessageLog::kCloud);
+  size_t last_cloud = 0;
+  for (size_t i = 0; i < log.size(); ++i)
+    if (log.kind(i) == MessageLog::kCloud) last_cloud = i;
+  Detections d;                                   // one car 8 m ahead in every frame: a track to carry over
+  d.push({8.0, 0.0, 0.8, 4.5, 1.9, 1.6, 0.0}, {0.0, 0.0}, 0.9, 0);
+  std::vector<PipelineOutput> pass[2];
+  for (int p = 0; p < 2; ++p)
+    for (size_t i = 0; i < log.size(); ++i) {
+      if (p == 1 && i == 1) {
+        EXPECT_FALSE(log.feed(in, last_cloud, &d));   // late, from before the jump
+      }
+      if (auto o = log.feed(in, i, &d)) pass[p].push_back(std::move(*o));
+    }
+  ASSERT_EQ(warned.size(), 2u);
+  EXPECT_NE(warned[0].find("jumped back"), std::string::npos) << warned[0];
+  EXPECT_NE(warned[1].find("from before the restart"), std::string::npos) << warned[1];
+  ASSERT_EQ(pass[1].size(), pass[0].size());
+  ASSERT_GT(pass[0].back().tracks.size(), 0u);
+  for (size_t f = 0; f < pass[0].size(); ++f) {
+    const PipelineOutput &a = pass[0][f], &b = pass[1][f];
+    EXPECT_EQ(b.stamp, a.stamp) << f;
+    EXPECT_EQ(b.frame.T_world_det, a.frame.T_world_det) << f;
+    EXPECT_EQ(b.frame.points, a.frame.points) << f;
+    ASSERT_EQ(b.tracks.size(), a.tracks.size()) << f;
+    for (size_t k = 0; k < a.tracks.size(); ++k) {
+      EXPECT_EQ(b.tracks[k].track_id, a.tracks[k].track_id) << f;
+      EXPECT_EQ(b.tracks[k].age, a.tracks[k].age) << f;
+      EXPECT_EQ(b.tracks[k].position, a.tracks[k].position) << f;
+    }
+  }
 }
 
 }  // namespace dogperc::test

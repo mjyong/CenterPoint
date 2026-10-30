@@ -39,7 +39,9 @@ ssh "$HOST" "mkdir -p $dirs"
 rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build*/' --exclude 'install/' --exclude 'log/' \
   dog_perception tools deploy configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
 if [ -n "$MODEL" ]; then
-  rsync -az --include '*.onnx' --include '*.json' --exclude '*' "$MODEL/" "$HOST:$DIR/models/$(basename "$MODEL")/"
+  # engines.json is the build log of the engines next to it (build_engines.py): the Orin keeps its own
+  rsync -az --exclude 'engines.json' --include '*.onnx' --include '*.json' --exclude '*' \
+    "$MODEL/" "$HOST:$DIR/models/$(basename "$MODEL")/"
 fi
 for f in "${FRAMES[@]}"; do
   scene=$(basename "$(dirname "$f")")

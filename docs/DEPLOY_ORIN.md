@@ -14,8 +14,8 @@ Python 流水线是唯一的参考实现。每换一样东西（运行时、精�
 | P3 | C++ 核心库，不依赖 ROS：预处理、检测、跟踪、预测（第 7 节） | — | 完成 |
 | P4 | Python 和 C++ 逐段对齐（golden 数据加 GoogleTest），GPU 部分和 TensorRT | T28 | 完成：服务器、板上测试全过 |
 | P5 | C++ 全链路离线评估：同一批检测时跟踪对齐，各自检测时 `pipeline_eval.py` 打分 | T28 | 完成：10 个验证场景 ID 每帧相同，标签指标逐项相同 |
-| P6 | ROS 2 节点和 `ObjectArray` 消息，bag 回放对比（第 8 节） | T29 | 已写：ROS 以外的部分本机和 Python 对上，节点本身待 T29 在板上编译、跑 |
-| P7 | 板上性能和稳定性 | T28B、T30 | 延迟达标（T28B，4 线程）：端到端 17.3 ms（p99 18.2），网络以外 11.4 ms；稳定性（长时间、10 Hz 不丢帧、和别的进程抢资源）待测 |
+| P6 | ROS 2 节点和 `ObjectArray` 消息，bag 回放对比（第 8 节） | T29 | 完成：板上编译过；ROS 读 bag 和消息日志逐位相同；在线回放不丢帧。复核加了时间戳倒退时整个重来 |
+| P7 | 板上性能和稳定性 | T28B、T29、T30 | 延迟达标（T28B，4 线程）：端到端 17.3 ms（p99 18.2），网络以外 11.4 ms；节点在样例 bag 上 18.9 ms（T29）。稳定性（长时间、10 Hz 不丢帧、和别的进程抢资源）T30 测 |
 
 已定（2026-10-28）：
 - 板上存储不够，只放 2–3 个验证场景的小子集，全量评估在服务器上做；
@@ -204,7 +204,7 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 | TRT FP16 对 PyTorch，标签上 | AP@2 / AP@4 掉 ≤ 0.005；`pipeline_eval.py` 的主要指标差值在 90% 区间之内 |
 | INT8 对 FP32 | AP 掉 ≤ 0.01；流水线指标不显著变差；板上延迟比 FP16 降 ≥ 30% 才值得用，否则用 FP16（人定） |
 | C++ 对 Python（P4） | 点 1e-4 m；体素集合相同；喂相同检测时跟踪 ID 完全一致、状态 1e-6；预测 1e-4 |
-| ROS 2 节点（P6） | `dogperc_bag_replay` 和 `dogperc_replay --messages` 逐位相同，对 Python 节点的 bag 回放同上一行（喂相同检测时 ID 每帧一致）；在线回放 bag 不丢帧（`objects_bag.py`） |
+| ROS 2 节点（P6） | `dogperc_bag_replay` 和 `dogperc_replay --messages` 逐位相同，对 Python 节点的 bag 回放同上一行（喂相同检测时 ID 每帧一致）；在线回放 bag 不丢帧（`objects_bag.py`，循环播放时每一遍都不丢） |
 | 板上（P7） | 网络以外 < 15 ms，端到端 < 50 ms，p99 < 100 ms，10 Hz 不丢帧 |
 
 `compare_backends.py` 的检测比较分两层：
@@ -333,7 +333,7 @@ cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUIL
 - 剩下较长的：去重 2.6 ms（顺序的哈希，没法分线程）、拼帧 2.0 ms、后处理 1.7 ms、体素化 1.6 ms、head 图拷回 1.1 ms；网络 PFN 0.8 ms 加 RPN 4.7 ms。
 
 **还没做 / 下一步**：
-- P6 ROS 2 节点见第 8 节，T29 在板上编译、跑；
+- P6 ROS 2 节点已上板（T29，第 8 节）；长时间回放、负载下的延迟 T30 测，上车实时跑要人（校时、和规划对字段）；
 - 性能（P7）：延迟已经达标，下面这些等稳定性测完、确实需要时再做：
   - 把各帧的世界坐标留在 GPU 上、在 GPU 上拼帧；
   - 解码搬到 GPU，省掉 head 图的拷贝（1.1 ms）；
@@ -373,7 +373,12 @@ deploy/ros2/
 - `~/tracks`、`~/predictions`（MarkerArray，世界系）：和 Python 节点画的一样；
 - `~/cloud`：检测器的输入点云（`node.publish_cloud`）。
 
-**线程**：回调在一个线程里按到达顺序执行，和 Python 节点一样。所以 Python 节点对一个 bag 的回放（`cpp_parity.py python --bag`）可以当参考。
+**线程**：回调都在一个线程里，一个接一个执行，和 Python 节点一样。同时有几条在等时，rclcpp 的执行器按订阅创建的顺序取（IMU、INS / 里程计、点云），不严格按到达顺序，这是在线和离线回放的差别之一。离线时 Python 节点对 bag 的回放（`cpp_parity.py python --bag`）按 bag 的顺序处理，拿来当参考。
+
+**时间戳倒退**（T29 复核）：某个话题的时间戳比它的上一条早 1 s 以上（`kTimeJumpBack`，bag 再播一遍、`--loop`、时钟往回跳），节点整个重来，和新起的一样：位姿、IMU、点云累积、地面估计、跟踪（ID 从 1 开始）、ENU 原点、航向检查都清掉，日志一行 warn。
+- 不重来的话，位姿缓存把新来的位姿都当乱序丢掉，bag 长于 3 s 时重播后基本没有输出；
+- 重来以后，别的话题还属于旧时间线的迟到消息（循环播放时上一遍的最后一帧点云）直接丢掉，不算第二次倒退；
+- 规则在 `OnlineInputs` 里（Python `dog_perception/online.py`，C++ `dogperc/online.hpp`），所以节点、`dogperc_bag_replay`、`dogperc_replay --messages`、`cpp_parity.py python --bag` 都一样。
 
 **怎么验**（T29）：
 1. 不用 ROS：`cpp_parity.py python --bag` 用 Python 的消息处理按到达顺序回放 bag，存结果，`--messages` 再把这些消息存成普通数组（`msgs.npz`）。`dogperc_replay --messages` 用 C++ 的消息处理跑同一批消息；
@@ -381,6 +386,16 @@ deploy/ros2/
    - golden 数据里带样例 bag 的前 8 帧，`Online.MessageLogMatchesPythonBagReplay` 每次都测；另有四种点云字节布局逐点对 Python；
 2. 有 ROS（板上）：`dogperc_bag_replay` 从 bag 读消息、反序列化，走同一套处理，结果应和 `dogperc_replay --messages` 逐位相同。这一步验的是 ROS 消息到结构体的拷贝；
 3. 在线：板上 `ros2 bag play` 样例 bag，节点照常订阅、发布，看帧数（不丢帧）、`~/objects` 的内容和每帧的耗时。
+
+T29 的结果：
+- 第 1 步，服务器上样例 bag 和 0921 前 600 云：喂相同检测时 ID 每帧相同，状态差 2e-10；
+- 第 2 步，板上逐位相同；
+- 第 3 步，在线 27 帧不丢，每帧 16–20 ms。`ros2 bag play` 要加 `--delay 3`：不加的话，DDS 还没配上对，第一帧就丢了。
+
+长时间（T30）：
+- `tools/deploy/cut_bag.py` 从原始 bag 截出节点的三个话题。按源 bag 的 rosbag2 版本写，Humble 能读；
+- `deploy/scripts/orin_soak.sh` 在板上 1× 循环播放（每遍节点重来一次），后一半时间加 GPU、CPU 负载，录 `~/objects`、内存、tegrastats；
+- `objects_bag.py` 按遍查不丢帧，`tools/deploy/soak_report.py` 按 5 分钟汇总延迟、warn、内存、温度。
 
 ```bash
 # 板上编译（kygi665_msgs 在仓库根目录）
@@ -413,5 +428,9 @@ ros2 launch dogperc_ros dogperc.launch.py config:=$HOME/dogperc/kygi.yaml model_
 | `deploy/ros2/` | ROS 2 消息包和节点包（第 8 节） |
 | `dog_perception/online.py` | 节点的消息处理，不依赖 ROS；Python 节点和 `cpp_parity.py python --bag` 共用 |
 | `tools/deploy/message_log.py` | 读 bag（到达顺序），把节点的输入消息存成普通数组，给 `dogperc_replay --messages` |
+| `tools/deploy/objects_bag.py` | 读录下的 `~/objects`，按遍和回放比：不丢帧、时间戳、ID |
+| `tools/deploy/cut_bag.py` | 原始 bag 截成节点的三个话题、前 N 云，保持 rosbag2 版本（板上 Humble 能播） |
+| `tools/deploy/soak_report.py` | 长时间回放的汇总：每 5 分钟的延迟、warn 计数、内存、tegrastats |
 | `deploy/scripts/orin_check.sh` | 环境报告 |
-| `deploy/scripts/sync_to_orin.sh` | 代码、模型、帧、参考检测、原始录制、bag 同步到板上 |
+| `deploy/scripts/sync_to_orin.sh` | 代码、模型（不带 `engines.json`）、帧、参考检测、原始录制、bag 同步到板上 |
+| `deploy/scripts/orin_soak.sh` | 板上长时间回放：节点、循环播放、录包、负载、内存和 tegrastats（T30） |

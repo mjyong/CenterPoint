@@ -36,13 +36,24 @@ class PerceptionPipeline:
                  pose_buffer=None, gyro_bias=(0.0, 0.0, 0.0)):
         """detector: callable(points_det (N,5), stamp) -> Detections (e.g. CenterPointDetector).
         predictor: "imm", None, or an object with ``__call__(tracker, ego_hist)`` (LearnedPredictor)."""
-        self.poses = pose_buffer or PoseBuffer()
+        self.poses = pose_buffer if pose_buffer is not None else PoseBuffer()     # an empty buffer is falsy
         self.imu = ImuPropagator(self.poses, gyro_bias)
         self.pre = Preprocessor(preprocess_cfg or PreprocessConfig(), self.poses)
         self.detector = detector
         self.tracker = MultiObjectTracker(tracker_cfg or TrackerConfig())
         self.predictor = IMMPredictor() if predictor == "imm" else predictor
         self._ego = deque(maxlen=64)
+
+    def reset(self):
+        """Back to a newly constructed pipeline, same configuration and detector (OnlineInputs, when the
+        stamps jump back)."""
+        self.poses.clear()
+        self.imu.reset()
+        self.pre.reset()
+        self.tracker.reset()
+        if hasattr(self.predictor, "reset"):
+            self.predictor.reset()
+        self._ego.clear()
 
     # ---------------------------------------------------------- pose inputs
     def on_imu(self, t, gyro):

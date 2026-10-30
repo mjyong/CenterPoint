@@ -5,6 +5,10 @@ track ids in each frame.
 
     python tools/deploy/objects_bag.py --bag <recorded bag> --replay <replay.npz> --out objects.json
 
+A bag played in a loop (``ros2 bag play --loop``) gives one pass per loop, split where the stamps jump back;
+each pass is checked against the replay, the last one up to its last frame when the recording stopped
+during it (more than one pass).
+
 The message definitions are read from deploy/ros2/dog_perception_msgs/msg (rosbags, no ROS install).
 """
 import argparse
@@ -49,6 +53,31 @@ def read_objects(bag, topic=None):
     return rows
 
 
+def split_passes(rows, jump_back=1.0):
+    """Rows in recording order -> one list per pass of the bag (a stamp more than ``jump_back`` s before the
+    previous one starts a pass: the node starts over there, dogperc/online.hpp)."""
+    out = []
+    for r in rows:
+        if not out or r["stamp"] < out[-1][-1]["stamp"] - jump_back:
+            out.append([])
+        out[-1].append(r)
+    return out
+
+
+def check_pass(rows, stamps, offsets, ids, partial=False):
+    by_stamp = {round(float(s), 6): k for k, s in enumerate(stamps)}
+    matched = [(r, by_stamp.get(round(r["stamp"], 6))) for r in rows]
+    found = [k for _, k in matched if k is not None]
+    expected = (max(found) + 1 if found else 0) if partial else len(stamps)
+    gaps = np.diff([r["received"] for r in rows])
+    return dict(messages=len(rows), matched_frames=len(set(found)),
+                received_gap_max=float(gaps.max()) if len(gaps) else 0.0,
+                unmatched_messages=sum(k is None for _, k in matched),
+                missing_frames=expected - len({k for k in found if k < expected}),
+                same_ids_frames=sum(1 for r, k in matched if k is not None
+                                    and r["ids"] == list(ids[offsets[k]:offsets[k + 1]])), partial=partial)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bag", required=True, help="recorded ~/objects")
@@ -70,13 +99,15 @@ def main():
     if args.replay:
         z = np.load(args.replay)
         stamps, off, ids = z["stamp"], z["trk_offsets"], z["trk_id"]
-        by_stamp = {round(float(s), 6): k for k, s in enumerate(stamps)}
-        matched = [(r, by_stamp.get(round(r["stamp"], 6))) for r in rows]
-        same_ids = sum(1 for r, k in matched if k is not None and r["ids"] == list(ids[off[k]:off[k + 1]]))
-        report.update(replay_frames=int(len(stamps)), matched_frames=sum(k is not None for _, k in matched),
-                      unmatched_messages=sum(k is None for _, k in matched),
-                      missing_frames=int(len(stamps)) - sum(k is not None for _, k in matched),
-                      same_ids_frames=same_ids)
+        parts = split_passes(rows)
+        per = [check_pass(p, stamps, off, ids, partial=len(parts) > 1 and i == len(parts) - 1)
+               for i, p in enumerate(parts)]
+        report.update(replay_frames=int(len(stamps)), passes=len(per))
+        for key in ("matched_frames", "unmatched_messages", "missing_frames", "same_ids_frames"):
+            report[key] = int(sum(p[key] for p in per))
+        report["received_gap_max"] = max(p["received_gap_max"] for p in per)    # [s] between messages of a pass
+        if len(per) > 1:
+            report["per_pass"] = per
         report["passed"] = report["missing_frames"] == 0 and report["unmatched_messages"] == 0
     for r in rows:
         del r["msg"]
