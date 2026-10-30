@@ -6,6 +6,7 @@
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
+#include "tf2_ros/transform_broadcaster.h"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "nav_msgs/msg/odometry.hpp"
@@ -60,6 +61,8 @@ class Lidar3dDetection : public rclcpp::Node {
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr tracks_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr preds_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_pub_;
+  // publish_tf: world_frame -> local_frame and -> the lidar frame, for viewers on a replayed bag (README)
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_;
 };
 
 }  // namespace perception

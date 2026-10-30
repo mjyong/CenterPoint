@@ -10,6 +10,8 @@
 //   ~/tracks        visualization_msgs/MarkerArray   boxes, ids, speed (world frame), as tools/dog/ros2_node.py
 //   ~/predictions   visualization_msgs/MarkerArray   one line per predicted mode
 //   ~/cloud         sensor_msgs/PointCloud2          the detector's input (node.publish_cloud)
+//   /tf             world_frame -> local_frame, world_frame -> the lidar frame, only with publish_tf (viewers on a
+//                   replayed bag: Foxglove, RViz; off on the robot, whose own TF tree has the lidar frame)
 // Callbacks run on one thread in arrival order, like the Python node, so its replay of a bag
 // (cpp_parity.py python --bag) is the reference; dogperc_bag_replay checks that offline.
 #include <cstdio>
@@ -18,6 +20,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <stdexcept>
 #include <string>
+#include <tf2_ros/transform_broadcaster.h>
 
 #include "dogperc/parallel.hpp"
 #include "ros_convert.hpp"
@@ -37,6 +40,7 @@ class DogPerceptionNode : public rclcpp::Node {
     const bool gpu = declare_parameter<bool>("gpu", true);
     local_frame_ = declare_parameter<std::string>("local_frame", "dog_det");
     publish_markers_ = declare_parameter<bool>("publish_markers", true);
+    if (declare_parameter<bool>("publish_tf", false)) tf_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     set_num_threads(static_cast<int>(declare_parameter<int64_t>("threads", 1)));
     if (config.empty()) throw std::runtime_error("parameter config: the YAML of tools/deploy/export_cpp_config.py --robot");
     if (model_dir.empty()) throw std::runtime_error("parameter model_dir: the exported model directory with its engines");
@@ -102,6 +106,7 @@ class DogPerceptionNode : public rclcpp::Node {
       preds_pub_->publish(prediction_markers(*out, world_frame_));
     }
     if (publish_cloud_) cloud_pub_->publish(det_cloud(*out, local_frame_));
+    if (tf_) tf_->sendTransform(viewer_transforms(*pipe_, *out, msg, local_frame_, world_frame_));
     std::string t;
     for (const char* k : {"preprocess_ms", "det_gpu_ms", "det_post_ms", "track_ms", "predict_ms", "total_ms"}) {
       auto it = out->timings.find(k);
@@ -128,6 +133,7 @@ class DogPerceptionNode : public rclcpp::Node {
   rclcpp::Publisher<dog_perception_msgs::msg::ObjectArray>::SharedPtr objects_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr tracks_pub_, preds_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_pub_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_;
 };
 
 }  // namespace dogperc::ros

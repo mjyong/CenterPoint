@@ -42,7 +42,7 @@ def parse_line(line, year):
 def read_node_log(path, year=None):
     year = year or time.localtime().tm_year
     frames, warnings = [], Counter()
-    with open(path) as f:
+    with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
             p = parse_line(line, year)
             if p is None:
@@ -61,7 +61,7 @@ def read_pairs(path):
     """'<epoch s> <value>' lines; lines without a value (the process was gone) are skipped."""
     out = []
     if os.path.exists(path):
-        with open(path) as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 p = line.split()
                 if len(p) >= 2:
@@ -72,7 +72,7 @@ def read_pairs(path):
 def read_load(path):
     on = off = None
     if os.path.exists(path):
-        with open(path) as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 p = line.split()
                 if p[:2] == ["load", "on"]:
@@ -85,7 +85,7 @@ def read_load(path):
 def read_tegrastats(path):
     gr3d, ram, temps = [], [], {}
     if os.path.exists(path):
-        with open(path) as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 m = re.search(r"GR3D_FREQ (\d+)%", line)
                 if m:

@@ -20,6 +20,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(dog_perception_msgs REQUIRED)
 find_package(kygi665_msgs QUIET)            # INSPVAX localization (the kygi robot)
 
@@ -47,6 +48,7 @@ endif()
 
 add_executable(dogperc_node src/node.cpp)
 target_link_libraries(dogperc_node dogperc_ros_convert)
+ament_target_dependencies(dogperc_node tf2_ros)
 
 add_executable(dogperc_bag_replay src/bag_replay.cpp)
 target_link_libraries(dogperc_bag_replay dogperc_ros_convert)

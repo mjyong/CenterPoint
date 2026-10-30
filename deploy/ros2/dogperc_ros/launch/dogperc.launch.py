@@ -21,6 +21,8 @@ def generate_launch_description():
         DeclareLaunchArgument("threads", default_value="4",
                               description="threads of the per-point preprocessing (4 on the Orin, T28B)"),
         DeclareLaunchArgument("local_frame", default_value="dog_det", description="frame_id of ~/objects"),
+        DeclareLaunchArgument("publish_tf", default_value="false",
+                              description="TF for viewers on a replayed bag (not on the robot)"),
     ]
     node = Node(package="dogperc_ros", executable="dogperc_node", name="dog_perception", output="screen",
                 parameters=[{
@@ -30,5 +32,6 @@ def generate_launch_description():
                     "gpu": True,
                     "threads": ParameterValue(LaunchConfiguration("threads"), value_type=int),
                     "local_frame": LaunchConfiguration("local_frame"),
+                    "publish_tf": ParameterValue(LaunchConfiguration("publish_tf"), value_type=bool),
                 }])
     return LaunchDescription(args + [node])

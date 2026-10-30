@@ -234,4 +234,42 @@ sensor_msgs::msg::PointCloud2 det_cloud(const PipelineOutput& out, const std::st
   return msg;
 }
 
+namespace {
+
+geometry_msgs::msg::TransformStamped transform(const Mat4& T, double t, const std::string& parent,
+                                               const std::string& child) {
+  geometry_msgs::msg::TransformStamped m;
+  m.header.stamp = stamp(t);
+  m.header.frame_id = parent;
+  m.child_frame_id = child;
+  m.transform.translation.x = T(0, 3);
+  m.transform.translation.y = T(1, 3);
+  m.transform.translation.z = T(2, 3);
+  const Eigen::Vector4d q = R_to_quat(T.topLeftCorner<3, 3>());   // x, y, z, w
+  m.transform.rotation.x = q[0];
+  m.transform.rotation.y = q[1];
+  m.transform.rotation.z = q[2];
+  m.transform.rotation.w = q[3];
+  return m;
+}
+
+}  // namespace
+
+std::vector<geometry_msgs::msg::TransformStamped> viewer_transforms(const PerceptionPipeline& pipe,
+                                                                    const PipelineOutput& out,
+                                                                    const sensor_msgs::msg::PointCloud2& cloud,
+                                                                    const std::string& local_frame,
+                                                                    const std::string& world_frame) {
+  std::vector<geometry_msgs::msg::TransformStamped> tf{transform(out.frame.T_world_det, out.stamp, world_frame,
+                                                                 local_frame)};
+  if (cloud.header.frame_id.empty() || cloud.header.frame_id == local_frame) return tf;
+  const double t = seconds(cloud.header.stamp);
+  try {
+    tf.push_back(transform(pipe.poses().pose_at(t) * pipe.config().preprocess.T_body_lidar, t, world_frame,
+                           cloud.header.frame_id));
+  } catch (const PoseOutOfRange&) {
+  }
+  return tf;
+}
+
 }  // namespace lidar3d::ros

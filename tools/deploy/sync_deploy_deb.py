@@ -113,7 +113,7 @@ def expected_config(current):
 def fields(path, renames=None):
     """The message's field and constant lines without comments."""
     out = []
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.split("#", 1)[0].strip()
             if not line:
@@ -147,25 +147,25 @@ def main():
     pairs = mirrored()
     stale = []
     for src, dst in pairs:
-        with open(src) as f:
+        with open(src, encoding="utf-8") as f:
             want = rename(f.read())
-        have = open(dst).read() if os.path.exists(dst) else None
+        have = open(dst, encoding="utf-8").read() if os.path.exists(dst) else None
         if have != want:
             stale.append(os.path.relpath(dst, DEB))
             if args.write:
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
-                with open(dst, "w") as f:
+                with open(dst, "w", encoding="utf-8") as f:
                     f.write(want)
                 if os.access(src, os.X_OK):
                     os.chmod(dst, 0o755)
     cfg = os.path.join(DEB, CONFIG)
-    with open(cfg) as f:
+    with open(cfg, encoding="utf-8") as f:
         current = f.read()
     want = expected_config(current)
     if want != current:
         stale.append(CONFIG)
         if args.write:
-            with open(cfg, "w") as f:
+            with open(cfg, "w", encoding="utf-8") as f:
                 f.write(want)
     extra = extra_files(pairs)
     problems = interface_problems()

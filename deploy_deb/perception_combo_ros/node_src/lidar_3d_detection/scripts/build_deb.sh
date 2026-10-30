@@ -15,6 +15,9 @@
 #   --skip-build      package <work>/install as it is
 #
 # No root needed (dpkg-deb --root-owner-group); installing is `sudo apt install ./lidar-3d-detection_*.deb`.
+# Needs patchelf (the interface packages' Python extensions carry an RPATH into the build tree; T31): on PATH, in
+# ~/bin, or PATCHELF=. The version is package.xml's plus the commit count and hash, from git or, in a copy without
+# .git, from the GIT_COMMIT file the sync scripts write next to perception_combo_ros ("count hash [dirty]").
 set -euo pipefail
 
 NODE=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)        # node_src/lidar_3d_detection
@@ -45,6 +48,8 @@ OUT=$(cd "$OUT" && pwd)
 WORK=$(cd "$WORK" && pwd)
 INSTALL=$WORK/install
 command -v dpkg-deb > /dev/null || die "dpkg-deb not found"
+PATCHELF=${PATCHELF:-$(command -v patchelf || echo "$HOME/bin/patchelf")}
+[ -x "$PATCHELF" ] || die "patchelf not found (sudo apt-get install patchelf, or PATCHELF=...)"
 
 # ---------------------------------------------------------------- build
 if [ $SKIP_BUILD = 0 ]; then
@@ -64,6 +69,8 @@ if [ $SKIP_BUILD = 0 ]; then
     --base-paths "$WS/common_interface" "$SLAM" "$WS/node_src" \
     --build-base "$WORK/build" --install-base "$INSTALL" --packages-up-to lidar_3d_detection \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_CUDA_COMPILER="$NVCC" \
+    -DCMAKE_C_FLAGS="-ffile-prefix-map=$WS/=" -DCMAKE_CXX_FLAGS="-ffile-prefix-map=$WS/=" \
+    -DCMAKE_CUDA_FLAGS="-Xcompiler=-ffile-prefix-map=$WS/=" \
     -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH" -DLIDAR3D_WITH_CUDA=ON -DLIDAR3D_KYGI=ON \
     -DLIDAR3D_MODEL_DIR="$MODEL" -DLIDAR3D_PRECISION="$PRECISION"
 fi
@@ -75,9 +82,15 @@ EXE=$INSTALL/lidar_3d_detection/lib/lidar_3d_detection/lidar_3d_detection
 PKG=lidar-3d-detection
 if [ -z "$VERSION" ]; then
   VERSION=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' "$NODE/package.xml" | head -1)
+  # the commit count first, so that a later build is a higher version for apt
   if sha=$(git -C "$NODE" rev-parse --short HEAD 2> /dev/null); then
-    VERSION=$VERSION+g$sha
-    git -C "$NODE" diff --quiet HEAD -- "$WS" "$SLAM" 2> /dev/null || VERSION=$VERSION.dirty
+    count=$(git -C "$NODE" rev-list --count HEAD)
+    dirty=$(git -C "$NODE" diff --quiet HEAD -- "$WS" "$SLAM" 2> /dev/null || echo dirty)
+  elif [ -e "$(dirname "$WS")/GIT_COMMIT" ]; then
+    read -r count sha dirty < "$(dirname "$WS")/GIT_COMMIT"
+  fi
+  if [ -n "${sha:-}" ]; then
+    VERSION=$VERSION+$count.g$sha${dirty:+.dirty}
   fi
 fi
 ARCH=$(dpkg --print-architecture)
@@ -90,12 +103,19 @@ find "$STAGE$PREFIX" -name __pycache__ -type d -prune -exec rm -rf {} +
 # text files (colcon and ament setup scripts, CMake configs) name the install path: rewrite it
 esc=$(printf '%s' "$INSTALL" | sed 's/[][\.*^$]/\\&/g')
 { grep -rlIZF "$INSTALL" "$STAGE$PREFIX" || true; } | xargs -0 -r sed -i "s|$esc|$PREFIX|g"
-# a binary that still has it (an RPATH): rewrite with patchelf, or stop
-mapfile -t left < <(grep -rlF "$INSTALL" "$STAGE$PREFIX" || true)
+# a binary that still has it or the build tree in its RPATH (rosidl's Python extensions): the install path becomes
+# the prefix, build-tree entries go (the setup scripts' LD_LIBRARY_PATH finds the libraries)
+mapfile -t left < <({ grep -rlF "$INSTALL" "$STAGE$PREFIX"; grep -rlF "$WS/" "$STAGE$PREFIX"; } | sort -u)
 for f in "${left[@]}"; do
-  command -v patchelf > /dev/null || die "$f has the build path $INSTALL in it (apt install patchelf)"
-  rp=$(patchelf --print-rpath "$f")
-  patchelf --set-rpath "${rp//$INSTALL/$PREFIX}" "$f"
+  rp=$("$PATCHELF" --print-rpath "$f" 2> /dev/null) || continue      # not an ELF file
+  keep=()
+  IFS=: read -ra parts <<< "$rp"
+  for e in "${parts[@]}"; do
+    e=${e//$INSTALL/$PREFIX}
+    case $e in "$WS"/*) ;; *) keep+=("$e") ;; esac
+  done
+  new=$(IFS=:; echo "${keep[*]}")
+  if [ "$new" != "$rp" ]; then "$PATCHELF" --set-rpath "$new" "$f"; fi
 done
 if grep -rlF "$INSTALL" "$STAGE$PREFIX"; then die "files above still have the build path $INSTALL"; fi
 # the sources are not on the target either; a file that names them is worth a look (not an error)

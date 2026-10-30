@@ -123,7 +123,8 @@
 | T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 完成，已复核。输出和 T28 逐位相同，1 线程和 4 线程也相同。板上网络以外：1 线程 12.9 ms，4 线程 11.4 ms，都低于 15 ms。用 4 个线程。服务器上 4 线程更慢，体素化 p99 尖峰从 215 ms 降到 19 ms（1 线程），还没消失 |
 | T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成，已复核。对齐都过：服务器两段同一批检测 ID 每帧相同；板上 ROS 读 bag 和读消息日志逐位相同；板上 GPU 对服务器过门槛。板上端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（样例 bag）。复核查出节点在时间戳倒退（bag 重播、时钟回跳）时不会重来，bag 长于 3 s 时重播后基本没有输出，已修（两边一样，加了测试）；在线 `same_ids_frames 0` 是热身那遍的状态带进了正式播放。TensorRT 新出现一句设备提示，T30 查 |
 | T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
-| T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成。deb 已装上再装回，和 deploy/ 逐位相同；在线第一帧要等 DDS 对上；服务不启用 |
+| T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成，已复核。deb 装上后和 deploy/ 逐位相同，服务起停、卸载都对。复核：打包补了 patchelf、去掉编译目录的 RPATH、二进制不带源码路径、版本号带提交数；循环时 ID 不同是编号顺延（加了不看编号的 same_tracks_frames）；加了 publish_tf 和 Foxglove 实时看 |
+| T32 | 板上准备 Foxglove 实时看：装 foxglove_bridge、patchelf；用新的打包脚本重打 deb、升级安装；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5867,3 +5868,110 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
 **第 7 步。** 删了 `/tmp/debx`、`data/*.npz`、`data/live_deb`、`data/soak_deb*`、`bags/`，以及这次多录的 `live_svc`、`live_deb_delay3`。`~/dogperc/deb/` 留着（35 MB 的 deb 和 txt）。根分区 3.8 GB，`build_deb/build` 69 MB，没删。引擎没动。
 
 **结论。** deb 可以交给车上 `apt install`。装好后服务不启用，`/etc/default` 里 `ROS_DOMAIN_ID` 仍是注释（这次测过写成 77，purge 之后的新安装又是注释）。服务用户是打包时的 `seres`。在线播放若不等 DDS 对上，第一朵点云会丢；空播一遍再放，或者放慢，27 帧能齐，跟踪 id 26/27 帧和离线回放相同。6 分钟里无负载除了起来的第一帧都不丢；合成负载下少数遍丢 1 帧，和 T30 一样。重新打包还要 `patchelf`（现在只在 `~/bin`，没装进系统）。板上时钟仍是 1970。
+
+### T31 复核
+
+2026-10-30。结论同意：deb 可以交给车上装。
+- 装上以后，不论是不装解开跑，还是装好以后跑，bag 回放都和 `deploy/` 的 `dogperc_bag_replay` 逐位相同；
+- 服务起停、`remove` 留下 conffile、`purge` 删干净，都对；
+- 两处代码改动合理：`objects_bag.py` 读文件指定 UTF-8；`orin_soak.sh` 加上可执行位。
+
+1. **RPATH**：接口包的 Python 扩展库（`lib*__rosidl_generator_py.so`）的 RPATH 指着编译目录。脚本靠 patchelf 改，板上系统里没装，Agent 用了 `~/bin` 里的一份。报告里"指向源码树"的四个库，是改完 RPATH 后还留着编译目录的项。
+   - 已改：`build_deb.sh` 开编之前先找 patchelf（PATH、`~/bin`、`PATCHELF=`），找不到就停；RPATH 里的安装路径换成最终位置，指向编译目录的项删掉（库靠 setup 脚本设的 `LD_LIBRARY_PATH` 找）；
+   - 本机用一个代替 patchelf 的小脚本验过：RPATH 变成 `/opt/seres/perception/perception_interface/lib:/opt/ros/humble/lib`。
+2. **节点二进制里的源码路径**：是 glog 的 `__FILE__`。已改：编译加 `-ffile-prefix-map=<源码树>/=`。
+3. **版本号没有提交号**：板上的代码是 rsync 过去的，没有 `.git`，所有包都是 `0.1.0`，apt 分不出新旧。已改：
+   - 两个同步脚本在板上写 `deploy_deb/GIT_COMMIT`（提交数、提交号、有没有未提交的改动）；
+   - 版本是 `0.1.0+<提交数>.g<提交号>`，后打的版本更高，apt 能直接从 `0.1.0` 升上去。
+4. **循环时 `same_ids_frames` 很低（426 / 1587），不是重来没清干净**：
+   - 每一遍都在差不多同一帧开始不同：样例 bag 多数在第 3 帧，也就是第一帧有轨迹的帧；T30 的 0921 段，没负载时每遍都在第 69 帧；
+   - 第一遍（节点刚起来）和后面各遍一样，所以重来以后和新起的节点一样；
+   - 不同的是在线和离线：在线到达顺序和 bag 不完全一样，某一帧的位姿略有不同，多出一条暂定轨迹，后面的编号全部顺延一位；
+   - 已改：`objects_bag.py` 加了 `same_tracks_frames`，不看编号，按类别和世界系位置（0.5 m 内）比报出来的轨迹。
+5. **在线第一帧**：只在播放器刚起来时丢（DDS 还没配上对），循环里后面的各遍都不丢。车上传感器一直在发，没有影响。测试时可以 `ros2 bag play --start-paused`，等几秒再调 `/rosbag2_player/resume`；空播或放慢也行。
+6. **有负载时丢 1 帧**：节点 p99 31 ms，离 100 ms 远，所以多半是点云在 DDS 传输里丢了：每帧 3.3 MB，best effort，CPU 很忙时 UDP 接收缓冲区溢出。Linux 默认的 `net.core.rmem_max` 只有约 200 KB，大消息常因此丢。可以试 `sysctl net.core.rmem_max=2147483647`、`rmem_default=8388608` 后再跑一次有负载的循环（要 root，人定）。
+7. **新加的**：
+   - 两个节点加参数 `publish_tf`（默认关，车上不开），发 `camera_init → <local_frame>` 和 `camera_init → <点云 frame_id>`（取点云时间戳那一刻的位姿）；
+   - `deploy_deb` 的 `scripts/orin_foxglove.sh`：板上循环播 bag，加 foxglove_bridge；
+   - `foxglove/lidar_3d_detection.json`：本机 Foxglove 的布局；
+   - `tools/deploy/foxglove_probe.py`：不开 GUI 查 bridge；
+   - `objects_bag.py` 录到 `/tf` 时，核对它和 `world_pose`。
+
+   T32 在板上把这些准备好，人在本机看。
+
+## T32 Orin：Foxglove 实时看的准备
+
+人要在连着板子的本机（192.168.123.55）上用 Foxglove 看板上循环播包的检测结果（deploy_deb README"用 Foxglove 看"）。T31 复核改了：打包脚本（patchelf、RPATH、版本号）、两个节点的 `publish_tf`、新脚本 `orin_foxglove.sh`。这次：
+- 板上装 foxglove_bridge 和 patchelf；
+- 重打 deb、升级安装；
+- 查 TF 和 bridge；
+- 留一段 60 s 的 bag，告诉人怎么看。
+
+本任务可以改的范围（通用约定 9）：`deploy_deb/`、`deploy/`、`tools/deploy/`。镜像文件改 `deploy/` 里的源文件，再 `sync_deploy_deb.py --write`。
+
+```text
+任务 T32：板上装 foxglove_bridge、重打并升级 deb、查 TF 和 bridge，给人留好 Foxglove 实时看。
+先按通用约定做（第 9 条：可以改代码，范围见本节开头）。前置：T31 完成。
+
+0. mkdir -p data/reports/T32；TASK=T32；n=rosbag2_2026_09_21-16_41_27_moving；c=rosbag2_0921_600
+   python -m pytest tests/dog/test_deploy.py -q 2>&1 | tail -3 | tee data/reports/T32/pytest.txt
+   （test_foxglove_probe_against_a_fake_bridge、test_objects_bag_same_tracks_ignore_the_numbering 要通过）
+   python tools/deploy/sync_deploy_deb.py | tail -1 | tee data/reports/T32/sync_check.txt
+1. 板上装包（seres 的 apt-get 免密 T31 已加）：
+     ssh orin 'sudo -n apt-get install -y patchelf ros-humble-foxglove-bridge 2>&1 | tail -3; \
+         apt-cache policy ros-humble-foxglove-bridge | head -4; which patchelf' 2>&1 | tee data/reports/T32/apt.txt
+   - foxglove_bridge 装不上（板子上不了 ROS 的 apt 源）就停下，抄下 apt-cache policy，问人（人可以在本机下 arm64 的 deb 拷过去）。
+2. 同步、重编 deploy/ros2（节点加了 publish_tf）：
+     deploy/scripts/sync_to_orin.sh --bag samples/$n          （现在会写 deploy_deb/GIT_COMMIT）
+     ssh orin 'cat ~/dogperc/repo/deploy_deb/GIT_COMMIT; df -h / | tail -1' | tee data/reports/T32/sync_orin.txt
+   deploy/ros2 的 colcon 同 T29 第 3b 步，输出 colcon_orin.txt。
+3. 重打 deb（同 T31 第 2 步；会全部重编，-ffile-prefix-map 改了编译选项），输出 build_deb.txt：
+   - 版本应该是 0.1.0+<提交数>.g<提交号>（GIT_COMMIT 那一行）；
+   - 报告里不应该再有 "installed files that name the source tree"，有就抄下；
+   - 解开看一个接口库的 RPATH 和节点里有没有源码路径：
+       ssh orin 'rm -rf /tmp/debx && dpkg-deb -x ~/dogperc/deb/lidar-3d-detection_0.1.0+*_arm64.deb /tmp/debx && \
+           readelf -d $(find /tmp/debx -name "libperception_interface__rosidl_generator_py.so") | grep -i path; \
+           grep -c "dogperc/repo/deploy_deb" /tmp/debx/opt/seres/perception/lidar_3d_detection/lib/lidar_3d_detection/lidar_3d_detection' \
+           2>&1 | tee -a data/reports/T32/build_deb.txt        （RUNPATH 里只有 /opt/... ；grep 的数是 0）
+4. 升级安装：
+     ssh orin 'sudo -n apt-get install -y ~/dogperc/deb/lidar-3d-detection_0.1.0+*_arm64.deb 2>&1 | tail -3; \
+         dpkg -s lidar-3d-detection | grep Version; systemctl is-enabled lidar-3d-detection' | tee data/reports/T32/install.txt
+   - 从 0.1.0 升上来，不用先卸；服务仍是 disabled。
+5. 离线逐位比（同 T31 第 3、5a 步，装好的 lidar_3d_bag_replay 对 deploy 的 dogperc_bag_replay，样例 bag）：
+   keys differing 必须是空的。输出 inst_replay.txt。
+6. TF：装好的节点开 publish_tf，录 objects 和 /tf：
+     同 T31 第 5b 步，但启动脚本加 -p publish_tf:=true，录 /perception/lidar_3d/objects /tf；先空播一遍再 --rate 0.5 正式播。
+     python tools/deploy/objects_bag.py --bag data/deploy/T32/live_tf --replay data/deploy/T32/inst_gpu.npz \
+         --out data/reports/T32/live_tf.json | tee data/reports/T32/live_tf.txt
+   - passed 为 true；tf_transforms 有 camera_init -> lidar_det 和 camera_init -> hesai_lidar；
+     tf_frames_with_pose 等于消息数；tf_pose_max_diff < 1e-9；same_ids_frames、same_tracks_frames 都记下。
+7. 给人留的 bag 和 bridge 检查：0921 截的 60 s（T30 的 data/deploy/T30/bags/$c 还在就用它，不在就按 T30 第 1 步用 cut_bag.py 重截）：
+     deploy/scripts/sync_to_orin.sh --bag data/deploy/T30/bags/$c
+     ssh orin "cd ~/dogperc && nohup repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_foxglove.sh \
+         bags/$c > data/foxglove.out 2>&1 &"
+     （等 20 s）
+     ssh orin 'python3 ~/dogperc/repo/tools/deploy/foxglove_probe.py --seconds 10 --topics /perception/lidar_3d/tracks \
+         /perception/lidar_3d/predictions /perception/lidar_3d/objects /tf /robot/topic/rdap/top_point_cloud2' \
+         2>&1 | tee data/reports/T32/foxglove_probe.txt
+     ssh orin 'pkill -INT -f orin_foxglove.sh; sleep 4; cat ~/dogperc/data/foxglove.out; tail -3 /tmp/lidar3d_foxglove/bridge.log; \
+         pgrep -fa "foxglove_bridge|lidar_3d_detection|bag play" || echo "all stopped"' 2>&1 | tee -a data/reports/T32/foxglove_probe.txt
+   - probe 的 passed 为 true：五个话题都 advertised，10 s 里 tracks、predictions、objects、/tf 约 100 条，点云也有；
+     channels 里 objects 的 schema 是 perception_interface/msg/LidarObjectArray（bridge 拿到了消息定义）；
+   - 停下以后进程都没了（all stopped）；
+   - bags/$c 留在板上给人看（约 1.9 GB），根分区剩不到 1.5 GB 就停下问人。
+8. 做完删掉 /tmp/debx、data/*.npz、data/live_tf、bags/$n；bags/$c、~/dogperc/deb 留着。记下根分区剩余空间。
+
+停止条件（按约定 9 修不好的时候）：foxglove_bridge 装不上；第 3 步编译失败或 RPATH 里还有编译目录；第 5 步 keys differing 不是空的；
+第 7 步 probe 不过。
+提交：data/reports/T32/、本文档，以及按约定 9 改的代码。不提交 data/deploy/T32/、deb、bag。
+报告（写进"T32 结果"）：
+- 代码改动（约定 9）；
+- apt 的结果；deb 的版本、大小、报告里的警告；RPATH 和 grep 的结果；升级安装的版本；
+- 第 5 步 keys differing；第 6 步 objects_bag 的输出（tf_* 三项、same_tracks_frames）；
+- 第 7 步 probe 的输出（channels、received）；
+- 给人的一句话：板上执行哪条命令、本机 Foxglove 连哪个地址、导入哪个布局。
+```
+
+### T32 结果
+
+（待填）

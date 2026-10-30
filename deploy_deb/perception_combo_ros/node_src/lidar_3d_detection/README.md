@@ -19,6 +19,8 @@ perception_combo_ros/
     packaging/                            deb 里的启动脚本、systemd 单元、默认设置、安装脚本
     scripts/build_deb.sh                  在板上打 deb
     scripts/orin_soak.sh                  长时间循环回放（装好的节点）
+    scripts/orin_foxglove.sh              板上循环播 bag，用 Foxglove 实时看（见"用 Foxglove 看"）
+    foxglove/lidar_3d_detection.json      Foxglove 的布局
     scripts/sync_to_orin.sh, scripts/orin_check.sh
 slam/interface/kygi665_msgs/              RTK 组合导航的 INSPVAX（定位）
 ```
@@ -36,10 +38,11 @@ slam/interface/kygi665_msgs/              RTK 组合导航的 INSPVAX（定位�
 - 话题名都在配置的 `node:` 一节里。
 - `LidarObjectArray` 的坐标系是这一帧的检测系（frame_id `lidar_det`）：重力对齐，航向跟着车体，原点在车体正下方的地面上。`world_pose` 是它在定位系（`camera_init`）里的位姿。字段说明见消息文件。
 - 某个话题的时间戳倒退 1 s 以上（bag 再播一遍、时钟回跳），节点会整个重来，日志里有一行 warn。
+- 参数 `publish_tf`（默认关）：发 TF `camera_init → lidar_det` 和 `camera_init → hesai_lidar`（点云自己的 frame_id，取点云时间戳那一刻的位姿）。查看器靠它把原始点云、检测框和轨迹放进同一个 3D 视图。车上不要开：车上自己的 TF 树里已经有雷达的 frame，再发就有两个父节点。
 
 ## 在板上打 deb
 
-前置：JetPack 6（L4T R36）、ROS 2 Humble（`/opt/ros/humble`）、colcon、CUDA、TensorRT，以及**在这块板上建好的引擎**。引擎只能在建它的 TensorRT 上加载，所以 deb 依赖的 `libnvinfer10` 版本和板上完全一致。
+前置：JetPack 6（L4T R36）、ROS 2 Humble（`/opt/ros/humble`）、colcon、CUDA、TensorRT、patchelf（`sudo apt install patchelf`：接口包的 Python 扩展库带着指向编译目录的 RPATH，要改掉），以及**在这块板上建好的引擎**。引擎只能在建它的 TensorRT 上加载，所以 deb 依赖的 `libnvinfer10` 版本和板上完全一致。
 
 ```bash
 # 模型目录：model_meta.json、pfn.onnx、rpn_head.onnx、pfn.fp16.engine、rpn_head.fp16.engine
@@ -52,7 +55,7 @@ node_src/lidar_3d_detection/scripts/build_deb.sh --model ~/dogperc/models/nusc_p
 - **改路径**：安装目录拷一份，装到最终位置 `/opt/seres/perception`。文本文件里的编译路径改成最终路径，二进制里还有编译路径就停下；
 - **依赖**：每个库由哪个系统包提供（`dpkg -S`），写进 Depends；
 - **输出**：
-  - `lidar-3d-detection_<版本>_arm64.deb`，版本是 `package.xml` 的版本加 git 提交号；
+  - `lidar-3d-detection_<版本>_arm64.deb`，版本是 `package.xml` 的版本加提交数和提交号，例如 `0.1.0+412.g1a2b3c4`。提交数在前，后打的包版本更高，apt 能直接升级。板上的代码是 rsync 过去的，没有 `.git`，这时从同步脚本写的 `GIT_COMMIT` 文件读；
   - 同名 `.txt` 报告：板子、模型文件的 sha256、Depends，以及找不到包的库；
 - **选项**：
   - `--prefix`：安装位置；
@@ -79,6 +82,38 @@ journalctl -u lidar-3d-detection -f            # 输出；glog 文件在 /tmp/li
 - 配置和 `/etc/default` 那个文件是 conffile：升级时保留你改过的；`dpkg -r` 卸载时也留着，`dpkg -P` 才删掉；
 - 起来以后日志里有一行 "lidar_3d_detection up: ..."，之后每秒一行：框数、轨迹数、各段耗时（ms）；
 - 不经过 deb，直接用 colcon 的安装目录也行：`source install/setup.bash && ros2 launch lidar_3d_detection lidar_3d_detection.launch.py`。
+
+## 用 Foxglove 看（板上循环播 bag）
+
+板上跑节点和 foxglove_bridge（WebSocket），连着板子的本机用 Foxglove 连上去看。本机和板子直连：本机 192.168.123.55，板子 192.168.123.100。
+
+1. 板上装一次 bridge：`sudo apt install ros-humble-foxglove-bridge`；
+2. 板上（从本机 `ssh seres@192.168.123.100` 进去）：
+   ```bash
+   ~/dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_foxglove.sh bags/<bag>
+   ```
+   这个脚本：
+   - 起装好的节点，打开 `publish_tf`；
+   - 起 bridge，端口 8765；
+   - 1× 循环播 bag，第二个参数可以改倍速；
+   - `ROS_DOMAIN_ID` 默认 77；
+   - Ctrl-C 全部停掉。
+
+   服务开着的话先 `sudo systemctl stop lidar-3d-detection`；
+3. 本机打开 Foxglove（桌面版；不想登录账号可以用开源的 Lichtblick，协议一样）：
+   - Open connection → Foxglove WebSocket → `ws://192.168.123.100:8765`；
+   - Layout → Import from file → `foxglove/lidar_3d_detection.json`。
+
+   布局里有：
+   - **3D**：跟着 `lidar_det`，原始点云按强度上色，轨迹的框、ID、速度，预测路径；
+   - **Raw Messages**：`/perception/lidar_3d/objects` 的内容，即给规划的 `LidarObjectArray`；
+   - **Plot**：每帧的目标数；
+   - **Log**：节点日志。
+
+- 连不上 8765（防火墙），就在本机开端口转发 `ssh -N -L 8765:localhost:8765 seres@192.168.123.100`，再连 `ws://localhost:8765`；
+- 原始点云每帧约 3.3 MB，10 Hz 下约 30 MB/s，直连的网口够用。卡的话在 3D 面板里关掉点云，只看框；
+- 每遍循环开头，节点会重来（日志 warn "jumped back"），时间戳往回跳，Foxglove 里可能闪一下；
+- 不起 GUI 也能查 bridge：`python3 ~/dogperc/repo/tools/deploy/foxglove_probe.py`，列出 bridge 发布的话题，订几秒、数消息条数（Foxglove 会看的那几个话题都要有）。
 
 ## 和算法仓库对齐
 

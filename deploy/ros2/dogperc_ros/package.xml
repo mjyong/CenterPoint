@@ -16,6 +16,7 @@
   <depend>sensor_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>visualization_msgs</depend>
+  <depend>tf2_ros</depend>
   <depend>dog_perception_msgs</depend>
   <depend>kygi665_msgs</depend>
   <depend>eigen</depend>

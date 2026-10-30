@@ -4,6 +4,7 @@
 
 #include <builtin_interfaces/msg/time.hpp>
 #include <perception_interface/msg/lidar_object_array.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -37,5 +38,14 @@ visualization_msgs::msg::MarkerArray track_markers(const PipelineOutput& out, co
 visualization_msgs::msg::MarkerArray prediction_markers(const PipelineOutput& out, const std::string& world_frame);
 // the accumulated det-frame cloud the detector saw (x, y, z, intensity, dt)
 sensor_msgs::msg::PointCloud2 det_cloud(const PipelineOutput& out, const std::string& local_frame);
+// TF for viewers (the node's publish_tf): world_frame -> local_frame (T_world_det at the scan stamp), and
+// world_frame -> the lidar's frame at the cloud's header stamp (the pose there, times T_body_lidar), so that the
+// raw cloud, the det cloud, the objects and the world-frame markers show together. None for the lidar when the
+// cloud has no frame_id or no pose covers its stamp.
+std::vector<geometry_msgs::msg::TransformStamped> viewer_transforms(const PerceptionPipeline& pipe,
+                                                                    const PipelineOutput& out,
+                                                                    const sensor_msgs::msg::PointCloud2& cloud,
+                                                                    const std::string& local_frame,
+                                                                    const std::string& world_frame);
 
 }  // namespace lidar3d::ros

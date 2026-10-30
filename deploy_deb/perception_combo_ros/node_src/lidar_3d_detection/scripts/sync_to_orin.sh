@@ -21,6 +21,12 @@ done
 ssh "$HOST" "mkdir -p $DIR/bags"
 rsync -az --delete --exclude 'build/' --exclude 'install/' --exclude 'log/' --exclude 'build_deb/' --exclude '*.deb' \
   --exclude '__pycache__' "$TREE/perception_combo_ros" "$TREE/slam" "$HOST:$DIR/"
+# the copy has no .git: build_deb.sh versions the .deb from this ("count hash [dirty]")
+if commit=$(git -C "$TREE" rev-list --count HEAD 2> /dev/null); then
+  commit="$commit $(git -C "$TREE" rev-parse --short HEAD)"
+  git -C "$TREE" diff --quiet HEAD -- . || commit="$commit dirty"
+  ssh "$HOST" "echo '$commit' > $DIR/GIT_COMMIT"
+fi
 for b in "${BAGS[@]}"; do
   rsync -az "${b%/}" "$HOST:$DIR/bags/"
 done

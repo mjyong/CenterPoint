@@ -462,12 +462,27 @@ def test_objects_bag_reads_the_vehicle_messages(tmp_path):
     msg = Arr(header=Header(stamp=Time(sec=100, nanosec=0), frame_id="lidar_det"), world_frame="camera_init",
               world_pose=Pose(position=Point(x=0.0, y=0.0, z=0.0), orientation=Quat(x=0.0, y=0.0, z=0.0, w=1.0)),
               objects=[obj])
+    TF, TS = ts.types["tf2_msgs/msg/TFMessage"], ts.types["geometry_msgs/msg/TransformStamped"]
+    Tr = ts.types["geometry_msgs/msg/Transform"]
+
+    def tf(parent, child, sec, x):
+        return TS(header=Header(stamp=Time(sec=sec, nanosec=0), frame_id=parent), child_frame_id=child,
+                  transform=Tr(translation=Vec(x=x, y=0.0, z=0.0), rotation=Quat(x=0.0, y=0.0, z=0.0, w=1.0)))
+
     bag = tmp_path / "vehicle"
     with Writer(bag, version=8) as w:
         c = w.add_connection("/perception/lidar_3d/objects", Arr.__msgtype__, typestore=ts)
         w.write(c, 100_030_000_000, ts.serialize_cdr(msg, Arr.__msgtype__))
+        t = w.add_connection("/tf", TF.__msgtype__, typestore=ts)     # what publish_tf sends: det frame, lidar
+        tfs = TF(transforms=[tf("camera_init", "lidar_det", 100, 0.0), tf("camera_init", "hesai_lidar", 99, 0.3)])
+        w.write(t, 100_030_000_001, ts.serialize_cdr(tfs, TF.__msgtype__))
     rows = read_objects(bag)
     assert [(r["stamp"], r["ids"], r["frame"]) for r in rows] == [(100.0, [4], "lidar_det")]
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "objects_bag.py"), "--bag", str(bag)],
+                       capture_output=True, text=True)
+    rep = json.loads(r.stdout)
+    assert rep["tf_frames_with_pose"] == 1 and rep["tf_pose_max_diff"] == 0.0
+    assert rep["tf_transforms"] == ["camera_init -> hesai_lidar (1)", "camera_init -> lidar_det (1)"]
 
 
 def test_deploy_deb_mirrors_deploy():
@@ -479,3 +494,78 @@ def test_deploy_deb_mirrors_deploy():
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "sync_deploy_deb.py")],
                        capture_output=True, text=True, cwd=ROOT)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_objects_bag_same_tracks_ignore_the_numbering():
+    """One extra tentative track early in a pass renumbers the rest of it: same_tracks_frames still counts the
+    frame when the reported tracks are the same (class, world position within TRACK_TOL)."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from objects_bag import check_pass
+
+    rows = [dict(stamp=10.0, received=10.03, ids=[7, 8], tracks=[(0, 1.0, 2.0), (0, 5.0, 2.0)]),
+            dict(stamp=10.1, received=10.13, ids=[7], tracks=[(1, 1.2, 2.0)])]
+    stamps, offsets, ids = np.array([10.0, 10.1]), np.array([0, 2, 3]), np.array([2, 1, 1])
+    labels, xy = np.array([0, 0, 0]), np.array([[5.05, 2.0], [1.0, 2.1], [1.2, 2.0]])
+    p = check_pass(rows, stamps, offsets, ids, labels=labels, positions=xy)
+    assert p["same_ids_frames"] == 0 and p["same_tracks_frames"] == 1       # frame 2: another class
+
+
+def test_foxglove_probe_against_a_fake_bridge():
+    """tools/deploy/foxglove_probe.py speaks foxglove.websocket.v1: handshake, advertise, subscribe, message data."""
+    import base64
+    import hashlib
+    import socket
+    import struct
+    import threading
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from foxglove_probe import probe
+
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+
+    def frame(op, data):
+        n = len(data)
+        head = bytes([0x80 | op]) + (bytes([n]) if n < 126 else bytes([126]) + struct.pack(">H", n))
+        return head + data
+
+    def serve():
+        c, _ = srv.accept()
+        req = b""
+        while b"\r\n\r\n" not in req:
+            req += c.recv(1024)
+        key = [ln.split(b": ")[1] for ln in req.split(b"\r\n") if ln.lower().startswith(b"sec-websocket-key")][0]
+        accept = base64.b64encode(hashlib.sha1(key + b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest())
+        c.sendall(b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                  b"Sec-WebSocket-Accept: " + accept + b"\r\nSec-WebSocket-Protocol: foxglove.websocket.v1\r\n\r\n")
+        c.sendall(frame(1, json.dumps(dict(op="serverInfo", name="fake", capabilities=[])).encode()))
+        chans = [dict(id=5, topic="/perception/lidar_3d/tracks", encoding="cdr",
+                      schemaName="visualization_msgs/msg/MarkerArray", schema=""),
+                 dict(id=6, topic="/tf", encoding="cdr", schemaName="tf2_msgs/msg/TFMessage", schema="")]
+        c.sendall(frame(1, json.dumps(dict(op="advertise", channels=chans)).encode()) + frame(0x9, b"hi"))
+        subs = {}
+        while len(subs) < 2:
+            b0, b1 = c.recv(2)
+            n = b1 & 0x7F
+            n = struct.unpack(">H", c.recv(2))[0] if n == 126 else n
+            mask, data = c.recv(4), b""
+            while len(data) < n:
+                data += c.recv(n - len(data))
+            data = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+            if b0 & 0x0F == 0x1:
+                for s in json.loads(data)["subscriptions"]:
+                    subs[s["channelId"]] = s["id"]
+        for _ in range(3):
+            c.sendall(frame(2, b"\x01" + struct.pack("<IQ", subs[5], 0) + b"cdr"))
+        c.sendall(frame(8, b""))
+        c.shutdown(socket.SHUT_WR)
+        while c.recv(1024):          # the client's pong and close: read them, or closing resets the connection
+            pass
+        c.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    rep = probe("ws://127.0.0.1:%d" % port, ["/perception/lidar_3d/tracks", "/tf"], 3.0)
+    srv.close()
+    assert rep["server"]["name"] == "fake" and rep["channels"]["/tf"] == "tf2_msgs/msg/TFMessage"
+    assert rep["received"] == {"/perception/lidar_3d/tracks": 3, "/tf": 0}

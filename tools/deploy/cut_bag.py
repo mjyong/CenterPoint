@@ -38,7 +38,7 @@ def _rows(db, topics):
 
 def cut(bag, out, topics, lidar_topic, max_clouds):
     """Returns {topic: messages written}."""
-    with open(os.path.join(bag, "metadata.yaml")) as f:
+    with open(os.path.join(bag, "metadata.yaml"), encoding="utf-8") as f:
         meta = yaml.safe_load(f)
     info = meta["rosbag2_bagfile_information"]
     if info.get("storage_identifier") != "sqlite3" or info.get("compression_mode"):
@@ -84,7 +84,7 @@ def cut(bag, out, topics, lidar_topic, max_clouds):
     if "files" in info:
         info["files"] = [dict(path=name, starting_time=dict(nanoseconds_since_epoch=first or 0),
                               duration=dict(nanoseconds=span), message_count=total)]
-    with open(os.path.join(out, "metadata.yaml"), "w") as f:
+    with open(os.path.join(out, "metadata.yaml"), "w", encoding="utf-8") as f:
         yaml.dump(dict(rosbag2_bagfile_information=info), f, Dumper=_Dumper, sort_keys=False)
     return counts
 

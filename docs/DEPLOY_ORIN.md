@@ -16,7 +16,7 @@ Python 流水线是唯一的参考实现。每换一样东西（运行时、精�
 | P5 | C++ 全链路离线评估：同一批检测时跟踪对齐，各自检测时 `pipeline_eval.py` 打分 | T28 | 完成：10 个验证场景 ID 每帧相同，标签指标逐项相同 |
 | P6 | ROS 2 节点和 `ObjectArray` 消息，bag 回放对比（第 8 节） | T29 | 完成：板上编译过；ROS 读 bag 和消息日志逐位相同；在线回放不丢帧。复核加了时间戳倒退时整个重来 |
 | P7 | 板上性能和稳定性 | T28B、T29、T30 | 延迟达标（T28B，4 线程）：端到端 17.3 ms（p99 18.2），网络以外 11.4 ms；节点在样例 bag 上 18.9 ms（T29）。稳定性（长时间、10 Hz 不丢帧、和别的进程抢资源）T30 测 |
-| P8 | 车上部署包：`deploy_deb`（车上的接口和名字）和 `deploy/` 对齐，板上打 deb，装上就能跑（第 9 节） | T31 | 已写：对齐检查通过，打包流程本机演练过（假的安装目录）；板上编译、打包、安装待 T31 |
+| P8 | 车上部署包：`deploy_deb`（车上的接口和名字）和 `deploy/` 对齐，板上打 deb，装上就能跑（第 9 节） | T31 | 完成：板上打出 deb（35 MB），装上后和 `deploy/` 逐位相同，服务起停、卸载都对。复核补了 patchelf、版本号、RPATH；加了 Foxglove 实时看 |
 
 已定（2026-10-28）：
 - 板上存储不够，只放 2–3 个验证场景的小子集，全量评估在服务器上做；
@@ -373,7 +373,8 @@ deploy/ros2/
   - `world_pose` 是这个坐标系在定位系里的位姿，要回到世界系就用它；
   - 每个目标：id、类别、运动状态（静止 / 在动 / 停下）、分数、是否这一帧没检测到（coasting）、年龄、框、速度、[x, y, vx, vy] 的协方差，以及预测：时刻表和每种模式的路径、概率、协方差，最可能的在前；
 - `~/tracks`、`~/predictions`（MarkerArray，世界系）：和 Python 节点画的一样；
-- `~/cloud`：检测器的输入点云（`node.publish_cloud`）。
+- `~/cloud`：检测器的输入点云（`node.publish_cloud`）；
+- `/tf`（参数 `publish_tf`，默认关）：`camera_init → <local_frame>` 和 `camera_init → <点云的 frame_id>`，给查看器把点云、框和轨迹放到一起（第 9 节"Foxglove"）。车上不开：车上的 TF 树里已经有雷达的 frame。
 
 **线程**：回调都在一个线程里，一个接一个执行，和 Python 节点一样。同时有几条在等时，rclcpp 的执行器按订阅创建的顺序取（IMU、INS / 里程计、点云），不严格按到达顺序，这是在线和离线回放的差别之一。离线时 Python 节点对 bag 的回放（`cpp_parity.py python --bag`）按 bag 的顺序处理，拿来当参考。
 
@@ -461,6 +462,29 @@ ros2 launch dogperc_ros dogperc.launch.py config:=$HOME/dogperc/kygi.yaml model_
 
 colcon 那一步和真机运行要在板上做（T31）。
 
+**T31 的结果**（2026-10-30）：
+- 板上打出 35 MB 的 deb，Depends 里有 `libnvinfer10 (= 10.3.0.30-1+cuda12.5)`、`cuda-cudart-12-6`、ROS 包、glog、yaml-cpp；
+- 不装、解开跑和装好以后跑，bag 回放都和 `deploy/` 的 `dogperc_bag_replay` 逐位相同；
+- 在线 27 帧不丢（先等 DDS 对上）；服务起停、`remove` / `purge` 都对；
+- 6 分钟循环 59 遍：没有负载时只有起来时的第一帧丢；有负载时 4 遍各丢 1 帧（同 T30）。
+
+复核时改的：
+- **RPATH**：接口包的 Python 扩展库（`lib*__rosidl_generator_py.so`）带着指向编译目录的 RPATH。脚本现在：
+  - 开编之前先确认有 patchelf；
+  - 把安装目录换成最终位置，指向编译目录的项删掉；
+- **源码路径**：编译加 `-ffile-prefix-map`，二进制里不再有源码路径（原来 glog 的 `__FILE__` 带着）；
+- **版本号**：板上的代码是 rsync 过去的，没有 `.git`，所有包的版本都是 `0.1.0`，apt 分不出新旧。现在同步脚本写 `GIT_COMMIT`（提交数、提交号），版本是 `0.1.0+<提交数>.g<提交号>`，后打的版本更高；
+- **ID 比较**：循环播放时 `same_ids_frames` 很低（59 遍里 426 / 1587 帧），但每遍都在差不多同一帧开始不同。原因是在线的到达顺序和 bag 不完全一样，一帧略有不同，多出一条暂定轨迹，后面的 ID 全部顺延一位。`objects_bag.py` 加了 `same_tracks_frames`：不看编号，按类别和世界系位置比报出来的轨迹；
+- **读文件**：`sync_deploy_deb.py`、`soak_report.py`、`cut_bag.py` 读文件都指定 UTF-8（T31 碰到 C locale 读中文注释崩溃）。
+
+**Foxglove 实时看**：板上循环播 bag，连着板子的本机（192.168.123.55，直连板子的 192.168.123.100）用 Foxglove 看检测结果。步骤见 [README](../deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/README.md) 的"用 Foxglove 看"：
+- 板上 `scripts/orin_foxglove.sh <bag>`：节点开 `publish_tf`，加 foxglove_bridge（端口 8765），循环播放；
+- 本机 Foxglove 连 `ws://192.168.123.100:8765`，导入布局 `foxglove/lidar_3d_detection.json`：
+  - 3D：原始点云、框、ID、预测路径；
+  - Raw Messages：`LidarObjectArray`；
+  - 目标数曲线和日志；
+- `tools/deploy/foxglove_probe.py` 在板上不开 GUI 也能查 bridge 发了哪些话题、各收到多少条；`objects_bag.py` 录到 `/tf` 时，会核对 TF 和消息里的 `world_pose`。
+
 ## 10. 文件一览
 
 | 文件 | 作用 |
@@ -491,3 +515,5 @@ colcon 那一步和真机运行要在板上做（T31）。
 | `deploy/scripts/orin_soak.sh` | 板上长时间回放：节点、循环播放、录包、负载、内存和 tegrastats（T30） |
 | `deploy_deb/` | 车上部署的代码树（第 9 节）；`node_src/lidar_3d_detection/scripts/build_deb.sh` 在板上打 deb |
 | `tools/deploy/sync_deploy_deb.py` | `deploy_deb` 的镜像文件按 `deploy/` 重写（`--write`）或检查；配置、消息字段一起查 |
+| `deploy_deb/.../scripts/orin_foxglove.sh`、`foxglove/lidar_3d_detection.json` | 板上循环播 bag 加 foxglove_bridge；本机 Foxglove 的布局 |
+| `tools/deploy/foxglove_probe.py` | 不开 GUI 查 foxglove_bridge：发了哪些话题、订几秒各收到多少条（只用标准库，板上能跑） |

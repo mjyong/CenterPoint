@@ -38,6 +38,12 @@ ssh "$HOST" "mkdir -p $dirs"
 # build*/: the C++ build directories (deploy/cpp/build, build_cuda) are per machine; excluded ones survive --delete
 rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build*/' --exclude 'install/' --exclude 'log/' \
   dog_perception tools deploy deploy_deb configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
+# the board's copy has no .git: deploy_deb's build_deb.sh versions the .deb from this ("count hash [dirty]")
+if commit=$(git rev-list --count HEAD 2> /dev/null); then
+  commit="$commit $(git rev-parse --short HEAD)"
+  git diff --quiet HEAD -- deploy_deb || commit="$commit dirty"
+  ssh "$HOST" "echo '$commit' > $DIR/repo/deploy_deb/GIT_COMMIT"
+fi
 if [ -n "$MODEL" ]; then
   # engines.json is the build log of the engines next to it (build_engines.py): the Orin keeps its own
   rsync -az --exclude 'engines.json' --include '*.onnx' --include '*.json' --exclude '*' \

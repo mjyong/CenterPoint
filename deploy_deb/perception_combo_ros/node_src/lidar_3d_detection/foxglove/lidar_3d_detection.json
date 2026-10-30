@@ -1,0 +1,133 @@
+{
+ "configById": {
+  "3D!lidar": {
+   "cameraState": {
+    "distance": 60,
+    "perspective": true,
+    "phi": 45,
+    "thetaOffset": 0,
+    "fovy": 45,
+    "target": [
+     0,
+     0,
+     0
+    ],
+    "targetOffset": [
+     0,
+     0,
+     0
+    ],
+    "targetOrientation": [
+     0,
+     0,
+     0,
+     1
+    ],
+    "near": 0.5,
+    "far": 5000
+   },
+   "followMode": "follow-pose",
+   "followTf": "lidar_det",
+   "scene": {
+    "enableStats": false
+   },
+   "transforms": {},
+   "topics": {
+    "/robot/topic/rdap/top_point_cloud2": {
+     "visible": true,
+     "colorField": "intensity",
+     "colorMode": "colormap",
+     "colorMap": "turbo",
+     "pointSize": 1.5
+    },
+    "/perception/lidar_3d/tracks": {
+     "visible": true
+    },
+    "/perception/lidar_3d/predictions": {
+     "visible": true
+    },
+    "/perception/lidar_3d/cloud": {
+     "visible": false
+    }
+   },
+   "layers": {
+    "grid": {
+     "visible": true,
+     "frameLocked": true,
+     "label": "Grid",
+     "instanceId": "grid",
+     "layerId": "foxglove.Grid",
+     "size": 100,
+     "divisions": 20,
+     "lineWidth": 1,
+     "color": "#248eff",
+     "position": [
+      0,
+      0,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "frameId": "lidar_det"
+    }
+   },
+   "publish": {
+    "type": "point"
+   },
+   "imageMode": {}
+  },
+  "RawMessages!objects": {
+   "topicPath": "/perception/lidar_3d/objects",
+   "diffEnabled": false,
+   "diffMethod": "custom",
+   "diffTopicPath": "",
+   "showFullMessageForDiff": false,
+   "expansion": "auto"
+  },
+  "Plot!counts": {
+   "paths": [
+    {
+     "value": "/perception/lidar_3d/objects.objects.length",
+     "enabled": true,
+     "timestampMethod": "receiveTime",
+     "label": "objects",
+     "color": "#4E98E2"
+    }
+   ],
+   "showXAxisLabels": true,
+   "showYAxisLabels": true,
+   "showLegend": true,
+   "legendDisplay": "floating",
+   "isSynced": true,
+   "xAxisVal": "timestamp",
+   "followingViewWidth": 30
+  },
+  "RosOut!log": {
+   "searchTerms": [],
+   "minLogLevel": 1
+  }
+ },
+ "globalVariables": {},
+ "userNodes": {},
+ "playbackConfig": {
+  "speed": 1
+ },
+ "layout": {
+  "first": "3D!lidar",
+  "second": {
+   "first": "RawMessages!objects",
+   "second": {
+    "first": "Plot!counts",
+    "second": "RosOut!log",
+    "direction": "column"
+   },
+   "direction": "column",
+   "splitPercentage": 55
+  },
+  "direction": "row",
+  "splitPercentage": 70
+ }
+}

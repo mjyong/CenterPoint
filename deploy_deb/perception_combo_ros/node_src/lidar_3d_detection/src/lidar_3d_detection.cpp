@@ -52,6 +52,7 @@ bool Lidar3dDetection::Init() {
   local_frame_ = declare_parameter<std::string>("local_frame", "lidar_det");
   gpu_ = declare_parameter<bool>("gpu", true);
   publish_markers_ = declare_parameter<bool>("publish_markers", true);
+  if (declare_parameter<bool>("publish_tf", false)) tf_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
   lidar3d::set_num_threads(static_cast<int>(declare_parameter<int64_t>("threads", 1)));
 
   YAML::Node root_yaml;
@@ -141,7 +142,7 @@ bool Lidar3dDetection::Init() {
   LOG(INFO) << "lidar_3d_detection up: config " << config_path_ << ", model " << model_dir_ << " (" << precision_
             << ", " << (gpu_ ? "GPU" : "host") << "), lidar " << nc.lidar_topic << ", " << nc.localization
             << " " << (nc.localization == "inspvax" ? nc.inspvax_topic : nc.odom_topic)
-            << ", imu " << nc.imu_topic << ", objects " << objects_topic_;
+            << ", imu " << nc.imu_topic << ", objects " << objects_topic_ << (tf_ ? ", publishing TF" : "");
   return true;
 #endif
 }
@@ -165,6 +166,7 @@ void Lidar3dDetection::OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr ms
     preds_pub_->publish(lidar3d::ros::prediction_markers(*out, world_frame_));
   }
   if (publish_cloud_) cloud_pub_->publish(lidar3d::ros::det_cloud(*out, local_frame_));
+  if (tf_) tf_->sendTransform(lidar3d::ros::viewer_transforms(*pipe_, *out, *msg, local_frame_, world_frame_));
   // once a second, as deploy/ros2's node (tools/deploy/soak_report.py reads these lines)
   if (now - last_stats_ < std::chrono::seconds(1)) return;
   last_stats_ = now;
