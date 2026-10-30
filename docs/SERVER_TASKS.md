@@ -123,7 +123,7 @@
 | T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 完成，已复核。输出和 T28 逐位相同，1 线程和 4 线程也相同。板上网络以外：1 线程 12.9 ms，4 线程 11.4 ms，都低于 15 ms。用 4 个线程。服务器上 4 线程更慢，体素化 p99 尖峰从 215 ms 降到 19 ms（1 线程），还没消失 |
 | T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成，已复核。对齐都过：服务器两段同一批检测 ID 每帧相同；板上 ROS 读 bag 和读消息日志逐位相同；板上 GPU 对服务器过门槛。板上端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（样例 bag）。复核查出节点在时间戳倒退（bag 重播、时钟回跳）时不会重来，bag 长于 3 s 时重播后基本没有输出，已修（两边一样，加了测试）；在线 `same_ids_frames 0` 是热身那遍的状态带进了正式播放。TensorRT 新出现一句设备提示，T30 查 |
 | T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
-| T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 待做 |
+| T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 停在第 4 步（apt 要密码）。deb 已打好，解开跑和 deploy/ 逐位相同 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5814,4 +5814,20 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
 
 ### T31 结果
 
-（待填）
+（2026-10-30）拉到 `b902d0e`。GPU 用物理卡 4。停在第 4 步：`sudo -n apt-get install` 要密码。deb 已经打好，不装解开跑和 `deploy/` 逐位相同。第 5–7 步还没做。
+
+**代码改动（约定 9）：** `88222c5`，`tools/deploy/objects_bag.py`。整文件跑 `test_deploy.py` 时，前面的测试把进程 locale 改成了 C，`open()` 按 ascii 读 `perception_interface` 的 `.msg`，中文注释（字节 0xe4）崩溃。改为 `encoding="utf-8"`。验证：`LC_ALL=C` 下 `test_deploy.py` 14 passed（含 `test_deploy_deb_mirrors_deploy`、`test_objects_bag_reads_the_vehicle_messages`、`test_soak_report_reads_glog_lines`、`test_objects_bag_against_a_replay`）；快速测试 171 passed。没改镜像文件。
+
+**第 0–1 步。** `sync_deploy_deb.py`：68 mirrored，0 stale，0 extra，0 interface problems。同步样例 bag 后根分区 4.0 GB（> 3 GB）。`deploy/ros2` colcon 3 包通过（仅 clock skew，板上时钟仍是 1970）。`deploy/cpp` 没重编。锁频还在（MAXN，GPU 1300500000）。
+
+**第 2 步打 deb。** 编译过了。打包时 `libperception_interface__rosidl_generator_py.so` 的 RPATH 还指着编译目录，脚本要 `patchelf`。`sudo -n apt-get install patchelf` 要密码，所以用了用户目录里的 patchelf 0.14.3（jammy arm64 包解开的二进制，`~/bin/patchelf`），`--skip-build` 再打包，通过。`lidar-3d-detection_0.1.0_arm64.deb`，35 MB，Installed-Size 62668 KB，`dpkg-deb -c` 1498 行。版本没有 git 短号（板上这份树 `git rev-parse` 失败，报告里 git 是 none）。Depends 里有：`libnvinfer10 (= 10.3.0.30-1+cuda12.5)`、`cuda-cudart-12-6`、`libgoogle-glog0v5`、`libyaml-cpp0.7`、`ros-humble-rclcpp`、`ros-humble-rosbag2-cpp`、`ros-humble-rmw-fastrtps-cpp`。没有 "libraries no installed package owns"。点了源码树的安装文件（脚本说不是错误）：
+
+- `/opt/seres/perception/kygi665_msgs/local/lib/python3.10/dist-packages/kygi665_msgs/libkygi665_msgs__rosidl_generator_py.so`
+- `/opt/seres/perception/common_interface/local/lib/python3.10/dist-packages/common_interface/libcommon_interface__rosidl_generator_py.so`
+- `/opt/seres/perception/nav2_interface/local/lib/python3.10/dist-packages/nav2_interface/libnav2_interface__rosidl_generator_py.so`
+- `/opt/seres/perception/perception_interface/local/lib/python3.10/dist-packages/perception_interface/libperception_interface__rosidl_generator_py.so`
+- `/opt/seres/perception/lidar_3d_detection/lib/lidar_3d_detection/lidar_3d_detection`
+
+**第 3 步。** 解开到 `/tmp/debx`，不安装。`lidar_3d_bag_replay` 和 `dogperc_bag_replay` 都是 647 messages、27 clouds、27 frames、110 tracks。`keys differing: []`。
+
+**第 4 步。** `sudo -n apt-get install -y ~/dogperc/deb/lidar-3d-detection_*_arm64.deb` 返回 `sudo: a password is required`。按任务停下。板上根分区还剩 3.8 GB。`~/dogperc/deb/` 留着。

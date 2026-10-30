@@ -1,0 +1,16 @@
+SOC family:tegra234  Machine:NVIDIA Jetson AGX Orin Developer Kit
+Online CPUs: 0-11
+cpu0:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu1:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu2:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu3:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu4:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu5:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu6:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu7:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu8:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu9:  Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu10: Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+cpu11: Online=1 Governor=schedutil MinFreq=2201600 MaxFreq=2201600 CurrentFreq=2201600 IdleStates: WFI=0 c7=0 
+GPU MinFreq=1300500000 MaxFreq=1300500000 CurrentFreq=1300500000
+Active GPU TPCs: 8
