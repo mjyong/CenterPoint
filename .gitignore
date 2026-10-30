@@ -35,5 +35,13 @@ data/labels/**/*.mcap
 !deploy/**/*.sh
 !tools/deploy/build_engines.py
 !deploy/ros2/**/*.yaml
+# the vehicle deployment tree (deploy_deb): its scripts and parameter files too; colcon's and build_deb.sh's
+# outputs and the packages stay local
+!deploy_deb/**/*.sh
+!deploy_deb/**/scripts/build_deb.sh
+!deploy_deb/**/*.yaml
+deploy_deb/**/install/
+deploy_deb/**/log/
+*.deb
 *.onnx
 *.engine

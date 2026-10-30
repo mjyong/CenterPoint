@@ -8,10 +8,12 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description():
     args = [
         DeclareLaunchArgument("config", default_value="",
-                              description="pipeline yaml; empty uses SERES_PERCEPTION_INSTALL_DIR"),
-        DeclareLaunchArgument("model_dir", description="directory of the TensorRT engines"),
+                              description="pipeline yaml; empty: the installed config/lidar_3d_detection.yaml"),
+        DeclareLaunchArgument("model_dir", default_value="",
+                              description="directory of the TensorRT engines; empty: node.model_dir of the config"),
         DeclareLaunchArgument("precision", default_value="fp16"),
-        DeclareLaunchArgument("threads", default_value="1"),
+        DeclareLaunchArgument("threads", default_value="4",
+                              description="threads of the per-point preprocessing (4 on the Orin)"),
         DeclareLaunchArgument("local_frame", default_value="lidar_det"),
     ]
     node = Node(

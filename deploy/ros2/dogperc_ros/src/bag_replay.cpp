@@ -5,7 +5,9 @@
 //
 //   dogperc_bag_replay --bag <bag> --config kygi.yaml --detections py_bag_dets.npz --out bag.npz
 //   dogperc_bag_replay --bag <bag> --config kygi.yaml --model-dir nusc_pp_dyn --gpu --out bag.npz
+//   dogperc_bag_replay --bag <bag> --config kygi.yaml --preprocess-only --out bag.npz   no detector (empty detections)
 //       [--save-points] [--max-clouds N] [--threads N]
+// One line per cloud on stdout (points in and out, preprocessing time, or why it was dropped), then a summary.
 #include <chrono>
 #include <cstdio>
 #include <iostream>
@@ -37,15 +39,16 @@ T deserialize(const rosbag2_storage::SerializedBagMessage& bm) {
 }
 
 void usage() {
-  std::cerr << "usage: dogperc_bag_replay --bag DIR --config YAML --out OUT.npz (--detections DETS.npz | --model-dir DIR "
-               "[--precision fp16] [--gpu]) [--save-points] [--max-clouds N] [--threads N]\n";
+  std::cerr << "usage: dogperc_bag_replay --bag DIR --config YAML --out OUT.npz "
+               "(--detections DETS.npz | --model-dir DIR [--precision fp16] [--gpu] | --preprocess-only) "
+               "[--save-points] [--max-clouds N] [--threads N]\n";
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
   std::string bag, config, out, dets_path, model_dir, precision = "fp16";
-  bool save_points = false, gpu = false;
+  bool save_points = false, gpu = false, preprocess_only = false;
   long max_clouds = 0;
   int threads = 1;
   for (int i = 1; i < argc; ++i) {
@@ -65,6 +68,7 @@ int main(int argc, char** argv) {
     else if (a == "--precision") precision = next();
     else if (a == "--gpu") gpu = true;
     else if (a == "--save-points") save_points = true;
+    else if (a == "--preprocess-only") preprocess_only = true;
     else if (a == "--max-clouds") max_clouds = std::stol(next());
     else if (a == "--threads") threads = std::stoi(next());
     else {
@@ -72,7 +76,8 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
-  if (bag.empty() || config.empty() || out.empty() || dets_path.empty() == model_dir.empty()) {
+  if (bag.empty() || config.empty() || out.empty() ||
+      (!preprocess_only && dets_path.empty() == model_dir.empty())) {
     usage();
     return 2;
   }
@@ -122,7 +127,10 @@ int main(int argc, char** argv) {
         const auto m = deserialize<sensor_msgs::msg::PointCloud2>(*bm);
         const LidarScan scan = inputs.scan(ros::cloud_view(m));
         std::optional<PipelineOutput> o;
-        if (given) {
+        if (preprocess_only) {
+          const Detections empty;
+          o = inputs.on_scan(scan, &empty);
+        } else if (given) {
           Detections d;
           const bool match = given->lookup(scan.stamp, d);
           o = inputs.on_scan(scan, &d);
@@ -131,7 +139,10 @@ int main(int argc, char** argv) {
         } else {
           o = inputs.on_scan(scan);
         }
+        if (!o) std::printf("cloud %ld stamp %.3f points_in %zu dropped (no pose)\n", clouds, scan.stamp, scan.size());
         if (o) {
+          std::printf("cloud %ld stamp %.3f points_in %zu points_out %zu preprocess %.1f ms\n", clouds, o->stamp,
+                      scan.size(), o->frame.num_points(), o->timings.count("preprocess_ms") ? o->timings.at("preprocess_ms") : 0.0);
           const Detections raw = detector ? detector->last_raw() : Detections{};
           w.add(*o, pipe.preprocessor(), save_points, detector ? &raw : nullptr, cfg.detection_filter);
         }

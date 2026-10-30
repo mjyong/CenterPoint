@@ -37,7 +37,7 @@ for b in "${BAGS[@]}"; do dirs="$dirs $DIR/bags"; done
 ssh "$HOST" "mkdir -p $dirs"
 # build*/: the C++ build directories (deploy/cpp/build, build_cuda) are per machine; excluded ones survive --delete
 rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build*/' --exclude 'install/' --exclude 'log/' \
-  dog_perception tools deploy configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
+  dog_perception tools deploy deploy_deb configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
 if [ -n "$MODEL" ]; then
   # engines.json is the build log of the engines next to it (build_engines.py): the Orin keeps its own
   rsync -az --exclude 'engines.json' --include '*.onnx' --include '*.json' --exclude '*' \

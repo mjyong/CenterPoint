@@ -1,0 +1,7 @@
+# Environment of lidar-3d-detection.service (start_lidar_3d_detection.sh). Kept on upgrades.
+#ROS_DOMAIN_ID=0
+#RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+LIDAR3D_THREADS=4
+#LIDAR3D_CONFIG=@PREFIX@/lidar_3d_detection/config/lidar_3d_detection.yaml
+#LIDAR3D_MODEL_DIR=@PREFIX@/lidar_3d_detection/model
+#LIDAR3D_LOG_DIR=/tmp/lidar_3d_detection_logs

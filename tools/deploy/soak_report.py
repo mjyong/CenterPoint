@@ -3,28 +3,51 @@
 
     python tools/deploy/soak_report.py data/deploy/T30/soak --window 300 --out soak.json
 
-Times are the board's clock (node.log's ROS stamps, rss.log and load.log from ``date +%s``).
+Times are the board's clock (node.log's ROS stamps, rss.log and load.log from ``date +%s``). node.log can also be
+the vehicle node's (deploy_deb, glog lines; their local time is read with the year of rss.log / load.log).
 """
 import argparse
 import json
 import os
 import re
+import time
 from collections import Counter
 
 import numpy as np
 
 LINE = re.compile(r"\[(INFO|WARN|ERROR)\] \[(\d+\.\d+)\] \[dog_perception\]: (.*)")
+# glog: Lmmdd or Lyyyymmdd, hh:mm:ss.uuuuuu, thread, file:line]
+GLOG = re.compile(r"\b([IWEF])(\d{8}|\d{4}) (\d\d):(\d\d):(\d\d(?:\.\d+)?)\s+\d+ [^\]\s]+\] (.*)")
+GLOG_LEVEL = dict(I="INFO", W="WARN", E="ERROR", F="ERROR")
 STATS = re.compile(r"(\d+) dets, (\d+) tracks \|(.*)")
 
 
-def read_node_log(path):
+def _glog_time(day, hh, mm, ss, year):
+    y, md = (int(day[:4]), day[4:]) if len(day) == 8 else (year, day)
+    whole = time.mktime((y, int(md[:2]), int(md[2:]), int(hh), int(mm), 0, 0, 0, -1))
+    return whole + float(ss)
+
+
+def parse_line(line, year):
+    """(level, t, text) of a ROS log or glog line, None for anything else."""
+    m = LINE.search(line)
+    if m:
+        return m.group(1), float(m.group(2)), m.group(3)
+    m = GLOG.search(line)
+    if m:
+        return GLOG_LEVEL[m.group(1)], _glog_time(*m.group(2, 3, 4, 5), year), m.group(6)
+    return None
+
+
+def read_node_log(path, year=None):
+    year = year or time.localtime().tm_year
     frames, warnings = [], Counter()
     with open(path) as f:
         for line in f:
-            m = LINE.search(line)
-            if not m:
+            p = parse_line(line, year)
+            if p is None:
                 continue
-            level, t, text = m.group(1), float(m.group(2)), m.group(3)
+            level, t, text = p
             s = STATS.match(text)
             if s:
                 ms = {k: float(v) for k, v in re.findall(r"(\w+_ms) ([0-9.]+)", s.group(3))}
@@ -100,9 +123,11 @@ def main():
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    frames, warnings = read_node_log(os.path.join(args.dir, "node.log"))
     load = read_load(os.path.join(args.dir, "load.log"))
     rss = read_pairs(os.path.join(args.dir, "rss.log"))
+    epoch = load[0] or (rss[0][0] if rss else None)
+    frames, warnings = read_node_log(os.path.join(args.dir, "node.log"),
+                                     time.localtime(epoch).tm_year if epoch else None)
     rows = windows(frames, args.window, load)
     report = dict(frames_logged=len(frames), windows=rows, warnings=dict(warnings),
                   rss_mb=dict(first=rss[0][1] / 1024, last=rss[-1][1] / 1024, max=max(r[1] for r in rss) / 1024)

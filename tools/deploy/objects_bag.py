@@ -9,7 +9,8 @@ A bag played in a loop (``ros2 bag play --loop``) gives one pass per loop, split
 each pass is checked against the replay, the last one up to its last frame when the recording stopped
 during it (more than one pass).
 
-The message definitions are read from deploy/ros2/dog_perception_msgs/msg (rosbags, no ROS install).
+The message definitions are read from deploy/ros2/dog_perception_msgs/msg (rosbags, no ROS install), and the
+vehicle node's perception_interface/LidarObjectArray (deploy_deb, the same fields) from its interface package.
 """
 import argparse
 import json
@@ -22,6 +23,10 @@ import numpy as np
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MSG_DIR = os.path.join(ROOT, "deploy", "ros2", "dog_perception_msgs", "msg")
 NAMES = ("PredictedPath", "Object", "ObjectArray")
+DEB_MSG_DIR = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "common_interface", "seres_interface", "ros",
+                           "perception_interface", "msg")
+DEB_NAMES = ("LidarPredictedPath", "LidarObject", "LidarObjectArray")
+ARRAYS = ("dog_perception_msgs/msg/ObjectArray", "perception_interface/msg/LidarObjectArray")
 
 
 def typestore():
@@ -29,9 +34,13 @@ def typestore():
 
     ts = get_typestore(Stores.ROS2_HUMBLE)
     types = {}
-    for name in NAMES:
-        with open(os.path.join(MSG_DIR, name + ".msg")) as f:
-            types.update(get_types_from_msg(f.read(), "dog_perception_msgs/msg/" + name))
+    for package, msg_dir, names in (("dog_perception_msgs", MSG_DIR, NAMES),
+                                    ("perception_interface", DEB_MSG_DIR, DEB_NAMES)):
+        if not os.path.isdir(msg_dir):
+            continue
+        for name in names:
+            with open(os.path.join(msg_dir, name + ".msg")) as f:
+                types.update(get_types_from_msg(f.read(), "%s/msg/%s" % (package, name)))
     ts.register(types)
     return ts
 
@@ -41,10 +50,9 @@ def read_objects(bag, topic=None):
 
     rows = []
     with AnyReader([Path(bag)], default_typestore=typestore()) as r:
-        conns = [c for c in r.connections if c.msgtype == "dog_perception_msgs/msg/ObjectArray" and
-                 (topic is None or c.topic == topic)]
+        conns = [c for c in r.connections if c.msgtype in ARRAYS and (topic is None or c.topic == topic)]
         if not conns:
-            raise SystemExit("%s: no dog_perception_msgs/msg/ObjectArray topic" % bag)
+            raise SystemExit("%s: no %s topic" % (bag, " or ".join(ARRAYS)))
         for c, t, raw in r.messages(connections=conns):
             m = r.deserialize(raw, c.msgtype)
             rows.append(dict(stamp=m.header.stamp.sec + m.header.stamp.nanosec * 1e-9, received=t * 1e-9,
@@ -81,7 +89,7 @@ def check_pass(rows, stamps, offsets, ids, partial=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bag", required=True, help="recorded ~/objects")
-    ap.add_argument("--topic", default=None, help="default: every ObjectArray topic in the bag")
+    ap.add_argument("--topic", default=None, help="default: every (Lidar)ObjectArray topic in the bag")
     ap.add_argument("--replay", default=None, help="replay .npz of the same input to compare with")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()

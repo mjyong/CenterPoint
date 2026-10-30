@@ -1,9 +1,12 @@
 #include "../include/lidar_3d_detection.h"
 #include "../include/logging.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <optional>
 
+#include <ament_index_cpp/get_package_prefix.hpp>
 #include <yaml-cpp/yaml.h>
 #ifdef LIDAR3D_HAVE_KYGI
 #include <kygi665_msgs/msg/inspvax.hpp>
@@ -30,12 +33,20 @@ std::string OptionalString(const YAML::Node& node, const char* key, const std::s
 
 Lidar3dDetection::Lidar3dDetection() : Node("lidar_3d_detection") {}
 
-bool Lidar3dDetection::Init() {
+std::string Lidar3dDetection::DefaultConfig() {
   const char* root = std::getenv("SERES_PERCEPTION_INSTALL_DIR");
-  const std::string default_config =
-      root ? std::string(root) + "/lidar_3d_detection/config/lidar_3d_detection.yaml"
-           : "config/lidar_3d_detection.yaml";
-  config_path_ = declare_parameter<std::string>("config", default_config);
+  if (root && *root) return std::string(root) + "/lidar_3d_detection/config/lidar_3d_detection.yaml";
+  try {
+    return ament_index_cpp::get_package_prefix("lidar_3d_detection") + "/config/lidar_3d_detection.yaml";
+  } catch (const std::exception&) {
+    return "config/lidar_3d_detection.yaml";
+  }
+}
+
+bool Lidar3dDetection::Init() {
+  // an empty parameter (the launch file's default) also means the installed config
+  config_path_ = declare_parameter<std::string>("config", "");
+  if (config_path_.empty()) config_path_ = DefaultConfig();
   model_dir_ = declare_parameter<std::string>("model_dir", "");
   precision_ = declare_parameter<std::string>("precision", "fp16");
   local_frame_ = declare_parameter<std::string>("local_frame", "lidar_det");
@@ -105,7 +116,7 @@ bool Lidar3dDetection::Init() {
   if (nc.localization == "inspvax") {
 #ifdef LIDAR3D_HAVE_KYGI
     pose_sub_ = create_subscription<kygi665_msgs::msg::INSPVAX>(
-        nc.inspvax_topic, rclcpp::QoS(50), [this](kygi665_msgs::msg::INSPVAX::ConstSharedPtr msg) {
+        nc.inspvax_topic, rclcpp::QoS(200), [this](kygi665_msgs::msg::INSPVAX::ConstSharedPtr msg) {
           inputs_->on_inspvax(lidar3d::ros::ins_sample(*msg));
         });
 #else
@@ -136,11 +147,15 @@ bool Lidar3dDetection::Init() {
 }
 
 void Lidar3dDetection::OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+  const auto now = std::chrono::steady_clock::now();
   std::optional<lidar3d::PipelineOutput> out;
   try {
     out = inputs_->on_cloud(lidar3d::ros::cloud_view(*msg));
   } catch (const std::exception& e) {
-    LOG_EVERY_N(ERROR, 20) << "scan dropped: " << e.what();
+    if (now - last_drop_ >= std::chrono::seconds(2)) {
+      last_drop_ = now;
+      LOG(ERROR) << "scan dropped: " << e.what();
+    }
     return;
   }
   if (!out) return;
@@ -150,7 +165,18 @@ void Lidar3dDetection::OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr ms
     preds_pub_->publish(lidar3d::ros::prediction_markers(*out, world_frame_));
   }
   if (publish_cloud_) cloud_pub_->publish(lidar3d::ros::det_cloud(*out, local_frame_));
-  LOG_EVERY_N(INFO, 10) << out->detections.size() << " dets, " << out->tracks.size() << " tracks";
+  // once a second, as deploy/ros2's node (tools/deploy/soak_report.py reads these lines)
+  if (now - last_stats_ < std::chrono::seconds(1)) return;
+  last_stats_ = now;
+  std::string t;
+  for (const char* k : {"preprocess_ms", "det_gpu_ms", "det_post_ms", "track_ms", "predict_ms", "total_ms"}) {
+    auto it = out->timings.find(k);
+    if (it == out->timings.end()) continue;
+    char buf[48];
+    std::snprintf(buf, sizeof(buf), " %s %.1f", k, it->second);
+    t += buf;
+  }
+  LOG(INFO) << out->detections.size() << " dets, " << out->tracks.size() << " tracks |" << t;
 }
 
 }  // namespace perception

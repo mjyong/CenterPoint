@@ -1,8 +1,8 @@
 // Replay a recorded sequence through the C++ pipeline; per-frame results to one .npz
 // (the layout of tools/deploy/dump_golden.py's pipeline.npz; tools/deploy/cpp_parity.py reads it).
 //
-//   lidar3d_replay --seq data/seq/0921_164127_s000 --config seq.yaml --out cpp.npz
-//   lidar3d_replay --messages msgs.npz --config kygi.yaml --out cpp.npz      the online node's path (OnlineInputs)
+//   lidar_3d_replay --seq data/seq/0921_164127_s000 --config seq.yaml --out cpp.npz
+//   lidar_3d_replay --messages msgs.npz --config kygi.yaml --out cpp.npz      the online node's path (OnlineInputs)
 //                                       on a bag's messages (cpp_parity.py python --bag --messages); the config
 //                                       needs the node: section (export_cpp_config.py --robot)
 //       [--detections dets.npz]                                      the detections of another run, frame by frame
@@ -33,7 +33,7 @@ using namespace lidar3d;
 namespace {
 
 void usage() {
-  std::cerr << "usage: lidar3d_replay (--seq DIR | --messages MSGS.npz) --config YAML --out OUT.npz [--detections DETS.npz] "
+  std::cerr << "usage: lidar_3d_replay (--seq DIR | --messages MSGS.npz) --config YAML --out OUT.npz [--detections DETS.npz] "
                "[--model-dir DIR --precision fp16 [--gpu]] [--odom-latency S] [--save-points] [--max-frames N] "
                "[--threads N]\n";
 }
@@ -145,7 +145,7 @@ int main(int argc, char** argv) {
     const double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     std::printf("%zu frames, %zu tracks, %.1f s -> %s\n", w.frames(), w.track_rows(), sec, out.c_str());
   } catch (const std::exception& e) {
-    std::cerr << "lidar3d_replay: " << e.what() << "\n";
+    std::cerr << "lidar_3d_replay: " << e.what() << "\n";
     return 1;
   }
   return 0;

@@ -428,3 +428,54 @@ def test_soak_report_windows_and_warnings(tmp_path):
     assert [(r["load"], r["frames"], r["total_median"]) for r in rows] == [(False, 10, 18.0), (True, 10, 25.0)]
     teg = read_tegrastats(tmp_path / "tegrastats.log")
     assert teg["gr3d_mean"] == 50 and teg["ram_mb_max"] == 5100 and teg["temp_max_c"] == dict(gpu=47.0, tj=52.5)
+
+
+def test_soak_report_reads_glog_lines():
+    """The vehicle node (deploy_deb) logs with glog: Lmmdd (glog 0.5, Ubuntu 22.04) or Lyyyymmdd."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from soak_report import parse_line
+
+    a = parse_line("[lidar_3d_detection-1] I1030 15:16:13.500000  7762 lidar_3d_detection.cpp:171] 41 dets, 5 tracks |"
+                   " preprocess_ms 6.1 total_ms 18.4", 2026)
+    b = parse_line("W20261030 15:16:14.000000  7762 online.cpp:201] inspvax stamps jumped back 59.9 s", 2026)
+    assert a[0] == "INFO" and a[2].startswith("41 dets, 5 tracks |") and b[0] == "WARN"
+    assert b[1] - a[1] == pytest.approx(0.5)
+    assert parse_line("[INFO] [launch]: All log files can be found below /tmp", 2026) is None
+
+
+def test_objects_bag_reads_the_vehicle_messages(tmp_path):
+    """objects_bag.py also reads deploy_deb's perception_interface/LidarObjectArray (the same fields)."""
+    pytest.importorskip("rosbags")
+    from rosbags.rosbag2 import Writer
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from objects_bag import read_objects, typestore
+
+    ts = typestore()
+    Obj, Arr = ts.types["perception_interface/msg/LidarObject"], ts.types["perception_interface/msg/LidarObjectArray"]
+    Header, Time = ts.types["std_msgs/msg/Header"], ts.types["builtin_interfaces/msg/Time"]
+    Point, Vec, Pose = (ts.types["geometry_msgs/msg/" + n] for n in ("Point", "Vector3", "Pose"))
+    Quat = ts.types["geometry_msgs/msg/Quaternion"]
+    obj = Obj(id=4, label=0, label_name="vehicle", motion=Obj.MOTION_STATIC, score=0.7, coasting=False, age=2.0,
+              position=Point(x=1.0, y=2.0, z=0.8), yaw=0.1, size=Vec(x=4.5, y=1.9, z=1.6),
+              velocity=Vec(x=0.0, y=0.0, z=0.0), covariance=np.eye(4).ravel(),
+              prediction_times=np.array([0.5], np.float32), predictions=[])
+    msg = Arr(header=Header(stamp=Time(sec=100, nanosec=0), frame_id="lidar_det"), world_frame="camera_init",
+              world_pose=Pose(position=Point(x=0.0, y=0.0, z=0.0), orientation=Quat(x=0.0, y=0.0, z=0.0, w=1.0)),
+              objects=[obj])
+    bag = tmp_path / "vehicle"
+    with Writer(bag, version=8) as w:
+        c = w.add_connection("/perception/lidar_3d/objects", Arr.__msgtype__, typestore=ts)
+        w.write(c, 100_030_000_000, ts.serialize_cdr(msg, Arr.__msgtype__))
+    rows = read_objects(bag)
+    assert [(r["stamp"], r["ids"], r["frame"]) for r in rows] == [(100.0, [4], "lidar_det")]
+
+
+def test_deploy_deb_mirrors_deploy():
+    """deploy_deb's library, ROS conversion and bag replay are deploy/'s with the vehicle's names, its config is
+    export_cpp_config.py --robot kygi plus the deploy keys, and its messages have dog_perception_msgs' fields
+    (tools/deploy/sync_deploy_deb.py; after changing deploy/, run it with --write)."""
+    if not os.path.isdir(os.path.join(ROOT, "deploy_deb")):
+        pytest.skip("no deploy_deb")
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "sync_deploy_deb.py")],
+                       capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode == 0, r.stdout + r.stderr

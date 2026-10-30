@@ -206,7 +206,7 @@ TEST(Pipeline, ThreadCountDoesNotChangeTheOutput) {
 
 TEST(Pipeline, ReplayToolWritesOneRowPerFrame) {
   REQUIRE_GOLDEN();
-  const std::string out = (std::filesystem::temp_directory_path() / "lidar3d_replay_test.npz").string();
+  const std::string out = (std::filesystem::temp_directory_path() / "lidar_3d_replay_test.npz").string();
   const std::string cmd = std::string(LIDAR3D_REPLAY_BIN) + " --seq " + golden("seq") + " --config " + golden("config.yaml") +
                           " --detections " + golden("dets.npz") + " --odom-latency 0.05 --out " + out + " > /dev/null";
   ASSERT_EQ(std::system(cmd.c_str()), 0) << cmd;

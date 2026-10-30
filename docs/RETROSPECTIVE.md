@@ -25,7 +25,8 @@
 | ROS 2 节点 | 板上编译、验证过（T29）：ROS 读 bag 和读消息日志逐位相同，在线回放不丢帧。复核加了时间戳倒退时节点重来 |
 
 **还没做的**：
-- T30：板上长时间循环回放、负载下的延迟、TensorRT 的设备提示；
+- T30（10-30 已跑，结果在 SERVER_TASKS，没复核）：板上长时间循环回放、负载下的延迟、TensorRT 的设备提示；
+- T31：车上部署包。`deploy_deb`（车上的接口和名字）已和 `deploy/` 对齐，板上编译、打 deb、安装验证待做；
 - 上车实时跑：要人（校时，板子时钟停在 1970）；
 - 规划确认 `ObjectArray` 的字段；
 - 厂区新数据的下一轮采集和训练；
@@ -35,7 +36,7 @@
 - 流水线库 `dog_perception/` 约 1 万行 Python，工具约 9 千行，测试约 5 千行；
 - C++ 核心库约 7 千行，含 24 个 GoogleTest；
 - ROS 2 包约 600 行；
-- 服务器任务 T0–T30 共 30 多个，人工步骤 H1–H5。
+- 服务器任务 T0–T31 共 30 多个，人工步骤 H1–H5。
 
 ---
 
@@ -97,7 +98,7 @@
 | E 选模型 | 10-23 ～ 10-27 | T7、T15、T18 续、T19 | 上线 nuScenes Pillar（人定） |
 | F 后处理、跟踪、预测调参 | 10-26 ～ 10-28 | T18–T22 | 新默认值，IDF1 0.726 → 0.786 |
 | G 第二档预测 | 10-28 | T23、T24 | 保持 IMM |
-| H Orin 部署 | 10-28 ～ 10-30 | T25–T30（P0–P7） | FP16 加动态 PFN；C++ 核心库；延迟达标；ROS 2 节点上板 |
+| H Orin 部署 | 10-28 ～ 10-30 | T25–T31（P0–P8） | FP16 加动态 PFN；C++ 核心库；延迟达标；ROS 2 节点上板；车上 deb 包 |
 
 ---
 
@@ -421,7 +422,8 @@
 
 | 项 | 谁 | 说明 |
 |---|---|---|
-| T30：板上长时间循环回放、负载下的延迟、TensorRT 设备提示 | Agent | 任务已写好（T29 10-30 完成） |
+| T30：板上长时间循环回放、负载下的延迟、TensorRT 设备提示 | Agent | 10-30 跑完，待复核 |
+| T31：车上部署包：板上编 `deploy_deb`、打 deb、安装、和 `deploy/` 逐位比、卸载 | Agent（安装要 root） | 任务已写好 |
 | 上车实时跑：10 Hz 不丢帧、和别的进程抢资源 | 人（上车、校时） | P7 剩下的部分 |
 | 规划确认 `ObjectArray` 的坐标系和字段 | 人、规划 | 字段是按常见需求定的 |
 | H4：在 Foxglove 里看 5 处问题 | 人 | 暂缓：新数据来了模型还会改 |
@@ -464,6 +466,6 @@
 | [DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md) | 为什么 v1 不如教师；下一批数据的采集计划 |
 | [PIPELINE_TUNING.md](PIPELINE_TUNING.md) | 后处理、跟踪、预测调参的计划和指标 |
 | [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md) | 跟踪和预测的设计 |
-| [SERVER_TASKS.md](SERVER_TASKS.md) | 服务器任务 T0–T30：命令、结果、复核 |
+| [SERVER_TASKS.md](SERVER_TASKS.md) | 服务器任务 T0–T31：命令、结果、复核 |
 | [DEPLOY_ORIN.md](DEPLOY_ORIN.md) | Orin 部署：通道、环境、转换、INT8、验收、C++ 核心库、ROS 2 节点 |
 | [SENSORS.md](SENSORS.md) | 传感器参数和外参 |

@@ -1,4 +1,4 @@
-// lidar3d_replay's output: per-frame pipeline results in one .npz, the layout of tools/deploy/dump_golden.py's
+// lidar_3d_replay's output: per-frame pipeline results in one .npz, the layout of tools/deploy/dump_golden.py's
 // pipeline.npz (tools/deploy/cpp_parity.py compares and scores it). Also the detections of another run fed
 // back frame by frame (dets.npz, cpp_parity.py python --dets). Shared by the sequence, message-log and ROS
 // bag replays.

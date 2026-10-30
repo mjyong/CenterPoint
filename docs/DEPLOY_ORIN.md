@@ -16,6 +16,7 @@ Python 流水线是唯一的参考实现。每换一样东西（运行时、精�
 | P5 | C++ 全链路离线评估：同一批检测时跟踪对齐，各自检测时 `pipeline_eval.py` 打分 | T28 | 完成：10 个验证场景 ID 每帧相同，标签指标逐项相同 |
 | P6 | ROS 2 节点和 `ObjectArray` 消息，bag 回放对比（第 8 节） | T29 | 完成：板上编译过；ROS 读 bag 和消息日志逐位相同；在线回放不丢帧。复核加了时间戳倒退时整个重来 |
 | P7 | 板上性能和稳定性 | T28B、T29、T30 | 延迟达标（T28B，4 线程）：端到端 17.3 ms（p99 18.2），网络以外 11.4 ms；节点在样例 bag 上 18.9 ms（T29）。稳定性（长时间、10 Hz 不丢帧、和别的进程抢资源）T30 测 |
+| P8 | 车上部署包：`deploy_deb`（车上的接口和名字）和 `deploy/` 对齐，板上打 deb，装上就能跑（第 9 节） | T31 | 已写：对齐检查通过，打包流程本机演练过（假的安装目录）；板上编译、打包、安装待 T31 |
 
 已定（2026-10-28）：
 - 板上存储不够，只放 2–3 个验证场景的小子集，全量评估在服务器上做；
@@ -206,6 +207,7 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 | C++ 对 Python（P4） | 点 1e-4 m；体素集合相同；喂相同检测时跟踪 ID 完全一致、状态 1e-6；预测 1e-4 |
 | ROS 2 节点（P6） | `dogperc_bag_replay` 和 `dogperc_replay --messages` 逐位相同，对 Python 节点的 bag 回放同上一行（喂相同检测时 ID 每帧一致）；在线回放 bag 不丢帧（`objects_bag.py`，循环播放时每一遍都不丢） |
 | 板上（P7） | 网络以外 < 15 ms，端到端 < 50 ms，p99 < 100 ms，10 Hz 不丢帧 |
+| 车上部署包（P8） | 板上 `build_deb.sh` 打出 deb；装上后节点起来，离线回放和 `deploy/` 的 `dogperc_bag_replay` 逐位相同，在线回放不丢帧；服务能起停；卸载干净 |
 
 `compare_backends.py` 的检测比较分两层：
 - **raw**：几何过滤之前；
@@ -406,7 +408,60 @@ source deploy/ros2/install/setup.bash
 ros2 launch dogperc_ros dogperc.launch.py config:=$HOME/dogperc/kygi.yaml model_dir:=$HOME/dogperc/models/nusc_pp_dyn
 ```
 
-## 9. 文件一览
+## 9. 车上部署（deploy_deb、deb 包，P8）
+
+`deploy_deb` 是车上真实部署的代码树，按车上仓库的样子组织：
+- `perception_combo_ros/common_interface/seres_interface/ros/`：接口包 `common_interface`、`nav2_interface`、`perception_interface`；
+- `perception_combo_ros/node_src/lidar_3d_detection/`：节点包；
+- `slam/interface/kygi665_msgs`：INSPVAX 消息。
+
+怎么用见那里的 [README](../deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/README.md)。
+
+**和 `deploy/` 的关系**：代码是同一套，只换了名字（命名空间 `lidar3d`、包 `lidar_3d_detection`、消息 `perception_interface/LidarObjectArray`，字段和 `ObjectArray` 相同）。
+- 镜像文件：库、测试、离线回放、ROS 消息转换、bag 回放，都是 `deploy/` 对应文件按固定规则改名的结果。改代码只在 `deploy/` 改、在那里测，然后 `python tools/deploy/sync_deploy_deb.py --write` 重写镜像；
+- 不带 `--write` 是检查，`test_deploy_deb_mirrors_deploy` 每次跑。检查的内容：
+  - 镜像文件逐字等于改名后的 `deploy/`；
+  - 配置除了末尾 5 个部署键（`model_dir`、四个话题名），等于 `export_cpp_config.py --robot kygi` 的输出；
+  - `LidarObject*` 的字段和 `dog_perception_msgs` 相同；
+  - `kygi665_msgs` 的消息相同；
+- 节点 `lidar_3d_detection` 是车上自己的写法：glog 日志、`Init()`、话题名在配置里。行为和 `deploy/ros2` 的节点对齐：
+  - 订阅的 QoS（IMU 400、INSPVAX 200、点云 SensorData 5）；
+  - 每秒一行统计，带各段耗时；
+  - launch 默认 4 线程；
+  - 时间戳倒退重来（在库里）。
+
+**接过来时改的地方**（2026-10-30）：
+- 镜像文件只有注释不同，已按规则重写。`bag_replay` 的 `--preprocess-only` 和每帧一行的输出，反过来加进了 `deploy/ros2`；
+- `package.xml` 没声明 `kygi665_msgs`：colcon 可能先编节点，节点就没有 INSPVAX，起来报错退出。已声明；CMake 里改成必需（`LIDAR3D_KYGI`）；
+- 和 `deploy/ros2` 不一致的几处：
+  - INSPVAX 队列 50 → 200；
+  - 统计没有耗时、每 10 帧一行 → 每秒一行带耗时；
+  - launch 默认 1 线程 → 4；
+  - launch 的 `model_dir` 没有默认值（不传就起不来）→ 空，用配置里的；
+- 配置的默认位置：`SERES_PERCEPTION_INSTALL_DIR` 没设时，找包自己的安装位置（ament index），不再是当前目录；
+- `orin_soak.sh`：`pkill -f lidar_3d_detection` 会连脚本自己一起杀掉（脚本路径里有这个名字）；`ps -C` 永远匹配不到（进程名截断到 15 个字符）。改成按可执行文件的路径找。`sync_to_orin.sh` 改成同步 `deploy_deb` 本身；
+- 测试：`LIDAR3D_TESTS=ON` 加 `LIDAR3D_GOLDEN_DIR`（算法仓库 `deploy/cpp` 编译目录下的 golden）可以在这里编、跑同一套对齐测试。
+
+**deb 包**（`scripts/build_deb.sh`，在板上跑，不用 root）：
+1. colcon 编接口包、`kygi665_msgs` 和节点（Release、sm_87、CUDA），`-DLIDAR3D_MODEL_DIR` 把模型装进 `<prefix>/model`：`model_meta.json`、两个 ONNX、两个 FP16 引擎、`engines.json`；
+2. 安装目录拷一份，装到 `/opt/seres/perception`：
+   - 文本文件里的编译路径（colcon、ament 的 setup 脚本，CMake 配置）改成最终路径；
+   - 删掉 `__pycache__`；
+   - 二进制里还有编译路径就用 patchelf 改 RPATH，改不了就停；
+3. 加上 `/lib/systemd/system/lidar-3d-detection.service`（默认不启用，`--enable-service` 装上就启用）和 `/etc/default/lidar-3d-detection`；
+4. Depends：节点和各个库加载的每个动态库，查出由哪个系统包提供，写成 `>=` 板上的版本。两个例外：
+   - `libnvinfer10` 写成 `=`，因为引擎只能在建它的 TensorRT 上加载；
+   - dlopen 加载的 RMW 单独加进去；
+5. `dpkg-deb --root-owner-group` 打包，另写一份报告：板子、模型文件的 sha256、Depends、找不到包的库。
+
+本机演练过打包这一步（`--skip-build`，假的安装目录加一个链接 zlib 的小程序）：
+- 路径改写、conffile、systemd 单元的替换都对；
+- Depends 自动算出 `libc6`、`zlib1g`；
+- `dpkg -i` 装上后，启动脚本按安装位置设好环境、传对参数；`dpkg -r` 留下 conffile，`dpkg -P` 删干净。
+
+colcon 那一步和真机运行要在板上做（T31）。
+
+## 10. 文件一览
 
 | 文件 | 作用 |
 |---|---|
@@ -434,3 +489,5 @@ ros2 launch dogperc_ros dogperc.launch.py config:=$HOME/dogperc/kygi.yaml model_
 | `deploy/scripts/orin_check.sh` | 环境报告 |
 | `deploy/scripts/sync_to_orin.sh` | 代码、模型（不带 `engines.json`）、帧、参考检测、原始录制、bag 同步到板上 |
 | `deploy/scripts/orin_soak.sh` | 板上长时间回放：节点、循环播放、录包、负载、内存和 tegrastats（T30） |
+| `deploy_deb/` | 车上部署的代码树（第 9 节）；`node_src/lidar_3d_detection/scripts/build_deb.sh` 在板上打 deb |
+| `tools/deploy/sync_deploy_deb.py` | `deploy_deb` 的镜像文件按 `deploy/` 重写（`--write`）或检查；配置、消息字段一起查 |

@@ -123,6 +123,7 @@
 | T28B | C++ 提速后复测：服务器容器和板上重编、测试；两个场景确认输出和 T28 逐位相同；板上 1 / 4 线程的每段延迟 | Agent | T28 | 40 分钟 | 完成，已复核。输出和 T28 逐位相同，1 线程和 4 线程也相同。板上网络以外：1 线程 12.9 ms，4 线程 11.4 ms，都低于 15 ms。用 4 个线程。服务器上 4 线程更慢，体素化 p99 尖峰从 215 ms 降到 19 ms（1 线程），还没消失 |
 | T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成，已复核。对齐都过：服务器两段同一批检测 ID 每帧相同；板上 ROS 读 bag 和读消息日志逐位相同；板上 GPU 对服务器过门槛。板上端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（样例 bag）。复核查出节点在时间戳倒退（bag 重播、时钟回跳）时不会重来，bag 长于 3 s 时重播后基本没有输出，已修（两边一样，加了测试）；在线 `same_ids_frames 0` 是热身那遍的状态带进了正式播放。TensorRT 新出现一句设备提示，T30 查 |
 | T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
+| T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5699,3 +5700,118 @@ T29 复核改了节点：某个话题的时间戳倒退 1 s 以上，节点整�
 warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍开头一次，对），没有 "from before the restart dropped"，没有 TensorRT 提示，没有 ERROR。rss：首 202 MB，尾 / 最大 222 MB（涨 19 MB，< 50）。tegrastats：GR3D 平均 19.9%，最高温度 tj/cpu 62.2 °C，gpu 57.5 °C。节点没有崩、没有卡住。
 
 **结论。** 时间戳倒退重来可用（28 次 jump back 都拉起来了）。无负载时端到端约 17 ms，中间连续 11 遍不丢帧，能维持 10 Hz。加了「同 bag GPU 离线循环 + 4 个忙 CPU」之后，多数遍会丢几帧（BEST_EFFORT 点云队列深度 5，和负载抢 GPU/CPU），gap 最大 0.40 s；延迟仍远低于 100 ms（有负载中位数 21 ms、p99 32 ms）。`objects_bag` 的 passed 因此是 false——这块人工负载比车上只跑感知更狠，真车上还要再测。TensorRT 设备提示是旧引擎留下的，板上重建后消失。还缺：和规划联调；车上长时间实车（人校时）。做完删了 soak、bags、`data/*.npz`；`t27/` 留着。根分区 4.3 GB。
+
+## T31 Orin 部署 P8：车上部署包（deploy_deb → deb）
+
+`deploy_deb` 是车上真实部署的代码树（DEPLOY_ORIN.md 第 9 节，用法见 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/README.md`）。库和 bag 回放是 `deploy/` 改名后的镜像（`tools/deploy/sync_deploy_deb.py` 检查），节点用的是车上的接口（`perception_interface/LidarObjectArray`、glog、`/perception/lidar_3d/*`）。打包脚本在本机只演练过打包那一步（假的安装目录），colcon 编译和真机运行都没做过。这次在板上：
+- 编译、打 deb；
+- 不装先解开跑（查有没有指回编译目录的路径）；
+- 装上后离线回放和 `deploy/` 逐位比，在线回放查不丢帧，服务起停，卸载；
+- 最后装回去。
+
+本任务可以改的范围（通用约定 9）：`deploy_deb/`、`deploy/`、`tools/deploy/`。镜像文件（库、测试、`ros_convert`、`bag_replay`、`lidar_3d_replay`）不要直接改：改 `deploy/` 里的源文件，再 `python tools/deploy/sync_deploy_deb.py --write`。`dog_perception/` 不改。
+
+```text
+任务 T31：板上编译 deploy_deb、打 deb、安装、运行、和 deploy/ 逐位比、卸载。
+先按通用约定做（第 9 条：可以改代码，范围见本节开头）。前置：T30 完成。
+
+0. mkdir -p data/reports/T31；TASK=T31；n=rosbag2_2026_09_21-16_41_27_moving
+   python -m pytest tests/dog/test_deploy.py -q 2>&1 | tail -3 | tee data/reports/T31/pytest.txt
+   （test_deploy_deb_mirrors_deploy、test_objects_bag_reads_the_vehicle_messages、test_soak_report_reads_glog_lines 要通过）
+   python tools/deploy/sync_deploy_deb.py | tee data/reports/T31/sync_check.txt        （0 stale、0 extra、0 interface problems）
+1. 同步、重编 deploy/ros2（bag_replay 改过，第 3 步要用它）：
+     deploy/scripts/sync_to_orin.sh --bag samples/$n          （代码里现在带 deploy_deb）
+     ssh orin 'df -h / | tail -1'                              （剩不到 3 GB 就停下问人）
+   deploy/ros2 的 colcon 同 T29 第 3b 步，输出 colcon_orin.txt。deploy/cpp 没改，不用重编。
+2. 板上打 deb（第一次约 10 分钟，CUDA 那几个文件最慢）：
+     ssh orin 'cd ~/dogperc/repo/deploy_deb/perception_combo_ros && \
+         node_src/lidar_3d_detection/scripts/build_deb.sh --model ~/dogperc/models/nusc_pp_dyn --out ~/dogperc/deb' \
+         2>&1 | tail -60 | tee data/reports/T31/build_deb.txt
+     scp 'orin:dogperc/deb/*.txt' data/reports/T31/
+     ssh orin 'cd ~/dogperc/deb && ls -la && dpkg-deb -c lidar-3d-detection_*.deb | wc -l' | tee -a data/reports/T31/build_deb.txt
+   - 编译错误按约定 9 修（CMakeLists、节点、package.xml 在 deploy_deb 里直接改；镜像文件见本节开头）；
+   - 报告里看 Depends：
+       应该有 libnvinfer10 (= 10.3.0.30-1+cuda12.5)、cuda-cudart-12-6、libgoogle-glog0v5、libyaml-cpp0.7、
+       ros-humble-rclcpp、ros-humble-rosbag2-cpp、ros-humble-rmw-fastrtps-cpp 等；
+     "libraries no installed package owns"、"installed files that name the source tree" 两节有的话全部抄下；
+   - 停止条件：build_deb.sh 报 "still have the build path"，二进制里还有编译路径，按约定 9 修不好。
+3. 不装，先解开跑：所有路径都应该跟着包走，不能指回编译目录。同时用 deploy/ 的 bag 回放跑同一个 bag、同一份配置：
+     X=/tmp/debx/opt/seres/perception；C=$X/lidar_3d_detection/config/lidar_3d_detection.yaml
+     R='source /opt/ros/humble/setup.bash && source ~/dogperc/repo/deploy/ros2/install/setup.bash && cd ~/dogperc'
+     ssh orin "rm -rf /tmp/debx && dpkg-deb -x ~/dogperc/deb/lidar-3d-detection_*.deb /tmp/debx && \
+         source /opt/ros/humble/setup.bash && source $X/local_setup.bash && cd ~/dogperc && \
+         $X/lidar_3d_detection/lib/lidar_3d_detection/lidar_3d_bag_replay --bag bags/$n --config $C \
+         --model-dir $X/lidar_3d_detection/model --precision fp16 --gpu --threads 4 --out data/debx_gpu.npz" \
+         2>&1 | tail -2 | tee data/reports/T31/debx_replay.txt
+     ssh orin "$R && ros2 run dogperc_ros dogperc_bag_replay --bag bags/$n --config $C --model-dir models/nusc_pp_dyn \
+         --precision fp16 --gpu --threads 4 --out data/deploy_gpu.npz" 2>&1 | tail -1 | tee -a data/reports/T31/debx_replay.txt
+     scp orin:dogperc/data/debx_gpu.npz orin:dogperc/data/deploy_gpu.npz data/deploy/T31/   （先 mkdir -p data/deploy/T31）
+     python -c "import numpy as np, sys; a, b = np.load(sys.argv[1]), np.load(sys.argv[2]); \
+         print('deb vs deploy, keys differing:', [k for k in a.files if not k.startswith('timing_') \
+         and not np.array_equal(a[k], b[k], equal_nan=True)])" data/deploy/T31/deploy_gpu.npz data/deploy/T31/debx_gpu.npz \
+         | tee -a data/reports/T31/debx_replay.txt
+   - "keys differing" 必须是空的：同一块板、同一份引擎、同一份配置，镜像代码应该逐位相同。不一样先比编译选项
+     （deploy_deb 的 CMakeLists 也要 -ffp-contract=off 和 CUDA 的 --fmad=false），再按约定 9 修。
+4. 安装（要 root）。板上的免密 sudo 只有 jetson_clocks / nvpmodel，先试：
+     ssh orin 'sudo -n apt-get install -y ~/dogperc/deb/lidar-3d-detection_*_arm64.deb' 2>&1 | tail -8 | tee data/reports/T31/install.txt
+   要密码就停下，请人在板上执行 `sudo apt install ~/dogperc/deb/lidar-3d-detection_*_arm64.deb`，或者给 apt-get、dpkg、
+   systemctl、sed 加免密（人定），之后接着做。装好后：
+     ssh orin 'dpkg -s lidar-3d-detection | head -12; ls /opt/seres/perception; systemctl is-enabled lidar-3d-detection; \
+         systemctl is-active lidar-3d-detection' 2>&1 | tee -a data/reports/T31/install.txt      （disabled、inactive）
+5. 装好以后：
+   a. 离线：第 3 步的命令把 X 换成 /opt/seres/perception、输出 data/inst_gpu.npz，和 deploy_gpu.npz 比，keys differing 必须是空的。
+      输出 inst_replay.txt。
+   b. 在线（手动起）：同 T29 第 3d 步，但节点用装好的启动脚本，话题是 /perception/lidar_3d/objects：
+        I=/opt/seres/perception
+        ssh orin "source /opt/ros/humble/setup.bash && source $I/local_setup.bash && export ROS_DOMAIN_ID=77 && cd ~/dogperc && \
+            ($I/lidar_3d_detection/bin/start_lidar_3d_detection.sh > data/node_deb.log 2>&1 &) && \
+            for i in \$(seq 120); do grep -q 'lidar_3d_detection up' data/node_deb.log && break; sleep 1; done && \
+            (ros2 bag record -o data/live_deb /perception/lidar_3d/objects > data/record.log 2>&1 &) && sleep 3 && \
+            ros2 bag play --delay 3 bags/$n && sleep 3 && pkill -INT -f 'ros2 bag record'; sleep 2; \
+            pkill -INT -f 'lib/lidar_3d_detection/lidar_3d_detection( |$)'; sleep 2; ros2 bag info data/live_deb" \
+            2>&1 | tail -12 | tee data/reports/T31/live_deb.txt
+        scp -r orin:dogperc/data/live_deb data/deploy/T31/; scp orin:dogperc/data/node_deb.log data/reports/T31/
+        python tools/deploy/objects_bag.py --bag data/deploy/T31/live_deb --replay data/deploy/T31/inst_gpu.npz \
+            --out data/reports/T31/live_deb.json | tee -a data/reports/T31/live_deb.txt
+      - passed 要是 true；same_ids_frames 记下（新起的节点，应该大多相同）；example 里 frame_ids 应该是 lidar_det；
+      - node_deb.log 里每秒一行 "N dets, M tracks | ... total_ms ..."，抄几行；warn / error 全部抄下。
+   c. 服务：设 ROS_DOMAIN_ID 后起停（要 root，同第 4 步）：
+        ssh orin 'sudo -n sed -i "s/^#ROS_DOMAIN_ID=0/ROS_DOMAIN_ID=77/" /etc/default/lidar-3d-detection && \
+            sudo -n systemctl start lidar-3d-detection && sleep 20 && systemctl is-active lidar-3d-detection && \
+            journalctl -u lidar-3d-detection -n 15 --no-pager' 2>&1 | tee data/reports/T31/service.txt
+      再按 b 的做法只录包、播一遍（不手动起节点），objects_bag.py 要 passed；然后
+        ssh orin 'sudo -n systemctl stop lidar-3d-detection; systemctl is-active lidar-3d-detection; \
+            journalctl -u lidar-3d-detection -n 5 --no-pager' 2>&1 | tee -a data/reports/T31/service.txt      （inactive，退出干净）
+   d. 短时间循环（6 分钟，后 3 分钟加负载），用 deploy_deb 自己的脚本和装好的节点：
+        ssh orin "cd ~/dogperc && nohup repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_soak.sh \
+            bags/$n - - 6 data/soak_deb > data/soak_deb.out 2>&1 &"
+        （约 7 分钟后）scp -r orin:dogperc/data/soak_deb data/deploy/T31/
+        python tools/deploy/objects_bag.py --bag data/deploy/T31/soak_deb/live --replay data/deploy/T31/inst_gpu.npz \
+            --out data/reports/T31/soak_deb_live.json > data/reports/T31/soak_deb_live.txt
+        python tools/deploy/soak_report.py data/deploy/T31/soak_deb --window 60 | tee data/reports/T31/soak_deb.txt
+      - 样例 bag 只有 2.7 s，6 分钟约 130 遍，每遍节点重来一次：jumped back 的次数应该约等于遍数，没有 ERROR、没有崩；
+      - soak_deb.txt 每分钟一行（glog 的时间）；没有负载的几分钟应该不丢帧。
+6. 卸载、再装：
+     ssh orin 'sudo -n apt-get remove -y lidar-3d-detection; ls -R /opt/seres 2>&1 | head; \
+         sudo -n apt-get purge -y lidar-3d-detection; ls /opt/seres /etc/default/lidar-3d-detection 2>&1; \
+         sudo -n apt-get install -y ~/dogperc/deb/lidar-3d-detection_*_arm64.deb | tail -2' 2>&1 | tee data/reports/T31/uninstall.txt
+   - remove 以后只剩配置文件（conffile），purge 以后 /opt/seres 和 /etc/default/lidar-3d-detection 都没了；
+   - 最后装回去，服务不启用（上车前由人决定要不要 enable）。
+7. 做完删掉板上的 /tmp/debx、data/*.npz、data/live_deb、data/soak_deb*、bags/；~/dogperc/deb/ 的 deb 和报告留着；
+   deploy_deb/perception_combo_ros/build_deb/ 是增量编译用的，根分区剩不到 2 GB 就删掉它的 build/。记下根分区剩余空间。
+
+停止条件（按约定 9 修不好的时候）：第 2 步编译失败或二进制里还有编译路径；第 3 步 keys differing 不是空的；
+第 4 步依赖装不上；装好的节点起不来。
+提交：data/reports/T31/、本文档，以及按约定 9 改的代码。不提交 data/deploy/T31/、deb、build、install。
+报告（写进"T31 结果"）：
+- 代码改动（约定 9）：每条写提交号、文件、原因、怎么验证的；改了镜像文件的，写 sync_deploy_deb.py --write 之后的检查结果；
+- build_deb 的报告：版本、大小、Depends、两类警告；dpkg-deb -c 的文件数；
+- 第 3、5a 步的 keys differing；第 5b、5c 步 objects_bag 的输出（含 example）、node 日志摘录、service 的 journal；
+- 第 5d 步：passes、passed、jumped back 次数、soak_deb.txt 的表、内存；
+- 第 6 步卸载以后剩什么；
+- 结论：deb 能不能交给车上装；还缺什么（比如服务用的用户、ROS_DOMAIN_ID、开机自启）。
+```
+
+### T31 结果
+
+（待填）

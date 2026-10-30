@@ -1,5 +1,5 @@
 // The node's input messages in arrival order as plain arrays (msgs.npz, written by
-// tools/deploy/cpp_parity.py python --bag): lidar3d_replay --messages runs the online path (OnlineInputs)
+// tools/deploy/cpp_parity.py python --bag): lidar_3d_replay --messages runs the online path (OnlineInputs)
 // on them without ROS, and the ROS 2 bag replay must give the same frames.
 #pragma once
 

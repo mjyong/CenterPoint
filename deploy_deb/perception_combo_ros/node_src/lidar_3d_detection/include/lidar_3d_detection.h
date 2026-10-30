@@ -1,6 +1,7 @@
 #ifndef SERES_PERCEPTION_LIDAR_3D_DETECTION_H_
 #define SERES_PERCEPTION_LIDAR_3D_DETECTION_H_
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -27,6 +28,9 @@ class Lidar3dDetection : public rclcpp::Node {
 
  private:
   void OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+  // config/lidar_3d_detection.yaml of this install: $SERES_PERCEPTION_INSTALL_DIR/lidar_3d_detection, else the
+  // package's own prefix (ament index)
+  static std::string DefaultConfig();
 
   std::string config_path_;
   std::string model_dir_;
@@ -47,6 +51,7 @@ class Lidar3dDetection : public rclcpp::Node {
 #endif
   std::unique_ptr<lidar3d::PerceptionPipeline> pipe_;
   std::unique_ptr<lidar3d::OnlineInputs> inputs_;
+  std::chrono::steady_clock::time_point last_stats_{}, last_drop_{};
 
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::SubscriptionBase::SharedPtr pose_sub_;

@@ -1,11 +1,13 @@
 // A rosbag2 through the node's message handling, offline: the bag's messages in storage order (what the
 // node gets from `ros2 bag play`), deserialized as the node receives them, into the same OnlineInputs.
-// Writes lidar3d_replay's .npz, so it compares with the Python node's replay of the same bag
-// (tools/deploy/cpp_parity.py python --bag) and with lidar3d_replay --messages on its message log:
+// Writes lidar_3d_replay's .npz, so it compares with the Python node's replay of the same bag
+// (tools/deploy/cpp_parity.py python --bag) and with lidar_3d_replay --messages on its message log:
 //
-//   lidar3d_bag_replay --bag <bag> --config kygi.yaml --detections py_bag_dets.npz --out bag.npz
-//   lidar3d_bag_replay --bag <bag> --config kygi.yaml --model-dir nusc_pp_dyn --gpu --out bag.npz
+//   lidar_3d_bag_replay --bag <bag> --config kygi.yaml --detections py_bag_dets.npz --out bag.npz
+//   lidar_3d_bag_replay --bag <bag> --config kygi.yaml --model-dir nusc_pp_dyn --gpu --out bag.npz
+//   lidar_3d_bag_replay --bag <bag> --config kygi.yaml --preprocess-only --out bag.npz   no detector (empty detections)
 //       [--save-points] [--max-clouds N] [--threads N]
+// One line per cloud on stdout (points in and out, preprocessing time, or why it was dropped), then a summary.
 #include <chrono>
 #include <cstdio>
 #include <iostream>
@@ -65,8 +67,8 @@ int main(int argc, char** argv) {
     else if (a == "--model-dir") model_dir = next();
     else if (a == "--precision") precision = next();
     else if (a == "--gpu") gpu = true;
-    else if (a == "--preprocess-only") preprocess_only = true;
     else if (a == "--save-points") save_points = true;
+    else if (a == "--preprocess-only") preprocess_only = true;
     else if (a == "--max-clouds") max_clouds = std::stol(next());
     else if (a == "--threads") threads = std::stoi(next());
     else {
@@ -154,7 +156,7 @@ int main(int argc, char** argv) {
     std::printf("%ld messages, %ld clouds, %zu frames, %zu tracks, %.1f s -> %s\n", messages, clouds, w.frames(),
                 w.track_rows(), sec, out.c_str());
   } catch (const std::exception& e) {
-    std::cerr << "lidar3d_bag_replay: " << e.what() << "\n";
+    std::cerr << "lidar_3d_bag_replay: " << e.what() << "\n";
     return 1;
   }
   return 0;

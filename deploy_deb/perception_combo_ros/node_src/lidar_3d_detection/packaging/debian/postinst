@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
+  systemctl daemon-reload || true
+  if [ "@ENABLE@" = yes ]; then
+    systemctl enable lidar-3d-detection.service || true
+    systemctl restart lidar-3d-detection.service || true
+  fi
+fi
+echo "lidar-3d-detection: installed in @PREFIX@"
+echo "  run by hand:  @PREFIX@/lidar_3d_detection/bin/start_lidar_3d_detection.sh"
+echo "  as a service: sudo systemctl start lidar-3d-detection (enable: at boot); settings /etc/default/lidar-3d-detection"
+exit 0

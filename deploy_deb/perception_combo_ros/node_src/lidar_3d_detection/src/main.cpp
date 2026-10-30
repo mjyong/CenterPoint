@@ -5,7 +5,8 @@
 #include "../include/logging.h"
 
 int main(int argc, char** argv) {
-  seres::perception::Logger::Init("/tmp/lidar_3d_detection_logs", "lidar_3d_detection");
+  const char* log_dir = std::getenv("LIDAR3D_LOG_DIR");
+  seres::perception::Logger::Init(log_dir && *log_dir ? log_dir : "/tmp/lidar_3d_detection_logs", "lidar_3d_detection");
   rclcpp::init(argc, argv);
   int code = 0;
   try {
