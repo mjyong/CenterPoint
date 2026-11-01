@@ -32,6 +32,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import sys
@@ -124,6 +125,30 @@ def machine():
     if os.path.exists(rel):                         # distinguishes two Orins with the same TensorRT
         m["l4t"] = open(rel).read().strip()
     return m
+
+
+def l4t_release(text):
+    """"R36.4.4" from /etc/nv_tegra_release ("# R36 (release), REVISION: 4.4, GCID: ...") or a short form; None
+    without one (not a Jetson, or an empty record)."""
+    if not text:
+        return None
+    m = re.search(r"R(\d+)\s*\(release\),\s*REVISION:\s*(\d+(?:\.\d+)*)", text)
+    if m:
+        return "R%s.%s" % m.groups()
+    m = re.search(r"R\d+(?:\.\d+)+", text)
+    return m.group(0) if m else None
+
+
+def check_target(log, arch, l4t_text):
+    """The engines of a machines/<host>/engines.json load on the target: same arch and, when recorded, same L4T
+    (engines only load on the TensorRT that built them; deploy/scripts/sync_to_orin.sh --engines)."""
+    arches = {e.get("arch") for e in log}
+    if arches != {arch}:
+        raise SystemExit("engines are %s, target is %s" % (", ".join(sorted(map(str, arches))), arch))
+    want = {l4t_release(e.get("l4t")) for e in log} - {None}
+    got = l4t_release(l4t_text)
+    if want and got not in want:
+        raise SystemExit("engines are L4T %s, target is %s" % (", ".join(sorted(want)), got or "not a Jetson"))
 
 
 def _host_dir(model_dir, host):

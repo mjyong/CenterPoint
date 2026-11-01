@@ -569,3 +569,35 @@ def test_foxglove_probe_against_a_fake_bridge():
     srv.close()
     assert rep["server"]["name"] == "fake" and rep["channels"]["/tf"] == "tf2_msgs/msg/TFMessage"
     assert rep["received"] == {"/perception/lidar_3d/tracks": 3, "/tf": 0}
+
+
+def test_engines_per_machine_and_the_target_check(tmp_path):
+    """build_engines.py keeps each machine's engines (machines/<host>/), stages one machine's set for
+    build_deb.sh, and refuses to deploy a set to another arch or L4T (the board's /etc/nv_tegra_release
+    has "R36 (release), REVISION: 4.4", no "R36.4.4" in it)."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from build_engines import archive_current, check_target, l4t_release, stage_machine
+
+    orin = "# R36 (release), REVISION: 4.4, GCID: 41062509, BOARD: generic, EABI: aarch64, DATE: Mon Jun 16\n" \
+           "# KERNEL_VARIANT: oot"
+    assert l4t_release(orin) == "R36.4.4" and l4t_release("R36.4.4") == "R36.4.4"
+    assert l4t_release("") is None and l4t_release("Ubuntu 22.04") is None
+
+    model = tmp_path / "nusc_pp_dyn"
+    model.mkdir()
+    for f in ("model_meta.json", "pfn.onnx", "rpn_head.onnx", "pfn.fp16.engine", "rpn_head.fp16.engine"):
+        (model / f).write_text(f)
+    log = [dict(engine=e, host="ubuntu", arch="aarch64", l4t=orin) for e in ("pfn.fp16.engine", "rpn_head.fp16.engine")]
+    (model / "engines.json").write_text(json.dumps(log))
+    archive_current(str(model))
+    kept = json.loads((model / "machines" / "ubuntu" / "engines.json").read_text())
+    assert sorted(e["engine"] for e in kept) == ["pfn.fp16.engine", "rpn_head.fp16.engine"]
+    out = tmp_path / "staged"
+    stage_machine(str(model), "ubuntu", str(out))
+    assert sorted(os.listdir(out)) == ["engines.json", "model_meta.json", "pfn.fp16.engine", "pfn.onnx",
+                                       "rpn_head.fp16.engine", "rpn_head.onnx"]    # what build_deb.sh needs
+
+    check_target(kept, "aarch64", orin)                                     # the same board: fine
+    for arch, l4t, why in (("x86_64", "", "target is x86_64"), ("aarch64", orin.replace("4.4", "3.0"), "R36.3.0")):
+        with pytest.raises(SystemExit, match=why):
+            check_target(kept, arch, l4t)

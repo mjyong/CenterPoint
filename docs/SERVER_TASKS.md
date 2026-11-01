@@ -5919,6 +5919,21 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
 4. **`LIDAR3D_ARGS`**：启动脚本加了环境变量 `LIDAR3D_ARGS`，可以写在 `/etc/default/lidar-3d-detection` 里，比如 `-p publish_tf:=true -p publish_cloud:=true`，让服务本身也能给查看器看。
 5. **流量**：检测器的输入点云是 5 帧拼起来的，比原始点云大，每帧几 MB，10 Hz 下要几十 MB/s。直连的网口一般够用，卡的话在 3D 面板里关掉点云。
 
+### c768c2f 复核（引擎按机器存）
+
+2026-11-01。思路同意：
+- 每台机器建的引擎另存一份到 `machines/<主机名>/`，服务器、板子各建各的，互不覆盖；
+- 同步时只发目标机器能用的那一套，先查架构和 L4T 版本；
+- `--stage` 给打包拼一个完整的模型目录。
+
+1. **L4T 版本查不出来，`--engines` 会直接崩**：
+   - 板上 `/etc/nv_tegra_release` 写的是 `# R36 (release), REVISION: 4.4, ...`，里面没有 `R36.4.4` 这样的字样，正则 `R\d+(?:\.\d+)+` 匹配不到；
+   - 这个提交以后在板上建的引擎都会记 `l4t`，同步时 `None.group(0)` 报错（本机用板子的真实内容试过：匹配结果是 None）；
+   - 已改：`build_engines.py` 加了 `l4t_release()`，把 "R36 (release), REVISION: 4.4" 读成 R36.4.4；检查挪进 `check_target()`，同步脚本调用它；
+   - 测试 `test_engines_per_machine_and_the_target_check`：用板子的原文测版本、测 archive / stage，对上的能过，换 x86 或 R36.3.0 都会拦下。
+2. **用法示例**：原来写的是 `--engines gpu1`，gpu1 是服务器（x86），发给 Orin 一定会被架构检查拦下。改成 `--engines ubuntu`（板子的主机名）。
+3. **主机名重复**：机器只按主机名区分。Jetson 出厂默认都叫 `ubuntu`，以后有第二块板就会混在一起，到时候改主机名，或者按主机名加型号分目录。现在只有一块板，先不改。
+
 ## T32 Orin：Foxglove 实时看的准备
 
 人要在连着板子的本机（192.168.123.55）上用 Foxglove 看板上循环播包的检测结果（deploy_deb README"用 Foxglove 看"）。T31 复核改了：打包脚本（patchelf、RPATH、版本号）、两个节点的 `publish_tf`、新脚本 `orin_foxglove.sh`。这次：

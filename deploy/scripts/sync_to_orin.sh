@@ -5,8 +5,9 @@
 #
 #   deploy/scripts/sync_to_orin.sh                                  # code only
 #   deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp      # ONNX + metadata, no engines
-#   deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp_dyn --engines gpu1
-#       engines from <model>/machines/<host> only, and only when that host's arch matches the target
+#   deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp_dyn --engines ubuntu
+#       + the engines one machine built (<model>/machines/<host>, build_engines.py files them by hostname; the
+#       Orin is "ubuntu"), only when they match the target's arch and L4T (build_engines.check_target)
 #   deploy/scripts/sync_to_orin.sh --frames data/runs/0921_164127_s000/frames --stride 3 --limit 100
 #   deploy/scripts/sync_to_orin.sh --dumps data/deploy/dumps        # reference detections (compare_backends --dump)
 #   deploy/scripts/sync_to_orin.sh --seq data/seq/0921_164127_s000 --limit 150   # a raw recording (dogperc_replay)
@@ -59,16 +60,10 @@ if [ -n "$ENGINES" ]; then
   remote_arch=$(ssh "$HOST" uname -m)
   remote_l4t=$(ssh "$HOST" "cat /etc/nv_tegra_release 2>/dev/null || true")
   python3 - "$src/engines.json" "$remote_arch" "$remote_l4t" << 'PY'
-import json, re, sys
-log, arch, l4t = json.load(open(sys.argv[1])), sys.argv[2], sys.argv[3]
-arches = {e.get("arch") for e in log}
-if arches != {arch}:
-    raise SystemExit("engines are %s, target is %s" % (", ".join(sorted(map(str, arches))), arch))
-want = {re.search(r"R\d+(?:\.\d+)+", e["l4t"]).group(0) for e in log if e.get("l4t")}
-got = re.search(r"R\d+(?:\.\d+)+", l4t)
-got = got.group(0) if got else ""
-if want and got not in want:
-    raise SystemExit("engines are L4T %s, target is %s" % (", ".join(sorted(want)), got or "not a Jetson"))
+import json, sys
+sys.path.insert(0, "tools/deploy")
+from build_engines import check_target
+check_target(json.load(open(sys.argv[1])), sys.argv[2], sys.argv[3])
 PY
   rsync -az "$src/" "$HOST:$DIR/models/$(basename "$MODEL")/"
   echo "engines: $ENGINES -> $HOST:$DIR/models/$(basename "$MODEL")/"

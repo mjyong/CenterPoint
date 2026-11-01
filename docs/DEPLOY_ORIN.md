@@ -76,6 +76,7 @@ Host orin
 **同步**：`deploy/scripts/sync_to_orin.sh`。
 - 拷代码；
 - 拷一个模型目录：只拷 ONNX 和元数据，引擎在板上建；
+- 引擎按机器分开存（c768c2f）：`build_engines.py` 每建一个，还拷一份到 `<模型>/machines/<主机名>/`（板子的主机名是 `ubuntu`），别的机器再建也不会盖掉。`--engines <主机名>` 只同步那台机器建的一套，架构和 L4T 版本对不上就停（`build_engines.check_target`）；`build_engines.py --stage <主机名> --stage-out <目录>` 拼出一台机器的完整模型目录，给 `build_deb.sh --model`；
 - 拷几个场景的帧（`--stride`、`--limit` 控制数量）；
 - 拷参考检测结果（`--dumps`）。
 - 默认目录 `~/dogperc/{repo,models,data}`。
@@ -492,7 +493,7 @@ colcon 那一步和真机运行要在板上做（T31）。
 | `dog_perception/detection/model_meta.py` | 元数据的读写；网络之后的后处理（PyTorch 和导出的检测器共用） |
 | `dog_perception/detection/voxelize.py` | numpy 体素化，和 det3d 一致 |
 | `dog_perception/detection/exported.py` | `ExportedPillarDetector`：ONNX Runtime 或 TensorRT 引擎，接口同 `CenterPointDetector` |
-| `tools/deploy/build_engines.py` | 建 FP32 / FP16 / INT8（Q/DQ）/ DLA 引擎，写 `engines.json` |
+| `tools/deploy/build_engines.py` | 建 FP32 / FP16 / INT8（Q/DQ）/ DLA 引擎，写 `engines.json`；引擎按机器存在 `machines/<主机名>/`（`--archive`、`--stage`） |
 | `tools/deploy/bench_engines.py` | 已建引擎的 GPU 时间（中位数、p99），没有 trtexec 的机器用它 |
 | `tools/deploy/quantize_int8.py` | ModelOpt INT8 PTQ，写 `<graph>.int8*.onnx` |
 | `tools/deploy/compare_backends.py` | 多个后端逐段、逐框比较，查门槛；`--dump` / `dump:` 跨机器比较 |
@@ -510,7 +511,7 @@ colcon 那一步和真机运行要在板上做（T31）。
 | `tools/deploy/cut_bag.py` | 原始 bag 截成节点的三个话题、前 N 云，保持 rosbag2 版本（板上 Humble 能播） |
 | `tools/deploy/soak_report.py` | 长时间回放的汇总：每 5 分钟的延迟、warn 计数、内存、tegrastats |
 | `deploy/scripts/orin_check.sh` | 环境报告 |
-| `deploy/scripts/sync_to_orin.sh` | 代码、模型（不带 `engines.json`）、帧、参考检测、原始录制、bag 同步到板上 |
+| `deploy/scripts/sync_to_orin.sh` | 代码、模型（不带 `engines.json`；`--engines <主机名>` 加上那台机器的引擎）、帧、参考检测、原始录制、bag 同步到板上 |
 | `deploy/scripts/orin_soak.sh` | 板上长时间回放：节点、循环播放、录包、负载、内存和 tegrastats（T30） |
 | `deploy_deb/` | 车上部署的代码树（第 9 节）；`node_src/lidar_3d_detection/scripts/build_deb.sh` 在板上打 deb |
 | `tools/deploy/sync_deploy_deb.py` | `deploy_deb` 的镜像文件按 `deploy/` 重写（`--write`）或检查；配置、消息字段一起查 |
