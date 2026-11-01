@@ -136,7 +136,8 @@
 | T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成，已复核。对齐都过：服务器两段同一批检测 ID 每帧相同；板上 ROS 读 bag 和读消息日志逐位相同；板上 GPU 对服务器过门槛。板上端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（样例 bag）。复核查出节点在时间戳倒退（bag 重播、时钟回跳）时不会重来，bag 长于 3 s 时重播后基本没有输出，已修（两边一样，加了测试）；在线 `same_ids_frames 0` 是热身那遍的状态带进了正式播放。TensorRT 新出现一句设备提示，T30 查 |
 | T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
 | T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成，已复核。deb 装上后和 deploy/ 逐位相同，服务起停、卸载都对。复核：打包补了 patchelf、去掉编译目录的 RPATH、二进制不带源码路径、版本号带提交数；循环时 ID 不同是编号顺延（加了不看编号的 same_tracks_frames）；加了 publish_tf 和 Foxglove 实时看 |
-| T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 完成 |
+| T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 完成，已复核。删掉 deploy/ 以后服务器 CTest 27 项全过，升级前后、两条回放路径都逐位相同，TF、bridge 过。复核：板子重启后没锁频，节点慢 2–3 倍（每帧 55 ms，T31 是 15–21 ms），Foxglove 那次只有 5 Hz 的原因没分清（没锁频、DDS 缓冲、调试点云）；节点每秒那一行加了收到 / 发出 / 缺的帧数和最长回调，加了 orin_clocks.sh；板上服务的配置不是包里的 |
+| T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -6119,3 +6120,119 @@ data/deploy/T32/msgs_dets.npz vs data/deploy/T32/bag_dets.npz keys differing: []
 
 **给人的一句话。** 在板上执行 `~/dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_foxglove.sh ~/dogperc/bags/rosbag2_0921_600`（Ctrl-C 会停掉播放和 bridge，并把服务拉起来）。本机 Foxglove 连 `ws://192.168.123.100:8765`，导入 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.json`，显示坐标系用 `camera_init`。
 
+### T32 复核
+
+**结论**：删掉 `deploy/` 以后，服务器和板上都验过了。
+- CTest 27 项（含 2 个 GPU）全过；样例 bag 上 Python 对 C++ pass；
+- 升级前后 bag 回放逐位相同；装好的两条回放路径（ROS 读 bag、读消息日志）逐位相同；
+- deb 的 RPATH、源码路径都干净；TF、bridge 都过了，60 s 的 bag 留在板上；
+- 探针同时提供 `foxglove.sdk.v1` 是对的：bridge 3.6 只认它。
+
+**问题**：
+1. **没锁频，节点慢了 2–3 倍**。任务没要求锁频，但报告里没记锁频状态，延迟的数字没法和以前比：
+   - 离线回放同一个样例 bag：预处理每帧 12.8–14.0 ms，整段 2.0 s；T31（锁频）是 6.1–6.5 ms、0.9 s；
+   - 在线（第 9 步）：`preprocess_ms` 16–18、`det_gpu_ms` 33–35、`total_ms` 55–58；T31 同样的在线回放是 6、8–12、15–21；
+   - 板子重启过（T32 的日志时间比 T31 早，时钟每次从 1970-01-01 重新走），`jetson_clocks` 每次重启都要重新执行；
+   - 第 10 步 Foxglove 那次只有约 5 Hz（10 s 里 objects 50 条，bridge 收到的原始点云 99 条）。报告归到 UDP 缓冲，但那一次节点每帧要 50 ms 以上，还要发几 MB 的 `/perception/lidar_3d/cloud`，bridge 也在同一块 CPU 上转发。节点忙不过来时，订阅队列（5 帧）里新帧覆盖旧帧，看起来同样是 5 Hz。日志里没有能区分这两种情况的数；
+   - 车上：服务开机自启，不会锁频。要不要开机锁频（功耗、温度）由人定，T33 先量清楚。
+2. **第 9 步的 8 MB socket 缓冲**只在那次手动运行里加了，没提交用的配置，也没记 `net.core.rmem_max`。T31 同样的回放（锁频、先空播、0.5 倍速）不加缓冲就收齐了。所以"默认缓冲收不齐"可能和没锁频有关（DDS 的接收线程也慢了），要锁频、不锁频各比一次。
+3. **板上服务的配置不是包里的**：journal 里服务起来用的是 `/home/seres/dogperc/lidar_3d_detection_cloud.yaml`，还在发 TF（`/etc/default/lidar-3d-detection` 是以前测试时改的，conffile 升级时保留了）。README 说车上不要发 TF。离线比较用的是装好的配置，结果不受影响；T33 改回包里的样子（`ROS_DOMAIN_ID=77` 保留）。
+4. **patchelf 装不上**：板上解析不了 tuna 镜像，用的是 `~/bin/patchelf` 0.14.3，能用（`build_deb.sh` 从 PATH 找到它）。系统里装一份要人修 apt 源或拷 deb，不急。
+5. 第 9 步 `same_ids_frames` 2、`same_tracks_frames` 23 / 27（T31 新起的节点是 26 / 27）。编号不同是顺延（T31 复核）；不看编号的也只有 23 帧，没锁频时消息的到达时机不一样。T33 锁频后再看。
+6. 第 10 步 "no pose for scan yet" 隔几秒一条：点云到的时候，覆盖它的定位还没到（在线最多外推 0.05 s）。没锁频时更容易出现。T33 数一下锁频后还有没有；还有的话，再考虑让节点等一小会儿再处理（设计改动，先不做）。
+
+**复核时改的**：
+- 节点每秒那一行末尾加了 `callback_max_ms`（这一秒里最长的回调，含发布）和 `| clouds N frames N skipped N`（收到几帧点云、发出几帧结果、按点云头时间戳算缺了几帧）。`callback_max_ms` 接近 100 ms 是忙不过来；它不大而 `skipped` 多，是 DDS 丢的。`soak_report.py` 按窗口汇总这几个数，老日志照常读；
+- `scripts/orin_clocks.sh`：一行打印 CPU、GPU 的最低 / 最高 / 当前频率和功耗模式，以及锁没锁（exit 0 锁了、1 没锁、2 读不到）。`orin_soak.sh` 写进 `<out>/clocks.txt`（`soak_report.py` 先打印它），`orin_foxglove.sh` 起节点前打印；
+- README：延迟要锁频后看；bridge 3.x 只认 `foxglove.sdk.v1`，Lichtblick 能不能连没验证，去掉了"协议一样"的说法；Foxglove 里不到 10 Hz 时怎么从日志判断原因；
+- 测试：`test_soak_report_reads_the_vehicle_node_counts`、`test_orin_clocks_tells_whether_jetson_clocks_ran`（假的 sysfs：锁了、没锁、读不到）。节点的改动只对着替身头文件做了语法检查，T33 在板上编。
+
+## T33 Orin：实时性（锁频、DDS 缓冲、调试点云）
+
+T32 在线时节点每帧 55 ms（T31 是 15–21 ms），Foxglove 那次只有约 5 Hz，原因有三个可能：没锁频、几 MB 的点云在 DDS（UDP）里丢、发调试点云和 bridge 抢资源。这次用 60 s 的 bag 1× 播，六种组合各跑一遍，用节点每秒那一行的新计数（`clouds / frames / skipped`、`callback_max_ms`）和录下的 objects 分清楚。另外把板上服务的配置改回包里的样子。
+
+本任务可以改的范围（通用约定 9）：`deploy_deb/`、`tools/deploy/`。
+
+```text
+任务 T33：板上的实时性：锁频与否、DDS 缓冲、发不发调试点云，对节点吞吐的影响；服务改回包里的配置。
+先按通用约定做（第 9 条：可以改代码，范围见本节开头；第 10 条：新旧名字）。前置：T32 复核。
+
+0. mkdir -p data/reports/T33 data/deploy/T33；N=data/deploy/T33；L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection
+   n=rosbag2_2026_09_21-16_41_27_moving；c=rosbag2_0921_600；I=/opt/seres/perception；B=$I/lidar_3d_detection/lib/lidar_3d_detection
+   python -m pytest tests/dog/test_deploy.py -q 2>&1 | tail -3 | tee data/reports/T33/pytest.txt
+   （test_soak_report_reads_the_vehicle_node_counts、test_orin_clocks_tells_whether_jetson_clocks_ran 要通过）
+   tools/deploy/sync_to_orin.sh --bag samples/$n
+1. 板上现状（只看，不改）：
+     ssh orin "uptime; ~/dogperc/repo/$L/scripts/orin_clocks.sh; sysctl net.core.rmem_max net.core.wmem_max; \
+         cat /etc/default/lidar-3d-detection; ls -la ~/dogperc/*.xml /tmp/*.xml 2>/dev/null" 2>&1 | tee data/reports/T33/board_state.txt
+   - T32 第 9 步用的 Fast DDS 配置还在的话，原样拷进 data/reports/T33/fastdds_t32.xml；不在就在报告里写清楚当时怎么加的。
+2. 重打 deb、升级（节点每秒那一行改了），同 T32 第 6、7 步，输出 build_deb.txt、install.txt。那两步的通配符
+   lidar-3d-detection_0.1.0+*_arm64.deb 要只匹配新打的一个包，所以打包前先把 T32 的挪开：
+     ssh orin 'mkdir -p ~/dogperc/deb/old && mv ~/dogperc/deb/lidar-3d-detection_0.1.0+* ~/dogperc/deb/old/'
+   然后：
+   - 离线逐位比：T32 第 5 步的命令（样例 bag、models/nusc_pp_dyn、装好的配置），输出 data/inst_gpu.npz，拷回 $N/，
+     和 data/deploy/T32/inst_gpu.npz 比（同 T32 第 8c 步的 python）：keys differing 必须是空的（库没改）；
+   - journal 里每秒一行末尾要有 "| clouds ... frames ... skipped ..."，抄两行。
+3. 服务改回包里的配置：
+     ssh orin 'dpkg-deb --fsys-tarfile ~/dogperc/deb/lidar-3d-detection_0.1.0+*_arm64.deb | tar -xO ./etc/default/lidar-3d-detection \
+         > /tmp/default.pkg; diff /tmp/default.pkg /etc/default/lidar-3d-detection' 2>&1 | tee data/reports/T33/default_diff.txt
+   - 除了 ROS_DOMAIN_ID=77，其余改动（LIDAR3D_CONFIG、LIDAR3D_ARGS 里的 publish_tf / publish_cloud 等）用 sudo -n sed 改回包里的样子；
+   - sudo -n systemctl restart lidar-3d-detection；journal 的 "lidar_3d_detection up" 里 config 是 /opt/seres/...，没有 "publishing TF"。
+4. 参考：装好的 bag 回放跑 60 s 的 bag（T32 留下的 bags/$c），装好的配置和模型：
+     ssh orin "source /opt/ros/humble/setup.bash && source $I/local_setup.bash && cd ~/dogperc && \
+         $B/lidar_3d_bag_replay --bag bags/$c --config $I/lidar_3d_detection/config/lidar_3d_detection.yaml \
+         --model-dir $I/lidar_3d_detection/model --precision fp16 --gpu --threads 4 --out data/ref_c.npz" 2>&1 | tail -2 \
+         | tee data/reports/T33/ref_c.txt
+     scp orin:dogperc/data/ref_c.npz $N/
+5. 六次在线运行。每次：sudo -n systemctl stop lidar-3d-detection；手动起装好的节点（同 T32 第 9 步，域 77）；等 "lidar_3d_detection up"；
+   起 ros2 bag record（/perception/lidar_3d/objects）；ros2 bag play --delay 3 bags/$c 1× 播一遍（不空播、不放慢）；停录包、停节点。
+   | 运行 | 锁频 | DDS | 另外的 |
+   |---|---|---|---|
+   | R1 | 不锁 | 默认 | 无（和服务一样） |
+   | R2 | 不锁 | 大缓冲 | 无 |
+   | R3 | 锁 | 默认 | 无 |
+   | R4 | 锁 | 大缓冲 | 无 |
+   | R5 | 锁 | 默认 | 看 Foxglove 的样子（见下） |
+   | R6 | 锁 | 大缓冲 | 同 R5 |
+   - R5、R6：节点加 LIDAR3D_ARGS="-p publish_tf:=true -p publish_cloud:=true"；起 foxglove_bridge（端口 8765）；播放期间跑
+     python3 ~/dogperc/repo/tools/deploy/foxglove_probe.py --seconds 65 --topics /perception/lidar_3d/cloud \
+         /robot/topic/rdap/top_point_cloud2 /perception/lidar_3d/tracks /perception/lidar_3d/objects /tf
+     （bridge 只在有客户端订阅时才订这些话题，probe 就是那个客户端）；
+   - 锁频：先 sudo -n jetson_clocks --store /tmp/clocks_default（存下现在的设置）。现在已经锁着（第 1 步 orin_clocks.sh 说 locked），
+     R1、R2 前用 sudo -n jetson_clocks --restore /tmp/clocks_default 解不开的话，就只跑 R3–R6，报告里写明；
+     R1、R2 之后 sudo -n jetson_clocks 锁上。每次运行前后用 orin_clocks.sh 各打一行，写进 data/T33_Rk/clocks.txt；
+   - 大缓冲：播放器、录包和节点都加 FASTRTPS_DEFAULT_PROFILES_FILE=/tmp/fastdds_large.xml。用 T32 那份；没有就写这一份：
+       <?xml version="1.0" encoding="UTF-8"?>
+       <profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+         <participant profile_name="large_buffers" is_default_profile="true">
+           <rtps>
+             <sendSocketBufferSize>8388608</sendSocketBufferSize>
+             <listenSocketBufferSize>8388608</listenSocketBufferSize>
+           </rtps>
+         </participant>
+       </profiles>
+     第 1 步的 rmem_max 小于 8 MB 时，内核会把缓冲截到 rmem_max（不改 sysctl，报告里写明实际值）；
+   - 每次运行 k：节点日志 data/T33_Rk/node.log，录包 data/T33_Rk/live；R5、R6 另存 probe 的输出 data/T33_Rk/probe.json；
+     运行之间等节点完全退出（pgrep -f 'lib/lidar_3d_detection/lidar_3d_detection( |$)' 没有输出）。
+   - 每次拷回来（scp -r orin:dogperc/data/T33_Rk $N/Rk）以后：
+       python tools/deploy/soak_report.py $N/Rk --window 60 | tee data/reports/T33/Rk_soak.txt
+       python tools/deploy/objects_bag.py --bag $N/Rk/live --replay $N/ref_c.npz --out data/reports/T33/Rk_live.json \
+           | tail -25 > data/reports/T33/Rk_live.txt
+       echo "no pose: $(grep -c 'no pose for scan yet' $N/Rk/node.log)" | tee -a data/reports/T33/Rk_soak.txt
+6. 结束：保持锁频（同 T25–T31）；服务 start、active，配置是包里的（ROS_DOMAIN_ID=77），orin_clocks.sh 打一行进 final.txt；
+   删掉板上 data/T33_*、data/*.npz、bags/$n；bags/$c、~/dogperc/deb 留着。
+
+停止条件（按约定 9 修不好的时候）：第 2 步编译失败或 keys differing 不是空的；节点起不来。
+提交：data/reports/T33/、本文档，以及按约定 9 改的代码。不提交 data/deploy/T33/、deb、bag。
+报告（写进"T33 结果"）：
+- 代码改动（约定 9）；
+- 第 1 步的现状：锁频、rmem_max / wmem_max、/etc/default 改过什么、T32 的 DDS 配置；
+- 第 2 步 keys differing 和 journal 里的两行；第 3 步改回去以后的 "lidar_3d_detection up" 那一行；
+- 六次运行一张表：录到的 objects 条数（应约 600）、objects_bag 的 missing_frames 和 same_tracks_frames、
+  每秒那一行汇总的 clouds / frames / skipped、total_ms 中位数和 p99、callback_max_ms 最大值、no pose 次数；R5、R6 的 probe received；
+- 结论：丢帧主要来自哪（没锁频、DDS 缓冲、调试点云和 bridge）；车上要不要开机锁频、要不要带 DDS 配置（只给建议，人定）。
+```
+
+### T33 结果
+
+（待填）

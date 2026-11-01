@@ -29,6 +29,9 @@ class Lidar3dDetection : public rclcpp::Node {
 
  private:
   void OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+  // counts a received cloud for the once-a-second line, and the scans missing before it (header stamps more
+  // than 1.5 scan periods apart: lost in DDS, or overwritten in the subscription queue while a callback ran)
+  void CountCloud(const sensor_msgs::msg::PointCloud2& msg);
   // config/lidar_3d_detection.yaml of this install: $SERES_PERCEPTION_INSTALL_DIR/lidar_3d_detection, else the
   // package's own prefix (ament index)
   static std::string DefaultConfig();
@@ -53,6 +56,12 @@ class Lidar3dDetection : public rclcpp::Node {
   std::unique_ptr<lidar3d::PerceptionPipeline> pipe_;
   std::unique_ptr<lidar3d::OnlineInputs> inputs_;
   std::chrono::steady_clock::time_point last_stats_{}, last_drop_{};
+  // since the last once-a-second line: clouds received, frames published, scans skipped, the longest callback
+  // (pipeline and publishing; near the scan period means the node cannot keep up)
+  static constexpr double kScanPeriod = 0.1;          // [s] the lidar's 10 Hz
+  int stat_clouds_ = 0, stat_frames_ = 0, stat_skipped_ = 0;
+  double stat_callback_max_ms_ = 0.0;
+  double last_cloud_stamp_ = -1.0;
 
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::SubscriptionBase::SharedPtr pose_sub_;

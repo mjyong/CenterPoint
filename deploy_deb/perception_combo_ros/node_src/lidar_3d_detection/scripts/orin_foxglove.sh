@@ -45,6 +45,7 @@ if pgrep -f "$NODE_RE" > /dev/null; then
   exit 1
 fi
 mkdir -p "$LOG"
+"$HERE/orin_clocks.sh"            # the node is 2-3x slower unlocked
 
 cleanup() {
   trap - EXIT INT TERM

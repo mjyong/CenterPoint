@@ -507,6 +507,16 @@ colcon 那一步和真机运行要在板上做（T31）。
   - Raw Messages：`LidarObjectArray`；
 - `tools/deploy/foxglove_probe.py` 在板上不开 GUI 也能查 bridge 发了哪些话题、各收到多少条；`objects_bag.py` 录到 `/tf` 时，会核对 TF 和消息里的 `world_pose`。
 
+**T32 的结果**（2026-11-01，删掉 `deploy/` 以后）：
+- 服务器容器里不带 ROS 编 `$L`：CTest 2 项都过，GoogleTest 27 项（含 2 个 GPU）；样例 bag 上 Python 对 C++ 喂同一批检测 pass；
+- 板上：重打的 deb（`0.1.0+308.gf3b536f`，35.8 MB）直接升级，服务 enabled、active；升级前后 bag 回放逐位相同，装好的 `lidar_3d_bag_replay` 和 `lidar_3d_replay --messages` 逐位相同；RPATH 只指 `/opt/...`，二进制里没有源码路径；
+- TF：`camera_init → lidar_det`、`camera_init → hesai_lidar` 每帧都有，和消息里的 `world_pose` 完全一致；foxglove_bridge 3.6 发出了全部话题（握手只认 `foxglove.sdk.v1`，探针已改）。
+
+**T32 复核发现的**：
+- **锁频**：板子重启后 `jetson_clocks` 没了，节点慢 2–3 倍：在线每帧 55 ms（预处理 17、GPU 检测 34 ms），T31 锁频时 15–21 ms。车上的服务开机自启，同样不锁频。延迟一律在锁频后量，`$L/scripts/orin_clocks.sh` 查锁没锁（`orin_soak.sh` 写进 `clocks.txt`）。车上要不要开机锁频由人定；
+- **吞吐**：Foxglove 那次（发调试点云 + bridge）检测只有约 5 Hz。可能是没锁频、几 MB 的点云在 DDS（UDP）里丢、调试点云和 bridge 抢资源。节点每秒那一行加了 `callback_max_ms` 和 `clouds / frames / skipped`，T33 用六种组合分清；
+- 板上服务的 `/etc/default/lidar-3d-detection` 是以前测试时改的（另一份配置、发 TF），T33 改回包里的样子。
+
 ## 10. 文件一览
 
 | 文件 | 作用 |
@@ -536,5 +546,6 @@ colcon 那一步和真机运行要在板上做（T31）。
 | `$L/scripts/orin_soak.sh` | 板上长时间回放：装好的节点、循环播放、录包、负载、内存和 tegrastats（T30、T31） |
 | `deploy_deb/` | 车上部署的代码树（第 9 节）；`$L/scripts/build_deb.sh` 在板上打 deb，`$L/scripts/sync_to_orin.sh` 只同步这棵树到 `~/seres_ws` |
 | `tools/deploy/check_deploy_deb.py` | `deploy_deb` 的配置是否等于 Python 导出的（`--write` 重写），`kygi665_msgs` 是否一致 |
+| `$L/scripts/orin_clocks.sh` | 锁频了没有（CPU、GPU 的最低 / 最高 / 当前频率，功耗模式）；没锁时节点慢 2–3 倍 |
 | `deploy_deb/.../scripts/orin_foxglove.sh`、`foxglove/lidar_3d_detection.json` | 板上循环播 bag 加 foxglove_bridge；本机 Foxglove 的布局 |
 | `tools/deploy/foxglove_probe.py` | 不开 GUI 查 foxglove_bridge：发了哪些话题、订几秒各收到多少条（只用标准库，板上能跑） |

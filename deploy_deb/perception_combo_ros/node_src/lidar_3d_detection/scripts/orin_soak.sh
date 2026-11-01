@@ -7,12 +7,13 @@
 #   orin_soak.sh bags/rosbag2_0921_600 - - 30 data/soak
 #
 # LIDAR3D_INSTALL: the install (default /opt/seres/perception, else this workspace's install/).
-# Writes <out>/node.log, live/ (the recorded objects), rss.log (epoch s, kB), tegrastats.log, load.log (when the
-# load started and stopped), play.log, record.log. The algorithm repository's tools/deploy/objects_bag.py checks
-# live/ pass by pass, tools/deploy/soak_report.py sums up the rest. ROS_DOMAIN_ID defaults to 77.
+# Writes <out>/clocks.txt (orin_clocks.sh: locked or not), node.log, live/ (the recorded objects), rss.log
+# (epoch s, kB), tegrastats.log, load.log (when the load started and stopped), play.log, record.log. The algorithm
+# repository's tools/deploy/objects_bag.py checks live/ pass by pass, tools/deploy/soak_report.py sums up the rest.
+# ROS_DOMAIN_ID defaults to 77.
 set -u
 if [ $# -ne 5 ]; then
-  sed -n '2,13p' "$0" >&2
+  sed -n '2,14p' "$0" >&2
   exit 2
 fi
 BAG=$1 CONFIG=$2 MODEL=$3 MINUTES=$4 OUT=$5
@@ -55,6 +56,7 @@ if pgrep -f "$NODE_RE" > /dev/null; then
   exit 1
 fi
 mkdir -p "$OUT"
+"$HERE/orin_clocks.sh" | tee "$OUT/clocks.txt"
 half=$((MINUTES * 30))
 
 LIDAR3D_CONFIG=$CONFIG LIDAR3D_MODEL_DIR=$MODEL "$PKG/bin/start_lidar_3d_detection.sh" > "$OUT/node.log" 2>&1 &

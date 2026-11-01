@@ -443,6 +443,52 @@ def test_soak_report_reads_glog_lines():
     assert parse_line("[INFO] [launch]: All log files can be found below /tmp", 2026) is None
 
 
+def test_soak_report_reads_the_vehicle_node_counts(tmp_path):
+    """The vehicle node's once-a-second line ends with the clouds received, frames out and scans skipped since the
+    previous line, and the longest callback (T32: tell lost clouds from a node that cannot keep up)."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from soak_report import read_node_log, windows
+
+    line = ("I1101 10:18:%02d.000000 22204 lidar_3d_detection.cpp:182] 39 dets, 5 tracks | preprocess_ms 17.2 "
+            "det_gpu_ms 33.2 total_ms 55.0 callback_max_ms %.1f | clouds 10 frames %d skipped %d")
+    (tmp_path / "node.log").write_text("\n".join([line % (30, 61.0, 10, 0), line % (31, 98.5, 6, 4)]) + "\n")
+    frames, _ = read_node_log(tmp_path / "node.log", 2026)
+    assert [(f["clouds"], f["frames"], f["skipped"], f["callback_max_ms"]) for f in frames] == [
+        (10, 10, 0, 61.0), (10, 6, 4, 98.5)]
+    assert frames[0]["total_ms"] == 55.0
+    (r,) = windows(frames, 60.0, (None, None))
+    assert (r["clouds"], r["frames_out"], r["skipped"], r["callback_max"]) == (20, 16, 4, 98.5)
+    # older lines without the counts still read, without the count columns
+    old = "I1030 15:16:13.500000  7762 lidar_3d_detection.cpp:171] 41 dets, 5 tracks | preprocess_ms 6.1 total_ms 18.4"
+    (tmp_path / "old.log").write_text(old + "\n")
+    (r,) = windows(read_node_log(tmp_path / "old.log", 2026)[0], 60.0, (None, None))
+    assert "clouds" not in r and r["total_median"] == 18.4
+
+
+@pytest.mark.parametrize("cpu, gpu, code, word", [((2201600, 2201600), (1300500000, 1300500000), 0, "clocks locked"),
+                                                  ((115200, 2201600), (306000000, 1300500000), 1, "NOT locked"),
+                                                  (None, None, 2, "unknown")])
+def test_orin_clocks_tells_whether_jetson_clocks_ran(tmp_path, cpu, gpu, code, word):
+    """deploy_deb's scripts/orin_clocks.sh on a made-up sysfs: locked when the CPU and GPU minimum and maximum
+    frequencies are equal (sudo jetson_clocks), which T32 found lost after a reboot (the node 2-3x slower)."""
+    script = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection", "scripts",
+                          "orin_clocks.sh")
+    if not os.path.exists(script):
+        pytest.skip("no deploy_deb")
+    if cpu:
+        c = tmp_path / "devices" / "system" / "cpu" / "cpu0" / "cpufreq"
+        g = tmp_path / "class" / "devfreq" / "17000000.gpu"
+        for d, (lo, hi), names in ((c, cpu, ("scaling_min_freq", "scaling_max_freq", "scaling_cur_freq")),
+                                   (g, gpu, ("min_freq", "max_freq", "cur_freq"))):
+            d.mkdir(parents=True)
+            for n, v in zip(names, (lo, hi, hi)):
+                (d / n).write_text("%d\n" % v)
+    r = subprocess.run(["bash", script], env=dict(os.environ, ORIN_SYSFS=str(tmp_path)), capture_output=True, text=True)
+    assert r.returncode == code and word in r.stdout, r.stdout + r.stderr
+    if cpu:
+        assert "%d / %d" % cpu in r.stdout and "%d / %d" % gpu in r.stdout
+
+
 def test_objects_bag_reads_the_vehicle_messages(tmp_path):
     """objects_bag.py also reads deploy_deb's perception_interface/LidarObjectArray (the same fields)."""
     pytest.importorskip("rosbags")

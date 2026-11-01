@@ -4,7 +4,9 @@
     python tools/deploy/soak_report.py data/deploy/T30/soak --window 300 --out soak.json
 
 Times are the board's clock (node.log's ROS stamps, rss.log and load.log from ``date +%s``). node.log can also be
-the vehicle node's (deploy_deb, glog lines; their local time is read with the year of rss.log / load.log).
+the vehicle node's (deploy_deb, glog lines; their local time is read with the year of rss.log / load.log), whose
+lines also count the clouds received, the frames out and the scans skipped, and give the longest callback: those
+are summed per window. clocks.txt (orin_clocks.sh) is printed first: unlocked clocks make the node 2-3x slower.
 """
 import argparse
 import json
@@ -51,7 +53,9 @@ def read_node_log(path, year=None):
             s = STATS.match(text)
             if s:
                 ms = {k: float(v) for k, v in re.findall(r"(\w+_ms) ([0-9.]+)", s.group(3))}
-                frames.append(dict(t=t, dets=int(s.group(1)), tracks=int(s.group(2)), **ms))
+                # the vehicle node's counts since its previous line (clouds received, frames out, scans skipped)
+                n = {k: int(v) for k, v in re.findall(r"\b(clouds|frames|skipped) (\d+)", s.group(3))}
+                frames.append(dict(t=t, dets=int(s.group(1)), tracks=int(s.group(2)), **ms, **n))
             elif level != "INFO":
                 warnings[level + ": " + re.sub(r"\d+(\.\d+)?", "#", text)] += 1
     return frames, warnings
@@ -113,6 +117,10 @@ def windows(frames, width, load):
                          total_median=float(np.median(total)), total_p99=float(np.percentile(total, 99)),
                          total_max=float(total.max()), dets_median=float(np.median([f["dets"] for f in w])),
                          tracks_median=float(np.median([f["tracks"] for f in w]))))
+        if all("clouds" in f for f in w):            # the vehicle node's counts (none in older logs)
+            rows[-1].update(clouds=sum(f["clouds"] for f in w), frames_out=sum(f["frames"] for f in w),
+                            skipped=sum(f["skipped"] for f in w),
+                            callback_max=max(f.get("callback_max_ms", 0.0) for f in w))
     return rows
 
 
@@ -132,12 +140,20 @@ def main():
     report = dict(frames_logged=len(frames), windows=rows, warnings=dict(warnings),
                   rss_mb=dict(first=rss[0][1] / 1024, last=rss[-1][1] / 1024, max=max(r[1] for r in rss) / 1024)
                   if rss else None, tegrastats=read_tegrastats(os.path.join(args.dir, "tegrastats.log")))
-    print("| from min | load | frames logged | total ms median | p99 | max | boxes | tracks |")
-    print("|---|---|---|---|---|---|---|---|")
+    clocks = os.path.join(args.dir, "clocks.txt")             # orin_soak.sh: were the clocks locked
+    if os.path.exists(clocks):
+        with open(clocks, encoding="utf-8", errors="replace") as f:
+            report["clocks"] = f.readline().strip()
+        print(report["clocks"])
+    print("| from min | load | frames logged | total ms median | p99 | max | boxes | tracks "
+          "| clouds / out / skipped | callback max ms |")
+    print("|---|---|---|---|---|---|---|---|---|---|")
     for r in rows:
-        print("| %.0f | %s | %d | %.1f | %.1f | %.1f | %.0f | %.0f |" % (
+        counts = "%d / %d / %d" % (r["clouds"], r["frames_out"], r["skipped"]) if "clouds" in r else "-"
+        cb = "%.1f" % r["callback_max"] if "clouds" in r else "-"
+        print("| %.0f | %s | %d | %.1f | %.1f | %.1f | %.0f | %.0f | %s | %s |" % (
             r["start_min"], "yes" if r["load"] else "no", r["frames"], r["total_median"], r["total_p99"],
-            r["total_max"], r["dets_median"], r["tracks_median"]))
+            r["total_max"], r["dets_median"], r["tracks_median"], counts, cb))
     print()
     for text, n in sorted(warnings.items(), key=lambda kv: -kv[1]):
         print("%6d  %s" % (n, text))

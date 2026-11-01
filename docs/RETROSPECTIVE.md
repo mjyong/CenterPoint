@@ -28,7 +28,8 @@
 - T30（10-30 已跑，结果在 SERVER_TASKS，没复核）：板上长时间循环回放、负载下的延迟、TensorRT 的设备提示；
 - T31（10-30 完成，已复核）：车上部署包。`deploy_deb` 和 `deploy/` 对齐，板上打出 deb，装上后和 `deploy/` 逐位相同；
 - 11-01：删掉算法仓库的 `deploy/`，C++ 只剩 `deploy_deb` 这一份（不带 ROS 也能编、跑对 Python 的测试）；
-- T32：删掉 `deploy/` 以后服务器、板上各验一遍（CTest、升级前后逐位比），板上准备 Foxglove 实时看（bridge、TF、重打 deb），人在本机看；
+- T32（11-01 完成，已复核）：删掉 `deploy/` 以后服务器、板上各验一遍，CTest 全过、升级前后逐位相同，TF 和 Foxglove bridge 过。复核发现板子重启后没锁频、节点慢 2–3 倍；
+- T33：板上实时性（锁频、DDS 缓冲、调试点云各自的影响），服务改回包里的配置；
 - 上车实时跑：要人（校时，板子时钟停在 1970）；
 - 规划确认 `ObjectArray` 的字段；
 - 厂区新数据的下一轮采集和训练；
@@ -38,7 +39,7 @@
 - 流水线库 `dog_perception/` 约 1 万行 Python，工具约 9 千行，测试约 5 千行；
 - C++ 核心库约 7 千行，含 24 个 GoogleTest；
 - ROS 2 包约 600 行；
-- 服务器任务 T0–T32 共 30 多个，人工步骤 H1–H5。
+- 服务器任务 T0–T33 共 30 多个，人工步骤 H1–H5。
 
 ---
 
@@ -432,7 +433,8 @@
 |---|---|---|
 | T30：板上长时间循环回放、负载下的延迟、TensorRT 设备提示 | Agent | 10-30 跑完，待复核 |
 | T31：车上部署包：板上编 `deploy_deb`、打 deb、安装、和 `deploy/` 逐位比、卸载 | Agent（安装要 root） | 10-30 完成，已复核 |
-| T32：删掉 `deploy/` 以后的验证（服务器 CTest、板上升级前后逐位比），板上准备 Foxglove 实时看：装 bridge、重打 deb、查 TF 和 bridge | Agent，人看 | 任务已写好（11-01 改写） |
+| T32：删掉 `deploy/` 以后的验证（服务器 CTest、板上升级前后逐位比），板上准备 Foxglove 实时看 | Agent，人看 | 11-01 完成，已复核；60 s 的 bag 留在板上 |
+| T33：板上实时性：锁频与否、DDS 缓冲、发不发调试点云 | Agent | 任务已写好 |
 | 上车实时跑：10 Hz 不丢帧、和别的进程抢资源 | 人（上车、校时） | P7 剩下的部分 |
 | 规划确认 `ObjectArray` 的坐标系和字段 | 人、规划 | 字段是按常见需求定的 |
 | H4：在 Foxglove 里看 5 处问题 | 人 | 暂缓：新数据来了模型还会改 |
@@ -476,6 +478,6 @@
 | [DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md) | 为什么 v1 不如教师；下一批数据的采集计划 |
 | [PIPELINE_TUNING.md](PIPELINE_TUNING.md) | 后处理、跟踪、预测调参的计划和指标 |
 | [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md) | 跟踪和预测的设计 |
-| [SERVER_TASKS.md](SERVER_TASKS.md) | 服务器任务 T0–T32：命令、结果、复核 |
+| [SERVER_TASKS.md](SERVER_TASKS.md) | 服务器任务 T0–T33：命令、结果、复核 |
 | [DEPLOY_ORIN.md](DEPLOY_ORIN.md) | Orin 部署：通道、环境、转换、INT8、验收、C++ 核心库、ROS 2 节点 |
 | [SENSORS.md](SENSORS.md) | 传感器参数和外参 |

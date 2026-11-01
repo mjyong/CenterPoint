@@ -1,6 +1,8 @@
 #include "../include/lidar_3d_detection.h"
 #include "../include/logging.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -148,8 +150,20 @@ bool Lidar3dDetection::Init() {
 #endif
 }
 
+void Lidar3dDetection::CountCloud(const sensor_msgs::msg::PointCloud2& msg) {
+  const double t = msg.header.stamp.sec + 1e-9 * msg.header.stamp.nanosec;
+  ++stat_clouds_;
+  const double dt = t - last_cloud_stamp_;
+  // not across a jump (a bag played again, a clock reset): the node starts over there
+  if (last_cloud_stamp_ >= 0.0 && dt > 1.5 * kScanPeriod && dt < 10.0) {
+    stat_skipped_ += static_cast<int>(std::lround(dt / kScanPeriod)) - 1;
+  }
+  last_cloud_stamp_ = t;
+}
+
 void Lidar3dDetection::OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
   const auto now = std::chrono::steady_clock::now();
+  CountCloud(*msg);
   std::optional<lidar3d::PipelineOutput> out;
   try {
     out = inputs_->on_cloud(lidar3d::ros::cloud_view(*msg));
@@ -168,6 +182,9 @@ void Lidar3dDetection::OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr ms
   }
   if (publish_cloud_) cloud_pub_->publish(lidar3d::ros::det_cloud(*out, local_frame_));
   if (tf_) tf_->sendTransform(lidar3d::ros::viewer_transforms(*pipe_, *out, *msg, local_frame_, world_frame_));
+  ++stat_frames_;
+  stat_callback_max_ms_ = std::max(
+      stat_callback_max_ms_, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - now).count());
   // once a second (tools/deploy/soak_report.py reads these lines)
   if (now - last_stats_ < std::chrono::seconds(1)) return;
   last_stats_ = now;
@@ -179,7 +196,12 @@ void Lidar3dDetection::OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr ms
     std::snprintf(buf, sizeof(buf), " %s %.1f", k, it->second);
     t += buf;
   }
-  LOG(INFO) << out->detections.size() << " dets, " << out->tracks.size() << " tracks |" << t;
+  char counts[128];
+  std::snprintf(counts, sizeof(counts), " callback_max_ms %.1f | clouds %d frames %d skipped %d", stat_callback_max_ms_,
+                stat_clouds_, stat_frames_, stat_skipped_);
+  LOG(INFO) << out->detections.size() << " dets, " << out->tracks.size() << " tracks |" << t << counts;
+  stat_clouds_ = stat_frames_ = stat_skipped_ = 0;
+  stat_callback_max_ms_ = 0.0;
 }
 
 }  // namespace perception

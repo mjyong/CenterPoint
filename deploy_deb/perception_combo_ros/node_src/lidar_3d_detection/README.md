@@ -23,7 +23,7 @@ perception_combo_ros/
     scripts/orin_soak.sh                  长时间循环回放（装好的节点）
     scripts/orin_foxglove.sh              板上循环播 bag，用 Foxglove 实时看（见"用 Foxglove 看"）
     foxglove/lidar_3d_detection.json      Foxglove 的布局
-    scripts/sync_to_orin.sh, scripts/orin_check.sh
+    scripts/sync_to_orin.sh, scripts/orin_check.sh, scripts/orin_clocks.sh（锁频了没有）
 slam/interface/kygi665_msgs/              RTK 组合导航的 INSPVAX（定位）
 ```
 
@@ -87,7 +87,8 @@ sudo systemctl stop lidar-3d-detection
   - `/lib/systemd/system/lidar-3d-detection.service`；
   - `/etc/default/lidar-3d-detection`：`ROS_DOMAIN_ID`、`RMW_IMPLEMENTATION`、`LIDAR3D_THREADS`（默认 4）、`LIDAR3D_CONFIG`、`LIDAR3D_MODEL_DIR`、`LIDAR3D_LOG_DIR`、`LIDAR3D_ARGS`（更多节点参数，比如 `-p publish_tf:=true -p publish_cloud:=true` 让服务本身也能给查看器看）；
 - 配置和 `/etc/default` 那个文件是 conffile：升级时保留你改过的；`dpkg -r` 卸载时也留着，`dpkg -P` 才删掉；
-- 起来以后日志里有一行 "lidar_3d_detection up: ..."，之后每秒一行：框数、轨迹数、各段耗时（ms）；
+- 起来以后日志里有一行 "lidar_3d_detection up: ..."，之后每秒一行：框数、轨迹数、各段耗时（ms），最后是这一秒里最长的回调（`callback_max_ms`，含发布）和 `clouds N frames N skipped N`（收到几帧点云、发出几帧结果、按点云时间戳算中间缺了几帧）；
+- 延迟要在锁频后看：`sudo jetson_clocks`，重启就没了。`scripts/orin_clocks.sh` 查锁没锁。没锁时节点慢 2–3 倍（T32：每帧 55 ms，锁频时 15–21 ms）；
 - 不经过 deb，直接用 colcon 的安装目录也行：`source install/setup.bash && ros2 launch lidar_3d_detection lidar_3d_detection.launch.py`。
 
 ## 用 Foxglove 看（板上循环播 bag）
@@ -107,7 +108,7 @@ sudo systemctl stop lidar-3d-detection
    - `ROS_DOMAIN_ID` 默认 77；
    - Ctrl-C 全部停掉。
 
-3. 本机打开 Foxglove（桌面版；不想登录账号可以用开源的 Lichtblick，协议一样）：
+3. 本机打开 Foxglove 桌面版：
    - Open connection → Foxglove WebSocket → `ws://192.168.123.100:8765`；
    - Layout → Import from file → `foxglove/lidar_3d_detection.json`。
 
@@ -117,8 +118,10 @@ sudo systemctl stop lidar-3d-detection
 
    想看原始点云（`/robot/topic/rdap/top_point_cloud2`，单帧，靠 `camera_init → hesai_lidar` 那条 TF），在 3D 面板的话题列表里勾上就行；
 
+- bridge 3.x（板上是 3.6）基于 Foxglove SDK，握手只认 `foxglove.sdk.v1`，新版 Foxglove 桌面版支持。开源的 Lichtblick 能不能连 3.x 没验证过，连不上就用 Foxglove 桌面版；
 - 连不上 8765（防火墙），就在本机开端口转发 `ssh -N -L 8765:localhost:8765 seres@192.168.123.100`，再连 `ws://localhost:8765`；
 - 点云流量：原始点云每帧约 3.3 MB，检测器的输入点云是 5 帧拼起来的，每帧几 MB，10 Hz 下都要几十 MB/s。直连的网口一般够用，卡的话在 3D 面板里关掉点云，只看框；
+- 检测话题明显不到 10 Hz（Foxglove 里框一卡一卡的）：看 `/tmp/lidar3d_foxglove/node.log` 每秒那一行。`callback_max_ms` 接近 100、`skipped` 跟着涨，是节点忙不过来（先锁频，再看要不要关掉 `publish_cloud`）；`callback_max_ms` 不大而 `skipped` 多，是点云在 DDS 里就丢了（几 MB 的点云走 UDP，T32 加大 Fast DDS 的 socket 缓冲后收齐）；
 - 每遍循环开头，节点会重来（日志 warn "jumped back"），时间戳往回跳，Foxglove 里可能闪一下；
 - 不起 GUI 也能查 bridge：`python3 ~/dogperc/repo/tools/deploy/foxglove_probe.py`，列出 bridge 发布的话题，订几秒、数消息条数（Foxglove 会看的那几个话题都要有）。
 
