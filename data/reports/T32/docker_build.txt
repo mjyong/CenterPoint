@@ -1,0 +1,8 @@
+#6 CACHED
+
+#7 exporting to image
+#7 exporting layers
+#7 exporting layers done
+#7 writing image sha256:e4426b283b5128cceaf9647085ccd06ffbccd7cbb20fe9a568f6710be9807239 0.0s done
+#7 naming to docker.io/library/dogperc-dev done
+#7 DONE 0.1s

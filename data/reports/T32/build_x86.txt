@@ -1,0 +1,5 @@
+docker build cached (dogperc-dev e4426b283b51).
+cmake/ninja finished: container exit 0, then stuck in Removal In Progress; logs unavailable.
+binaries: build/lidar3d_cuda/lidar3d_tests build/lidar3d_cuda/lidar_3d_replay liblidar3d.a
+-rwx--x--x 1 junyongmou engineers 3426016 Nov  1 12:03 build/lidar3d_cuda/lidar3d_tests
+-rwx--x--x 1 junyongmou engineers 2578320 Nov  1 12:03 build/lidar3d_cuda/lidar_3d_replay
