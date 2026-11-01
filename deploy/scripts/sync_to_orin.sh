@@ -4,7 +4,9 @@
 # The Orin's root partition has only a few GB free: copy small subsets and delete them after use.
 #
 #   deploy/scripts/sync_to_orin.sh                                  # code only
-#   deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp      # + the model directory
+#   deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp      # ONNX + metadata, no engines
+#   deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp_dyn --engines gpu1
+#       engines from <model>/machines/<host> only, and only when that host's arch matches the target
 #   deploy/scripts/sync_to_orin.sh --frames data/runs/0921_164127_s000/frames --stride 3 --limit 100
 #   deploy/scripts/sync_to_orin.sh --dumps data/deploy/dumps        # reference detections (compare_backends --dump)
 #   deploy/scripts/sync_to_orin.sh --seq data/seq/0921_164127_s000 --limit 150   # a raw recording (dogperc_replay)
@@ -15,10 +17,11 @@ export LC_ALL=C          # list frames in the order Python's sorted() uses (comp
 HOST=${ORIN_HOST:-orin}
 DIR=${ORIN_DIR:-dogperc}
 cd "$(dirname "$0")/../.."
-MODEL="" ; DUMPS="" ; FRAMES=() ; SEQS=() ; BAGS=() ; STRIDE=1 ; LIMIT=0
+MODEL="" ; ENGINES="" ; DUMPS="" ; FRAMES=() ; SEQS=() ; BAGS=() ; STRIDE=1 ; LIMIT=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --model) MODEL=$2; shift 2 ;;
+    --engines) ENGINES=$2; shift 2 ;;
     --frames) FRAMES+=("$2"); shift 2 ;;
     --seq) SEQS+=("$2"); shift 2 ;;
     --bag) BAGS+=("$2"); shift 2 ;;
@@ -46,8 +49,29 @@ if commit=$(git rev-list --count HEAD 2> /dev/null); then
 fi
 if [ -n "$MODEL" ]; then
   # engines.json is the build log of the engines next to it (build_engines.py): the Orin keeps its own
-  rsync -az --exclude 'engines.json' --include '*.onnx' --include '*.json' --exclude '*' \
+  rsync -az --exclude 'engines.json' --exclude 'machines/' --include '*.onnx' --include '*.json' --exclude '*' \
     "$MODEL/" "$HOST:$DIR/models/$(basename "$MODEL")/"
+fi
+if [ -n "$ENGINES" ]; then
+  [ -n "$MODEL" ] || { echo "--engines needs --model" >&2; exit 2; }
+  src="$MODEL/machines/$ENGINES"
+  [ -d "$src" ] || { echo "no engines for $ENGINES ($src)" >&2; exit 1; }
+  remote_arch=$(ssh "$HOST" uname -m)
+  remote_l4t=$(ssh "$HOST" "cat /etc/nv_tegra_release 2>/dev/null || true")
+  python3 - "$src/engines.json" "$remote_arch" "$remote_l4t" << 'PY'
+import json, re, sys
+log, arch, l4t = json.load(open(sys.argv[1])), sys.argv[2], sys.argv[3]
+arches = {e.get("arch") for e in log}
+if arches != {arch}:
+    raise SystemExit("engines are %s, target is %s" % (", ".join(sorted(map(str, arches))), arch))
+want = {re.search(r"R\d+(?:\.\d+)+", e["l4t"]).group(0) for e in log if e.get("l4t")}
+got = re.search(r"R\d+(?:\.\d+)+", l4t)
+got = got.group(0) if got else ""
+if want and got not in want:
+    raise SystemExit("engines are L4T %s, target is %s" % (", ".join(sorted(want)), got or "not a Jetson"))
+PY
+  rsync -az "$src/" "$HOST:$DIR/models/$(basename "$MODEL")/"
+  echo "engines: $ENGINES -> $HOST:$DIR/models/$(basename "$MODEL")/"
 fi
 for f in "${FRAMES[@]}"; do
   scene=$(basename "$(dirname "$f")")

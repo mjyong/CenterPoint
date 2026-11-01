@@ -16,6 +16,10 @@ checks) and Orin engines on the Orin (latency, the deployed ones). Output names 
 and p99: ``TrtRunner.benchmark``; ``tools/deploy/bench_engines.py`` times engines already built, the
 same number as trtexec's GPU Compute Time, also where there is no trtexec). Each build appends to
 ``<model-dir>/engines.json``: TensorRT version, machine, graph, precision, build time, size.
+The same build is also copied to ``<model-dir>/machines/<host>/`` so a later build on another
+machine does not replace it. Deploy that directory for the machine that will run it
+(``deploy/scripts/sync_to_orin.sh --model <dir> --engines <host>``); ``--stage <host>`` writes
+one directory (ONNX, model_meta and that host's engines) for ``build_deb.sh --model``.
 
 Graphs are parsed from their file, so ONNX weights stored in an external file next to the graph
 (torch's dynamo exporter writes ``<name>.onnx.data``) are found whatever the working directory.
@@ -28,6 +32,7 @@ import argparse
 import json
 import os
 import platform
+import shutil
 import socket
 import sys
 import time
@@ -115,7 +120,65 @@ def machine():
     model = "/proc/device-tree/model"
     if os.path.exists(model):                       # Jetson
         m["model"] = open(model).read().strip("\x00\n ")
+    rel = "/etc/nv_tegra_release"
+    if os.path.exists(rel):                         # distinguishes two Orins with the same TensorRT
+        m["l4t"] = open(rel).read().strip()
     return m
+
+
+def _host_dir(model_dir, host):
+    return os.path.join(model_dir, "machines", host)
+
+
+def archive_engine(model_dir, engine_path, info):
+    """Keep this engine under machines/<host>/, replacing only that host's copy of the same file."""
+    dest = _host_dir(model_dir, info["host"])
+    os.makedirs(dest, exist_ok=True)
+    shutil.copy2(engine_path, os.path.join(dest, os.path.basename(engine_path)))
+    log_path = os.path.join(dest, "engines.json")
+    log = json.load(open(log_path)) if os.path.exists(log_path) else []
+    log = [e for e in log if e.get("engine") != info["engine"]]
+    log.append(info)
+    with open(log_path, "w") as f:
+        json.dump(log, f, indent=1)
+    print("  archived %s -> machines/%s/" % (info["engine"], info["host"]), flush=True)
+
+
+def archive_current(model_dir):
+    """File the engines sitting in model_dir under the host recorded for each file."""
+    log_path = os.path.join(model_dir, "engines.json")
+    if not os.path.exists(log_path):
+        raise SystemExit("%s missing" % log_path)
+    newest = {}
+    for entry in json.load(open(log_path)):
+        newest[entry["engine"]] = entry          # the file on disk is the last build of that name
+    n = 0
+    for engine, info in newest.items():
+        src = os.path.join(model_dir, engine)
+        if os.path.isfile(src):
+            archive_engine(model_dir, src, info)
+            n += 1
+    if not n:
+        raise SystemExit("%s: engines.json names no engine file in this directory" % model_dir)
+
+
+def stage_machine(model_dir, host, out):
+    """One directory for the packager: shared ONNX and model_meta, plus this host's engines."""
+    src = _host_dir(model_dir, host)
+    if not os.path.isdir(src):
+        raise SystemExit("no engines for %s (%s)" % (host, src))
+    os.makedirs(out, exist_ok=True)
+    copied = []
+    for name in os.listdir(model_dir):
+        if name == "model_meta.json" or name.endswith(".onnx") or name.endswith(".onnx.data"):
+            shutil.copy2(os.path.join(model_dir, name), os.path.join(out, name))
+            copied.append(name)
+    for name in os.listdir(src):
+        shutil.copy2(os.path.join(src, name), os.path.join(out, name))
+        copied.append(name)
+    if not any(name.endswith(".engine") for name in copied):
+        raise SystemExit("%s has no .engine files" % src)
+    print("staged %s -> %s (%s)" % (host, out, ", ".join(sorted(copied))), flush=True)
 
 
 def main():
@@ -130,7 +193,20 @@ def main():
     ap.add_argument("--warmup-ms", type=float, default=500.0, help="warm-up before --benchmark timing")
     ap.add_argument("--opt-pillars", type=int, default=None,
                     help="dynamic PFN: pillar count the kernels are tuned for (default max_pillars / 2)")
+    ap.add_argument("--archive", action="store_true",
+                    help="copy the engines already in --model-dir into machines/<host>/ and exit")
+    ap.add_argument("--stage", default=None, metavar="HOST",
+                    help="write ONNX, model_meta and machines/HOST engines to --stage-out, then exit")
+    ap.add_argument("--stage-out", default=None, help="directory written by --stage")
     args = ap.parse_args()
+    if args.archive:
+        archive_current(args.model_dir)
+        return
+    if args.stage:
+        if not args.stage_out:
+            raise SystemExit("--stage needs --stage-out")
+        stage_machine(args.model_dir, args.stage, args.stage_out)
+        return
 
     from dog_perception.detection.model_meta import ModelMeta
     meta = ModelMeta.load(os.path.join(args.model_dir, "model_meta.json"))
@@ -156,6 +232,7 @@ def main():
             print("  %s" % json.dumps(info), flush=True)
             with open(log_path, "w") as f:
                 json.dump(log, f, indent=1)
+            archive_engine(args.model_dir, engine_path, info)
 
 
 if __name__ == "__main__":
