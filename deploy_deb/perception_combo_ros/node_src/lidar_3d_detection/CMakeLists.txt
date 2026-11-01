@@ -210,6 +210,8 @@ install(TARGETS lidar_3d_detection lidar_3d_bag_replay lidar_3d_replay
 install(DIRECTORY config DESTINATION .)
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 install(PROGRAMS packaging/start_lidar_3d_detection.sh DESTINATION bin)
+# optional Fast DDS settings for the large clouds (README "DDS"; scripts/orin_foxglove.sh uses it)
+install(FILES packaging/fastdds_large_buffers.xml DESTINATION share/${PROJECT_NAME})
 
 if(LIDAR3D_MODEL_DIR)
   set(_model_files model_meta.json pfn.onnx rpn_head.onnx pfn.${LIDAR3D_PRECISION}.engine

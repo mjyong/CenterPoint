@@ -18,7 +18,7 @@ perception_combo_ros/
     config/lidar_3d_detection.yaml        参数：算法仓库导出，末尾 5 个部署键（model_dir、四个话题名）是本包自己的
     docker/Dockerfile.dev                 服务器上编译、测试用的镜像（TensorRT 10.3、CUDA 12.6，和板上一样）
     launch/                               ros2 launch
-    packaging/                            deb 里的启动脚本、systemd 单元、默认设置、安装脚本
+    packaging/                            deb 里的启动脚本、systemd 单元、默认设置、安装脚本、Fast DDS 大缓冲配置（见"DDS"）
     scripts/build_deb.sh                  在板上打 deb
     scripts/orin_soak.sh                  长时间循环回放（装好的节点）
     scripts/orin_foxglove.sh              板上循环播 bag，用 Foxglove 实时看（见"用 Foxglove 看"）
@@ -121,9 +121,28 @@ sudo systemctl stop lidar-3d-detection
 - bridge 3.x（板上是 3.6）基于 Foxglove SDK，握手只认 `foxglove.sdk.v1`，新版 Foxglove 桌面版支持。开源的 Lichtblick 能不能连 3.x 没验证过，连不上就用 Foxglove 桌面版；
 - 连不上 8765（防火墙），就在本机开端口转发 `ssh -N -L 8765:localhost:8765 seres@192.168.123.100`，再连 `ws://localhost:8765`；
 - 点云流量：原始点云每帧约 3.3 MB，检测器的输入点云是 5 帧拼起来的，每帧几 MB，10 Hz 下都要几十 MB/s。直连的网口一般够用，卡的话在 3D 面板里关掉点云，只看框；
-- 检测话题明显不到 10 Hz（Foxglove 里框一卡一卡的）：看 `/tmp/lidar3d_foxglove/node.log` 每秒那一行。`callback_max_ms` 接近 100、`skipped` 跟着涨，是节点忙不过来（先锁频，再看要不要关掉 `publish_cloud`）；`callback_max_ms` 不大而 `skipped` 多，是点云在 DDS 里就丢了（几 MB 的点云走 UDP，T32 加大 Fast DDS 的 socket 缓冲后收齐）；
+- 检测话题明显不到 10 Hz（Foxglove 里框一卡一卡的）：看 `/tmp/lidar3d_foxglove/node.log` 每秒那一行。`callback_max_ms` 接近 100、`skipped` 跟着涨，是节点忙不过来（先锁频，再看要不要关掉 `publish_cloud`）；`callback_max_ms` 不大而 `skipped` 多，是点云在 DDS 里就丢了（见"DDS"；脚本在 Fast DDS 下默认已经加大了缓冲，开头一行 `DDS: ...` 写着用的是什么）；
 - 每遍循环开头，节点会重来（日志 warn "jumped back"），时间戳往回跳，Foxglove 里可能闪一下；
 - 不起 GUI 也能查 bridge：`python3 ~/dogperc/repo/tools/deploy/foxglove_probe.py`，列出 bridge 发布的话题，订几秒、数消息条数（Foxglove 会看的那几个话题都要有）。
+
+## DDS
+
+一帧点云约 3 MB，比 DDS 共享内存的段大，走的是本机 UDP。缓冲不够时整帧丢掉（点云是 best effort），节点收到的帧就少了。T33 在板上用 60 s 的 bag（600 帧）1× 播：
+
+| 锁频 | Fast DDS 缓冲 | 另外 | 节点出的帧 | 缺的帧（`skipped`） | 每帧 ms（中位 / p99） |
+|---|---|---|---|---|---|
+| 不锁 | 默认 | | 341 | 247 | 50 / 122 |
+| 不锁 | 8 MB | | 592 | 0 | 50 / 114 |
+| 锁 | 默认 | | 598 | 0 | 17.7 / 26.5 |
+| 锁 | 8 MB | | 597 | 0 | 17.5 / 24.4 |
+| 锁 | 默认 | 调试点云 + TF + bridge 有人看 | 452 | 144 | 16.6 / 26.7 |
+| 锁 | 8 MB | 同上 | 597 | 0 | 16.6 / 25.5 |
+
+- **锁频**：没锁时节点慢 3 倍，DDS 的接收也跟不上；
+- **缓冲**：同一份点云多一个订阅的（比如 bridge），发的那一边要多发一份，默认缓冲又不够了（R5 里 bridge 收到的原始点云也只有 453 帧，丢在发的那一边）；
+- **用法**：`share/lidar_3d_detection/fastdds_large_buffers.xml`（send / listen 各 8 MB），`FASTRTPS_DEFAULT_PROFILES_FILE=<这个文件>`。路上的每个进程都要有：发点云的（雷达驱动、`ros2 bag play`）、本节点、看点云的（bridge）。内核会截到 `net.core.rmem_max` / `wmem_max`（板上是 16 MB，够）；
+- `scripts/orin_foxglove.sh` 在 Fast DDS 下默认用它（`FASTRTPS_DEFAULT_PROFILES_FILE=none` 关掉）；`orin_soak.sh` 不改，把用的 DDS 设置记进 `clocks.txt`；
+- **服务**：`/etc/default/lidar-3d-detection` 里 RMW 要和机器人上别的节点一样，不然互相收不到。机器人用 CycloneDDS 时，写 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` 和机器人的 `CYCLONEDDS_URI`（大点云的缓冲在那份 XML 里配，Fast DDS 的这个文件不起作用）；deb 依赖打包板上装着的每个 RMW。
 
 ## 和算法仓库对齐
 

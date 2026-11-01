@@ -465,6 +465,27 @@ def test_soak_report_reads_the_vehicle_node_counts(tmp_path):
     assert "clouds" not in r and r["total_median"] == 18.4
 
 
+def test_fastdds_profile_is_installed_and_listed():
+    """deploy_deb ships the 8 MB Fast DDS socket buffers T33 measured (600 clouds instead of 341 / 452): valid XML,
+    installed by CMake to share/lidar_3d_detection, offered (commented) in /etc/default/lidar-3d-detection, used by
+    orin_foxglove.sh."""
+    import xml.etree.ElementTree as ET
+
+    node = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection")
+    if not os.path.isdir(node):
+        pytest.skip("no deploy_deb")
+    root = ET.parse(os.path.join(node, "packaging", "fastdds_large_buffers.xml")).getroot()
+    sizes = {e.tag.split("}")[-1]: int(e.text) for e in root.iter() if e.tag.endswith("SocketBufferSize")}
+    assert sizes == dict(sendSocketBufferSize=8 << 20, listenSocketBufferSize=8 << 20)
+    with open(os.path.join(node, "CMakeLists.txt"), encoding="utf-8") as f:
+        assert "install(FILES packaging/fastdds_large_buffers.xml DESTINATION share/${PROJECT_NAME})" in f.read()
+    path = "lidar_3d_detection/share/lidar_3d_detection/fastdds_large_buffers.xml"
+    with open(os.path.join(node, "packaging", "lidar-3d-detection.default"), encoding="utf-8") as f:
+        assert "#FASTRTPS_DEFAULT_PROFILES_FILE=@PREFIX@/" + path in f.read()
+    with open(os.path.join(node, "scripts", "orin_foxglove.sh"), encoding="utf-8") as f:
+        assert "PROFILE=$PKG/share/lidar_3d_detection/fastdds_large_buffers.xml" in f.read()
+
+
 @pytest.mark.parametrize("cpu, gpu, code, word", [((2201600, 2201600), (1300500000, 1300500000), 0, "clocks locked"),
                                                   ((115200, 2201600), (306000000, 1300500000), 1, "NOT locked"),
                                                   (None, None, 2, "unknown")])

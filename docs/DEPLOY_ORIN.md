@@ -517,6 +517,13 @@ colcon 那一步和真机运行要在板上做（T31）。
 - **吞吐**：Foxglove 那次（发调试点云 + bridge）检测只有约 5 Hz。可能是没锁频、几 MB 的点云在 DDS（UDP）里丢、调试点云和 bridge 抢资源。节点每秒那一行加了 `callback_max_ms` 和 `clouds / frames / skipped`，T33 用六种组合分清；
 - 板上服务的 `/etc/default/lidar-3d-detection` 是以前测试时改的（另一份配置、发 TF），T33 改回包里的样子。
 
+**T33 的结果**（60 s bag，600 帧，1× 播）：丢帧有两条，计数（`clouds / frames / skipped`）把它们分开了。
+- 没锁频：节点每帧 50 ms，默认 Fast DDS 缓冲下只出 341 帧；只加大到 8 MB 缓冲就是 592 帧，只锁频就是 598 帧（每帧 17.7 ms）；
+- 锁频以后多一个订阅者（发调试点云、开 bridge）：默认缓冲 452 帧，8 MB 缓冲 597 帧。约 3 MB 的点云比共享内存的段大，走 UDP；
+- deb 带上 `share/lidar_3d_detection/fastdds_large_buffers.xml`（send / listen 各 8 MB），`orin_foxglove.sh` 在 Fast DDS 下默认用它；`/etc/default` 列了 RMW、`CYCLONEDDS_URI`、这份 profile 的选项（默认都不开）；Depends 写打包板上装着的每个 RMW；
+- **车上的 DDS 还没定**：T33 说机器人用 CycloneDDS（域 0，`/opt/ros/cyclonedds.xml`），没有依据，T34 核实。服务的 RMW 要和机器人的节点一样；CycloneDDS 下大点云的缓冲在那份 XML 里配；
+- 车上开机锁不锁频，由人定（不锁时慢 3 倍）。
+
 ## 10. 文件一览
 
 | 文件 | 作用 |
@@ -547,5 +554,6 @@ colcon 那一步和真机运行要在板上做（T31）。
 | `deploy_deb/` | 车上部署的代码树（第 9 节）；`$L/scripts/build_deb.sh` 在板上打 deb，`$L/scripts/sync_to_orin.sh` 只同步这棵树到 `~/seres_ws` |
 | `tools/deploy/check_deploy_deb.py` | `deploy_deb` 的配置是否等于 Python 导出的（`--write` 重写），`kygi665_msgs` 是否一致 |
 | `$L/scripts/orin_clocks.sh` | 锁频了没有（CPU、GPU 的最低 / 最高 / 当前频率，功耗模式）；没锁时节点慢 2–3 倍 |
+| `$L/packaging/fastdds_large_buffers.xml` | Fast DDS 8 MB socket 缓冲（T33），`FASTRTPS_DEFAULT_PROFILES_FILE` 用；README "DDS" |
 | `deploy_deb/.../scripts/orin_foxglove.sh`、`foxglove/lidar_3d_detection.json` | 板上循环播 bag 加 foxglove_bridge；本机 Foxglove 的布局 |
 | `tools/deploy/foxglove_probe.py` | 不开 GUI 查 foxglove_bridge：发了哪些话题、订几秒各收到多少条（只用标准库，板上能跑） |

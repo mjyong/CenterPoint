@@ -9,9 +9,12 @@
 # ROS_DOMAIN_ID (default 77, away from the robot's programs), FOXGLOVE_PORT (8765), LIDAR3D_INSTALL (default
 # /opt/seres/perception, else this workspace's install/). Logs in /tmp/lidar3d_foxglove.
 # Needs foxglove_bridge: sudo apt install ros-humble-foxglove-bridge (README.md for a board without internet).
+# With Fast DDS (the default RMW) the node, the bridge and the player get 8 MB socket buffers
+# (share/lidar_3d_detection/fastdds_large_buffers.xml; T33: 452 of 600 clouds without, 597 with); a
+# FASTRTPS_DEFAULT_PROFILES_FILE already set is kept, "none" turns it off.
 set -u
 if [ $# -lt 1 ]; then
-  sed -n '2,10p' "$0" >&2
+  sed -n '2,14p' "$0" >&2
   exit 2
 fi
 BAG=$1 RATE=${2:-1.0}
@@ -45,6 +48,14 @@ if pgrep -f "$NODE_RE" > /dev/null; then
   exit 1
 fi
 mkdir -p "$LOG"
+PROFILE=$PKG/share/lidar_3d_detection/fastdds_large_buffers.xml
+case ${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp} in
+  rmw_fastrtps_cpp)
+    if [ "${FASTRTPS_DEFAULT_PROFILES_FILE:-}" = none ]; then unset FASTRTPS_DEFAULT_PROFILES_FILE
+    elif [ -z "${FASTRTPS_DEFAULT_PROFILES_FILE:-}" ] && [ -f "$PROFILE" ]; then export FASTRTPS_DEFAULT_PROFILES_FILE=$PROFILE
+    fi ;;
+esac
+echo "DDS: ${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}, FASTRTPS_DEFAULT_PROFILES_FILE ${FASTRTPS_DEFAULT_PROFILES_FILE:-none}, CYCLONEDDS_URI ${CYCLONEDDS_URI:-none}"
 "$HERE/orin_clocks.sh"            # the node is 2-3x slower unlocked
 
 cleanup() {

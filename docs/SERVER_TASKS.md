@@ -137,7 +137,8 @@
 | T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
 | T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成，已复核。deb 装上后和 deploy/ 逐位相同，服务起停、卸载都对。复核：打包补了 patchelf、去掉编译目录的 RPATH、二进制不带源码路径、版本号带提交数；循环时 ID 不同是编号顺延（加了不看编号的 same_tracks_frames）；加了 publish_tf 和 Foxglove 实时看 |
 | T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 完成，已复核。删掉 deploy/ 以后服务器 CTest 27 项全过，升级前后、两条回放路径都逐位相同，TF、bridge 过。复核：板子重启后没锁频，节点慢 2–3 倍（每帧 55 ms，T31 是 15–21 ms），Foxglove 那次只有 5 Hz 的原因没分清（没锁频、DDS 缓冲、调试点云）；节点每秒那一行加了收到 / 发出 / 缺的帧数和最长回调，加了 orin_clocks.sh；板上服务的配置不是包里的 |
-| T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置 |
+| T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成，已复核。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置。复核："真狗是 CycloneDDS"没有依据，T34 核实；deb 带上 8 MB 的 Fast DDS profile，orin_foxglove.sh 默认用它；/etc/default 列了 DDS 选项 |
+| T34 | 机器人的 DDS：只读核实用的是哪个 RMW、哪份配置；节点在机器人的 CycloneDDS 配置下回放 60 s bag 收不收得齐；Cyclone 发、Fast DDS 收通不通；重打 deb | Agent | T33 复核 | 1.5 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -6279,3 +6280,104 @@ R5 探针 `passed` true，65 s：cloud 452、原始点云 453、tracks 452、obj
 **建议（不改服务、不改 sysctl）。** 车上开机锁频：不锁时慢 3 倍，并且默认 UDP 下会丢帧；`jetson_clocks` 每次重启都掉。Fast DDS 的机器带上这份 8 MB profile（播放器、节点、要看点云的客户端都要有）：没锁频时它单独就能把 skipped 打到 0；锁频以后只要有人订那帧约 2 MB 的 best-effort 点云，默认缓冲仍会丢。真狗是 CycloneDDS（域 0，`/opt/ros/cyclonedds.xml`），这份 Fast DDS XML 在那边不起作用。
 
 **第 6 步。** 锁频留着。服务 active、enabled。配置是包里的，`ROS_DOMAIN_ID=77`，up 那一行没有 `publishing TF`。板上删了 `data/T33_*`、`data/*.npz`、样例 bag、`/tmp/debx`。`bags/rosbag2_0921_600` 和 `~/dogperc/deb` 留着。根分区剩 2.0 GB。
+
+### T33 复核
+
+**结论认可**：丢帧有两条，计数把它们分开了。
+- 没锁频：节点每帧 50 ms（p99 约 120 ms），DDS 也跟不上，默认缓冲下 600 帧只出 341 帧；
+- 默认的 Fast DDS 缓冲装不下约 3 MB 的点云：锁频以后，只要多一个订阅者（bridge）就丢（452 帧）。R5 里 bridge 收到的原始点云也只有 453 帧，丢在发的那一边；
+- 锁频，或者 8 MB 缓冲，各自都能收齐（592–598 帧，skipped 0）；
+- 锁频以后 `no pose` 每次只有开头 1 条，不用让节点等定位。
+
+**要注意的**：
+1. **"真狗是 CycloneDDS（域 0，`/opt/ros/cyclonedds.xml`）"在报告里没有依据**（没贴 XML、环境变量、进程）。如果属实，这比缓冲重要：
+   - deb 的服务默认是 Fast DDS（`/etc/default` 里 RMW 是注释），和机器人的节点不是同一个 DDS。不同厂家的 DDS 能不能互通、大消息走不走得通，都没验证过；
+   - Fast DDS 的 profile 在 CycloneDDS 下不起作用；大点云的缓冲要在机器人的那份 CycloneDDS XML 里配；
+   - T34 先只读地核实，再让节点在 CycloneDDS 下跑一遍。
+2. `objects_bag` 的 `passed` 六次都是 false，原因是开头缺 1–2 帧：参考自己也丢了第一帧（599 帧），在线播放在 DDS 对上之前又可能丢一帧。不空播的 1× 播放里这是正常的，看 `missing_frames` 的数就行。
+3. `same_tracks_frames` 锁频时是 517–532 / 599（86–89%）。在线和离线的到达时机不同，位姿外推差一点，阈值附近的检测就会不一样，后面的轨迹跟着变。这不是门槛，记下就行。
+4. 板上的服务配置已经改回包里的（`ROS_DOMAIN_ID=77`），锁频也留着，但板子一重启锁频就没了。
+
+**复核时改的**：
+- `packaging/fastdds_large_buffers.xml`：T32、T33 用的那份（send / listen 各 8 MB），装到 `share/lidar_3d_detection/`；
+- `scripts/orin_foxglove.sh`：Fast DDS 下默认用它（节点、bridge、播放器都继承），开头打一行 `DDS: ...`；已经设了 `FASTRTPS_DEFAULT_PROFILES_FILE` 的照用，设成 `none` 就关掉。这样人在本机看 Foxglove 时就是 R6 的情况（597 / 600），不是 R5 的（452）；
+- `scripts/orin_soak.sh`：不改 DDS，把用的 DDS 设置记进 `clocks.txt`；
+- `/etc/default/lidar-3d-detection`：加了注释掉的 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`、`CYCLONEDDS_URI`、`FASTRTPS_DEFAULT_PROFILES_FILE`。默认行为不变；
+- `build_deb.sh`：Depends 里写打包板上装着的每个 RMW（原来只写找到的第一个，Fast DDS），服务改用 CycloneDDS 时包也在；
+- README 加了"DDS"一节（T33 的表、用法、服务的 RMW 要和机器人一致）；
+- 测试 `test_fastdds_profile_is_installed_and_listed`。
+
+**要人定的**：
+- 车上开机要不要锁频：不锁时慢 3 倍。可以在服务里加一个可选的开机 `jetson_clocks`（`/etc/default` 里开关、默认关），也可以交给机器人的系统设置。功耗和温度是机器人团队的事；
+- 车上服务的 RMW 和 DDS 配置：等 T34 核实机器人用的是什么。
+
+## T34 Orin：机器人的 DDS，节点在它下面收不收得齐
+
+T33 说机器人上的节点用 CycloneDDS（域 0，`/opt/ros/cyclonedds.xml`），但没有给依据；deb 的服务默认是 Fast DDS。这次：
+- 只读地核实机器人用的 DDS 和配置；
+- 重打 deb（DDS 的 profile、`/etc/default` 的选项、Depends），升级时保留板上的 `/etc/default`；
+- 用 60 s 的 bag，让播放器和节点都在机器人的 CycloneDDS 配置下跑，看收不收得齐；再看播放器是 CycloneDDS、节点是 Fast DDS（deb 默认）时收不收得到。
+
+本任务可以改的范围（通用约定 9）：`deploy_deb/`、`tools/deploy/`。**不要在域 0 上起任何会发消息的东西**（机器人的程序在那个域上），域 0 上只用 `ros2 topic list / info / hz` 这类只读命令。
+
+```text
+任务 T34：核实机器人的 DDS；节点在 CycloneDDS（机器人的配置）下回放 60 s bag 收不收得齐；跨厂家（Cyclone 发、Fast DDS 收）通不通。
+先按通用约定做（第 9 条：可以改代码，范围见本节开头；第 10 条）。前置：T33 复核。
+
+0. mkdir -p data/reports/T34 data/deploy/T34；N=data/deploy/T34；L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection
+   c=rosbag2_0921_600；I=/opt/seres/perception；B=$I/lidar_3d_detection/lib/lidar_3d_detection
+   python -m pytest tests/dog/test_deploy.py -q 2>&1 | tail -3 | tee data/reports/T34/pytest.txt
+   （test_fastdds_profile_is_installed_and_listed 要通过）
+   tools/deploy/sync_to_orin.sh --bag samples/rosbag2_2026_09_21-16_41_27_moving
+1. 机器人的 DDS（只读，输出 robot_dds.txt；拿不到的项写"拿不到"和原因）：
+   a. 配置文件：cat /opt/ros/cyclonedds.xml（原样另存 data/reports/T34/cyclonedds_robot.xml）；
+   b. 谁在用：
+        ps -eo pid,user,etime,cmd | grep -E 'ros|_node|launch|hesai|lidar' | grep -v grep | head -40
+        对其中 seres 用户的几个 ROS 进程：tr '\0' '\n' < /proc/<pid>/environ | grep -E 'RMW|CYCLONE|FASTRTPS|ROS_DOMAIN|ROS_LOCALHOST'
+        grep -rn 'RMW_IMPLEMENTATION\|CYCLONEDDS_URI\|ROS_DOMAIN_ID' ~/.bashrc ~/.profile /etc/environment /etc/profile.d/ 2>/dev/null
+        systemctl list-units --type=service --no-pager | grep -iE 'ros|robot|lidar|hesai|nav|plan|percep'
+        对列出来的机器人的服务：systemctl show <unit> -p User -p Environment -p EnvironmentFiles -p ExecStart
+   c. 装了哪些 RMW：dpkg -l | grep -E 'rmw-(fastrtps|cyclonedds)'；
+   d. 机器人的程序现在在不在跑、雷达在不在发（域 0，只读）：
+        export ROS_DOMAIN_ID=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+        timeout 20 ros2 topic list；有雷达话题的话 timeout 15 ros2 topic hz /robot/topic/rdap/top_point_cloud2，
+        timeout 10 ros2 topic info -v /robot/topic/rdap/top_point_cloud2（发布者的节点名、QoS）
+   - 结论写一句：机器人用哪个 RMW、哪份配置、哪个域、谁发雷达点云。和 T33 说的不一样就以这里为准。
+2. 重打 deb、升级（packaging 改了），同 T32 第 6、7 步。打包前把 T33 的包挪开（同 T33 第 2 步，挪到 ~/dogperc/deb/old/）。
+   - /etc/default/lidar-3d-detection 在板上改过（ROS_DOMAIN_ID=77），包里的这次也变了，dpkg 会问留哪个。安装命令加
+     -o Dpkg::Options::=--force-confold（留板上的），装完 diff /etc/default/lidar-3d-detection /etc/default/lidar-3d-detection.dpkg-dist；
+   - 报告里的 Depends：板上装了 rmw-cyclonedds-cpp 的话应该两个 RMW 都有；
+   - ls $I/lidar_3d_detection/share/lidar_3d_detection/fastdds_large_buffers.xml；
+   - 离线逐位比：同 T33 第 2 步，和 data/deploy/T32/inst_gpu.npz 比，keys differing 必须是空的。
+3. 回放（域 77，锁频；先 orin_clocks.sh，没锁就 sudo -n jetson_clocks）。每次同 T33 第 5 步：停服务、手动起节点、录 objects、
+   ros2 bag play --delay 3 bags/$c 1× 播一遍、停。每次运行前把这次的 DDS 环境写进 data/T34_Ck/dds.txt：
+   | 运行 | 播放器 | 节点 | 另外的 |
+   |---|---|---|---|
+   | C1 | Cyclone（机器人的 XML） | Cyclone（机器人的 XML） | 无 |
+   | C2 | 同 C1 | 同 C1 | 调试点云 + TF + bridge（bridge 也用 Cyclone）+ 65 s probe，同 T33 的 R5 |
+   | X1 | Cyclone（机器人的 XML） | Fast DDS 默认（deb 的默认） | 无 |
+   - Cyclone：RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml，录包的进程同样设置；
+     机器人的 XML 里写死了域（<Domain id="0">）或者只开了某个网口、本机收不到时，拷一份到 /tmp/cyclonedds_77.xml，
+     只改这几处（域改 any，网口加上 lo 或去掉限制），报告里贴 diff；
+   - C1 或 C2 的 skipped 不是 0：再跑 C3（= C1）、C4（= C2），用 /tmp/cyclonedds_big.xml = 机器人的 XML 在 <Domain> 里加
+       <Internal><SocketReceiveBufferSize min="8MB"/></Internal>
+     （已经有 SocketReceiveBufferSize 的就改大），报告里贴 diff；
+   - X1 收不到或者收得很少，就记下来，不用修（说明 deb 的默认 RMW 在车上不能用）；
+   - 每次拷回来：soak_report.py --window 60、objects_bag.py --replay data/deploy/T33/ref_c.npz（T33 的参考还在就用它，不在就按
+     T33 第 4 步重做）、no pose 次数，同 T33 第 5 步。
+4. 结束：锁频保持；服务 start、active，/etc/default 是板上原来的（ROS_DOMAIN_ID=77）；删掉板上 data/T34_*、data/*.npz、/tmp/debx、
+   样例 bag；bags/$c、~/dogperc/deb 留着。
+
+停止条件（按约定 9 修不好的时候）：第 2 步编译失败或 keys differing 不是空的；节点起不来；第 1 步发现机器人的程序在用域 77（停下问人）。
+提交：data/reports/T34/、本文档，以及按约定 9 改的代码。不提交 data/deploy/T34/、deb、bag。
+报告（写进"T34 结果"）：
+- 第 1 步的证据和那一句结论；
+- 第 2 步：Depends 里的 RMW、keys differing、.dpkg-dist 的 diff；
+- 运行表（C1、C2、X1，以及 C3、C4）：objects 条数、missing_frames、same_tracks_frames、clouds / frames / skipped、total_ms 中位和 p99、
+  callback_max_ms、no pose；C2 / C4 的 probe received；
+- 建议的车上 /etc/default/lidar-3d-detection（RMW、CYCLONEDDS_URI、ROS_DOMAIN_ID），以及机器人的 XML 要不要加缓冲（只给建议，人定）。
+```
+
+### T34 结果
+
+（待填）

@@ -161,9 +161,10 @@ mapfile -t owners < <(
       LD_LIBRARY_PATH="$libdirs${LD_LIBRARY_PATH:-}" ldd "$f" 2> /dev/null | awk '$2 == "=>" && $3 ~ /^\// {print $3}'
     done | sort -u | { grep -vF "$STAGE" || true; } | while read -r lib; do owner "$lib"; done | sort -u)
 deps=(python3)    # the colcon setup scripts
-# loaded with dlopen, so ldd does not list them: the DDS middleware of this board's ROS 2
+# loaded with dlopen, so ldd does not list them: every DDS middleware of this board's ROS 2 (RMW_IMPLEMENTATION in
+# /etc/default/lidar-3d-detection picks one; the robot's nodes may use CycloneDDS)
 for o in ros-humble-rmw-fastrtps-cpp ros-humble-rmw-cyclonedds-cpp; do
-  if v=$(dpkg-query -W -f='${Version}' "$o" 2> /dev/null); then deps+=("$o (>= $v)"); break; fi
+  if v=$(dpkg-query -W -f='${Version}' "$o" 2> /dev/null); then deps+=("$o (>= $v)"); fi
 done
 unowned=()
 for o in "${owners[@]}"; do

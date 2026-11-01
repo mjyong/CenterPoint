@@ -57,6 +57,8 @@ if pgrep -f "$NODE_RE" > /dev/null; then
 fi
 mkdir -p "$OUT"
 "$HERE/orin_clocks.sh" | tee "$OUT/clocks.txt"
+# the DDS settings the run had (T33: they decide whether ~3 MB clouds get lost)
+echo "DDS: ${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}, FASTRTPS_DEFAULT_PROFILES_FILE ${FASTRTPS_DEFAULT_PROFILES_FILE:-none}, CYCLONEDDS_URI ${CYCLONEDDS_URI:-none}" | tee -a "$OUT/clocks.txt"
 half=$((MINUTES * 30))
 
 LIDAR3D_CONFIG=$CONFIG LIDAR3D_MODEL_DIR=$MODEL "$PKG/bin/start_lidar_3d_detection.sh" > "$OUT/node.log" 2>&1 &
