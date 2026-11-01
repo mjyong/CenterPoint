@@ -200,7 +200,7 @@ mindmap
 
 **已知问题**：狗急停时，INS 报的速度会冲过头（2.5 m/s），位置跑到真实位置前面约 0.45 m，并保持 1 秒以上；随后位置每约 0.2 s 被往回拉一次（最多 0.33 m），但没拉够（运动样例 bag 的最后 1 s）。
 - 预览里的 `ins_step_m` 量的是往回拉的跳变，`shift_p90_m` 用激光配准量位姿误差本身；
-- 修正方法见第 4 节的 `refine_poses.py`。
+- 修正方法见第 4 节的 `refine_poses.py`，设计和迭代见 [LOCALIZATION.md](LOCALIZATION.md)。
 
 ---
 

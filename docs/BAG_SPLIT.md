@@ -213,6 +213,8 @@ python tools/dog/split_check.py --seq data/seq/0921_* --out data/survey/split \
 
 ### 3.5 位姿融合：激光里程计 + RTK（`refine_poses.py`）
 
+> 整理后的设计、参数、迭代总结和在线定位见 [LOCALIZATION.md](LOCALIZATION.md)；这里保留每一轮的原始记录。
+
 **问题**：
 - 狗急停时，kygi INS 的速度会冲过头（2.5 m/s），位置跑到真实位置前面约 0.5 m，并保持 1 秒以上；随后几次往回拉只修正了一部分。运动样例 bag 在 2.1 s 时超前 0.44 m，这是把激光帧两两配准测出来的。
 - INSPVAX 给的位置不是激光雷达（机身原点）的位置，而是它后方约 0.54 m 处一个点的位置（杠杆臂，见 5.6 的结果）。狗一转弯，这个点就绕着机身甩：原地掉头后差 1.1 m。

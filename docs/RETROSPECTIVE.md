@@ -471,6 +471,7 @@
 | [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) | 一轮迭代的完整做法：数据 → 标注 → 训练 → 评估 → 部署 |
 | [BAG_SPLIT.md](BAG_SPLIT.md) | bag 体检、切场景、位姿融合；0921 数据准备的十一轮记录 |
 | [DATA_LINEAGE.md](DATA_LINEAGE.md) | 每一步读写哪些文件、哪些字段 |
+| [LOCALIZATION.md](LOCALIZATION.md) | 定位优化：INS 的问题、离线位姿融合的设计和六版迭代、在线定位、验收和下一步 |
 | [DOG_FINETUNE.md](DOG_FINETUNE.md) | 自动标注、审核、导出、训练的参考；只检车辆的做法；标注规则 |
 | [DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md) | 为什么 v1 不如教师；下一批数据的采集计划 |
 | [PIPELINE_TUNING.md](PIPELINE_TUNING.md) | 后处理、跟踪、预测调参的计划和指标 |
