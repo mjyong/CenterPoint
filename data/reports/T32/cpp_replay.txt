@@ -1,0 +1,30 @@
+
+=====================
+== NVIDIA TensorRT ==
+=====================
+
+NVIDIA Release 24.08 (build 106933332)
+NVIDIA TensorRT Version 10.3.0
+Copyright (c) 2016-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Container image Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+https://developer.nvidia.com/tensorrt
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+To install Python sample dependencies, run /opt/tensorrt/python/python_setup.sh
+
+To install the open-source samples corresponding to this TensorRT release version
+run /opt/tensorrt/install_opensource.sh.  To build the open source parsers,
+plugins, and samples for current top-of-tree on master or a different branch,
+run /opt/tensorrt/install_opensource.sh -b <branch>
+See https://github.com/NVIDIA/TensorRT for more information.
+
+REPLAY_UP
+info: ENU origin 29.73325161 106.78497842 217.10
+27 frames, 110 tracks, 0.8 s -> data/deploy/T32/rosbag2_2026_09_21-16_41_27_moving/cpp_dets.npz
+-rw-r--r-- 1 980 888 251362 Nov  1 04:36 data/deploy/T32/rosbag2_2026_09_21-16_41_27_moving/cpp_dets.npz

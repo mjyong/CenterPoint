@@ -1,0 +1,15 @@
+cloud 16 stamp 1789980192.498 points_in 106304 points_out 188170 preprocess 7.5 ms
+cloud 17 stamp 1789980192.598 points_in 106372 points_out 188767 preprocess 7.5 ms
+cloud 18 stamp 1789980192.698 points_in 106438 points_out 189444 preprocess 7.7 ms
+cloud 19 stamp 1789980192.798 points_in 106518 points_out 190166 preprocess 7.6 ms
+cloud 20 stamp 1789980192.897 points_in 107294 points_out 191019 preprocess 8.4 ms
+cloud 21 stamp 1789980192.998 points_in 107468 points_out 191770 preprocess 7.7 ms
+cloud 22 stamp 1789980193.098 points_in 107470 points_out 192250 preprocess 7.7 ms
+cloud 23 stamp 1789980193.198 points_in 107448 points_out 192563 preprocess 7.7 ms
+cloud 24 stamp 1789980193.297 points_in 107356 points_out 192796 preprocess 7.7 ms
+cloud 25 stamp 1789980193.398 points_in 107382 points_out 192673 preprocess 7.7 ms
+cloud 26 stamp 1789980193.498 points_in 107488 points_out 192573 preprocess 7.8 ms
+cloud 27 stamp 1789980193.597 points_in 107606 points_out 192925 preprocess 7.8 ms
+647 messages, 27 clouds, 27 frames, 110 tracks, 0.8 s -> data/bag_dets.npz
+info: ENU origin 29.73325161 106.78497842 217.10
+27 frames, 110 tracks, 1.0 s -> data/msgs_dets.npz

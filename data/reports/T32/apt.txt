@@ -1,0 +1,31 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+ros-humble-foxglove-bridge is already the newest version (3.6.0-1jammy.20260929.215014).
+The following packages were automatically installed and are no longer required:
+  libfwupdplugin5 libgcab-1.0-0 libslirp0 ros-humble-ros2-control-test-assets
+  slirp4netns
+Use 'sudo apt autoremove' to remove them.
+The following NEW packages will be installed:
+  patchelf
+0 upgraded, 1 newly installed, 0 to remove and 102 not upgraded.
+Need to get 67.1 kB of archives.
+After this operation, 166 kB of additional disk space will be used.
+Ign:1 http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports jammy/universe arm64 patchelf arm64 0.14.3-1
+Ign:1 http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports jammy/universe arm64 patchelf arm64 0.14.3-1
+Ign:1 http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports jammy/universe arm64 patchelf arm64 0.14.3-1
+Err:1 http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports jammy/universe arm64 patchelf arm64 0.14.3-1
+  Temporary failure resolving 'mirrors.tuna.tsinghua.edu.cn'
+E: Failed to fetch http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/pool/universe/p/patchelf/patchelf_0.14.3-1_arm64.deb  Temporary failure resolving 'mirrors.tuna.tsinghua.edu.cn'
+E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?
+---POLICY---
+ros-humble-foxglove-bridge:
+  Installed: 3.6.0-1jammy.20260929.215014
+  Candidate: 3.6.0-1jammy.20260929.215014
+  Version table:
+ *** 3.6.0-1jammy.20260929.215014 100
+        100 /var/lib/dpkg/status
+     3.4.3-2jammy.20260725.213251 500
+        500 https://mirrors.ustc.edu.cn/ros2/ubuntu jammy/main arm64 Packages
+---WHICH---
+bash: line 1: patchelf: command not found

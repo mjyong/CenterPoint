@@ -1,0 +1,14 @@
+GIT
+308 f3b536f
+---
+configs
+deploy_deb
+dog_perception
+kygi665_msgs
+log
+requirements_dog.txt
+tests
+tools
+---
+87M	/home/seres/dogperc/bags/rosbag2_2026_09_21-16_41_27_moving
+/dev/mmcblk0p1   54G   48G  3.8G  93% /

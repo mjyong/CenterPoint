@@ -1,0 +1,44 @@
+{
+ "server": {
+  "name": "",
+  "capabilities": [
+   "clientPublish",
+   "connectionGraph",
+   "parameters",
+   "parametersSubscribe",
+   "services",
+   "assets"
+  ]
+ },
+ "channels": {
+  "/events/read_split": "rosbag2_interfaces/msg/ReadSplitEvent",
+  "/foxglove_bridge/sysinfo": "foxglove.SystemInfo",
+  "/parameter_events": "rcl_interfaces/msg/ParameterEvent",
+  "/perception/lidar_3d/cloud": "sensor_msgs/msg/PointCloud2",
+  "/perception/lidar_3d/objects": "perception_interface/msg/LidarObjectArray",
+  "/perception/lidar_3d/predictions": "visualization_msgs/msg/MarkerArray",
+  "/perception/lidar_3d/tracks": "visualization_msgs/msg/MarkerArray",
+  "/robot/topic/rdap/top_point_cloud2": "sensor_msgs/msg/PointCloud2",
+  "/rosout": "rcl_interfaces/msg/Log",
+  "/rte/rdap/rtk/imus/data_raw": "sensor_msgs/msg/Imu",
+  "/rte/rdap/rtk/inspvax": "kygi665_msgs/msg/INSPVAX",
+  "/tf": "tf2_msgs/msg/TFMessage"
+ },
+ "received": {
+  "/perception/lidar_3d/tracks": 49,
+  "/perception/lidar_3d/predictions": 49,
+  "/perception/lidar_3d/objects": 50,
+  "/perception/lidar_3d/cloud": 49,
+  "/tf": 50,
+  "/robot/topic/rdap/top_point_cloud2": 99
+ },
+ "seconds": 10.0,
+ "missing": [],
+ "silent": [],
+ "passed": true
+}
+--- stop ---
+lidar-3d-detection.service started again
+stopped (logs in /tmp/lidar3d_foxglove)
+bridge and player stopped
+service active

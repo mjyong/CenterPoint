@@ -1,0 +1,2 @@
+158M	/home/seres/dogperc/repo/deploy
+/dev/mmcblk0p1   54G   48G  3.9G  93% /

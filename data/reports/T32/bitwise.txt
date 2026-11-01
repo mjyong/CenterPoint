@@ -1,0 +1,3 @@
+data/deploy/T32/old_gpu.npz vs data/deploy/T32/inst_gpu.npz keys differing: []
+data/deploy/T32/msgs_dets.npz vs data/deploy/T32/bag_dets.npz keys differing: []
+| 27 / 27 / 27 | 8.9e-16 | 1.0000 | 0 (0/0/0/0/0) | 0 | 27 / 27 | 3.2e-14 | 1.0000 | 3.7e-13 | pass |

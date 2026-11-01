@@ -1,0 +1,13 @@
+[33ms[0m[33ms[0m[33ms[0m[32m.[0m[32m.[0m[33ms[0m[33ms[0m[32m.[0m[33ms[0m[33ms[0m[32m.[0m[32m.[0m[33ms[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[33ms[0m[33ms[0m[32m                                                     [100%][0m
+============================= slowest 30 durations =============================
+1.05s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_engine_names_and_run_sequence_specs
+0.33s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_export_cpp_config
+0.27s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_deploy_deb_config_follows_python
+0.05s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_foxglove_probe_against_a_fake_bridge
+0.01s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_compare_classifies_reported_misses
+0.01s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_soak_report_windows_and_warnings
+0.01s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_objects_bag_same_tracks_ignore_the_numbering
+0.01s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_engines_per_machine_and_the_target_check
+
+(22 durations < 0.005s hidden.  Use -vv to show these durations.)
+[32m[32m[1m10 passed[0m, [33m10 skipped[0m[32m in 5.03s[0m[0m

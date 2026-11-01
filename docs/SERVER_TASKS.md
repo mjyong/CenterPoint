@@ -136,7 +136,7 @@
 | T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成，已复核。对齐都过：服务器两段同一批检测 ID 每帧相同；板上 ROS 读 bag 和读消息日志逐位相同；板上 GPU 对服务器过门槛。板上端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（样例 bag）。复核查出节点在时间戳倒退（bag 重播、时钟回跳）时不会重来，bag 长于 3 s 时重播后基本没有输出，已修（两边一样，加了测试）；在线 `same_ids_frames 0` 是热身那遍的状态带进了正式播放。TensorRT 新出现一句设备提示，T30 查 |
 | T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
 | T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成，已复核。deb 装上后和 deploy/ 逐位相同，服务起停、卸载都对。复核：打包补了 patchelf、去掉编译目录的 RPATH、二进制不带源码路径、版本号带提交数；循环时 ID 不同是编号顺延（加了不看编号的 same_tracks_frames）；加了 publish_tf 和 Foxglove 实时看 |
-| T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 待做 |
+| T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 完成 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -6085,4 +6085,37 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
 
 ### T32 结果
 
-（待填）
+（2026-11-01）代码在 `f3b536f`。服务器用物理 GPU 1。`deploy/` 已经不在版本库里，C++ 只剩 `deploy_deb`。升级后的 deb 装上了，服务 enabled、active。TF 和 bridge 都过了。60 s 的 bag 留在板上。
+
+**代码改动（约定 9）：**
+
+- `tools/deploy/foxglove_probe.py`。板上的 `ros-humble-foxglove-bridge` 3.6 是 Foxglove SDK 的服务，握手只认 `foxglove.sdk.v1`。探针只发 `foxglove.websocket.v1` 时，桥回 HTTP 400，正文是 `Missing expected sec-websocket-protocol header`（头在，协议名不是它要的）。探针改为同时提供 `foxglove.sdk.v1, foxglove.websocket.v1`，由服务端选。验证：`test_foxglove_probe_against_a_fake_bridge` 通过；板上对正在播的桥探针 `passed` true，`/perception/lidar_3d/objects` 的 schema 是 `perception_interface/msg/LidarObjectArray`。
+
+**第 0 步。** 服务器上没进版本库的 `deploy/` 编译目录约 107 MB，删掉之后 `git status` 里没有 `deploy/`。pytest `10 passed, 10 skipped`。`check_deploy_deb.py`：`config ok, 0 message problems`。`old_names.txt` 是空的。
+
+**第 1 步。** 镜像 `dogperc-dev` 用缓存。CTest 2 项都过（共 30.10 s）。parity 里 GoogleTest 27 项 PASSED，其中 `Gpu.PillarPreprocessingMatchesTheCpu`、`Gpu.GpuDetectorMatchesTheHostCopyDetector` 都是 OK（没有 SKIPPED）。`Online.MessageLogMatchesPythonBagReplay`：`online parity: 8 frames from 268 messages, max diff poses 3.61e-16, points 0.00e+00 m`。
+
+**第 2 步。** 样例 bag 上 Python 对 C++：`27 / 27 / 27`，pose max `8.9e-16`，det match 1，missed 0，extra 0，track 27/27，pred max diff `2.7e-13`，gates pass。
+
+**第 3 步。** 板上 `~/dogperc/repo/deploy` 158 MB，删掉之后根分区 3.9 GB；同步代码和样例 bag 之后 3.8 GB。`foxglove_bridge` 已经是 `3.6.0-1jammy.20260929.215014`。`apt-get install patchelf` 失败：解析 `mirrors.tuna.tsinghua.edu.cn` 失败。打包用的是 `~/bin/patchelf` 0.14.3。升级前已装版本 `0.1.0`，同一 bag 回放 647 messages、27 clouds、27 frames、110 tracks、2.0 s。
+
+**deb。** `lidar-3d-detection_0.1.0+308.gf3b536f_arm64.deb`，35,781,396 字节，Installed-Size 62696 KB。Depends 含 `libnvinfer10 (= 10.3.0.30-1+cuda12.5)`、`cuda-cudart-12-6`、`nvidia-l4t-core (>= 36.4.4-20250616085344)`。报告里没有 "source tree" / "no installed package" 这类警告（报告头上的 git 是 none，版本号里有 `f3b536f`）。`libperception_interface__rosidl_generator_py.so` 的 RUNPATH 只有 `/opt/seres/perception/common_interface/lib:/opt/seres/perception/nav2_interface/lib:/opt/ros/humble/lib`。节点二进制里 `dogperc/repo/deploy_deb` 出现 0 次。
+
+**第 7 步。** 直接升级。版本 `0.1.0+308.gf3b536f`。`is-enabled` enabled，`is-active` active。journal 有 `lidar_3d_detection up`。
+
+**第 8 步。** `bitwise.txt`：
+
+```text
+data/deploy/T32/old_gpu.npz vs data/deploy/T32/inst_gpu.npz keys differing: []
+data/deploy/T32/msgs_dets.npz vs data/deploy/T32/bag_dets.npz keys differing: []
+| 27 / 27 / 27 | 8.9e-16 | 1.0000 | 0 (0/0/0/0/0) | 0 | 27 / 27 | 3.2e-14 | 1.0000 | 3.7e-13 | pass |
+```
+
+**第 9 步。** 停掉服务，手动起节点（`LIDAR3D_ARGS="-p publish_tf:=true"`，域 77），先空播一遍再 `--rate 0.5`。默认的 UDP 缓冲约 200 KB，best-effort 的点云（一帧约 2 MB）会被丢掉，节点收不满 27 帧。给播放器和节点加上 Fast DDS 的 8 MB socket 缓冲之后，录到 27 条 objects、27 条 `/tf`。`objects_bag.py`：`passed` true，`missing_frames` 0，`same_ids_frames` 2，`same_tracks_frames` 23，`frame_ids` 是 `lidar_det`，`received_gap_max` 0.218 s。`tf_transforms`：`camera_init -> hesai_lidar (27)`、`camera_init -> lidar_det (27)`。`tf_frames_with_pose` 27，`tf_pose_max_diff` 0。warn：空播一次 `no pose for scan yet`，正式那遍 `imu stamps jumped back 3.1 s ... starting over`。没有 ERROR。做完服务是 active。
+
+**第 10 步。** `rosbag2_0921_600` 1.9 GB 拷上之后根分区剩 1.7 GB（高于 1.5 GB）。`orin_foxglove.sh` 先停服务再播，结束时 `lidar-3d-detection.service started again`，`is-active` 是 active，bridge 和播放器都没了。探针 `passed` true。10 s 里 tracks 49、predictions 49、objects 50、cloud 49、`/tf` 50，原始点云 99。objects 的 schema 是 `perception_interface/msg/LidarObjectArray`。检测话题大约是 5 Hz 而不是 10 Hz：这一次播放没有加大 UDP 缓冲，best-effort 点云有丢，节点日志里隔几秒一条 `no pose for scan yet`，同时每秒都有检测（`total_ms` 约 50）。
+
+**第 11 步。** 板上删了 `/tmp/debx`、`data/*.npz`、`data/live_tf`、样例 bag。`bags/rosbag2_0921_600` 和 `~/dogperc/deb` 留着。根分区 2.0 GB（第 3 步删 `deploy/` 之后是 3.9 GB，少的主要是这 1.9 GB 的 bag）。服务器上 `build/lidar3d_cuda` 留着。
+
+**给人的一句话。** 在板上执行 `~/dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_foxglove.sh ~/dogperc/bags/rosbag2_0921_600`（Ctrl-C 会停掉播放和 bridge，并把服务拉起来）。本机 Foxglove 连 `ws://192.168.123.100:8765`，导入 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.json`，显示坐标系用 `camera_init`。
+

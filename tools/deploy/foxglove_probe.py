@@ -1,6 +1,7 @@
-"""Is foxglove_bridge serving what Foxglove will show? Connects like Foxglove does (WebSocket, subprotocol
-foxglove.websocket.v1), lists the advertised channels, subscribes to some topics for a few seconds and counts
-their messages. Standard library only, so it runs on the board (deploy_deb's scripts/orin_foxglove.sh).
+"""Is foxglove_bridge serving what Foxglove will show? Connects like Foxglove does (WebSocket). Offers
+foxglove.sdk.v1 (ros-humble-foxglove-bridge 3.x) and foxglove.websocket.v1 (older bridges); the server picks
+one. Lists the advertised channels, subscribes to some topics for a few seconds and counts their messages.
+Standard library only, so it runs on the board (deploy_deb's scripts/orin_foxglove.sh).
 
     python3 tools/deploy/foxglove_probe.py --url ws://localhost:8765 --seconds 5 \\
         --topics /perception/lidar_3d/tracks /perception/lidar_3d/predictions /perception/lidar_3d/cloud /tf
@@ -17,7 +18,7 @@ import sys
 import time
 from urllib.parse import urlparse
 
-PROTOCOL = "foxglove.websocket.v1"
+PROTOCOL = "foxglove.sdk.v1, foxglove.websocket.v1"
 
 
 class WebSocket:

@@ -1,0 +1,49 @@
+{
+ "messages": 27,
+ "objects": 110,
+ "paths": 112,
+ "frame_ids": [
+  "lidar_det"
+ ],
+ "example": {
+  "id": 1,
+  "label": "vehicle",
+  "motion": 0,
+  "score": 0.6886835694313049,
+  "position": [
+   -40.430543718235846,
+   21.796609578546384,
+   0.8833918778984629
+  ],
+  "yaw": 3.140948473337833,
+  "size": [
+   5.244755382537842,
+   1.943149561882019,
+   2.2534576892852782
+  ],
+  "prediction_times": [
+   0.5,
+   1.0,
+   1.5,
+   2.0,
+   2.5,
+   3.0
+  ],
+  "paths": 2
+ },
+ "replay_frames": 27,
+ "passes": 1,
+ "matched_frames": 27,
+ "unmatched_messages": 0,
+ "missing_frames": 0,
+ "same_ids_frames": 2,
+ "same_tracks_frames": 23,
+ "received_gap_max": 0.2180670639991149,
+ "passed": true,
+ "tf_transforms": [
+  "camera_init -> hesai_lidar (27)",
+  "camera_init -> lidar_det (27)"
+ ],
+ "tf_frames_with_pose": 27,
+ "tf_pose_max_diff": 0.0
+}
