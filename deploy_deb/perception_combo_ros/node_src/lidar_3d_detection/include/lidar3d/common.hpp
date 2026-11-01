@@ -1,4 +1,4 @@
-// Classes, per-class values and small helpers shared by every stage (lidar_3d_detection/detection/boxes.py).
+// Classes, per-class values and small helpers shared by every stage (dog_perception/detection/boxes.py).
 #pragma once
 
 #include <array>

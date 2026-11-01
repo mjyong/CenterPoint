@@ -5,9 +5,9 @@
     python tools/deploy/cpp_parity.py python --seq data/seq/<scene> --exported data/deploy/nusc_pp:trt:fp16 \\
         --out <dir>/py.npz --dets <dir>/py_dets.npz --config <dir>/config.yaml
     # 2. C++: tracking and prediction on the same detections, then the whole chain with its own detector
-    dogperc_replay --seq data/seq/<scene> --config <dir>/config.yaml --detections <dir>/py_dets.npz \
+    lidar_3d_replay --seq data/seq/<scene> --config <dir>/config.yaml --detections <dir>/py_dets.npz \
         --out <dir>/cpp_dets.npz
-    dogperc_replay --seq data/seq/<scene> --config <dir>/config.yaml --model-dir data/deploy/nusc_pp --gpu \
+    lidar_3d_replay --seq data/seq/<scene> --config <dir>/config.yaml --model-dir data/deploy/nusc_pp --gpu \
         --out <dir>/cpp.npz
     # 3. compare (gates of docs/DEPLOY_ORIN.md section 6), and turn the C++ run into a results.pkl for pipeline_eval.py
     python tools/deploy/cpp_parity.py compare --ref <dir>/py.npz --cpp <dir>/cpp_dets.npz --same-detections \
@@ -26,9 +26,9 @@ through dog_perception/online.py (the Python node's message handling) with the `
 
     python tools/deploy/cpp_parity.py python --bag <bag> --robot kygi --exported data/deploy/nusc_pp_dyn \
         --out <dir>/py_bag.npz --dets <dir>/py_bag_dets.npz --config <dir>/kygi.yaml --messages <dir>/msgs.npz
-    dogperc_replay --messages <dir>/msgs.npz --config <dir>/kygi.yaml --detections <dir>/py_bag_dets.npz \
+    lidar_3d_replay --messages <dir>/msgs.npz --config <dir>/kygi.yaml --detections <dir>/py_bag_dets.npz \
         --out <dir>/cpp_msgs.npz        # then compare --same-detections as above
-    dogperc_bag_replay --bag <bag> ...  # (deploy/ros2) the same through the ROS messages: identical to cpp_msgs.npz
+    lidar_3d_bag_replay --bag <bag> ...  # the same through the ROS messages (with ROS): identical to cpp_msgs.npz
 """
 import argparse
 import json
@@ -130,7 +130,7 @@ def run_python(args):
     k = 0
     for scan in scans:
         dets, match = None, False
-        if given is not None:          # the other run's frames in order, as dogperc_replay --detections reads them
+        if given is not None:          # the other run's frames in order, as lidar_3d_replay --detections reads them
             match = k < len(given["stamp"]) and abs(given["stamp"][k] - scan.stamp) < 1e-9
             dets = frame_dets(given, "", k) if match else Detections()
         elif det is None:              # --no-detector
@@ -305,7 +305,7 @@ def to_results(args):
 
 # ------------------------------------------------------------------ timings
 def timings(args):
-    """Per-stage latency of dogperc_replay runs (median, p90, p99, max over the frames, the first frames left
+    """Per-stage latency of lidar_3d_replay runs (median, p90, p99, max over the frames, the first frames left
     out as warm-up); with several runs also ``all``, their frames pooled."""
     print("| run | stage | median ms | p90 | p99 | max |")
     print("|---|---|---|---|---|---|")
@@ -343,7 +343,7 @@ def main():
     p.add_argument("--seq", default=None, help="a recorded sequence (data/seq/<scene>)")
     p.add_argument("--bag", default=None, help="instead: a rosbag2, replayed in arrival order like the online node")
     p.add_argument("--robot", default="kygi", help="--bag: the node_config.py preset")
-    p.add_argument("--messages", default=None, help="--bag: also save the messages for dogperc_replay --messages")
+    p.add_argument("--messages", default=None, help="--bag: also save the messages for lidar_3d_replay --messages")
     p.add_argument("--max-clouds", type=int, default=0, help="--bag: stop after this many clouds")
     p.add_argument("--no-detector", action="store_true", help="no detections (preprocessing and poses only)")
     p.add_argument("--exported", default=None, help="dir[:runtime[:precision]] (exported.py), default runtime trt fp16")
@@ -351,7 +351,7 @@ def main():
     p.add_argument("--odom-latency", type=float, default=0.0)
     p.add_argument("--save-points", action="store_true", help="also the det-frame clouds (large)")
     p.add_argument("--out", required=True)
-    p.add_argument("--dets", default=None, help="its detections, for dogperc_replay --detections")
+    p.add_argument("--dets", default=None, help="its detections, for lidar_3d_replay --detections")
     p.add_argument("--config", default=None, help="the C++ configuration of this run")
     c = sub.add_parser("compare")
     c.add_argument("--ref", required=True)
@@ -359,11 +359,11 @@ def main():
     c.add_argument("--same-detections", action="store_true", help="C++ ran on the Python detections")
     c.add_argument("--subset", action="store_true", help="the C++ run has only the first frames of the reference")
     c.add_argument("--out", default=None)
-    r = sub.add_parser("to-results", help="dogperc_replay output -> results.pkl for pipeline_eval.py")
+    r = sub.add_parser("to-results", help="lidar_3d_replay output -> results.pkl for pipeline_eval.py")
     r.add_argument("--cpp", required=True)
     r.add_argument("--seq", default=None, help="for pose_bad")
     r.add_argument("--out", required=True)
-    t = sub.add_parser("timings", help="per-stage latency of dogperc_replay outputs")
+    t = sub.add_parser("timings", help="per-stage latency of lidar_3d_replay outputs")
     t.add_argument("runs", nargs="+")
     t.add_argument("--skip", type=int, default=5, help="warm-up frames left out")
     t.add_argument("--out", default=None)

@@ -1,6 +1,6 @@
-// The online node's input handling without ROS (lidar_3d_detection/online.py, ros_utils.py): PointCloud2
+// The online node's input handling without ROS (dog_perception/online.py, ros_utils.py): PointCloud2
 // bytes -> LidarScan, the RTK IMU's units, INSPVAX -> poses (ENU origin at the first good fix, lever arm,
-// heading check) or LIO odometry. The ROS 2 node (deploy/ros2/lidar_3d_detection) copies its messages into these
+// heading check) or LIO odometry. The ROS 2 node (src/lidar_3d_detection.cpp) copies its messages into these
 // structs; lidar_3d_replay --messages feeds the message log tools/deploy/cpp_parity.py python --bag writes.
 #pragma once
 
@@ -17,7 +17,7 @@
 
 namespace lidar3d {
 
-// the node: section of tools/deploy/export_cpp_config.py --robot (lidar_3d_detection/node_config.py); the rest
+// the node: section of tools/deploy/export_cpp_config.py --robot (dog_perception/node_config.py); the rest
 // of the node parameters (extrinsic, base height, self filter) are already in the pipeline sections
 struct NodeConfig {
   std::string lidar_topic = "/lidar_points", time_field = "timestamp", time_mode = "absolute";
@@ -110,7 +110,7 @@ class OnlineInputs {
   std::map<std::string, std::chrono::steady_clock::time_point> last_log_;
 };
 
-// one object of perception_interface/ObjectArray (deploy/ros2) in the det frame of the scan: gravity aligned,
+// one object of perception_interface/LidarObjectArray (src/ros_convert.cpp) in the det frame of the scan: gravity aligned,
 // yaw with the body, origin on the ground (PerceptionPipeline::to_local)
 struct PlannerObject {
   LocalTrack track;

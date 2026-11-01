@@ -64,7 +64,7 @@
    - 可以改：
      - 环境和编译：库路径、CMake 和依赖、真实的 nvcc / TensorRT 头文件下的编译错误、库的 API 版本差异、脚本里的路径和参数；
      - 工具的 bug：崩溃、读写格式不对、参数没接上，原因清楚、改动局部的；
-     - C++ 和 Python 对不上：以 Python 为准改 C++（`deploy/cpp/`）；
+     - C++ 和 Python 对不上：以 Python 为准改 C++（2026-11-01 起是 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/`，见约定 10）；
      - 做完这一步缺的小功能（多一个参数、多打印一项），以及不改结果的提速（并行、缓存）。
    - 不能改，停下报告：
      - 门槛、停止条件、配置和参数的默认值（`configs/`、dataclass 的默认值）、训练设置、评估指标的定义；
@@ -77,6 +77,18 @@
      - 报告里加一节"代码改动"：每条写提交号、文件、原因、怎么验证的；
      - 改了代码，前面已经跑完、受影响的步骤要重跑。
    - 任务里写了"可以改的范围"的，以任务里的为准。
+10. C++ 只有一份（2026-11-01 起）。算法仓库的 `deploy/` 删掉了，C++ 在 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/`（下文 `$L`），不带 ROS 也能编：
+    ```text
+    cmake -S $L -B build/lidar3d -G Ninja -DLIDAR3D_ROS=OFF -DLIDAR3D_TESTS=ON [-DLIDAR3D_WITH_CUDA=ON]
+    cmake --build build/lidar3d -j && [LIDAR3D_MODEL_DIR=<模型>] ctest --test-dir build/lidar3d --output-on-failure
+    ```
+    T25–T31 里的命令照下面换（完整的表在 DEPLOY_ORIN.md 第 7 节）。那些任务的报告是当时的记录，不用改：
+    - `deploy/cpp`、`deploy/cpp/build_cuda/dogperc_replay` → `$L`、`build/lidar3d_cuda/lidar_3d_replay`；`dogperc_tests` → `lidar3d_tests`；
+    - `DOGPERC_WITH_CUDA`、`DOGPERC_MODEL_DIR` → `LIDAR3D_WITH_CUDA`、`LIDAR3D_MODEL_DIR`；
+    - `deploy/ros2` 的 `dogperc_node`、`dogperc_bag_replay` → deb 里的 `lidar_3d_detection`、`lidar_3d_bag_replay`（板上不再单独 colcon）；
+    - `deploy/docker/Dockerfile.dev` → `$L/docker/Dockerfile.dev`（镜像名还是 `dogperc-dev`）；
+    - `deploy/scripts/sync_to_orin.sh` → `tools/deploy/sync_to_orin.sh`；`orin_check.sh`、`orin_soak.sh` → `$L/scripts/`；
+    - `tools/deploy/sync_deploy_deb.py` → `tools/deploy/check_deploy_deb.py`（只查配置和消息）。
 
 ## 状态
 
@@ -124,7 +136,7 @@
 | T29 | Orin 部署 P6：C++ ROS 2 节点。服务器上用 Python 节点的 bag 回放对 C++ 的消息处理（样例 bag、0921 原始 bag 前 60 s）；板上 colcon 编译，`dogperc_bag_replay` 对服务器逐位比，`ros2 bag play` 在线跑、查不丢帧 | Agent | T28B | 2 小时 | 完成，已复核。对齐都过：服务器两段同一批检测 ID 每帧相同；板上 ROS 读 bag 和读消息日志逐位相同；板上 GPU 对服务器过门槛。板上端到端 18.9 ms（p99 21.0），网络以外 12.2 ms（样例 bag）。复核查出节点在时间戳倒退（bag 重播、时钟回跳）时不会重来，bag 长于 3 s 时重播后基本没有输出，已修（两边一样，加了测试）；在线 `same_ids_frames 0` 是热身那遍的状态带进了正式播放。TensorRT 新出现一句设备提示，T30 查 |
 | T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
 | T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成，已复核。deb 装上后和 deploy/ 逐位相同，服务起停、卸载都对。复核：打包补了 patchelf、去掉编译目录的 RPATH、二进制不带源码路径、版本号带提交数；循环时 ID 不同是编号顺延（加了不看编号的 same_tracks_frames）；加了 publish_tf 和 Foxglove 实时看 |
-| T32 | 板上准备 Foxglove 实时看：装 foxglove_bridge、patchelf；用新的打包脚本重打 deb、升级安装；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1 小时 | 待做 |
+| T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -5934,33 +5946,74 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
 2. **用法示例**：原来写的是 `--engines gpu1`，gpu1 是服务器（x86），发给 Orin 一定会被架构检查拦下。改成 `--engines ubuntu`（板子的主机名）。
 3. **主机名重复**：机器只按主机名区分。Jetson 出厂默认都叫 `ubuntu`，以后有第二块板就会混在一起，到时候改主机名，或者按主机名加型号分目录。现在只有一块板，先不改。
 
-## T32 Orin：Foxglove 实时看的准备
+## T32 Orin：删掉 deploy/ 以后的验证、Foxglove 实时看的准备
 
-人要在连着板子的本机（192.168.123.55）上用 Foxglove 看板上循环播包的检测结果（deploy_deb README"用 Foxglove 看"）。T31 复核改了：打包脚本（patchelf、RPATH、版本号）、两个节点的 `publish_tf`、新脚本 `orin_foxglove.sh`。这次：
-- 板上装 foxglove_bridge 和 patchelf；
-- 重打 deb、升级安装；
+人要在连着板子的本机（192.168.123.55）上用 Foxglove 看板上循环播包的检测结果（deploy_deb README"用 Foxglove 看"）。T31 复核以后改了：打包脚本（patchelf、RPATH、版本号）、节点的 `publish_tf` / `publish_cloud`、新脚本 `orin_foxglove.sh`。2026-11-01 删掉了算法仓库的 `deploy/`：C++ 只剩 deploy_deb 这一份（下文 `$L`），不带 ROS 也能编、跑对 Python 的测试，新旧名字的对应见 DEPLOY_ORIN.md 第 7 节（通用约定 10）。这次：
+- 服务器：清掉 `deploy/` 剩下的编译目录；容器里不带 ROS 编 `$L`、跑 CTest（含 GPU）；样例 bag 上 Python 节点对 C++ 的消息处理；
+- 板上：清掉旧的 `deploy/`；装 foxglove_bridge 和 patchelf；升级前用装着的版本跑一遍 bag 回放留作参考；重打 deb、升级安装；升级前后逐位比，ROS 读 bag 和读消息日志逐位比；
 - 查 TF 和 bridge；
 - 留一段 60 s 的 bag，告诉人怎么看。
 
-本任务可以改的范围（通用约定 9）：`deploy_deb/`、`deploy/`、`tools/deploy/`。镜像文件改 `deploy/` 里的源文件，再 `sync_deploy_deb.py --write`。
+本任务可以改的范围（通用约定 9）：`deploy_deb/`、`tools/deploy/`。C++ 直接改 `$L`，改了就回服务器容器重跑第 1 步的 CTest。
 
 ```text
-任务 T32：板上装 foxglove_bridge、重打并升级 deb、查 TF 和 bridge，给人留好 Foxglove 实时看。
-先按通用约定做（第 9 条：可以改代码，范围见本节开头）。前置：T31 完成。
+任务 T32：删掉 deploy/ 以后服务器、板上各验一遍；板上装 foxglove_bridge、重打并升级 deb、查 TF 和 bridge，给人留好 Foxglove 实时看。
+先按通用约定做（第 9 条：可以改代码，范围见本节开头；第 10 条：新旧名字）。前置：T31 完成。
 
-0. mkdir -p data/reports/T32；TASK=T32；n=rosbag2_2026_09_21-16_41_27_moving；c=rosbag2_0921_600
-   python -m pytest tests/dog/test_deploy.py -q 2>&1 | tail -3 | tee data/reports/T32/pytest.txt
-   （test_foxglove_probe_against_a_fake_bridge、test_objects_bag_same_tracks_ignore_the_numbering 要通过）
-   python tools/deploy/sync_deploy_deb.py | tail -1 | tee data/reports/T32/sync_check.txt
-1. 板上装包（seres 的 apt-get 免密 T31 已加）：
+0. mkdir -p data/reports/T32 data/deploy/T32；TASK=T32；N=data/deploy/T32；M=data/deploy/nusc_pp_dyn
+   L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection；n=rosbag2_2026_09_21-16_41_27_moving；c=rosbag2_0921_600
+   G、dk 同 T28 第 0 步（镜像名还是 dogperc-dev）。
+   git pull 以后 deploy/ 只剩没进版本库的编译目录（deploy/cpp/build*、deploy/ros2/build、install），删掉：
+     du -sh deploy 2>/dev/null; rm -rf deploy; git status --short | grep deploy/ ; echo "status checked"
+   python -m pytest tests/dog/test_deploy.py tests/dog/test_ros2_node.py -q 2>&1 | tail -3 | tee data/reports/T32/pytest.txt
+   （test_deploy_deb_config_follows_python、test_foxglove_probe_against_a_fake_bridge、test_objects_bag_same_tracks_ignore_the_numbering 要通过）
+   python tools/deploy/check_deploy_deb.py | tee data/reports/T32/check_deploy_deb.txt        （config ok, 0 message problems）
+   grep -rnE 'deploy/(cpp|ros2|scripts|docker)\b|dogperc_(bag_)?replay|sync_deploy_deb' dog_perception tools tests deploy_deb \
+       --include='*.py' --include='*.sh' --include='*.cpp' --include='*.hpp' --include='*.h' --include=CMakeLists.txt \
+       | tee data/reports/T32/old_names.txt        （应该是空的；有就抄下）
+1. 服务器容器里不带 ROS 编 $L、跑 CTest（Dockerfile 搬了位置，内容没变，镜像多半直接用缓存）：
+     docker build -t dogperc-dev -f $L/docker/Dockerfile.dev $L/docker 2>&1 | tail -3 | tee data/reports/T32/docker_build.txt
+     dk "cmake -S $L -B build/lidar3d_cuda -G Ninja -DLIDAR3D_ROS=OFF -DLIDAR3D_TESTS=ON -DLIDAR3D_WITH_CUDA=ON \
+         -DCMAKE_CUDA_ARCHITECTURES=89 && cmake --build build/lidar3d_cuda -j16" 2>&1 | tail -20 | tee data/reports/T32/build_x86.txt
+     dk "LIDAR3D_MODEL_DIR=$PWD/$M ctest --test-dir build/lidar3d_cuda --output-on-failure -V" \
+         > data/reports/T32/ctest_x86.txt 2>&1; tail -30 data/reports/T32/ctest_x86.txt
+   - golden、parity 两个都通过（"100% tests passed, 0 tests failed out of 2"）；
+   - GoogleTest 和 T30 的 ctest_x86.txt 一样是 27 个，2 个 Gpu.* 跑了（不是 SKIPPED）；
+     Online.MessageLogMatchesPythonBagReplay 打印 "online parity: 8 frames ..."。个数少了就停下报告；
+   - 引擎加载失败（"could not load the engine"）：c768c2f 起引擎按机器存，
+     python tools/deploy/build_engines.py --model-dir $M --stage $(hostname) --stage-out $N/model_x86
+     拼出本机那一套再把 LIDAR3D_MODEL_DIR 指过去；没有本机的就按 T28 第 2 步重建，报告里写明。
+2. 服务器上，样例 bag：Python 节点回放、存消息日志；容器里刚编的 lidar_3d_replay 喂同一批检测（同 T29 第 2 步的 B1）：
+     mkdir -p $N/$n
+     python tools/deploy/cpp_parity.py python --bag samples/$n --robot kygi --exported $M:trt:fp16 \
+         --out $N/$n/py.npz --dets $N/$n/py_dets.npz --config $N/$n/kygi.yaml --messages $N/$n/msgs.npz \
+         2>&1 | tail -3 | tee data/reports/T32/python_$n.txt
+     dk "build/lidar3d_cuda/lidar_3d_replay --messages $N/$n/msgs.npz --config $N/$n/kygi.yaml \
+         --detections $N/$n/py_dets.npz --out $N/$n/cpp_dets.npz"
+     python tools/deploy/cpp_parity.py compare --ref $N/$n/py.npz --cpp $N/$n/cpp_dets.npz --same-detections \
+         --out data/reports/T32/msgs_dets.json | tail -1 | tee data/reports/T32/msgs_dets.txt
+   - 要 pass：帧相同、每帧跟踪 ID 一致、状态 ≤ 1e-6、预测 ≤ 1e-4（和 T29 的 msgs_dets 一样）。
+3. 板上清掉旧的 deploy/，同步（sync_to_orin.sh 的 --delete 只管它同步的那几个目录，不会删 deploy/）：
+     ssh orin 'du -sh ~/dogperc/repo/deploy 2>/dev/null; rm -rf ~/dogperc/repo/deploy; df -h / | tail -1' \
+         2>&1 | tee data/reports/T32/orin_cleanup.txt
+     tools/deploy/sync_to_orin.sh --bag samples/$n          （写 deploy_deb/GIT_COMMIT）
+     scp $N/$n/kygi.yaml $N/$n/py_dets.npz $N/$n/msgs.npz orin:dogperc/data/
+     ssh orin 'cat ~/dogperc/repo/deploy_deb/GIT_COMMIT; ls ~/dogperc/repo; df -h / | tail -1' | tee data/reports/T32/sync_orin.txt
+   - ls 里不应该再有 deploy；以后不再编 deploy/ros2（没有了），板上的节点只从 deb 来。
+4. 板上装包（seres 的 apt-get 免密 T31 已加）：
      ssh orin 'sudo -n apt-get install -y patchelf ros-humble-foxglove-bridge 2>&1 | tail -3; \
          apt-cache policy ros-humble-foxglove-bridge | head -4; which patchelf' 2>&1 | tee data/reports/T32/apt.txt
    - foxglove_bridge 装不上（板子上不了 ROS 的 apt 源）就停下，抄下 apt-cache policy，问人（人可以在本机下 arm64 的 deb 拷过去）。
-2. 同步、重编 deploy/ros2（节点加了 publish_tf）：
-     deploy/scripts/sync_to_orin.sh --bag samples/$n          （现在会写 deploy_deb/GIT_COMMIT）
-     ssh orin 'cat ~/dogperc/repo/deploy_deb/GIT_COMMIT; df -h / | tail -1' | tee data/reports/T32/sync_orin.txt
-   deploy/ros2 的 colcon 同 T29 第 3b 步，输出 colcon_orin.txt。
-3. 重打 deb（同 T31 第 2 步；会全部重编，-ffile-prefix-map 改了编译选项），输出 build_deb.txt：
+5. 升级前的参考：板上现在装着的版本跑一遍样例 bag（离线回放，不碰话题，服务开着也没关系）：
+     I=/opt/seres/perception；C=$I/lidar_3d_detection/config/lidar_3d_detection.yaml；B=$I/lidar_3d_detection/lib/lidar_3d_detection
+     ssh orin 'dpkg -s lidar-3d-detection | grep -E "^(Status|Version)"; ls ~/dogperc/deb' 2>&1 | tee data/reports/T32/old_version.txt
+     ssh orin "source /opt/ros/humble/setup.bash && source $I/local_setup.bash && cd ~/dogperc && \
+         $B/lidar_3d_bag_replay --bag bags/$n --config $C --model-dir models/nusc_pp_dyn --precision fp16 --gpu --threads 4 \
+         --out data/old_gpu.npz" 2>&1 | tail -2 | tee -a data/reports/T32/old_version.txt
+   - 升级前后都用 ~/dogperc/models/nusc_pp_dyn（同一份引擎）和装好的配置（T31 以来没改过），比的只是代码；
+   - 没装（dpkg -s 说没有这个包）：把 ~/dogperc/deb 里旧的 deb 解开到 /tmp/debold 跑（同 T31 第 3 步），I 换成
+     /tmp/debold/opt/seres/perception；旧的 deb 也没有就停下报告。
+6. 重打 deb（同 T31 第 2 步；会全部重编：编译选项和 CMakeLists 都改了），输出 build_deb.txt：
    - 版本应该是 0.1.0+<提交数>.g<提交号>（GIT_COMMIT 那一行）；
    - 报告里不应该再有 "installed files that name the source tree"，有就抄下；
    - 解开看一个接口库的 RPATH 和节点里有没有源码路径：
@@ -5968,23 +6021,40 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
            readelf -d $(find /tmp/debx -name "libperception_interface__rosidl_generator_py.so") | grep -i path; \
            grep -c "dogperc/repo/deploy_deb" /tmp/debx/opt/seres/perception/lidar_3d_detection/lib/lidar_3d_detection/lidar_3d_detection' \
            2>&1 | tee -a data/reports/T32/build_deb.txt        （RUNPATH 里只有 /opt/... ；grep 的数是 0）
-4. 升级安装：
+7. 升级安装：
      ssh orin 'sudo -n apt-get install -y ~/dogperc/deb/lidar-3d-detection_0.1.0+*_arm64.deb 2>&1 | tail -3; \
-         dpkg -s lidar-3d-detection | grep Version; systemctl is-enabled lidar-3d-detection' | tee data/reports/T32/install.txt
-   - 从 0.1.0 升上来，不用先卸；装完服务是 enabled、active（77a8738 起默认启用并启动）。journal 里有 "lidar_3d_detection up"。
-5. 离线逐位比（同 T31 第 3、5a 步，装好的 lidar_3d_bag_replay 对 deploy 的 dogperc_bag_replay，样例 bag）：
-   keys differing 必须是空的。输出 inst_replay.txt。
-6. TF：装好的节点开 publish_tf，录 objects 和 /tf：
+         dpkg -s lidar-3d-detection | grep Version; systemctl is-enabled lidar-3d-detection; systemctl is-active lidar-3d-detection; \
+         journalctl -u lidar-3d-detection -n 5 --no-pager' 2>&1 | tee data/reports/T32/install.txt
+   - 直接升，不用先卸；装完服务是 enabled、active（77a8738 起默认启用并启动），journal 里有 "lidar_3d_detection up"。
+8. 升级以后，逐位比：
+   a. 第 5 步的 bag 回放命令（I 是 /opt/seres/perception），输出 data/inst_gpu.npz；
+   b. 装好的两条回放路径喂同一批检测（同 T29 第 3c 步）：ROS 读 bag，和不用 ROS 读第 2 步的消息日志：
+        ssh orin "source /opt/ros/humble/setup.bash && source $I/local_setup.bash && cd ~/dogperc && \
+            $B/lidar_3d_bag_replay --bag bags/$n --config data/kygi.yaml --detections data/py_dets.npz --save-points \
+                --out data/bag_dets.npz && \
+            $B/lidar_3d_replay --messages data/msgs.npz --config data/kygi.yaml --detections data/py_dets.npz --save-points \
+                --out data/msgs_dets.npz" 2>&1 | tail -3 | tee data/reports/T32/orin_bag_dets.txt
+   c. 拷回来比：
+        scp orin:dogperc/data/old_gpu.npz orin:dogperc/data/inst_gpu.npz orin:dogperc/data/bag_dets.npz \
+            orin:dogperc/data/msgs_dets.npz $N/
+        for p in "old_gpu inst_gpu" "msgs_dets bag_dets"; do set -- $p; python -c "import numpy as np, sys; \
+            a, b = np.load(sys.argv[1]), np.load(sys.argv[2]); print(sys.argv[1], 'vs', sys.argv[2], 'keys differing:', \
+            [k for k in a.files if not k.startswith('timing_') and not np.array_equal(a[k], b[k], equal_nan=True)])" \
+            $N/$1.npz $N/$2.npz; done | tee data/reports/T32/bitwise.txt
+        python tools/deploy/cpp_parity.py compare --ref $N/$n/py.npz --cpp $N/bag_dets.npz --same-detections \
+            --out data/reports/T32/orin_bag_dets.json | tail -1 | tee -a data/reports/T32/bitwise.txt
+   - 两行 keys differing 都必须是空的：升级前后只改了部署（删掉 deploy/、CMake、打包），库的代码没变；
+   - 板上的 bag_dets 对 Python 也要 pass（同第 2 步）。
+9. TF：装好的节点开 publish_tf，录 objects 和 /tf：
      先 sudo -n systemctl stop lidar-3d-detection（服务的节点也在发，会混进来），做完 start 回来；
-     同 T31 第 5b 步，但启动脚本加 -p publish_tf:=true，录 /perception/lidar_3d/objects /tf；先空播一遍再 --rate 0.5 正式播。
-     python tools/deploy/objects_bag.py --bag data/deploy/T32/live_tf --replay data/deploy/T32/inst_gpu.npz \
+     同 T31 第 5b 步，启动脚本前加 LIDAR3D_ARGS="-p publish_tf:=true"，录 /perception/lidar_3d/objects /tf；先空播一遍再 --rate 0.5 正式播。
+     python tools/deploy/objects_bag.py --bag $N/live_tf --replay $N/inst_gpu.npz \
          --out data/reports/T32/live_tf.json | tee data/reports/T32/live_tf.txt
    - passed 为 true；tf_transforms 有 camera_init -> lidar_det 和 camera_init -> hesai_lidar；
      tf_frames_with_pose 等于消息数；tf_pose_max_diff < 1e-9；same_ids_frames、same_tracks_frames 都记下。
-7. 给人留的 bag 和 bridge 检查：0921 截的 60 s（T30 的 data/deploy/T30/bags/$c 还在就用它，不在就按 T30 第 1 步用 cut_bag.py 重截）：
-     deploy/scripts/sync_to_orin.sh --bag data/deploy/T30/bags/$c
-     ssh orin "cd ~/dogperc && nohup repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_foxglove.sh \
-         bags/$c > data/foxglove.out 2>&1 &"
+10. 给人留的 bag 和 bridge 检查：0921 截的 60 s（T30 的 data/deploy/T30/bags/$c 还在就用它，不在就按 T30 第 1 步用 cut_bag.py 重截）：
+     tools/deploy/sync_to_orin.sh --bag data/deploy/T30/bags/$c
+     ssh orin "cd ~/dogperc && nohup repo/$L/scripts/orin_foxglove.sh bags/$c > data/foxglove.out 2>&1 &"
      （等 20 s）
      ssh orin 'python3 ~/dogperc/repo/tools/deploy/foxglove_probe.py --seconds 10 --topics /perception/lidar_3d/tracks \
          /perception/lidar_3d/predictions /perception/lidar_3d/objects /perception/lidar_3d/cloud /tf \
@@ -5997,16 +6067,19 @@ warn：`jumped back` 28 次（每遍一次，对），`no pose` 28 次（每遍�
      channels 里 objects 的 schema 是 perception_interface/msg/LidarObjectArray（bridge 拿到了消息定义）；
    - 停下以后 bridge 和播放器都没了；剩下的 lidar_3d_detection 是服务起回来的那个；
    - bags/$c 留在板上给人看（约 1.9 GB），根分区剩不到 1.5 GB 就停下问人。
-8. 做完删掉 /tmp/debx、data/*.npz、data/live_tf、bags/$n；bags/$c、~/dogperc/deb 留着。记下根分区剩余空间。
+11. 做完删掉板上的 /tmp/debx、/tmp/debold、data/*.npz、data/live_tf、bags/$n；bags/$c、~/dogperc/deb 留着。记下根分区剩余空间
+    （和第 3 步删 deploy/ 之前比）。服务器上 build/lidar3d_cuda 留着（以后增量编译）。
 
-停止条件（按约定 9 修不好的时候）：foxglove_bridge 装不上；第 3 步编译失败或 RPATH 里还有编译目录；第 5 步 keys differing 不是空的；
-第 7 步 probe 不过。
-提交：data/reports/T32/、本文档，以及按约定 9 改的代码。不提交 data/deploy/T32/、deb、bag。
+停止条件（按约定 9 修不好的时候）：第 1 步 CTest 不过或 GoogleTest 少了；第 2 步 msgs_dets 不过；foxglove_bridge 装不上；
+第 6 步编译失败或 RPATH 里还有编译目录；第 8 步 keys differing 不是空的；第 10 步 probe 不过。
+提交：data/reports/T32/、本文档，以及按约定 9 改的代码。不提交 data/deploy/T32/、build/、deb、bag。
 报告（写进"T32 结果"）：
 - 代码改动（约定 9）；
-- apt 的结果；deb 的版本、大小、报告里的警告；RPATH 和 grep 的结果；升级安装的版本；
-- 第 5 步 keys differing；第 6 步 objects_bag 的输出（tf_* 三项、same_tracks_frames）；
-- 第 7 步 probe 的输出（channels、received）；
+- 第 0 步：删掉的 deploy/ 有多大，old_names.txt；第 1 步：测试数、Gpu.* 和 Online 的输出；第 2 步 msgs_dets；
+- 第 3 步：板上删掉的 deploy/ 有多大；apt 的结果；升级前的版本；
+- deb 的版本、大小、报告里的警告；RPATH 和 grep 的结果；升级后的版本、服务状态；
+- 第 8 步：bitwise.txt 全文；第 9 步 objects_bag 的输出（tf_* 三项、same_tracks_frames）；
+- 第 10 步 probe 的输出（channels、received）；
 - 给人的一句话：板上执行哪条命令、本机 Foxglove 连哪个地址、导入哪个布局。
 ```
 

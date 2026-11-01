@@ -2,8 +2,8 @@
 # Environment report of the Jetson (also runs on the x86 server, where the Jetson parts print nothing):
 # versions, power mode, memory and disk, the build tools the C++ pipeline needs. docs/DEPLOY_ORIN.md.
 #
-#   deploy/scripts/orin_check.sh > orin_env.txt
-#   PYTHON=/path/to/venv/bin/python deploy/scripts/orin_check.sh     # the server: check the project env
+#   node_src/lidar_3d_detection/scripts/orin_check.sh > orin_env.txt
+#   PYTHON=/path/to/venv/bin/python node_src/lidar_3d_detection/scripts/orin_check.sh     # the server: check the project env
 # Lines starting with MISSING name what to install (apt on the Orin, docs/DEPLOY_ORIN.md 3).
 set -u
 PY=${PYTHON:-python3}

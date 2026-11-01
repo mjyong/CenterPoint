@@ -15,8 +15,8 @@ Publishes (world = LIO odom frame, ``world_frame`` parameter):
     ~/predictions   visualization_msgs/MarkerArray  one line strip per predicted mode
     ~/cloud         sensor_msgs/PointCloud2         (debug) accumulated det-frame cloud
 Planner-facing data in the gravity-aligned local frame is available from
-``PerceptionPipeline.to_local``; the C++ node (deploy/ros2, docs/DEPLOY_ORIN.md section 8) publishes it
-as dog_perception_msgs/ObjectArray. The message handling is ``dog_perception/online.py``, shared with
+``PerceptionPipeline.to_local``; the C++ node (deploy_deb's lidar_3d_detection, docs/DEPLOY_ORIN.md section 9)
+publishes it as perception_interface/LidarObjectArray. The message handling is ``dog_perception/online.py``, shared with
 the offline bag replay (tools/deploy/cpp_parity.py python --bag).
 """
 import os

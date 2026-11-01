@@ -13,7 +13,7 @@ heads, decode, class mapping, merged NMS, geometric filters), with the networks 
 The directory holds what ``tools/dog/export_pillar_onnx.py`` writes (``model_meta.json``,
 ``pfn.onnx``, ``rpn_head.onnx``) and the engines, named ``<graph>.<precision>.engine``
 (``pfn.fp16.engine``, ``rpn_head.int8.engine``, ...). Everything here is the host reference of the
-C++ / CUDA pipeline (``deploy/cpp``); its timings are not the deployed ones.
+C++ / CUDA pipeline (``deploy_deb (lidar3d)``); its timings are not the deployed ones.
 """
 import ctypes
 import ctypes.util

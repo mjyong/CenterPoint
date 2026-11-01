@@ -1,8 +1,8 @@
 """The online node's input messages as plain arrays (msgs.npz), for the C++ node path without ROS.
 
 ``bag_messages`` reads a rosbag2 in arrival order (the bag's receive times, as ``ros2 bag play`` replays
-it); ``MessageLog`` keeps the fields ``dog_perception/online.py`` reads; ``dogperc_replay --messages``
-(deploy/cpp, ``dogperc/message_log.hpp``) feeds them to the C++ OnlineInputs. Layout:
+it); ``MessageLog`` keeps the fields ``dog_perception/online.py`` reads; ``lidar_3d_replay --messages``
+(deploy_deb, ``lidar3d/message_log.hpp``) feeds them to the C++ OnlineInputs. Layout:
 
     order_kind, order_index        arrival order: kind 0 imu, 1 odom, 2 inspvax, 3 cloud; index among its kind
     imu_t, imu_w                   header stamp [s], angular_velocity (as published)

@@ -1,4 +1,4 @@
-"""Summary of a long run on the Orin (deploy/scripts/orin_soak.sh): the node's once-a-second lines in time windows
+"""Summary of a long run on the Orin (deploy_deb's scripts/orin_soak.sh): the node's once-a-second lines in time windows
 (milliseconds of those frames, boxes, tracks), with and without the load; its warnings; its memory; tegrastats.
 
     python tools/deploy/soak_report.py data/deploy/T30/soak --window 300 --out soak.json

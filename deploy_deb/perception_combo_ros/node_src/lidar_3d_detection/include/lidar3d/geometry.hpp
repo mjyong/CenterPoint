@@ -1,4 +1,4 @@
-// SE(3) / SO(3) helpers (lidar_3d_detection/geometry.py).
+// SE(3) / SO(3) helpers (dog_perception/geometry.py).
 //
 // Poses are 4x4 T_A_B mapping points of frame B into frame A; quaternions are [x, y, z, w] (ROS order);
 // yaw is counter-clockwise about +z from +x. The rotation conversions follow scipy's Rotation (the

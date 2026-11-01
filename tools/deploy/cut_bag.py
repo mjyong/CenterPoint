@@ -1,5 +1,5 @@
 """The online node's topics of a rosbag2 (sqlite3), up to the first N clouds: a bag small enough for the
-Orin (``ros2 bag play``, dogperc_bag_replay).
+Orin (``ros2 bag play``, lidar_3d_bag_replay).
 
 Rows are copied as stored (CDR bytes, receive times, the recorder's QoS) into the source's own schema, and
 metadata.yaml keeps the source's version, so ROS 2 Humble reads the cut as it reads the source (rosbags 0.11

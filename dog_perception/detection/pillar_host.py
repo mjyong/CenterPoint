@@ -1,7 +1,7 @@
 """Host side of the deployed CenterPoint-Pillar, in NumPy and without PyTorch (the Orin has none).
 
 Pillar decoration, padding to the PFN engine's static size, scatter into the BEV canvas and the
-split of the RPN engine's outputs per task: the reference for the CUDA kernels of deploy/cpp.
+split of the RPN engine's outputs per task: the reference for the CUDA kernels of deploy_deb (lidar3d).
 ``pillar_export.py`` holds the PyTorch side (the graphs that are exported).
 """
 import numpy as np

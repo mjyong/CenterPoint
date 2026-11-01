@@ -1,6 +1,6 @@
-"""What the C++ node published: a rosbag2 of ``~/objects`` (dog_perception_msgs/ObjectArray, recorded with
-``ros2 bag record``), summarized and checked against a replay of the same input (dogperc_bag_replay or
-dogperc_replay --messages, their .npz): one message per frame (none dropped), the same stamps, the same
+"""What the C++ node published: a rosbag2 of its objects (perception_interface/LidarObjectArray, recorded with
+``ros2 bag record``), summarized and checked against a replay of the same input (lidar_3d_bag_replay or
+lidar_3d_replay --messages, their .npz): one message per frame (none dropped), the same stamps, the same
 track ids in each frame.
 
     python tools/deploy/objects_bag.py --bag <recorded bag> --replay <replay.npz> --out objects.json
@@ -16,8 +16,9 @@ same_ids_frames compares the id lists, which one extra tentative track early in 
 it (the message order online is not quite the bag's: T31); same_tracks_frames compares the reported tracks
 without their ids, by class and world position (within TRACK_TOL).
 
-The message definitions are read from deploy/ros2/dog_perception_msgs/msg (rosbags, no ROS install), and the
-vehicle node's perception_interface/LidarObjectArray (deploy_deb, the same fields) from its interface package.
+The message definitions are read from deploy_deb's perception_interface package (rosbags, no ROS install).
+Recordings of the earlier node (T29, T30) carry dog_perception_msgs/ObjectArray, the same fields under other names:
+registered from the same files.
 """
 import argparse
 import json
@@ -28,12 +29,10 @@ from pathlib import Path
 import numpy as np
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-MSG_DIR = os.path.join(ROOT, "deploy", "ros2", "dog_perception_msgs", "msg")
-NAMES = ("PredictedPath", "Object", "ObjectArray")
-DEB_MSG_DIR = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "common_interface", "seres_interface", "ros",
-                           "perception_interface", "msg")
-DEB_NAMES = ("LidarPredictedPath", "LidarObject", "LidarObjectArray")
-ARRAYS = ("dog_perception_msgs/msg/ObjectArray", "perception_interface/msg/LidarObjectArray")
+MSG_DIR = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "common_interface", "seres_interface", "ros",
+                       "perception_interface", "msg")
+NAMES = ("LidarPredictedPath", "LidarObject", "LidarObjectArray")
+ARRAYS = ("perception_interface/msg/LidarObjectArray", "dog_perception_msgs/msg/ObjectArray")
 TRACK_TOL = 0.5          # [m]
 
 
@@ -42,13 +41,13 @@ def typestore():
 
     ts = get_typestore(Stores.ROS2_HUMBLE)
     types = {}
-    for package, msg_dir, names in (("dog_perception_msgs", MSG_DIR, NAMES),
-                                    ("perception_interface", DEB_MSG_DIR, DEB_NAMES)):
-        if not os.path.isdir(msg_dir):
-            continue
-        for name in names:
-            with open(os.path.join(msg_dir, name + ".msg"), encoding="utf-8") as f:
-                types.update(get_types_from_msg(f.read(), "%s/msg/%s" % (package, name)))
+    for name in NAMES:
+        with open(os.path.join(MSG_DIR, name + ".msg"), encoding="utf-8") as f:
+            text = f.read()
+        types.update(get_types_from_msg(text, "perception_interface/msg/" + name))
+        # the earlier node's dog_perception_msgs: Lidar* without the prefix (LidarObjectArray -> ObjectArray)
+        old = text.replace("LidarPredictedPath", "PredictedPath").replace("LidarObject", "Object")
+        types.update(get_types_from_msg(old, "dog_perception_msgs/msg/" + name[len("Lidar"):]))
     ts.register(types)
     return ts
 
@@ -136,7 +135,7 @@ def tf_report(tf, rows):
 
 def split_passes(rows, jump_back=1.0):
     """Rows in recording order -> one list per pass of the bag (a stamp more than ``jump_back`` s before the
-    previous one starts a pass: the node starts over there, dogperc/online.hpp)."""
+    previous one starts a pass: the node starts over there, lidar3d/online.hpp)."""
     out = []
     for r in rows:
         if not out or r["stamp"] < out[-1][-1]["stamp"] - jump_back:

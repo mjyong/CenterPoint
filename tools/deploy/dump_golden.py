@@ -1,6 +1,6 @@
-"""Golden data for the C++ parity tests (deploy/cpp/tests): every stage run in Python on the same inputs.
+"""Golden data for the C++ parity tests (deploy_deb's lidar_3d_detection/tests): every stage in Python, same inputs.
 
-    python tools/deploy/dump_golden.py --out deploy/cpp/build/golden      # CTest runs this first
+    python tools/deploy/dump_golden.py --out build/lidar3d/golden      # CTest runs this first
 
 Needs numpy and scipy only (no det3d, no PyTorch, no model): the detector stages run on a synthetic
 model_meta.json with the deployed nuScenes Pillar's head layout and synthetic head maps (peaks planted on
@@ -14,7 +14,7 @@ Writes into --out:
     pipeline.npz        PerceptionPipeline on seq/ (odometry 50 ms late): per frame the det-frame cloud,
                         poses, ground estimate, detections fed in, tracks and predictions
                         and the planner-frame output (PerceptionPipeline.to_local, local_*)
-    dets.npz            those detections per frame, the C++ replay's input (dogperc_replay --detections)
+    dets.npz            those detections per frame, the C++ replay's input (lidar_3d_replay --detections)
     geometry.npz, imm.npz, lsa.npz, pose_buffer.npz, preprocess.npz, pillars.npz, decode.npz, ins.npz
     clouds.npz          PointCloud2 byte layouts (XT32, Livox, integer fields, big-endian) and what
                         ros_utils.scan_from_msg reads from them
@@ -253,7 +253,7 @@ def online_golden(out, max_clouds=8):
 
 
 def pipeline_arrays(rec, save_points=True, points_every=1):
-    """Per-frame results as flat arrays with offsets (the layout dogperc_replay writes). The clouds of every
+    """Per-frame results as flat arrays with offsets (the layout lidar_3d_replay writes). The clouds of every
     ``points_every``-th frame only (point_offsets: no points for the others)."""
     F = len(rec["stamp"])
     keep_pts = [save_points and f % points_every == 0 for f in range(F)]

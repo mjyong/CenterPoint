@@ -168,7 +168,7 @@ void Lidar3dDetection::OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr ms
   }
   if (publish_cloud_) cloud_pub_->publish(lidar3d::ros::det_cloud(*out, local_frame_));
   if (tf_) tf_->sendTransform(lidar3d::ros::viewer_transforms(*pipe_, *out, *msg, local_frame_, world_frame_));
-  // once a second, as deploy/ros2's node (tools/deploy/soak_report.py reads these lines)
+  // once a second (tools/deploy/soak_report.py reads these lines)
   if (now - last_stats_ < std::chrono::seconds(1)) return;
   last_stats_ = now;
   std::string t;

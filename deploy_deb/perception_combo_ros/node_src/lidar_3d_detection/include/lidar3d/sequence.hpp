@@ -1,4 +1,4 @@
-// Recorded sequences as the offline tools store them (lidar_3d_detection/io.py):
+// Recorded sequences as the offline tools store them (dog_perception/io.py):
 //   meta.json, scans/NNNNNN.npz (xyz, intensity, t, stamp), imu.npy (t, wx, wy, wz), odom.npy (t, xyz, quat, vel)
 // events() replays them in time order exactly as SequenceReader.events does.
 #pragma once

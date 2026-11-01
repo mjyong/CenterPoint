@@ -2,7 +2,7 @@
 
 车上部署的激光感知节点：点云预处理 → 3D 检测（CenterPoint Pillar，TensorRT FP16）→ 跟踪 → 预测，发布给规划。在 Jetson AGX Orin 上编译、打成 deb 包，装上就能跑。
 
-代码和算法仓库（CenterPoint 仓库的 `deploy/`）是同一套，只是换了名字。算法仓库里有逐段对 Python 的测试、bag 回放的逐位比较、板上的延迟和长时间测试（`docs/DEPLOY_ORIN.md`）。
+C++ 代码只有这一份：算法仓库（CenterPoint 仓库）的 Python 是参考实现，本包是它的 C++ 版。不带 ROS 也能编，在算法仓库里跑逐段对 Python 的测试（见"和算法仓库对齐"）；bag 回放的逐位比较、板上的延迟和长时间测试见算法仓库的 `docs/DEPLOY_ORIN.md`。
 
 ## 目录
 
@@ -10,11 +10,13 @@
 perception_combo_ros/
   common_interface/seres_interface/ros/   common_interface、nav2_interface、perception_interface（LidarObjectArray）
   node_src/lidar_3d_detection/
-    include/lidar3d/, src/, tests/        库 lidar3d：镜像，不要在这里改（见"和算法仓库对齐"）
-    tools/lidar_3d_replay.cpp             离线回放（镜像）
-    src/ros_convert.cpp, src/bag_replay.cpp, include/ros_convert.hpp     ROS 消息转换、bag 回放（镜像）
-    src/lidar_3d_detection.cpp, src/main.cpp, include/lidar_3d_detection.h, include/logging.h   节点（本包自己的）
+    include/lidar3d/, src/                库 lidar3d：预处理、检测、跟踪、预测，不依赖 ROS
+    tests/                                对 Python 的逐段测试（GoogleTest，见"和算法仓库对齐"）
+    tools/lidar_3d_replay.cpp             离线回放（录好的序列或消息日志，不要 ROS）
+    src/ros_convert.cpp, src/bag_replay.cpp, include/ros_convert.hpp     ROS 消息转换、bag 回放
+    src/lidar_3d_detection.cpp, src/main.cpp, include/lidar_3d_detection.h, include/logging.h   节点
     config/lidar_3d_detection.yaml        参数：算法仓库导出，末尾 5 个部署键（model_dir、四个话题名）是本包自己的
+    docker/Dockerfile.dev                 服务器上编译、测试用的镜像（TensorRT 10.3、CUDA 12.6，和板上一样）
     launch/                               ros2 launch
     packaging/                            deb 里的启动脚本、systemd 单元、默认设置、安装脚本
     scripts/build_deb.sh                  在板上打 deb
@@ -122,18 +124,23 @@ sudo systemctl stop lidar-3d-detection
 
 ## 和算法仓库对齐
 
-- 改代码在算法仓库的 `deploy/` 里改，在那里测（对 Python 的逐段测试、bag 回放）。改完运行 `python tools/deploy/sync_deploy_deb.py --write`，按固定的改名规则重写这里的镜像文件；
-- 不带 `--write` 就是检查，算法仓库的测试 `test_deploy_deb_mirrors_deploy` 每次都跑。检查四项：
-  - 镜像文件；
-  - 配置：除末尾 5 个部署键外，等于 `export_cpp_config.py --robot kygi` 的输出；
-  - `LidarObject*` 的字段和 `dog_perception_msgs` 一致；
-  - `kygi665_msgs` 的消息一致；
-- 本包自己的文件（节点、CMakeLists、package.xml、launch、packaging、scripts）不镜像，改的时候和 `deploy/ros2` 的节点保持同样的行为：
-  - 订阅的 QoS；
-  - 每秒一行的统计；
-  - 线程数。
+- 改 C++ 就在这里改（算法仓库原来的 `deploy/` 已经删掉，不再有镜像）。库 `lidar3d` 不依赖 ROS，在算法仓库里不带 ROS 编，跑对 Python 的测试：
+  ```bash
+  # CenterPoint 仓库根目录；L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection
+  cmake -S $L -B build/lidar3d -G Ninja -DLIDAR3D_ROS=OFF -DLIDAR3D_TESTS=ON     # GPU 部分再加 -DLIDAR3D_WITH_CUDA=ON
+  cmake --build build/lidar3d -j && ctest --test-dir build/lidar3d --output-on-failure
+  ```
+  - `golden`：先用算法仓库的 `tools/deploy/dump_golden.py` 生成黄金数据（同样的输入，Python 每一段的输出，写在 `build/lidar3d/golden`），要 python3、numpy、scipy；
+  - `parity`：GoogleTest 逐段和黄金数据比（预处理、体素化、解码、跟踪、预测……），再用 `lidar_3d_replay` 回放黄金序列，和 Python 的整条流水线比；
+  - 设了环境变量 `LIDAR3D_MODEL_DIR`（导出的模型目录，引擎已在本机建好）时，GPU 检测器还要和主机拷贝的 TensorRT 检测器逐帧比；
+  - 不在算法仓库里（只有 deploy_deb）时用 `-DLIDAR3D_GOLDEN_DIR=<目录>` 指向生成好的黄金数据；
+  - 服务器上用 `docker/Dockerfile.dev` 的镜像编，命令在文件开头；
+- 参数和消息：`python tools/deploy/check_deploy_deb.py`，算法仓库的测试 `test_deploy_deb_config_follows_python` 每次都跑。检查两项：
+  - 配置：除末尾 5 个部署键外，等于 `export_cpp_config.py --robot kygi` 的输出（参数的唯一来源是 Python 的 dataclass）。改了 Python 的参数后用 `--write` 重写；
+  - `kygi665_msgs` 的消息和算法仓库的 `kygi665_msgs` 一致；
+- 算法仓库的离线工具直接读本包的输出：`cpp_parity.py` 读回放的 npz，`objects_bag.py` 按本包的消息定义读 `LidarObjectArray`，`soak_report.py` 读 glog。
 
 ## 验证
 
-- **离线**：`lib/lidar_3d_detection/lidar_3d_bag_replay --bag <bag> --config <配置> --model-dir <模型> --gpu --threads 4 --out x.npz`，结果应和算法仓库的 `dogperc_bag_replay` 逐位相同（同一块板、同一份引擎）。`--preprocess-only` 只做预处理；
+- **离线**：`lib/lidar_3d_detection/lidar_3d_bag_replay --bag <bag> --config <配置> --model-dir <模型> --gpu --threads 4 --out x.npz`，同一块板、同一份引擎下，两次结果逐位相同，也应和升级前的版本逐位相同（只改了部署、没改算法时）。和 Python 比用算法仓库的 `cpp_parity.py`。`--preprocess-only` 只做预处理；
 - **长时间**：`scripts/orin_soak.sh <bag> - - 30 data/soak`，对装好的节点循环播放 30 分钟，后一半时间加负载。算法仓库的 `objects_bag.py`（能读 `LidarObjectArray`）按遍查不丢帧，`soak_report.py`（能读 glog）汇总延迟、内存、温度。

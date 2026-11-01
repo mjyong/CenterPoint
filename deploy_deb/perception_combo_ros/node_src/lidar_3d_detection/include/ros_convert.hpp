@@ -1,4 +1,4 @@
-// ROS 2 messages <-> liblidar3d (deploy/cpp): the inputs into the ROS-free structs of lidar3d/online.hpp
+// ROS 2 messages <-> liblidar3d: the inputs into the ROS-free structs of lidar3d/online.hpp
 // (no copy of the point cloud), the outputs into ObjectArray, markers and the debug cloud.
 #pragma once
 

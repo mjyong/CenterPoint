@@ -306,8 +306,8 @@ def test_export_cpp_config(tmp_path):
 
 
 def test_objects_bag_against_a_replay(tmp_path):
-    """tools/deploy/objects_bag.py reads a recorded ~/objects bag (the message definitions of
-    deploy/ros2/dog_perception_msgs) and finds dropped frames against a replay of the same input."""
+    """tools/deploy/objects_bag.py reads a recorded objects bag (here the earlier node's dog_perception_msgs, the
+    fields of perception_interface's LidarObjectArray) and finds dropped frames against a replay of the same input."""
     pytest.importorskip("rosbags")
     from rosbags.rosbag2 import Writer
     sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
@@ -485,13 +485,12 @@ def test_objects_bag_reads_the_vehicle_messages(tmp_path):
     assert rep["tf_transforms"] == ["camera_init -> hesai_lidar (1)", "camera_init -> lidar_det (1)"]
 
 
-def test_deploy_deb_mirrors_deploy():
-    """deploy_deb's library, ROS conversion and bag replay are deploy/'s with the vehicle's names, its config is
-    export_cpp_config.py --robot kygi plus the deploy keys, and its messages have dog_perception_msgs' fields
-    (tools/deploy/sync_deploy_deb.py; after changing deploy/, run it with --write)."""
+def test_deploy_deb_config_follows_python():
+    """deploy_deb's config is export_cpp_config.py --robot kygi plus the deploy keys, and its kygi665_msgs are this
+    repository's (tools/deploy/check_deploy_deb.py; after changing the dataclasses, run it with --write)."""
     if not os.path.isdir(os.path.join(ROOT, "deploy_deb")):
         pytest.skip("no deploy_deb")
-    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "sync_deploy_deb.py")],
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "check_deploy_deb.py")],
                        capture_output=True, text=True, cwd=ROOT)
     assert r.returncode == 0, r.stdout + r.stderr
 

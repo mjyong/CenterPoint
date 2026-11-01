@@ -1,6 +1,6 @@
 // The online node's input handling against Python: PointCloud2 layouts (ros_utils.scan_from_msg), the
 // node configuration, INSPVAX handling, the sample bag's messages through OnlineInputs against
-// lidar_3d_detection/online.py on the same messages (cpp_parity.py python --bag), and a bag played twice.
+// dog_perception/online.py on the same messages (cpp_parity.py python --bag), and a bag played twice.
 #include <filesystem>
 #include <sstream>
 

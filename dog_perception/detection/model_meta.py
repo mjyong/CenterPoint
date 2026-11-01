@@ -2,7 +2,7 @@
 
 ``tools/dog/export_pillar_onnx.py`` writes ``model_meta.json`` next to ``pfn.onnx`` /
 ``rpn_head.onnx`` from the PyTorch detector (``meta_from_detector``). The exported detector
-(``exported.py``, ONNX Runtime or TensorRT) and the C++ pipeline (``deploy/cpp``) read it, so a
+(``exported.py``, ONNX Runtime or TensorRT) and the C++ pipeline (``deploy_deb (lidar3d)``) read it, so a
 retrained or differently configured model needs no code change: grid, pillar limits, the head
 layout per task, the decoder settings, the class mapping to the dog classes and the merged-class NMS
 all come from here.

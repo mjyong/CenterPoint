@@ -27,7 +27,8 @@
 **还没做的**：
 - T30（10-30 已跑，结果在 SERVER_TASKS，没复核）：板上长时间循环回放、负载下的延迟、TensorRT 的设备提示；
 - T31（10-30 完成，已复核）：车上部署包。`deploy_deb` 和 `deploy/` 对齐，板上打出 deb，装上后和 `deploy/` 逐位相同；
-- T32：板上准备 Foxglove 实时看（bridge、TF、重打 deb），人在本机看；
+- 11-01：删掉算法仓库的 `deploy/`，C++ 只剩 `deploy_deb` 这一份（不带 ROS 也能编、跑对 Python 的测试）；
+- T32：删掉 `deploy/` 以后服务器、板上各验一遍（CTest、升级前后逐位比），板上准备 Foxglove 实时看（bridge、TF、重打 deb），人在本机看；
 - 上车实时跑：要人（校时，板子时钟停在 1970）；
 - 规划确认 `ObjectArray` 的字段；
 - 厂区新数据的下一轮采集和训练；
@@ -288,7 +289,7 @@
 | P0 环境和通道 | T25 | 服务器经本机的反向隧道连到 Orin。板上是 AGX Orin 64 GB、JetPack 6、TensorRT 10.3、CUDA 12.6、ROS 2 Humble |
 | P1 FP32 / FP16 引擎 | T26 | P_max 定为 24000；FP16 上线，标签上 AP 只掉 0.001。板上 FP16 的 PFN 3.4 ms、RPN 4.7 ms |
 | P2 INT8、动态 PFN | T27 | INT8 两版 AP@2 掉 0.124 / 0.099，不上；动态 PFN 在 10000 柱时 1.50 ms，静态是 3.52 ms，上线 |
-| P3 C++ 核心库 | 本仓库 | `deploy/cpp`（libdogperc），不依赖 ROS |
+| P3 C++ 核心库 | 本仓库 | `deploy/cpp`（libdogperc），不依赖 ROS。11-01 起是 `deploy_deb` 里的库 `lidar3d`（见下面"一份代码"） |
 | P4 / P5 对齐、评估 | T28 | C++ 可以替代 Python。板上端到端 27.7 ms，网络以外 21.8 ms，超标 |
 | P7 性能 | T28 复核、T28B | 提速后网络以外 11.4 ms，端到端 17.3 ms，达标 |
 | P6 ROS 2 节点 | 本仓库、T29 | 板上编译过；ROS 读 bag 和读消息日志逐位相同；在线 27 帧不丢；端到端 18.9 ms。复核修了时间戳倒退 |
@@ -369,6 +370,12 @@
 - 修法：某个话题倒退 1 s 以上就整个重来；旧时间线迟到的消息丢掉，免得循环播放时重来两次。Python、C++ 一样，加了测试；
 - TensorRT 新出现一句设备提示（同一块板、同样的引擎，T28B 没有），T30 查。
 
+**一份代码**（11-01）：
+- T31 之前 C++ 有两份：算法仓库的 `deploy/`（`deploy/cpp` 库加 `deploy/ros2` 节点），和车上的 `deploy_deb`（`deploy/` 按规则改名的镜像，`sync_deploy_deb.py` 重写、测试检查逐字相同）。每改一处要同步一次，节点还是两套写法，行为靠人对齐；
+- 改成只留 `deploy_deb`：CMake 加了不带 ROS 的编法（`LIDAR3D_ROS=OFF`），CTest 用算法仓库的 `dump_golden.py` 现场生成 golden，对 Python 的逐段测试直接在车上的代码上跑；`check_deploy_deb.py` 只剩配置和消息两项；
+- 删之前本机核对：新编法的 `lidar_3d_replay` 在 golden 序列和消息日志上和 `dogperc_replay` 逐位相同，GoogleTest 全过；板上的升级前后逐位比留给 T32；
+- 早该这么做：镜像从一开始就是为了"先在算法仓库测、再搬到车上"，但车上的代码一旦能脱离 ROS 编，两份就没有理由并存。
+
 ---
 
 ## 5. 问题汇总
@@ -425,7 +432,7 @@
 |---|---|---|
 | T30：板上长时间循环回放、负载下的延迟、TensorRT 设备提示 | Agent | 10-30 跑完，待复核 |
 | T31：车上部署包：板上编 `deploy_deb`、打 deb、安装、和 `deploy/` 逐位比、卸载 | Agent（安装要 root） | 10-30 完成，已复核 |
-| T32：板上准备 Foxglove 实时看：装 bridge、重打 deb、查 TF 和 bridge | Agent，人看 | 任务已写好 |
+| T32：删掉 `deploy/` 以后的验证（服务器 CTest、板上升级前后逐位比），板上准备 Foxglove 实时看：装 bridge、重打 deb、查 TF 和 bridge | Agent，人看 | 任务已写好（11-01 改写） |
 | 上车实时跑：10 Hz 不丢帧、和别的进程抢资源 | 人（上车、校时） | P7 剩下的部分 |
 | 规划确认 `ObjectArray` 的坐标系和字段 | 人、规划 | 字段是按常见需求定的 |
 | H4：在 Foxglove 里看 5 处问题 | 人 | 暂缓：新数据来了模型还会改 |

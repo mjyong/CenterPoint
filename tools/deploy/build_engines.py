@@ -18,7 +18,7 @@ same number as trtexec's GPU Compute Time, also where there is no trtexec). Each
 ``<model-dir>/engines.json``: TensorRT version, machine, graph, precision, build time, size.
 The same build is also copied to ``<model-dir>/machines/<host>/`` so a later build on another
 machine does not replace it. Deploy that directory for the machine that will run it
-(``deploy/scripts/sync_to_orin.sh --model <dir> --engines <host>``); ``--stage <host>`` writes
+(``tools/deploy/sync_to_orin.sh --model <dir> --engines <host>``); ``--stage <host>`` writes
 one directory (ONNX, model_meta and that host's engines) for ``build_deb.sh --model``.
 
 Graphs are parsed from their file, so ONNX weights stored in an external file next to the graph
@@ -141,7 +141,7 @@ def l4t_release(text):
 
 def check_target(log, arch, l4t_text):
     """The engines of a machines/<host>/engines.json load on the target: same arch and, when recorded, same L4T
-    (engines only load on the TensorRT that built them; deploy/scripts/sync_to_orin.sh --engines)."""
+    (engines only load on the TensorRT that built them; tools/deploy/sync_to_orin.sh --engines)."""
     arches = {e.get("arch") for e in log}
     if arches != {arch}:
         raise SystemExit("engines are %s, target is %s" % (", ".join(sorted(map(str, arches))), arch))

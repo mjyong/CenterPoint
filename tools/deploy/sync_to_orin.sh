@@ -3,15 +3,15 @@
 # model directory (ONNX + metadata; engines are built on the Orin itself) and a few scenes' frames.
 # The Orin's root partition has only a few GB free: copy small subsets and delete them after use.
 #
-#   deploy/scripts/sync_to_orin.sh                                  # code only
-#   deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp      # ONNX + metadata, no engines
-#   deploy/scripts/sync_to_orin.sh --model data/deploy/nusc_pp_dyn --engines ubuntu
+#   tools/deploy/sync_to_orin.sh                                  # code only
+#   tools/deploy/sync_to_orin.sh --model data/deploy/nusc_pp      # ONNX + metadata, no engines
+#   tools/deploy/sync_to_orin.sh --model data/deploy/nusc_pp_dyn --engines ubuntu
 #       + the engines one machine built (<model>/machines/<host>, build_engines.py files them by hostname; the
 #       Orin is "ubuntu"), only when they match the target's arch and L4T (build_engines.check_target)
-#   deploy/scripts/sync_to_orin.sh --frames data/runs/0921_164127_s000/frames --stride 3 --limit 100
-#   deploy/scripts/sync_to_orin.sh --dumps data/deploy/dumps        # reference detections (compare_backends --dump)
-#   deploy/scripts/sync_to_orin.sh --seq data/seq/0921_164127_s000 --limit 150   # a raw recording (dogperc_replay)
-#   deploy/scripts/sync_to_orin.sh --bag samples/rosbag2_2026_09_21-16_41_27_moving  # a rosbag2 (dogperc_bag_replay)
+#   tools/deploy/sync_to_orin.sh --frames data/runs/0921_164127_s000/frames --stride 3 --limit 100
+#   tools/deploy/sync_to_orin.sh --dumps data/deploy/dumps        # reference detections (compare_backends --dump)
+#   tools/deploy/sync_to_orin.sh --seq data/seq/0921_164127_s000 --limit 150   # a raw recording (lidar_3d_replay)
+#   tools/deploy/sync_to_orin.sh --bag samples/rosbag2_2026_09_21-16_41_27_moving  # a rosbag2 (lidar_3d_bag_replay)
 # ORIN_HOST (default orin, ~/.ssh/config) and ORIN_DIR (default ~/dogperc) choose the target.
 set -euo pipefail
 export LC_ALL=C          # list frames in the order Python's sorted() uses (compare_backends.py --stride / --limit)
@@ -39,9 +39,9 @@ for f in "${FRAMES[@]}"; do dirs="$dirs $DIR/data/$(basename "$(dirname "$f")")/
 for s in "${SEQS[@]}"; do dirs="$dirs $DIR/seq/$(basename "$s")/scans"; done
 for b in "${BAGS[@]}"; do dirs="$dirs $DIR/bags"; done
 ssh "$HOST" "mkdir -p $dirs"
-# build*/: the C++ build directories (deploy/cpp/build, build_cuda) are per machine; excluded ones survive --delete
+# build*/: the build directories (build/lidar3d, deploy_deb/.../build_deb) are per machine; excluded ones survive --delete
 rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build*/' --exclude 'install/' --exclude 'log/' \
-  dog_perception tools deploy deploy_deb configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
+  dog_perception tools deploy_deb configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
 # the board's copy has no .git: deploy_deb's build_deb.sh versions the .deb from this ("count hash [dirty]")
 if commit=$(git rev-list --count HEAD 2> /dev/null); then
   commit="$commit $(git rev-parse --short HEAD)"

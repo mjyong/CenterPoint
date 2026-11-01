@@ -73,7 +73,7 @@ Host orin
 - sudo 密码不写进仓库，执行时由人给；
 - 板上只有 `nvpmodel`、`jetson_clocks` 和 apt 安装需要 sudo。
 
-**同步**：`deploy/scripts/sync_to_orin.sh`。
+**同步**：`tools/deploy/sync_to_orin.sh`（2026-11-01 前在 `deploy/scripts/`）。
 - 拷代码；
 - 拷一个模型目录：只拷 ONNX 和元数据，引擎在板上建；
 - 引擎按机器分开存（c768c2f）：`build_engines.py` 每建一个，还拷一份到 `<模型>/machines/<主机名>/`（板子的主机名是 `ubuntu`），别的机器再建也不会盖掉。`--engines <主机名>` 只同步那台机器建的一套，架构和 L4T 版本对不上就停（`build_engines.check_target`）；`build_engines.py --stage <主机名> --stage-out <目录>` 拼出一台机器的完整模型目录，给 `build_deb.sh --model`；
@@ -84,7 +84,9 @@ Host orin
 
 ## 3. 环境
 
-**Orin**：`deploy/scripts/orin_check.sh > orin_env.txt` 记录版本、功耗模式、内存和磁盘、编译工具。T25 时需要的都已经有，没有装任何包。以后标 `MISSING` 的再装：
+下文 `$L` 指 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection`，C++ 只有这一份（第 7–9 节）。
+
+**Orin**：`$L/scripts/orin_check.sh > orin_env.txt` 记录版本、功耗模式、内存和磁盘、编译工具。T25 时需要的都已经有，没有装任何包。以后标 `MISSING` 的再装：
 
 ```bash
 sudo apt install libeigen3-dev libyaml-cpp-dev libgtest-dev python3-colcon-common-extensions
@@ -98,13 +100,13 @@ sudo apt install python3-libnvinfer        # 若没有 TensorRT 的 Python 绑�
 - 在项目环境里加 `tensorrt==10.3.*`，和板上同一个大版本、小版本，保证数值可比；
 - 再加 `onnx`、`onnxruntime-gpu`（或 `onnxruntime`）、`polygraphy`、`nvidia-modelopt`；
 - 装不进项目环境就另建一个，`torch` 后端那一步回项目环境跑。
-- 以上 T25 已装好。`orin_check.sh` 在服务器上要指定项目环境：`PYTHON=<venv>/bin/python deploy/scripts/orin_check.sh`。
+- 以上 T25 已装好。`orin_check.sh` 在服务器上要指定项目环境：`PYTHON=<venv>/bin/python $L/scripts/orin_check.sh`。
 - pip 的 TensorRT 是 CUDA 12 编的，`exported.py` 先加载 `libcudart.so.12`（`import tensorrt` 已带进来），找不到再用系统的。
 
 **服务器上的 C++ 开发环境**（T26 定）：服务器没有 CUDA 12 工具链，也没有 sudo，但 Docker 免 sudo 就能用 GPU。
 - 用 `nvcr.io/nvidia/tensorrt:24.08-py3`：TensorRT 10.3.0、CUDA 12.6、Ubuntu 22.04，和板子一致，已拉下来；
 - Docker 数据目录在 `/zjst`，空间充足；
-- 在容器里装 Eigen、yaml-cpp、GoogleTest 和 ROS 2 Humble；
+- 镜像 `dogperc-dev`（`$L/docker/Dockerfile.dev`，构建和运行的命令在文件开头）：Eigen、yaml-cpp、GoogleTest，golden 要的 numpy、scipy、rosbags。不带 ROS，节点在板上用 colcon 编；
 - C++ 全部（含 CUDA、TensorRT）先在服务器的 4090 上开发、测试，再到板上原生编译、终验；
 - Python 参考、golden 数据和全量评估都在服务器上做。
 
@@ -206,9 +208,9 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 | TRT FP16 对 PyTorch，标签上 | AP@2 / AP@4 掉 ≤ 0.005；`pipeline_eval.py` 的主要指标差值在 90% 区间之内 |
 | INT8 对 FP32 | AP 掉 ≤ 0.01；流水线指标不显著变差；板上延迟比 FP16 降 ≥ 30% 才值得用，否则用 FP16（人定） |
 | C++ 对 Python（P4） | 点 1e-4 m；体素集合相同；喂相同检测时跟踪 ID 完全一致、状态 1e-6；预测 1e-4 |
-| ROS 2 节点（P6） | `dogperc_bag_replay` 和 `dogperc_replay --messages` 逐位相同，对 Python 节点的 bag 回放同上一行（喂相同检测时 ID 每帧一致）；在线回放 bag 不丢帧（`objects_bag.py`，循环播放时每一遍都不丢） |
+| ROS 2 节点（P6） | `lidar_3d_bag_replay` 和 `lidar_3d_replay --messages` 逐位相同，对 Python 节点的 bag 回放同上一行（喂相同检测时 ID 每帧一致）；在线回放 bag 不丢帧（`objects_bag.py`，循环播放时每一遍都不丢） |
 | 板上（P7） | 网络以外 < 15 ms，端到端 < 50 ms，p99 < 100 ms，10 Hz 不丢帧 |
-| 车上部署包（P8） | 板上 `build_deb.sh` 打出 deb；装上后节点起来，离线回放和 `deploy/` 的 `dogperc_bag_replay` 逐位相同，在线回放不丢帧；服务能起停；卸载干净 |
+| 车上部署包（P8） | 板上 `build_deb.sh` 打出 deb；装上后节点起来，离线回放和上一版逐位相同（T31 对的是当时 `deploy/` 的 `dogperc_bag_replay`），在线回放不丢帧；服务能起停；卸载干净 |
 
 `compare_backends.py` 的检测比较分两层：
 - **raw**：几何过滤之前；
@@ -236,14 +238,28 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 ## 7. C++ 核心库（P3）
 
 ```text
-deploy/cpp/
-  include/dogperc/   头文件，一个 Python 模块对应一个
-  src/               CPU 部分；src/cuda/：GPU 体素化（pillars.cu）、TensorRT 引擎、GPU 检测器（DOGPERC_WITH_CUDA）
+$L/                  deploy_deb/perception_combo_ros/node_src/lidar_3d_detection：库、测试、节点、打包
+  include/lidar3d/   头文件，一个 Python 模块对应一个
+  src/               CPU 部分；src/cuda/：GPU 体素化（pillars.cu）、TensorRT 引擎、GPU 检测器（LIDAR3D_WITH_CUDA）
   tests/             GoogleTest，读 tools/deploy/dump_golden.py 写的 golden 数据，逐段和 Python 比
-  tools/dogperc_replay.cpp   序列进，逐帧结果 npz 出（格式同 golden 的 pipeline.npz）
-deploy/docker/Dockerfile.dev 服务器上编译测试用的镜像（TensorRT 10.3、CUDA 12.6，同板子）
-deploy/ros2/       P6：dog_perception_msgs（Object、PredictedPath、ObjectArray）、dogperc_ros（节点、bag 回放，第 8 节）
+  tools/lidar_3d_replay.cpp   序列或消息日志进，逐帧结果 npz 出（格式同 golden 的 pipeline.npz）
+  docker/Dockerfile.dev       服务器上编译测试用的镜像（TensorRT 10.3、CUDA 12.6，同板子）
+  src/lidar_3d_detection.cpp、src/ros_convert.cpp、src/bag_replay.cpp   ROS 2 节点和 bag 回放（第 8 节）
 ```
+
+**一份代码**（2026-11-01）：以前库在算法仓库的 `deploy/cpp`（libdogperc，命名空间 `dogperc`），节点在 `deploy/ros2`，`deploy_deb` 是按规则改名的镜像。现在 `deploy/` 删掉了，只改 `$L`。T25–T31 的报告、命令里的名字这样对应：
+
+| 以前 | 现在 |
+|---|---|
+| `deploy/cpp`、libdogperc、`include/dogperc/` | `$L`、库 `lidar3d`、`include/lidar3d/` |
+| `dogperc_replay`、`dogperc_bag_replay`、`dogperc_tests` | `lidar_3d_replay`、`lidar_3d_bag_replay`、`lidar3d_tests` |
+| `DOGPERC_WITH_CUDA`、`DOGPERC_MODEL_DIR` | `LIDAR3D_WITH_CUDA`、`LIDAR3D_MODEL_DIR` |
+| `deploy/ros2` 的 `dogperc_node`、`dog_perception_msgs/ObjectArray` | `lidar_3d_detection`、`perception_interface/LidarObjectArray`（字段相同） |
+| `deploy/docker/Dockerfile.dev` | `$L/docker/Dockerfile.dev` |
+| `deploy/scripts/sync_to_orin.sh`、`orin_check.sh`、`orin_soak.sh` | `tools/deploy/sync_to_orin.sh`、`$L/scripts/orin_check.sh`、`$L/scripts/orin_soak.sh` |
+| `tools/deploy/sync_deploy_deb.py` | `tools/deploy/check_deploy_deb.py`（只查配置和消息） |
+
+删之前在本机核对过：不带 ROS 编出的 `lidar_3d_replay` 在 golden 序列和它的消息日志上，输出和 `deploy/cpp` 的 `dogperc_replay` 逐位相同（除计时外 52 个键）；GoogleTest 25 个全过。
 
 **模块对应**：
 
@@ -282,28 +298,31 @@ deploy/ros2/       P6：dog_perception_msgs（Object、PredictedPath、ObjectArr
 **编译和测试**：
 
 ```bash
-# 只要 CPU 部分：Eigen、yaml-cpp、GoogleTest、zlib；golden 数据要 python3 加 numpy、scipy
-cmake -S deploy/cpp -B deploy/cpp/build -DCMAKE_BUILD_TYPE=Release
-cmake --build deploy/cpp/build -j && ctest --test-dir deploy/cpp/build --output-on-failure
+# 在仓库根目录，不带 ROS。只要 CPU 部分：Eigen、yaml-cpp、GoogleTest、zlib；golden 数据要 python3 加 numpy、scipy
+L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection
+cmake -S $L -B build/lidar3d -DLIDAR3D_ROS=OFF -DLIDAR3D_TESTS=ON -DLIDAR3D_WITH_CUDA=OFF
+cmake --build build/lidar3d -j && ctest --test-dir build/lidar3d --output-on-failure
 # 加上 CUDA 和 TensorRT：服务器在 dogperc-dev 容器里，板上原生编译
-cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUILD_TYPE=Release
-# 板上：-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87
+cmake -S $L -B build/lidar3d_cuda -DLIDAR3D_ROS=OFF -DLIDAR3D_TESTS=ON -DLIDAR3D_WITH_CUDA=ON
+# 板上：-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87（不指定时编 87 和 89）
 ```
 
-- CTest 先跑 `dump_golden.py` 生成 golden 数据（约 60 MB，在 build 目录里），再跑 GoogleTest；
-- 设了 `DOGPERC_MODEL_DIR`（导出的模型目录，引擎已在本机建好）时，GPU 检测器还要和"主机拷贝"的 TensorRT 检测器逐帧比。
+- `LIDAR3D_ROS=OFF` 只编库、`lidar_3d_replay` 和测试，不找 ROS；source 了 ROS（有 ament_cmake）时默认是 ON，用 colcon 编节点（第 8、9 节）；
+- CTest 先跑 `golden`（`dump_golden.py --out build/lidar3d/golden`，约 60 MB），再跑 `parity`（GoogleTest，逐段比；再用 `lidar_3d_replay` 回放 golden 序列，和 Python 的整条流水线比）；
+- 设了 `LIDAR3D_MODEL_DIR`（导出的模型目录，引擎已在本机建好）时，GPU 检测器还要和"主机拷贝"的 TensorRT 检测器逐帧比；
+- 不在算法仓库里编（只有 deploy_deb）时，`-DLIDAR3D_GOLDEN_DIR=<目录>` 指向生成好的 golden。
 
 **GPU 检测器**：
 - 点云拷到 GPU，体素化、decorate、scatter 都在 GPU 上；
 - 两个引擎直接读写 GPU 缓冲区；
 - 只有 head 图拷回主机（约 2.7 MB），解码、NMS、过滤在 CPU 上；
-- 每段用 CUDA event 计时：h2d（点云上传）、voxelize（含 decorate）、pfn、scatter、rpn、d2h，写进 `dogperc_replay` 的 `timing_det_*`；
+- 每段用 CUDA event 计时：h2d（点云上传）、voxelize（含 decorate）、pfn、scatter、rpn、d2h，写进 `lidar_3d_replay` 的 `timing_det_*`；
 - 预处理的计时：`sweep_ms` = `dedup_ms` + `self_filter_ms` + `deskew_ms`，再加 `accumulate_ms`（多帧拼接和地面估计）。T28 的 `deskew_ms` 是现在的 `sweep_ms`。
 
-**Python 和 C++ 在真实录制上比**（`tools/deploy/cpp_parity.py` 加 `dogperc_replay`）：
+**Python 和 C++ 在真实录制上比**（`tools/deploy/cpp_parity.py` 加 `lidar_3d_replay`）：
 1. `cpp_parity.py python`：Python 流水线照 `run_sequence.py` 的方式跑一段录制，存逐帧结果、它用的检测、这次的 C++ 配置；
-2. `dogperc_replay --detections`：C++ 用同一批检测。跟踪 ID 每帧必须完全一致，状态 1e-6，预测 1e-4（第 6 节）；
-3. `dogperc_replay --model-dir ... --gpu`：C++ 用自己的检测器跑全链路，检测按 compare_backends.py 的办法比；
+2. `lidar_3d_replay --detections`：C++ 用同一批检测。跟踪 ID 每帧必须完全一致，状态 1e-6，预测 1e-4（第 6 节）；
+3. `lidar_3d_replay --model-dir ... --gpu`：C++ 用自己的检测器跑全链路，检测按 compare_backends.py 的办法比；
 4. `cpp_parity.py to-results`：转成 `results.pkl`，用 `pipeline_eval.py` 和 Python 并排打分；
 5. `cpp_parity.py timings`：每段延迟的中位数、p90、p99。
 
@@ -318,7 +337,7 @@ cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUIL
 - 去畸变的时间格稠密排名 1.4 → 0.4 ms；一帧扫描合计 8.4 → 3.9 ms；
 - 解码先用 logit 筛格子 0.64 → 0.24 ms；过滤的点网格改 CSR；head 图移动、不拷贝；
 - thrust 临时显存用缓存分配器，设备缓冲区按 1.5 倍增长（只编译过）；
-- `parallel_for` 线程池（`include/dogperc/parallel.hpp`，`dogperc_replay --threads`），逐点的循环都可以分给几个线程，结果和线程数无关。本机没有收益，板上 T28B 测；
+- `parallel_for` 线程池（`include/lidar3d/parallel.hpp`，`lidar_3d_replay --threads`），逐点的循环都可以分给几个线程，结果和线程数无关。本机没有收益，板上 T28B 测；
 - 预处理本机 12.9 → 8.4 ms。
 
 **板上提速后**（T28B，同样 150 帧，中位数 / p99）：
@@ -331,7 +350,7 @@ cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUIL
 | 端到端 | 27.71 / 30.16 | 18.70 / 19.65 | 17.26 / 18.19 |
 | 网络以外 | 21.79 / 24.25 | 12.87 / 13.75 | 11.41 / 12.28 |
 
-- 板上用 4 个线程（`dogperc_replay --threads 4`，节点的 `threads` 参数，launch 默认 4）；服务器的共享 vCPU 上 4 线程反而慢，用 1 个；
+- 板上用 4 个线程（`lidar_3d_replay --threads 4`，节点的 `threads` 参数，launch 默认 4）；服务器的共享 vCPU 上 4 线程反而慢，用 1 个；
 - 输出和线程数无关，和 T28 逐位相同；
 - 剩下较长的：去重 2.6 ms（顺序的哈希，没法分线程）、拼帧 2.0 ms、后处理 1.7 ms、体素化 1.6 ms、head 图拷回 1.1 ms；网络 PFN 0.8 ms 加 RPN 4.7 ms。
 
@@ -346,35 +365,37 @@ cmake -S deploy/cpp -B deploy/cpp/build_cuda -DDOGPERC_WITH_CUDA=ON -DCMAKE_BUIL
 ## 8. ROS 2 节点（P6）
 
 ```text
-deploy/ros2/
-  dog_perception_msgs/   Object、PredictedPath、ObjectArray：给规划的消息
-  dogperc_ros/
-    src/ros_convert.*    ROS 消息和 libdogperc 的结构互转（点云不拷贝）；ObjectArray、MarkerArray、调试点云
-    src/node.cpp         dogperc_node：在线节点
-    src/bag_replay.cpp   dogperc_bag_replay：rosbag2 直接读进节点的同一套处理，离线、逐帧确定
-    launch/dogperc.launch.py
+$L/
+  src/ros_convert.cpp、include/ros_convert.hpp   ROS 消息和 lidar3d 的结构互转（点云不拷贝）；LidarObjectArray、MarkerArray、调试点云
+  src/lidar_3d_detection.cpp、src/main.cpp      lidar_3d_detection：在线节点
+  src/bag_replay.cpp                            lidar_3d_bag_replay：rosbag2 直接读进节点的同一套处理，离线、逐帧确定
+  launch/lidar_3d_detection.launch.py
+deploy_deb/perception_combo_ros/common_interface/seres_interface/ros/perception_interface/
+  msg/LidarObject、LidarPredictedPath、LidarObjectArray：给规划的消息
 ```
 
+T29–T31 时节点是 `deploy/ros2` 的 `dogperc_node`，发 `dog_perception_msgs/ObjectArray`，字段和 `LidarObjectArray` 相同（第 7 节的对应表）。
+
 **分层**，为了在没有 ROS 的机器上也能测：
-- 节点的消息处理在 libdogperc 里，不依赖 ROS（`dogperc/online.hpp`）：
+- 节点的消息处理在库 `lidar3d` 里，不依赖 ROS（`lidar3d/online.hpp`）：
   - PointCloud2 的字节按字段表解析，规则同 Python 的 `ros_utils.scan_from_msg`：xyz 转 float32，丢掉原点和非有限的点，Livox 的噪点 tag，四种时间格式（absolute、absolute_ns、relative、relative_ns）；字段可以不对齐（XT32 的 float64 时间戳在偏移 18）；
   - INSPVAX：第一个好解定 ENU 原点，杠杆臂，航向检查；RTK IMU 的单位；LIO 里程计和 twist；
   - 这些在 Python 那边是 `dog_perception/online.py`，Python 节点 `tools/dog/ros2_node.py` 也改成用它；
-- `dogperc_ros` 只把 ROS 消息拷进这些结构，再把结果拷回消息。
+- 节点和 bag 回放只把 ROS 消息拷进这些结构，再把结果拷回消息。
 
 **参数**：
-- `config`：`tools/deploy/export_cpp_config.py --robot kygi` 写的 YAML，流水线各段加 `node:` 一节（话题、定位方式、时间格式、杠杆臂）。和 Python 节点的 `robot:=kygi` 是同一份预设；
-- `model_dir`：导出的模型目录，引擎在这台机器上建（上线是 `nusc_pp_dyn`）；`precision` 默认 fp16，`gpu` 默认 true；
-- `threads`：预处理逐点循环的线程数（参数默认 1，launch 默认 4，板上 T28B 定的）；`local_frame`：`~/objects` 的 frame_id，默认 `dog_det`；
-- 话题照 config 订阅，要换就用 ROS 的 `-r` 重映射。
+- `config`：`tools/deploy/export_cpp_config.py --robot kygi` 写的 YAML（`$L/config/lidar_3d_detection.yaml`，第 9 节），流水线各段加 `node:` 一节（话题、定位方式、时间格式、杠杆臂、输出话题）。和 Python 节点的 `robot:=kygi` 是同一份预设。不传就用装好的那份；
+- `model_dir`：导出的模型目录，引擎在这台机器上建（上线是 `nusc_pp_dyn`）。不传就用配置里的 `node.model_dir`（deb 里是装好的模型）；`precision` 默认 fp16，`gpu` 默认 true；
+- `threads`：预处理逐点循环的线程数（参数默认 1，launch 和 deb 的服务默认 4，板上 T28B 定的）；`local_frame`：`LidarObjectArray` 的 frame_id，默认 `lidar_det`；
+- 输入话题照配置订阅，输出话题也在配置里（`objects_topic`、`tracks_topic`、`predictions_topic`、`cloud_topic`）。
 
 **发布**：
-- `~/objects`（`dog_perception_msgs/ObjectArray`），给规划：
+- `/perception/lidar_3d/objects`（`perception_interface/LidarObjectArray`），给规划：
   - 坐标系是这一帧的检测系：重力对齐，yaw 跟车体，原点在车下的地面上（`PerceptionPipeline::to_local`）；
   - `world_pose` 是这个坐标系在定位系里的位姿，要回到世界系就用它；
   - 每个目标：id、类别、运动状态（静止 / 在动 / 停下）、分数、是否这一帧没检测到（coasting）、年龄、框、速度、[x, y, vx, vy] 的协方差，以及预测：时刻表和每种模式的路径、概率、协方差，最可能的在前；
-- `~/tracks`、`~/predictions`（MarkerArray，世界系）：和 Python 节点画的一样；
-- `~/cloud`：检测器的输入点云（`node.publish_cloud`）；
+- `/perception/lidar_3d/tracks`、`/perception/lidar_3d/predictions`（MarkerArray，世界系，`publish_markers`）：和 Python 节点画的一样；
+- `/perception/lidar_3d/cloud`：检测器的输入点云（参数 `publish_cloud`，默认取配置的 `node.publish_cloud`）；
 - `/tf`（参数 `publish_tf`，默认关）：`camera_init → <local_frame>` 和 `camera_init → <点云的 frame_id>`，给查看器把点云、框和轨迹放到一起（第 9 节"Foxglove"）。车上不开：车上的 TF 树里已经有雷达的 frame。
 
 **线程**：回调都在一个线程里，一个接一个执行，和 Python 节点一样。同时有几条在等时，rclcpp 的执行器按订阅创建的顺序取（IMU、INS / 里程计、点云），不严格按到达顺序，这是在线和离线回放的差别之一。离线时 Python 节点对 bag 的回放（`cpp_parity.py python --bag`）按 bag 的顺序处理，拿来当参考。
@@ -382,14 +403,14 @@ deploy/ros2/
 **时间戳倒退**（T29 复核）：某个话题的时间戳比它的上一条早 1 s 以上（`kTimeJumpBack`，bag 再播一遍、`--loop`、时钟往回跳），节点整个重来，和新起的一样：位姿、IMU、点云累积、地面估计、跟踪（ID 从 1 开始）、ENU 原点、航向检查都清掉，日志一行 warn。
 - 不重来的话，位姿缓存把新来的位姿都当乱序丢掉，bag 长于 3 s 时重播后基本没有输出；
 - 重来以后，别的话题还属于旧时间线的迟到消息（循环播放时上一遍的最后一帧点云）直接丢掉，不算第二次倒退；
-- 规则在 `OnlineInputs` 里（Python `dog_perception/online.py`，C++ `dogperc/online.hpp`），所以节点、`dogperc_bag_replay`、`dogperc_replay --messages`、`cpp_parity.py python --bag` 都一样。
+- 规则在 `OnlineInputs` 里（Python `dog_perception/online.py`，C++ `lidar3d/online.hpp`），所以节点、`lidar_3d_bag_replay`、`lidar_3d_replay --messages`、`cpp_parity.py python --bag` 都一样。
 
 **怎么验**（T29）：
-1. 不用 ROS：`cpp_parity.py python --bag` 用 Python 的消息处理按到达顺序回放 bag，存结果，`--messages` 再把这些消息存成普通数组（`msgs.npz`）。`dogperc_replay --messages` 用 C++ 的消息处理跑同一批消息；
+1. 不用 ROS：`cpp_parity.py python --bag` 用 Python 的消息处理按到达顺序回放 bag，存结果，`--messages` 再把这些消息存成普通数组（`msgs.npz`）。`lidar_3d_replay --messages` 用 C++ 的消息处理跑同一批消息；
    - 本机：样例 bag 27 帧，点逐位相同，位姿差 9e-16；
    - golden 数据里带样例 bag 的前 8 帧，`Online.MessageLogMatchesPythonBagReplay` 每次都测；另有四种点云字节布局逐点对 Python；
-2. 有 ROS（板上）：`dogperc_bag_replay` 从 bag 读消息、反序列化，走同一套处理，结果应和 `dogperc_replay --messages` 逐位相同。这一步验的是 ROS 消息到结构体的拷贝；
-3. 在线：板上 `ros2 bag play` 样例 bag，节点照常订阅、发布，看帧数（不丢帧）、`~/objects` 的内容和每帧的耗时。
+2. 有 ROS（板上）：`lidar_3d_bag_replay` 从 bag 读消息、反序列化，走同一套处理，结果应和 `lidar_3d_replay --messages` 逐位相同。这一步验的是 ROS 消息到结构体的拷贝；
+3. 在线：板上 `ros2 bag play` 样例 bag，节点照常订阅、发布，看帧数（不丢帧）、`LidarObjectArray` 的内容和每帧的耗时。
 
 T29 的结果：
 - 第 1 步，服务器上样例 bag 和 0921 前 600 云：喂相同检测时 ID 每帧相同，状态差 2e-10；
@@ -398,16 +419,17 @@ T29 的结果：
 
 长时间（T30）：
 - `tools/deploy/cut_bag.py` 从原始 bag 截出节点的三个话题。按源 bag 的 rosbag2 版本写，Humble 能读；
-- `deploy/scripts/orin_soak.sh` 在板上 1× 循环播放（每遍节点重来一次），后一半时间加 GPU、CPU 负载，录 `~/objects`、内存、tegrastats；
+- `$L/scripts/orin_soak.sh` 在板上对装好的节点 1× 循环播放（每遍节点重来一次），后一半时间加 GPU、CPU 负载，录 `LidarObjectArray`、内存、tegrastats（T30 时是 `deploy/scripts/orin_soak.sh` 和 `dogperc_node`）；
 - `objects_bag.py` 按遍查不丢帧，`tools/deploy/soak_report.py` 按 5 分钟汇总延迟、warn、内存、温度。
 
 ```bash
-# 板上编译（kygi665_msgs 在仓库根目录）
+# 板上编译、不打包（打 deb 见第 9 节）：接口包、kygi665_msgs 和节点
 source /opt/ros/humble/setup.bash
-colcon build --base-paths deploy/ros2 kygi665_msgs --build-base deploy/ros2/build --install-base deploy/ros2/install \
+cd deploy_deb/perception_combo_ros
+colcon build --base-paths common_interface ../slam/interface node_src --packages-up-to lidar_3d_detection \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87
-source deploy/ros2/install/setup.bash
-ros2 launch dogperc_ros dogperc.launch.py config:=$HOME/dogperc/kygi.yaml model_dir:=$HOME/dogperc/models/nusc_pp_dyn
+source install/setup.bash
+ros2 launch lidar_3d_detection lidar_3d_detection.launch.py model_dir:=$HOME/dogperc/models/nusc_pp_dyn
 ```
 
 ## 9. 车上部署（deploy_deb、deb 包，P8）
@@ -419,20 +441,20 @@ ros2 launch dogperc_ros dogperc.launch.py config:=$HOME/dogperc/kygi.yaml model_
 
 怎么用见那里的 [README](../deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/README.md)。
 
-**和 `deploy/` 的关系**：代码是同一套，只换了名字（命名空间 `lidar3d`、包 `lidar_3d_detection`、消息 `perception_interface/LidarObjectArray`，字段和 `ObjectArray` 相同）。
-- 镜像文件：库、测试、离线回放、ROS 消息转换、bag 回放，都是 `deploy/` 对应文件按固定规则改名的结果。改代码只在 `deploy/` 改、在那里测，然后 `python tools/deploy/sync_deploy_deb.py --write` 重写镜像；
-- 不带 `--write` 是检查，`test_deploy_deb_mirrors_deploy` 每次跑。检查的内容：
-  - 镜像文件逐字等于改名后的 `deploy/`；
-  - 配置除了末尾 5 个部署键（`model_dir`、四个话题名），等于 `export_cpp_config.py --robot kygi` 的输出；
-  - `LidarObject*` 的字段和 `dog_perception_msgs` 相同；
-  - `kygi665_msgs` 的消息相同；
-- 节点 `lidar_3d_detection` 是车上自己的写法：glog 日志、`Init()`、话题名在配置里。行为和 `deploy/ros2` 的节点对齐：
-  - 订阅的 QoS（IMU 400、INSPVAX 200、点云 SensorData 5）；
-  - 每秒一行统计，带各段耗时；
-  - launch 默认 4 线程；
-  - 时间戳倒退重来（在库里）。
+**一份代码**（2026-11-01 起）：算法仓库的 `deploy/` 已删掉，`deploy_deb` 不再是镜像，C++ 只有 `$L` 这一份（第 7 节）。和算法仓库的对齐靠：
+- 对 Python 的逐段测试和回放比较：在算法仓库里不带 ROS 编 `$L`、跑 CTest（第 7 节）；
+- `python tools/deploy/check_deploy_deb.py`，`test_deploy_deb_config_follows_python` 每次跑：
+  - 配置除了末尾 5 个部署键（`model_dir`、四个话题名），等于 `export_cpp_config.py --robot kygi` 的输出。改了 Python 的参数就用 `--write` 重写；
+  - `deploy_deb/slam/interface/kygi665_msgs` 的消息和仓库根目录的 `kygi665_msgs`（Python 读的）相同；
+- `objects_bag.py` 用 `perception_interface` 的消息文件读 `LidarObjectArray`（T29–T31 录的 `dog_perception_msgs/ObjectArray` 也还能读）。
 
-**接过来时改的地方**（2026-10-30）：
+节点 `lidar_3d_detection` 是车上的写法：glog 日志、`Init()`、话题名在配置里；
+- 订阅的 QoS：IMU 400、INSPVAX 200、点云 SensorData 5；
+- 每秒一行统计，带各段耗时；
+- launch 默认 4 线程；
+- 时间戳倒退重来（在库里）。
+
+**接过来时改的地方**（2026-10-30，当时还有 `deploy/`）：
 - 镜像文件只有注释不同，已按规则重写。`bag_replay` 的 `--preprocess-only` 和每帧一行的输出，反过来加进了 `deploy/ros2`；
 - `package.xml` 没声明 `kygi665_msgs`：colcon 可能先编节点，节点就没有 INSPVAX，起来报错退出。已声明；CMake 里改成必需（`LIDAR3D_KYGI`）；
 - 和 `deploy/ros2` 不一致的几处：
@@ -442,7 +464,7 @@ ros2 launch dogperc_ros dogperc.launch.py config:=$HOME/dogperc/kygi.yaml model_
   - launch 的 `model_dir` 没有默认值（不传就起不来）→ 空，用配置里的；
 - 配置的默认位置：`SERES_PERCEPTION_INSTALL_DIR` 没设时，找包自己的安装位置（ament index），不再是当前目录；
 - `orin_soak.sh`：`pkill -f lidar_3d_detection` 会连脚本自己一起杀掉（脚本路径里有这个名字）；`ps -C` 永远匹配不到（进程名截断到 15 个字符）。改成按可执行文件的路径找。`sync_to_orin.sh` 改成同步 `deploy_deb` 本身；
-- 测试：`LIDAR3D_TESTS=ON` 加 `LIDAR3D_GOLDEN_DIR`（算法仓库 `deploy/cpp` 编译目录下的 golden）可以在这里编、跑同一套对齐测试。
+- 测试：当时要借 `deploy/cpp` 编译目录下的 golden（`LIDAR3D_GOLDEN_DIR`）；2026-11-01 起不带 ROS 编时 CTest 自己生成（第 7 节）。
 
 **deb 包**（`scripts/build_deb.sh`，在板上跑，不用 root）：
 1. colcon 编接口包、`kygi665_msgs` 和节点（Release、sm_87、CUDA），`-DLIDAR3D_MODEL_DIR` 把模型装进 `<prefix>/model`：`model_meta.json`、两个 ONNX、两个 FP16 引擎、`engines.json`；
@@ -476,7 +498,7 @@ colcon 那一步和真机运行要在板上做（T31）。
 - **源码路径**：编译加 `-ffile-prefix-map`，二进制里不再有源码路径（原来 glog 的 `__FILE__` 带着）；
 - **版本号**：板上的代码是 rsync 过去的，没有 `.git`，所有包的版本都是 `0.1.0`，apt 分不出新旧。现在同步脚本写 `GIT_COMMIT`（提交数、提交号），版本是 `0.1.0+<提交数>.g<提交号>`，后打的版本更高；
 - **ID 比较**：循环播放时 `same_ids_frames` 很低（59 遍里 426 / 1587 帧），但每遍都在差不多同一帧开始不同。原因是在线的到达顺序和 bag 不完全一样，一帧略有不同，多出一条暂定轨迹，后面的 ID 全部顺延一位。`objects_bag.py` 加了 `same_tracks_frames`：不看编号，按类别和世界系位置比报出来的轨迹；
-- **读文件**：`sync_deploy_deb.py`、`soak_report.py`、`cut_bag.py` 读文件都指定 UTF-8（T31 碰到 C locale 读中文注释崩溃）。
+- **读文件**：`sync_deploy_deb.py`（现在的 `check_deploy_deb.py`）、`soak_report.py`、`cut_bag.py` 读文件都指定 UTF-8（T31 碰到 C locale 读中文注释崩溃）。
 
 **Foxglove 实时看**：板上循环播 bag，连着板子的本机（192.168.123.55，直连板子的 192.168.123.100）用 Foxglove 看检测结果。步骤见 [README](../deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/README.md) 的"用 Foxglove 看"：
 - 板上 `scripts/orin_foxglove.sh <bag>`：先停掉在跑的服务；节点开 `publish_tf`、`publish_cloud`；加 foxglove_bridge（端口 8765）；循环播放；结束时把服务起回来；
@@ -499,21 +521,20 @@ colcon 那一步和真机运行要在板上做（T31）。
 | `tools/deploy/compare_backends.py` | 多个后端逐段、逐框比较，查门槛；`--dump` / `dump:` 跨机器比较 |
 | `tools/deploy/pillar_stats.py` | 柱数分布，定 P_max |
 | `tools/dog/run_sequence.py --exported` | 导出的检测器跑完整流水线，结果给 `pipeline_eval.py` |
-| `deploy/cpp/` | C++ 核心库 libdogperc、GoogleTest 对齐测试、`dogperc_replay`（第 7 节） |
+| `$L`（`deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/`） | C++ 只有这一份：库 `lidar3d`、GoogleTest 对齐测试、`lidar_3d_replay`（第 7 节），ROS 2 节点和 `lidar_3d_bag_replay`（第 8 节），打 deb（第 9 节） |
 | `tools/deploy/export_cpp_config.py` | 从 Python 的 dataclass 写 C++ 的参数 YAML |
 | `tools/deploy/dump_golden.py` | C++ 对齐测试用的 golden 数据（模拟器序列加每一段的 Python 输出） |
 | `tools/deploy/cpp_parity.py` | 真实录制上 Python 和 C++ 比：参考运行、比较、转 results.pkl、延迟汇总 |
-| `deploy/docker/Dockerfile.dev` | 服务器上编译测试 C++ 的镜像 |
-| `deploy/ros2/` | ROS 2 消息包和节点包（第 8 节） |
+| `$L/docker/Dockerfile.dev` | 服务器上编译测试 C++ 的镜像 `dogperc-dev` |
 | `dog_perception/online.py` | 节点的消息处理，不依赖 ROS；Python 节点和 `cpp_parity.py python --bag` 共用 |
-| `tools/deploy/message_log.py` | 读 bag（到达顺序），把节点的输入消息存成普通数组，给 `dogperc_replay --messages` |
-| `tools/deploy/objects_bag.py` | 读录下的 `~/objects`，按遍和回放比：不丢帧、时间戳、ID |
+| `tools/deploy/message_log.py` | 读 bag（到达顺序），把节点的输入消息存成普通数组，给 `lidar_3d_replay --messages` |
+| `tools/deploy/objects_bag.py` | 读录下的 `LidarObjectArray`（或以前的 `ObjectArray`），按遍和回放比：不丢帧、时间戳、ID、轨迹；录了 `/tf` 时核对 `world_pose` |
 | `tools/deploy/cut_bag.py` | 原始 bag 截成节点的三个话题、前 N 云，保持 rosbag2 版本（板上 Humble 能播） |
 | `tools/deploy/soak_report.py` | 长时间回放的汇总：每 5 分钟的延迟、warn 计数、内存、tegrastats |
-| `deploy/scripts/orin_check.sh` | 环境报告 |
-| `deploy/scripts/sync_to_orin.sh` | 代码、模型（不带 `engines.json`；`--engines <主机名>` 加上那台机器的引擎）、帧、参考检测、原始录制、bag 同步到板上 |
-| `deploy/scripts/orin_soak.sh` | 板上长时间回放：节点、循环播放、录包、负载、内存和 tegrastats（T30） |
-| `deploy_deb/` | 车上部署的代码树（第 9 节）；`node_src/lidar_3d_detection/scripts/build_deb.sh` 在板上打 deb |
-| `tools/deploy/sync_deploy_deb.py` | `deploy_deb` 的镜像文件按 `deploy/` 重写（`--write`）或检查；配置、消息字段一起查 |
+| `$L/scripts/orin_check.sh` | 环境报告 |
+| `tools/deploy/sync_to_orin.sh` | 代码、模型（不带 `engines.json`；`--engines <主机名>` 加上那台机器的引擎）、帧、参考检测、原始录制、bag 同步到板上的 `~/dogperc` |
+| `$L/scripts/orin_soak.sh` | 板上长时间回放：装好的节点、循环播放、录包、负载、内存和 tegrastats（T30、T31） |
+| `deploy_deb/` | 车上部署的代码树（第 9 节）；`$L/scripts/build_deb.sh` 在板上打 deb，`$L/scripts/sync_to_orin.sh` 只同步这棵树到 `~/seres_ws` |
+| `tools/deploy/check_deploy_deb.py` | `deploy_deb` 的配置是否等于 Python 导出的（`--write` 重写），`kygi665_msgs` 是否一致 |
 | `deploy_deb/.../scripts/orin_foxglove.sh`、`foxglove/lidar_3d_detection.json` | 板上循环播 bag 加 foxglove_bridge；本机 Foxglove 的布局 |
 | `tools/deploy/foxglove_probe.py` | 不开 GUI 查 foxglove_bridge：发了哪些话题、订几秒各收到多少条（只用标准库，板上能跑） |

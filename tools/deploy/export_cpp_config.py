@@ -1,12 +1,12 @@
-"""Parameters of the C++ pipeline (deploy/cpp) from the Python dataclasses: their single source.
+"""Parameters of the C++ pipeline (deploy_deb (lidar3d)) from the Python dataclasses: their single source.
 
-The C++ library hard-codes nothing it could read from here (``deploy/cpp/include/dogperc/config.hpp``
+The C++ library hard-codes nothing it could read from here (``lidar3d/config.hpp`` in deploy_deb
 mirrors the defaults only so tests can check they agree). Every key below is required by the loader.
 
     # generic defaults (what PerceptionPipeline() runs with)
-    python tools/deploy/export_cpp_config.py --out deploy/config/default.yaml
+    python tools/deploy/export_cpp_config.py --out <dir>/default.yaml
     # the kygi robot as the online node runs it (node_config.py preset, also its ROS parameters)
-    python tools/deploy/export_cpp_config.py --robot kygi --out deploy/config/kygi.yaml
+    python tools/deploy/export_cpp_config.py --robot kygi --out <dir>/kygi.yaml
     # a recorded sequence as the offline tools run it (meta.json: mounting, base height, det frame, self filter)
     python tools/deploy/export_cpp_config.py --seq data/seq/0921_164127_s000 --out <dir>/config.yaml
 """
