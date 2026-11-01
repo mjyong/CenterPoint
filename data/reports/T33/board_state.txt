@@ -1,0 +1,17 @@
+ 10:55:39 up  2:55,  0 users,  load average: 0.02, 0.01, 0.08
+clocks NOT locked (sudo jetson_clocks; latencies 2-3x higher): cpu0 729600 / 2201600 / 729600 kHz, gpu 306000000 / 1300500000 / 306000000 Hz (min / max / current), power mode MAXN
+clocks_exit:1
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+=== default ===
+# Environment of lidar-3d-detection.service (start_lidar_3d_detection.sh). Kept on upgrades.
+ROS_DOMAIN_ID=77
+#RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+LIDAR3D_THREADS=4
+LIDAR3D_CONFIG=/home/seres/dogperc/lidar_3d_detection_cloud.yaml
+LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model
+#LIDAR3D_LOG_DIR=/tmp/lidar_3d_detection_logs
+LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true
+=== xml ===
+-rw-r--r-- 1 seres seres 386 Jan  1 10:17 /tmp/large_udp.xml
+no xml

@@ -1,0 +1,14 @@
+[33ms[0m[33ms[0m[33ms[0m[32m.[0m[32m.[0m[33ms[0m[33ms[0m[32m.[0m[33ms[0m[33ms[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[33ms[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m                                                    [100%][0m
+============================= slowest 30 durations =============================
+0.37s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_export_cpp_config
+0.30s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_deploy_deb_config_follows_python
+0.18s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_compare_classifies_reported_misses
+0.17s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_engine_names_and_run_sequence_specs
+0.05s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_foxglove_probe_against_a_fake_bridge
+0.02s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_orin_clocks_tells_whether_jetson_clocks_ran[cpu1-gpu1-1-NOT locked]
+0.02s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_orin_clocks_tells_whether_jetson_clocks_ran[cpu0-gpu0-0-clocks locked]
+0.02s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_orin_clocks_tells_whether_jetson_clocks_ran[None-None-2-unknown]
+0.01s call     d20car_predict/CenterPoint/tests/dog/test_deploy.py::test_soak_report_windows_and_warnings
+
+(21 durations < 0.005s hidden.  Use -vv to show these durations.)
+[32m[32m[1m13 passed[0m, [33m8 skipped[0m[32m in 1.32s[0m[0m

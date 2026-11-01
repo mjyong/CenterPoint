@@ -1,0 +1,8 @@
+active: active
+enabled: enabled
+clocks locked: cpu0 2201600 / 2201600 / 2201600 kHz, gpu 1300500000 / 1300500000 / 1300500000 Hz (min / max / current), power mode MAXN
+up: lidar_3d_detection up: config /opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml, model /opt/seres/perception/lidar_3d_detection/model (fp16, GPU), lidar /robot/topic/rdap/top_point_cloud2, inspvax /rte/rdap/rtk/inspvax, imu /rte/rdap/rtk/imus/data_raw, objects /perception/lidar_3d/objects
+/etc/default: ROS_DOMAIN_ID=77, LIDAR3D_CONFIG and LIDAR3D_ARGS commented (package file)
+deleted: data/T33_*, data/*.npz, bags/rosbag2_2026_09_21-16_41_27_moving, /tmp/debx
+kept: bags/rosbag2_0921_600, ~/dogperc/deb
+df: /dev/mmcblk0p1 54G, 50G used, 2.0G avail

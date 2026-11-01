@@ -1,0 +1,27 @@
+The following packages will be upgraded:
+  lidar-3d-detection
+1 upgraded, 0 newly installed, 0 to remove and 102 not upgraded.
+Need to get 0 B/35.8 MB of archives.
+After this operation, 4096 B disk space will be freed.
+Get:1 /home/seres/dogperc/deb/lidar-3d-detection_0.1.0+312.gb7dc5c6_arm64.deb lidar-3d-detection arm64 0.1.0+312.gb7dc5c6 [35.8 MB]
+debconf: delaying package configuration, since apt-utils is not installed
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 332021 files and directories currently installed.)
+Preparing to unpack .../lidar-3d-detection_0.1.0+312.gb7dc5c6_arm64.deb ...
+Unpacking lidar-3d-detection (0.1.0+312.gb7dc5c6) over (0.1.0+308.gf3b536f) ...
+Setting up lidar-3d-detection (0.1.0+312.gb7dc5c6) ...
+lidar-3d-detection: installed in /opt/seres/perception
+  the service is enabled (at boot) and started: systemctl status lidar-3d-detection
+  by hand:      /opt/seres/perception/lidar_3d_detection/bin/start_lidar_3d_detection.sh (stop the service first)
+  settings:     /etc/default/lidar-3d-detection
+---
+Version: 0.1.0+312.gb7dc5c6
+enabled
+active
+Jan 01 11:00:15 ubuntu systemd[1]: Stopping lidar_3d_detection: lidar 3D detection, tracking and prediction (ROS 2)...
+Jan 01 11:00:15 ubuntu start_lidar_3d_detection.sh[23445]: [INFO] [0000010815.075346242] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+Jan 01 11:00:15 ubuntu systemd[1]: lidar-3d-detection.service: Deactivated successfully.
+Jan 01 11:00:15 ubuntu systemd[1]: Stopped lidar_3d_detection: lidar 3D detection, tracking and prediction (ROS 2).
+Jan 01 11:00:15 ubuntu systemd[1]: lidar-3d-detection.service: Consumed 1.307s CPU time.
+Jan 01 11:00:19 ubuntu systemd[1]: Started lidar_3d_detection: lidar 3D detection, tracking and prediction (ROS 2).
+Jan 01 11:00:19 ubuntu start_lidar_3d_detection.sh[30574]: I0101 11:00:19.465556 30574 logging.h:30] Lidar 3D detection logger initialized. Log directory: /tmp/lidar_3d_detection_logs
+Jan 01 11:00:19 ubuntu start_lidar_3d_detection.sh[30574]: I0101 11:00:19.816144 30574 lidar_3d_detection.cpp:145] lidar_3d_detection up: config /home/seres/dogperc/lidar_3d_detection_cloud.yaml, model /opt/seres/perception/lidar_3d_detection/model (fp16, GPU), lidar /robot/topic/rdap/top_point_cloud2, inspvax /rte/rdap/rtk/inspvax, imu /rte/rdap/rtk/imus/data_raw, objects /perception/lidar_3d/objects, publishing TF

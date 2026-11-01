@@ -1,0 +1,25 @@
+  "size": [
+   4.754187831878662,
+   1.978564705848694,
+   1.8225262117385863
+  ],
+  "prediction_times": [
+   0.5,
+   1.0,
+   1.5,
+   2.0,
+   2.5,
+   3.0
+  ],
+  "paths": 1
+ },
+ "replay_frames": 599,
+ "passes": 1,
+ "matched_frames": 592,
+ "unmatched_messages": 0,
+ "missing_frames": 7,
+ "same_ids_frames": 0,
+ "same_tracks_frames": 484,
+ "received_gap_max": 0.17753767399881326,
+ "passed": false
+}

@@ -1,0 +1,8 @@
+clocks locked: cpu0 2201600 / 2201600 / 2201600 kHz, gpu 1300500000 / 1300500000 / 1300500000 Hz (min / max / current), power mode MAXN
+| from min | load | frames logged | total ms median | p99 | max | boxes | tracks | clouds / out / skipped | callback max ms |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | no | 57 | 17.5 | 24.4 | 28.9 | 55 | 10 | 596 / 593 / 0 | 36.5 |
+
+     1  WARN: no pose for scan yet (waiting for odometry / IMU)
+{"rss_mb": null, "tegrastats": {"samples": 0, "gr3d_mean": null, "ram_mb_min": null, "ram_mb_max": null, "temp_max_c": {}}}
+no pose: 1

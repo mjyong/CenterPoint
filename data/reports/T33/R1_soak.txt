@@ -1,0 +1,8 @@
+clocks NOT locked (sudo jetson_clocks; latencies 2-3x higher): cpu0 729600 / 2201600 / 1420800 kHz, gpu 306000000 / 1300500000 / 306000000 Hz (min / max / current), power mode MAXN
+| from min | load | frames logged | total ms median | p99 | max | boxes | tracks | clouds / out / skipped | callback max ms |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | no | 52 | 50.0 | 122.0 | 186.8 | 56 | 10 | 339 / 337 / 247 | 213.5 |
+
+     2  WARN: no pose for scan yet (waiting for odometry / IMU)
+{"rss_mb": null, "tegrastats": {"samples": 0, "gr3d_mean": null, "ram_mb_min": null, "ram_mb_max": null, "temp_max_c": {}}}
+no pose: 2

@@ -137,7 +137,7 @@
 | T30 | Orin 部署 P7：0921 截 60 s bag（节点的三个话题）；板上 1× 循环播 30 分钟（每遍节点重来一次），后 15 分钟加负载；每遍不丢帧、延迟、内存、温度；TensorRT 设备提示：记版本、板上重建引擎 | Agent | T29 复核 | 2 小时 | 完成。截 bag 与 T29 msgs 逐键相同；msgs_dets / msgs pass。板上重建引擎后 TensorRT 设备提示消失（PFN 1.48 ms、RPN 4.75 ms）。离线 bag_gpu pass，端到端 16.9 ms。浸泡 29 遍：无负载中间 11 遍不丢帧；加负载后多数遍丢 2–10 帧（gap 最大 0.40 s），objects_bag passed=false。节点没崩，内存涨 19 MB，最高温度 62 °C |
 | T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成，已复核。deb 装上后和 deploy/ 逐位相同，服务起停、卸载都对。复核：打包补了 patchelf、去掉编译目录的 RPATH、二进制不带源码路径、版本号带提交数；循环时 ID 不同是编号顺延（加了不看编号的 same_tracks_frames）；加了 publish_tf 和 Foxglove 实时看 |
 | T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 完成，已复核。删掉 deploy/ 以后服务器 CTest 27 项全过，升级前后、两条回放路径都逐位相同，TF、bridge 过。复核：板子重启后没锁频，节点慢 2–3 倍（每帧 55 ms，T31 是 15–21 ms），Foxglove 那次只有 5 Hz 的原因没分清（没锁频、DDS 缓冲、调试点云）；节点每秒那一行加了收到 / 发出 / 缺的帧数和最长回调，加了 orin_clocks.sh；板上服务的配置不是包里的 |
-| T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 待做 |
+| T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -6235,4 +6235,47 @@ T32 在线时节点每帧 55 ms（T31 是 15–21 ms），Foxglove 那次只有�
 
 ### T33 结果
 
-（待填）
+（2026-11-01）代码在 `b7dc5c6`。板上重打并装上 `lidar-3d-detection_0.1.0+312.gb7dc5c6`。六次都是 `bags/rosbag2_0921_600` 1× 播一遍（`--delay 3`，不空播、不放慢）。开始时板子没锁频，所以 R1、R2 直接在未锁状态下跑，没有 `--restore`。R2 之后 `jetson_clocks` 锁上（exit 0），结束时仍锁着。`net.core.rmem_max` 和 `wmem_max` 都是 16777216，8 MB 的 socket 缓冲不会被内核截断。
+
+**代码改动（约定 9）：** 无。每秒那一行的 `callback_max_ms`、`clouds / frames / skipped` 和 `orin_clocks.sh` 已经在拉下来的 `b7dc5c6` 里，这次只在板上编进 deb。
+
+**第 1 步。** `orin_clocks.sh`：`clocks NOT locked`，cpu0 729600 / 2201600 / 729600 kHz，gpu 306000000 / 1300500000 / 306000000 Hz，电源模式 MAXN。`rmem_max = wmem_max = 16777216`。`/etc/default/lidar-3d-detection` 当时不是包里的：`LIDAR3D_CONFIG=/home/seres/dogperc/lidar_3d_detection_cloud.yaml`，`LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true`，`ROS_DOMAIN_ID=77`。T32 的 Fast DDS 配置还在 `/tmp/large_udp.xml`，原样拷进 `data/reports/T33/fastdds_t32.xml`（send / listen 各 8388608）。
+
+**第 2 步。** pytest `13 passed, 8 skipped`（含 `test_soak_report_reads_the_vehicle_node_counts`、`test_orin_clocks_tells_whether_jetson_clocks_ran`）。deb `lidar-3d-detection_0.1.0+312.gb7dc5c6_arm64.deb`，从 `0.1.0+308.gf3b536f` 升上来。样例 bag、装好的配置、`models/nusc_pp_dyn`：`T32 vs T33 keys differing: []`，`only in T33: []`。空闲服务的 journal 只有 up 那一行（没有点云就不会打统计行）。同一只装好的二进制在 R3 的 `node.log` 里：
+
+```text
+56 dets, 0 tracks | preprocess_ms 7.5 det_gpu_ms 22.8 det_post_ms 1.5 track_ms 0.0 predict_ms 0.0 total_ms 32.3 callback_max_ms 41.6 | clouds 1 frames 1 skipped 0
+55 dets, 8 tracks | preprocess_ms 5.3 det_gpu_ms 8.8 det_post_ms 1.7 track_ms 0.1 predict_ms 0.1 total_ms 16.1 callback_max_ms 26.9 | clouds 11 frames 10 skipped 0
+```
+
+**第 3 步。** `LIDAR3D_CONFIG`、`LIDAR3D_MODEL_DIR`、`LIDAR3D_ARGS` 改回注释，只留 `ROS_DOMAIN_ID=77`。重启后：
+
+```text
+lidar_3d_detection up: config /opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml, model /opt/seres/perception/lidar_3d_detection/model (fp16, GPU), lidar /robot/topic/rdap/top_point_cloud2, inspvax /rte/rdap/rtk/inspvax, imu /rte/rdap/rtk/imus/data_raw, objects /perception/lidar_3d/objects
+```
+
+没有 `publishing TF`。
+
+**第 4 步。** 装好的配置和模型、未锁频，离线回放 60 s bag：`12608 messages, 600 clouds, 599 frames, 6037 tracks, 44.4 s`。第一帧 `no pose` 丢掉，参考是 599 帧。
+
+**第 5 步。** objects 条数来自 `ros2 bag info`。`clouds / frames / skipped`、`total_ms`、`callback_max_ms` 来自 `soak_report.py --window 60` 对 1 Hz 行的加总（大约 52–57 行，所以会比整段少几帧）。`missing_frames`、`same_tracks_frames` 相对这 599 帧的离线参考。`no pose` 是日志里 `no pose for scan yet` 的条数（这条两秒最多打一次）。
+
+| 运行 | 锁频 | DDS | 另外 | objects | missing | same_tracks | clouds / frames / skipped | total_ms 中位 / p99 | callback_max_ms | no pose |
+|---|---|---|---|---|---|---|---|---|---|---|
+| R1 | 不锁 | 默认 | 无 | 341 | 258 | 108 | 339 / 337 / 247 | 50.0 / 122.0 | 213.5 | 2 |
+| R2 | 不锁 | 8 MB | 无 | 592 | 7 | 484 | 600 / 592 / 0 | 50.3 / 113.5 | 195.3 | 4 |
+| R3 | 锁 | 默认 | 无 | 598 | 1 | 517 | 593 / 592 / 0 | 17.7 / 26.5 | 41.6 | 1 |
+| R4 | 锁 | 8 MB | 无 | 597 | 2 | 532 | 596 / 593 / 0 | 17.5 / 24.4 | 36.5 | 1 |
+| R5 | 锁 | 默认 | 调试点云 + TF + bridge | 452 | 147 | 177 | 452 / 451 / 144 | 16.6 / 26.7 | 44.3 | 1 |
+| R6 | 锁 | 8 MB | 同 R5 | 597 | 2 | 531 | 600 / 597 / 0 | 16.6 / 25.5 | 37.7 | 1 |
+
+R5 探针 `passed` true，65 s：cloud 452、原始点云 453、tracks 452、objects 452、`/tf` 452。R6 探针 `passed` true：cloud 597、原始点云 600、tracks 597、objects 597、`/tf` 597。`objects_bag` 的 `passed` 六次都是 false（`missing_frames` 不是 0）。R3、R4、R6 缺的 1–2 帧和离线丢掉的第一帧是同一类；锁频之后 `no pose` 每次 1 条，不必让节点再多等。
+
+**结论。** 丢帧有两条，都能从计数上看出来。
+
+- 没锁频时节点忙：中位数 50 ms，p99 约 120 ms，`callback_max_ms` 到 200 ms。再配默认 UDP（约 200 KB，一帧点云约 2 MB），60 s 只收到 339 帧点云、skipped 247，objects 341。只把 send / listen 加到 8 MB、频率仍不锁：600 帧点云、skipped 0、objects 592。节点还是慢，但点云不再丢。
+- 锁频以后节点不忙（中位数 17 ms，`callback_max_ms` 约 40 ms），默认缓冲在没有额外订阅者时就够（R3：598 条，skipped 0）。再发调试点云、开 bridge，默认缓冲仍丢：objects 452、skipped 144，探针里原始点云也只有 453。同一负载加大缓冲后回到 597、skipped 0。这条不是节点算不过来。
+
+**建议（不改服务、不改 sysctl）。** 车上开机锁频：不锁时慢 3 倍，并且默认 UDP 下会丢帧；`jetson_clocks` 每次重启都掉。Fast DDS 的机器带上这份 8 MB profile（播放器、节点、要看点云的客户端都要有）：没锁频时它单独就能把 skipped 打到 0；锁频以后只要有人订那帧约 2 MB 的 best-effort 点云，默认缓冲仍会丢。真狗是 CycloneDDS（域 0，`/opt/ros/cyclonedds.xml`），这份 Fast DDS XML 在那边不起作用。
+
+**第 6 步。** 锁频留着。服务 active、enabled。配置是包里的，`ROS_DOMAIN_ID=77`，up 那一行没有 `publishing TF`。板上删了 `data/T33_*`、`data/*.npz`、样例 bag、`/tmp/debx`。`bags/rosbag2_0921_600` 和 `~/dogperc/deb` 留着。根分区剩 2.0 GB。

@@ -1,0 +1,48 @@
+=== pkg ===
+# Environment of lidar-3d-detection.service (start_lidar_3d_detection.sh). Kept on upgrades.
+#ROS_DOMAIN_ID=0
+#RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+LIDAR3D_THREADS=4
+#LIDAR3D_CONFIG=/opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml
+#LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model
+#LIDAR3D_LOG_DIR=/tmp/lidar_3d_detection_logs
+# a viewer (Foxglove, RViz) on this node: TF and the detector's input cloud; not with the vehicle's own TF tree
+#LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true
+=== diff ===
+2c2
+< #ROS_DOMAIN_ID=0
+---
+> ROS_DOMAIN_ID=77
+5,6c5,6
+< #LIDAR3D_CONFIG=/opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml
+< #LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model
+---
+> LIDAR3D_CONFIG=/home/seres/dogperc/lidar_3d_detection_cloud.yaml
+> LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model
+8,9c8
+< # a viewer (Foxglove, RViz) on this node: TF and the detector's input cloud; not with the vehicle's own TF tree
+< #LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true
+---
+> LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true
+=== now ===
+# Environment of lidar-3d-detection.service (start_lidar_3d_detection.sh). Kept on upgrades.
+ROS_DOMAIN_ID=77
+#RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+LIDAR3D_THREADS=4
+#LIDAR3D_CONFIG=/opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml
+#LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model
+#LIDAR3D_LOG_DIR=/tmp/lidar_3d_detection_logs
+# a viewer (Foxglove, RViz) on this node: TF and the detector's input cloud; not with the vehicle's own TF tree
+#LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true
+=== diff ===
+2c2
+< #ROS_DOMAIN_ID=0
+---
+> ROS_DOMAIN_ID=77
+active
+Jan 01 11:00:36 ubuntu systemd[1]: Stopping lidar_3d_detection: lidar 3D detection, tracking and prediction (ROS 2)...
+Jan 01 11:00:36 ubuntu systemd[1]: lidar-3d-detection.service: Deactivated successfully.
+Jan 01 11:00:36 ubuntu systemd[1]: Stopped lidar_3d_detection: lidar 3D detection, tracking and prediction (ROS 2).
+Jan 01 11:00:55 ubuntu systemd[1]: Started lidar_3d_detection: lidar 3D detection, tracking and prediction (ROS 2).
+Jan 01 11:00:55 ubuntu start_lidar_3d_detection.sh[30810]: I0101 11:00:55.506642 30810 logging.h:30] Lidar 3D detection logger initialized. Log directory: /tmp/lidar_3d_detection_logs
+Jan 01 11:00:55 ubuntu start_lidar_3d_detection.sh[30810]: I0101 11:00:55.865823 30810 lidar_3d_detection.cpp:145] lidar_3d_detection up: config /opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml, model /opt/seres/perception/lidar_3d_detection/model (fp16, GPU), lidar /robot/topic/rdap/top_point_cloud2, inspvax /rte/rdap/rtk/inspvax, imu /rte/rdap/rtk/imus/data_raw, objects /perception/lidar_3d/objects
