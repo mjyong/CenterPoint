@@ -1,0 +1,374 @@
+=== topics ===
+/perception/lidar_3d/cloud
+/perception/lidar_3d/objects
+/perception/lidar_3d/predictions
+/perception/lidar_3d/tracks
+/perception/ptz_infrared_image
+/perception/ptz_ori_image
+/perception/seg_det_result
+=== bridge log ===
+[INFO] [1793790595.106362112] [foxglove_bridge]: Starting foxglove_bridge (humble, 3.6.0@)
+[2026-11-04T11:09:55Z INFO  foxglove::websocket::server] Started server on 0.0.0.0:8765
+[INFO] [1793790595.159845152] [foxglove_bridge]: Server listening on port 8765
+[ERROR] [1793790595.205220928] [foxglove_bridge]: Failed to load schemaDefinition for topic "/webctr_robot_arcane_blueprint/rcs_cmd" (robot_interface/msg/Stream): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.205906944] [foxglove_bridge]: Advertising new channel 2 for topic "/web_calibration/mock"
+[ERROR] [1793790595.206189856] [foxglove_bridge]: Failed to load schemaDefinition for topic "/voice_agent/tts_state" (voice_interface/msg/VoiceMessage): package 'voice_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.208149824] [foxglove_bridge]: Advertising new channel 3 for topic "/tf"
+[ERROR] [1793790595.208430432] [foxglove_bridge]: Failed to load schemaDefinition for topic "/srcpDebug" (robot_interface/msg/Stream): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.208576448] [foxglove_bridge]: Failed to load schemaDefinition for topic "/scene_interface/scene/state" (scene_interface/msg/Scene): package 'scene_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.209138144] [foxglove_bridge]: Advertising new channel 4 for topic "/rte/rdap/rtk/odm"
+[INFO] [1793790595.209766816] [foxglove_bridge]: Advertising new channel 5 for topic "/rte/rdap/rtk/inspvax"
+[INFO] [1793790595.210257408] [foxglove_bridge]: Advertising new channel 6 for topic "/rosout"
+[INFO] [1793790595.210309312] [foxglove_bridge]: Advertising new channel 7 for topic "/robot_rms_slave/device_info"
+[INFO] [1793790595.210340800] [foxglove_bridge]: Advertising new channel 8 for topic "/robot_rms_node/topic/factory_reset"
+[INFO] [1793790595.210362368] [foxglove_bridge]: Advertising new channel 9 for topic "/robot_rms_node/device_info"
+[INFO] [1793790595.210621376] [foxglove_bridge]: Advertising new channel 10 for topic "/robot/topic/rdap/rect_front_right_sensor_camera"
+[INFO] [1793790595.211227168] [foxglove_bridge]: Advertising new channel 11 for topic "/robot/topic/rdap/rear_point_cloud2"
+[INFO] [1793790595.211307168] [foxglove_bridge]: Advertising new channel 12 for topic "/robot/topic/rdap/raw_front_left_sensor_camera"
+[INFO] [1793790595.211633344] [foxglove_bridge]: Advertising new channel 13 for topic "/robot/topic/rdap/rear_sensor_camera"
+[ERROR] [1793790595.211791456] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/necks/cmd" (rte_interface/msg/MotorCmds): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.211907648] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/link_status" (rte_interface/msg/LinkStates): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.212048064] [foxglove_bridge]: Failed to load schemaDefinition for topic "/voice_agent/voice_event" (voice_interface/msg/VoiceMessage): package 'voice_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.212471392] [foxglove_bridge]: Advertising new channel 14 for topic "/rte/rdap/rtk/gnss"
+[INFO] [1793790595.212547232] [foxglove_bridge]: Advertising new channel 15 for topic "/robot/topic/rdap/h264_front_left_sensor_camera"
+[INFO] [1793790595.212576032] [foxglove_bridge]: Advertising new channel 16 for topic "/robot/topic/rdap/h264_front_camera"
+[INFO] [1793790595.212608736] [foxglove_bridge]: Advertising new channel 17 for topic "/robot/topic/rdap/h264_back_sensor_camera"
+[INFO] [1793790595.212639392] [foxglove_bridge]: Advertising new channel 18 for topic "/robot/topic/rdap/front_sensor_camera"
+[INFO] [1793790595.212687840] [foxglove_bridge]: Advertising new channel 19 for topic "/tf_static"
+[INFO] [1793790595.212719072] [foxglove_bridge]: Advertising new channel 20 for topic "/robot/topic/rdap/front_color_sensor_camera"
+[INFO] [1793790595.213133600] [foxglove_bridge]: Advertising new channel 21 for topic "/robot/topic/ptz/rgb_img_data"
+[INFO] [1793790595.213185920] [foxglove_bridge]: Advertising new channel 22 for topic "/robot/topic/ptz/nav_take_photo_data"
+[INFO] [1793790595.214659360] [foxglove_bridge]: Advertising new channel 23 for topic "/rte/rdap/rtk/imus/data_raw"
+[ERROR] [1793790595.214962624] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/ptz/nav_cam_ctrl" (rte_interface/msg/NavPtzCamCtrl): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.215123936] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/ptz/nav_angle_ctrl" (rte_interface/msg/NavPtzAngleCtrl): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.215264128] [foxglove_bridge]: Failed to load schemaDefinition for topic "/zsibot/multi_status" (zsi_interface/msg/MultiStatus): package 'zsi_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.215322720] [foxglove_bridge]: Advertising new channel 24 for topic "/robot/topic/ptz/infrared_h264_video"
+[ERROR] [1793790595.215457024] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot_service/focus_event" (robot_interface/msg/RobotSkillFocusEvent): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.216950752] [foxglove_bridge]: Advertising new channel 25 for topic "/robot/topic/ptz/h264_video"
+[ERROR] [1793790595.217398784] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/ptz/grab_image" (rte_interface/msg/GrabImage): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.217926016] [foxglove_bridge]: Advertising new channel 26 for topic "/robot_rms_log_level"
+[INFO] [1793790595.218024736] [foxglove_bridge]: Advertising new channel 27 for topic "/robot/topic/rdap/front_point_cloud2"
+[ERROR] [1793790595.218201888] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/ptz/connected" (rte_interface/msg/PTZConnected): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.219005952] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/speed_status" (rte_interface/msg/DeviceSpeedStates): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.219197824] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/Pedestrian/PedestrianStandard" (nav_interface/msg/NavPedestrianStandard): package 'nav_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.219340384] [foxglove_bridge]: Failed to load schemaDefinition for topic "/rhr/topic/event_item" (rhr_interface/msg/EventInfo): package 'rhr_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.219453184] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/ptz/current_state" (rte_interface/msg/CurrentPTZ): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.219566656] [foxglove_bridge]: Failed to load schemaDefinition for topic "/rhr/topic/alarm_item" (rhr_interface/msg/AlarmInfo): package 'rhr_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.219675360] [foxglove_bridge]: Failed to load schemaDefinition for topic "/rhr/topic/alarm_info" (rhr_interface/msg/AlarmInfo): package 'rhr_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.219741472] [foxglove_bridge]: Advertising new channel 28 for topic "/robot/topic/rdap/h264_front_right_sensor_camera"
+[ERROR] [1793790595.219931872] [foxglove_bridge]: Failed to load schemaDefinition for topic "/remote/event/emergency" (rhr_interface/msg/EventInfo): package 'rhr_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.220747424] [foxglove_bridge]: Advertising new channel 29 for topic "/reflector_position"
+[ERROR] [1793790595.220970272] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/legs/cmd" (rte_interface/msg/MotorCmds): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.221155264] [foxglove_bridge]: Failed to load schemaDefinition for topic "/power_manager/power_cur_mode" (power_interface/msg/PowerMode): package 'power_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.221196288] [foxglove_bridge]: Advertising new channel 30 for topic "/robot/topic/ptz/rgb_camera"
+[INFO] [1793790595.222441664] [foxglove_bridge]: Advertising new channel 31 for topic "/planning/debug/teb_planner"
+[INFO] [1793790595.222512192] [foxglove_bridge]: Advertising new channel 32 for topic "/robot/topic/ptz/infrared_camera"
+[INFO] [1793790595.222541632] [foxglove_bridge]: Advertising new channel 33 for topic "/planning/debug/plotjuggler/string"
+[INFO] [1793790595.222566912] [foxglove_bridge]: Advertising new channel 34 for topic "/planning/debug/path_tracking"
+[ERROR] [1793790595.222691040] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/xhand/cmd" (rte_interface/msg/MotorCmds): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.223044288] [foxglove_bridge]: Advertising new channel 35 for topic "/planning/debug/gradient_vector"
+[INFO] [1793790595.223084416] [foxglove_bridge]: Advertising new channel 36 for topic "/planning/debug/goal_pose"
+[ERROR] [1793790595.223283584] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot_arcane_blueprint/rcs_cmd" (robot_interface/msg/Stream): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.223346656] [foxglove_bridge]: Advertising new channel 37 for topic "/planning/debug/following"
+[INFO] [1793790595.223400864] [foxglove_bridge]: Advertising new channel 38 for topic "/planning/debug/focus_point"
+[INFO] [1793790595.223915616] [foxglove_bridge]: Advertising new channel 39 for topic "/planning/debug/diagnostic"
+[INFO] [1793790595.224912480] [foxglove_bridge]: Advertising new channel 40 for topic "/planning/debug/cost_map_production/grid_map"
+[INFO] [1793790595.225021280] [foxglove_bridge]: Advertising new channel 41 for topic "/robot/topic/rdap/front_depth_sensor_camera"
+[INFO] [1793790595.225057952] [foxglove_bridge]: Advertising new channel 42 for topic "/planning/debug/collision_checker"
+[ERROR] [1793790595.225501696] [foxglove_bridge]: Failed to load schemaDefinition for topic "/webctr_robot_arcane_blueprint/web_output" (robot_interface/msg/Stream): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[WARN] [1793790595.225837696] [foxglove_bridge]: no .msg definition for kygi665_msgs/msg/IMUAHRS, falling back to IDL
+[WARN] [1793790595.226036160] [foxglove_bridge]: Could not find definition for type kygi665_msgs/msg/IMUAHRS: kygi665_msgs/msg/IMUAHRS
+[INFO] [1793790595.226089152] [foxglove_bridge]: Advertising new channel 43 for topic "/rte/rdap/rtk/imuAhrs"
+[INFO] [1793790595.226138944] [foxglove_bridge]: Advertising new channel 44 for topic "/perception/ptz_ori_image"
+[INFO] [1793790595.226173056] [foxglove_bridge]: Advertising new channel 45 for topic "/robot/topic/rdap/imu_state"
+[ERROR] [1793790595.226316192] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/ears/cmd" (rte_interface/msg/MotorCmds): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.226432480] [foxglove_bridge]: Advertising new channel 46 for topic "/perception/lidar_3d/predictions"
+[ERROR] [1793790595.226563296] [foxglove_bridge]: Failed to load schemaDefinition for topic "/voice/audio_playback" (robot_interface/msg/RealtimeVoice): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.227140512] [foxglove_bridge]: Advertising new channel 47 for topic "/perception/lidar_3d/objects"
+[INFO] [1793790595.227212352] [foxglove_bridge]: Advertising new channel 48 for topic "/patchworkpp/patch_txt_init"
+[INFO] [1793790595.227264832] [foxglove_bridge]: Advertising new channel 49 for topic "/patchworkpp/patch_txt"
+[INFO] [1793790595.227294912] [foxglove_bridge]: Advertising new channel 50 for topic "/robot/topic/rdap/raw_back_sensor_camera"
+[INFO] [1793790595.227333024] [foxglove_bridge]: Advertising new channel 51 for topic "/patchworkpp/patch_init"
+[INFO] [1793790595.227369440] [foxglove_bridge]: Advertising new channel 52 for topic "/patchworkpp/patch"
+[INFO] [1793790595.227412256] [foxglove_bridge]: Advertising new channel 53 for topic "/patchworkpp/ground_seg"
+[INFO] [1793790595.227439008] [foxglove_bridge]: Advertising new channel 54 for topic "/patchworkpp/ground_revert"
+[ERROR] [1793790595.227614752] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/battery_states" (rte_interface/msg/BatteryStates): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.227695776] [foxglove_bridge]: Advertising new channel 55 for topic "/patchworkpp/ground_convert"
+[ERROR] [1793790595.227823808] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/peripheral_status" (rte_interface/msg/PhysicalProperties): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.228559648] [foxglove_bridge]: Advertising new channel 56 for topic "/parameter_events"
+[INFO] [1793790595.228669600] [foxglove_bridge]: Advertising new channel 57 for topic "/ota/upgrade/otamaster/state"
+[INFO] [1793790595.228710272] [foxglove_bridge]: Advertising new channel 58 for topic "/ota/master/device/version"
+[INFO] [1793790595.228738720] [foxglove_bridge]: Advertising new channel 59 for topic "/robot/topic/rdap/rect_back_sensor_camera"
+[INFO] [1793790595.228773888] [foxglove_bridge]: Advertising new channel 60 for topic "/omstuns_99f9_353e_208c_4c44/rgb_rect_vga"
+[ERROR] [1793790595.228917856] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/upper/cmd" (rte_interface/msg/MotorCmds): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.228982144] [foxglove_bridge]: Advertising new channel 61 for topic "/octomap/local_markers"
+[INFO] [1793790595.229201760] [foxglove_bridge]: Advertising new channel 62 for topic "/planning/debug/plotjuggler/dictionary"
+[INFO] [1793790595.229540224] [foxglove_bridge]: Advertising new channel 63 for topic "/octomap/local_binary"
+[INFO] [1793790595.229614816] [foxglove_bridge]: Advertising new channel 64 for topic "/octomap/global_binary"
+[ERROR] [1793790595.229779584] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/wifi/v1/WifiState" (tau_interface/msg/WifiState): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.229937408] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/wifi/v1/WifiScanResults" (tau_interface/msg/WifiScanResults): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.230055168] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/wifi/v1/WifiConnectionInfo" (tau_interface/msg/WifiConnectionInfo): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.230183712] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/peripheral_status" (rte_interface/msg/DevicePhysicalProperties): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.230301184] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/wifi/v1/WifiApState" (tau_interface/msg/WifiApState): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.230340608] [foxglove_bridge]: Advertising new channel 65 for topic "/robot/topic/rdap/raw_front_right_sensor_camera"
+[ERROR] [1793790595.230545888] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/wifi/v1/WifiApClients" (tau_interface/msg/WifiApClients): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.230678464] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/v1/ProcessState" (tau_interface/msg/ProcessState): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.230799648] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/lower/cmd" (rte_interface/msg/MotorCmds): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.230925952] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/link_status" (rte_interface/msg/DeviceLinkStates): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.231057536] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/v1/MsgFromBtSrv/HidHost" (tau_interface/msg/BtSrvMsg): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.231224000] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/v1/CellularNetworkInfo" (tau_interface/msg/CellularNetworkInfo): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.231337728] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/v1/BtDevicePairList" (tau_interface/msg/BtDevicePairList): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.231448512] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/v1/ApnConnectState" (tau_interface/msg/ApnConnectState): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.231910976] [foxglove_bridge]: Advertising new channel 66 for topic "/planning/debug/cost_map_production/occmap"
+[ERROR] [1793790595.232055616] [foxglove_bridge]: Failed to load schemaDefinition for topic "/mc/state" (mc_interface/msg/State): package 'mc_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.232174720] [foxglove_bridge]: Failed to load schemaDefinition for topic "/mc/motion_control" (mc_interface/msg/Motion): package 'mc_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.232292768] [foxglove_bridge]: Failed to load schemaDefinition for topic "/rhr/topic/event_info" (rhr_interface/msg/EventInfo): package 'rhr_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.232402464] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/v1/ApnSwitchState" (tau_interface/msg/ApnSwitchState): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.232442080] [foxglove_bridge]: Advertising new channel 67 for topic "/map/occupancy_grid"
+[WARN] [1793790595.233089120] [foxglove_bridge]: no .msg definition for common_interface/msg/PathFile, falling back to IDL
+[WARN] [1793790595.233492000] [foxglove_bridge]: Could not find definition for type common_interface/msg/PathFile: common_interface/msg/PathFile
+[INFO] [1793790595.233569344] [foxglove_bridge]: Advertising new channel 68 for topic "/map/file_update"
+[ERROR] [1793790595.233758144] [foxglove_bridge]: Failed to load schemaDefinition for topic "/loginout" (robot_interface/msg/Loginout): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.234035200] [foxglove_bridge]: Failed to load schemaDefinition for topic "/log_service/log_file_packing_result" (log_interface/msg/LogFilePackingResult): package 'log_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.234096320] [foxglove_bridge]: Advertising new channel 69 for topic "/segment/mask_raw"
+[INFO] [1793790595.234133760] [foxglove_bridge]: Advertising new channel 70 for topic "/patchworkpp/ncr"
+[INFO] [1793790595.234163392] [foxglove_bridge]: Advertising new channel 71 for topic "/livox/imu_192_168_123_166"
+[ERROR] [1793790595.234427008] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot_arcane_blueprint/web_output" (robot_interface/msg/Stream): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.234492896] [foxglove_bridge]: Advertising new channel 72 for topic "/livox/imu_192_168_123_165"
+[INFO] [1793790595.234548800] [foxglove_bridge]: Advertising new channel 73 for topic "/robot/topic/rdap/left_sensor_camera"
+[INFO] [1793790595.234589856] [foxglove_bridge]: Advertising new channel 74 for topic "/robot/topic/ptz/infrared_img_data"
+[INFO] [1793790595.235403968] [foxglove_bridge]: Advertising new channel 75 for topic "/lightning/odom"
+[ERROR] [1793790595.235601568] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/ptz/cam_tem_matrix" (rte_interface/msg/CamTemMatrix): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.235656032] [foxglove_bridge]: Advertising new channel 76 for topic "/lightning/map_cloud"
+[INFO] [1793790595.235698528] [foxglove_bridge]: Advertising new channel 77 for topic "/robot/topic/rdap/right_sensor_camera"
+[INFO] [1793790595.236106720] [foxglove_bridge]: Advertising new channel 78 for topic "/lightning/ins_path"
+[ERROR] [1793790595.236247616] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/v1/TimeAdjustInfo" (tau_interface/msg/TimeAdjustInfo): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.236287744] [foxglove_bridge]: Advertising new channel 79 for topic "/lightning/current_scan_world"
+[ERROR] [1793790595.236406528] [foxglove_bridge]: Failed to load schemaDefinition for topic "/perception/seg_det_result" (nav_interface/msg/DetSegResults): package 'nav_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.236448928] [foxglove_bridge]: Advertising new channel 80 for topic "/patchworkpp/ground_seg_intensity"
+[INFO] [1793790595.236479616] [foxglove_bridge]: Advertising new channel 81 for topic "/lightning/current_scan_body"
+[ERROR] [1793790595.236593248] [foxglove_bridge]: Failed to load schemaDefinition for topic "/light/control/state" (light_interface/msg/LightStates): package 'light_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.236694912] [foxglove_bridge]: Advertising new channel 82 for topic "/light/control/mock"
+[INFO] [1793790595.236736608] [foxglove_bridge]: Advertising new channel 83 for topic "/lidar_points"
+[INFO] [1793790595.236803680] [foxglove_bridge]: Advertising new channel 84 for topic "/lidar_imu"
+[INFO] [1793790595.236847616] [foxglove_bridge]: Advertising new channel 85 for topic "/perception/lidar_3d/cloud"
+[INFO] [1793790595.237143616] [foxglove_bridge]: Advertising new channel 86 for topic "/joy_to_voice"
+[INFO] [1793790595.237459072] [foxglove_bridge]: Advertising new channel 87 for topic "/initialpose"
+[INFO] [1793790595.237507904] [foxglove_bridge]: Advertising new channel 88 for topic "/robot/topic/rdap/top_point_cloud2"
+[ERROR] [1793790595.237640544] [foxglove_bridge]: Failed to load schemaDefinition for topic "/grpc_loginout" (robot_interface/msg/Loginout): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.237695136] [foxglove_bridge]: Advertising new channel 89 for topic "/grid/source_point_cloud"
+[ERROR] [1793790595.237824096] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot_service/skill_command" (robot_interface/msg/RobotSkillMsg): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.237953088] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/ptz/nav_take_photo_ctrl" (rte_interface/msg/NavPtzTakePhotoCtrl): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.238003840] [foxglove_bridge]: Advertising new channel 90 for topic "/grid/source_non_ground_points"
+[INFO] [1793790595.238292416] [foxglove_bridge]: Advertising new channel 91 for topic "/robot/topic/rdap/joy"
+[ERROR] [1793790595.238492192] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/wifi/v1/WifiApConfig" (tau_interface/msg/WifiApConfig): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.238546880] [foxglove_bridge]: Advertising new channel 92 for topic "/grid/source_ground_points"
+[ERROR] [1793790595.238670272] [foxglove_bridge]: Failed to load schemaDefinition for topic "/to_remote" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.238712832] [foxglove_bridge]: Advertising new channel 93 for topic "/grid/projected_points_vis"
+[ERROR] [1793790595.238828960] [foxglove_bridge]: Failed to load schemaDefinition for topic "/nad/topic/v1/BtSwitchStatus" (tau_interface/msg/BtSwitchStatus): package 'tau_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.238867424] [foxglove_bridge]: Advertising new channel 94 for topic "/goal_pose"
+[ERROR] [1793790595.238990016] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot_service/status" (robot_interface/msg/RobotServiceStatus): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.239157696] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/rdap/sensor_uwb_status" (rte_interface/msg/UwbStatus): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.239194272] [foxglove_bridge]: Advertising new channel 95 for topic "/embodied_agent/runtime/control_status"
+[ERROR] [1793790595.239309696] [foxglove_bridge]: Failed to load schemaDefinition for topic "/device/resources/slave" (device_info_interface/msg/DeviceResources): package 'device_info_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.239422592] [foxglove_bridge]: Failed to load schemaDefinition for topic "/device/resources" (device_info_interface/msg/DeviceResources): package 'device_info_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.239457568] [foxglove_bridge]: Advertising new channel 96 for topic "/device/per_cpu_usage"
+[INFO] [1793790595.239810720] [foxglove_bridge]: Advertising new channel 97 for topic "/planning/debug/plotjuggler/data_points"
+[INFO] [1793790595.240038560] [foxglove_bridge]: Advertising new channel 98 for topic "/cmd_vel"
+[INFO] [1793790595.240088928] [foxglove_bridge]: Advertising new channel 99 for topic "/map"
+[INFO] [1793790595.240288672] [foxglove_bridge]: Advertising new channel 100 for topic "/clock"
+[INFO] [1793790595.241067104] [foxglove_bridge]: Advertising new channel 101 for topic "/clicked_point"
+[INFO] [1793790595.241144736] [foxglove_bridge]: Advertising new channel 102 for topic "/camera/vis_freespace_seg"
+[INFO] [1793790595.241182112] [foxglove_bridge]: Advertising new channel 103 for topic "/perception/ptz_infrared_image"
+[INFO] [1793790595.241211840] [foxglove_bridge]: Advertising new channel 104 for topic "/camera/seg_det_result"
+[INFO] [1793790595.241241312] [foxglove_bridge]: Advertising new channel 105 for topic "/camera/image/compressed"
+[ERROR] [1793790595.241397344] [foxglove_bridge]: Failed to load schemaDefinition for topic "/lidar_packets_loss" (hesai_ros_driver/msg/LossPacket): package 'hesai_ros_driver' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.241445440] [foxglove_bridge]: Advertising new channel 106 for topic "/fused_point_cloud"
+[INFO] [1793790595.241485792] [foxglove_bridge]: Advertising new channel 107 for topic "/behavior/vis_img"
+[INFO] [1793790595.241557984] [foxglove_bridge]: Advertising new channel 108 for topic "/perception/lidar_3d/tracks"
+[ERROR] [1793790595.241698752] [foxglove_bridge]: Failed to load schemaDefinition for topic "/audio_service/focus_change_listener" (audio_interface/msg/FocusChange): package 'audio_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.241850080] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot_service/status" (robot_interface/msg/RobotServiceFocusInfo): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.241988480] [foxglove_bridge]: Failed to load schemaDefinition for topic "/audio_service/focus_change" (audio_interface/msg/FocusChange): package 'audio_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.242109632] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot_service_manager_node/system_status" (robot_interface/msg/SystemStatus): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.242224352] [foxglove_bridge]: Failed to load schemaDefinition for topic "/TaskOperate" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.242276544] [foxglove_bridge]: Advertising new channel 109 for topic "/planning/debug/global_map_manager/occmap"
+[ERROR] [1793790595.242390496] [foxglove_bridge]: Failed to load schemaDefinition for topic "/RobotStateQuery" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.242513696] [foxglove_bridge]: Failed to load schemaDefinition for topic "/RobotEventInfo" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.242550144] [foxglove_bridge]: Advertising new channel 110 for topic "/robot/topic/rdap/rect_front_left_sensor_camera"
+[ERROR] [1793790595.242667296] [foxglove_bridge]: Failed to load schemaDefinition for topic "/RobotAlarmInfo" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.242780864] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot_service/skill_feedback_result" (robot_interface/msg/RobotSkillMsg): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.242891040] [foxglove_bridge]: Failed to load schemaDefinition for topic "/RemoteControlTask" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.243003648] [foxglove_bridge]: Failed to load schemaDefinition for topic "/robot/topic/ptz/target_ctrl" (rte_interface/msg/CurrentPTZ): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.243152928] [foxglove_bridge]: Failed to load schemaDefinition for topic "/SceneOperate" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.243263424] [foxglove_bridge]: Failed to load schemaDefinition for topic "/RemoteConfig" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.243375616] [foxglove_bridge]: Failed to load schemaDefinition for topic "/NavOperation" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.243959104] [foxglove_bridge]: Advertising new channel 111 for topic "/nav/location"
+[INFO] [1793790595.244015648] [foxglove_bridge]: Advertising new channel 112 for topic "/LogServer_log_level"
+[INFO] [1793790595.244092672] [foxglove_bridge]: Advertising new channel 113 for topic "/octomap/global_markers"
+[INFO] [1793790595.244129024] [foxglove_bridge]: Advertising new channel 114 for topic "/map/switch"
+[ERROR] [1793790595.244253984] [foxglove_bridge]: Failed to load schemaDefinition for topic "/GetRhrData" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[ERROR] [1793790595.244370464] [foxglove_bridge]: Failed to load schemaDefinition for topic "/GetPlatformRhrLog" (robot_interface/msg/Command): package 'robot_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.244420768] [foxglove_bridge]: Advertising new channel 115 for topic "/robot/topic/rdap/raw_front_sensor_camera"
+[ERROR] [1793790595.244544096] [foxglove_bridge]: Failed to load schemaDefinition for topic "/mc/joints/control" (mc_interface/msg/JointsControl): package 'mc_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[INFO] [1793790595.244582560] [foxglove_bridge]: Advertising new channel 116 for topic "/lightning/lio_path"
+[INFO] [1793790595.244625504] [foxglove_bridge]: Advertising new channel 117 for topic "/FrontBlindSpotLidar"
+[INFO] [1793790595.244678208] [foxglove_bridge]: Advertising new channel 118 for topic "/BackBlindSpotLidar"
+[INFO] [1793790595.244711520] [foxglove_bridge]: Advertising new channel 119 for topic "/AudioServer_log_level"
+[WARN] [1793790595.675660352] [foxglove_bridge]: Failed to add service "/alarm_dump_service" (alarmapp_interface/srv/AlarmAppDump): package 'alarmapp_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[WARN] [1793790595.950680448] [foxglove_bridge]: Failed to add service "/audio_service/abandon_audio_focus" (audio_interface/srv/AbandonAudioFocus): package 'audio_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[WARN] [1793790595.950917824] [foxglove_bridge]: Failed to add service "/audio_service/request_audio_focus" (audio_interface/srv/RequestAudioFocus): package 'audio_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[WARN] [1793790596.345407136] [foxglove_bridge]: Failed to add service "/front_camera_info" (rte_interface/srv/CameraIntrinsics): package 'rte_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[WARN] [1793790596.488608928] [foxglove_bridge]: Failed to add service "/hmi_service/hmi_control" (hmi_interface/srv/HmiControl): package 'hmi_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[WARN] [1793790596.488963904] [foxglove_bridge]: Failed to add service "/hmi_service/hmi_control_release" (hmi_interface/srv/HmiControlRelease): package 'hmi_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[WARN] [1793790596.489110656] [foxglove_bridge]: Failed to add service "/hmi_service/hmi_control_request" (hmi_interface/srv/HmiControlRequest): package 'hmi_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+[WARN] [1793790596.489230848] [foxglove_bridge]: Failed to add service "/hmi_service/system_control" (hmi_interface/srv/SysControl): package 'hmi_interface' not found, searching: [/opt/seres/perception/lidar_3d_detection, /opt/seres/perception/perception_interface, /opt/seres/perception/nav2_interface, /opt/seres/perception/kygi665_msgs, /opt/seres/perception/common_interface, /opt/ros/humble]
+=== probe ===
+{
+ "server": {
+  "name": "",
+  "capabilities": [
+   "clientPublish",
+   "connectionGraph",
+   "parameters",
+   "parametersSubscribe",
+   "services",
+   "assets"
+  ]
+ },
+ "channels": {
+  "/AudioServer_log_level": "std_msgs/msg/UInt8",
+  "/BackBlindSpotLidar": "sensor_msgs/msg/PointCloud2",
+  "/FrontBlindSpotLidar": "sensor_msgs/msg/PointCloud2",
+  "/LogServer_log_level": "std_msgs/msg/UInt8",
+  "/behavior/vis_img": "sensor_msgs/msg/Image",
+  "/camera/image/compressed": "sensor_msgs/msg/CompressedImage",
+  "/camera/seg_det_result": "sensor_msgs/msg/Image",
+  "/camera/vis_freespace_seg": "sensor_msgs/msg/Image",
+  "/clicked_point": "geometry_msgs/msg/PointStamped",
+  "/clock": "rosgraph_msgs/msg/Clock",
+  "/cmd_vel": "geometry_msgs/msg/Twist",
+  "/device/per_cpu_usage": "std_msgs/msg/String",
+  "/embodied_agent/runtime/control_status": "std_msgs/msg/String",
+  "/foxglove_bridge/sysinfo": "foxglove.SystemInfo",
+  "/fused_point_cloud": "sensor_msgs/msg/PointCloud2",
+  "/goal_pose": "geometry_msgs/msg/PoseStamped",
+  "/grid/projected_points_vis": "sensor_msgs/msg/Image",
+  "/grid/source_ground_points": "sensor_msgs/msg/PointCloud2",
+  "/grid/source_non_ground_points": "sensor_msgs/msg/PointCloud2",
+  "/grid/source_point_cloud": "sensor_msgs/msg/PointCloud2",
+  "/initialpose": "geometry_msgs/msg/PoseWithCovarianceStamped",
+  "/joy_to_voice": "std_msgs/msg/Bool",
+  "/lidar_imu": "sensor_msgs/msg/Imu",
+  "/lidar_points": "sensor_msgs/msg/PointCloud2",
+  "/light/control/mock": "std_msgs/msg/String",
+  "/lightning/current_scan_body": "sensor_msgs/msg/PointCloud2",
+  "/lightning/current_scan_world": "sensor_msgs/msg/PointCloud2",
+  "/lightning/ins_path": "nav_msgs/msg/Path",
+  "/lightning/lio_path": "nav_msgs/msg/Path",
+  "/lightning/map_cloud": "sensor_msgs/msg/PointCloud2",
+  "/lightning/odom": "nav_msgs/msg/Odometry",
+  "/livox/imu_192_168_123_165": "sensor_msgs/msg/Imu",
+  "/livox/imu_192_168_123_166": "sensor_msgs/msg/Imu",
+  "/map": "nav_msgs/msg/OccupancyGrid",
+  "/map/file_update": "",
+  "/map/occupancy_grid": "nav_msgs/msg/OccupancyGrid",
+  "/map/switch": "std_msgs/msg/String",
+  "/nav/location": "nav2_interface/msg/Location",
+  "/octomap/global_binary": "octomap_msgs/msg/Octomap",
+  "/octomap/global_markers": "visualization_msgs/msg/MarkerArray",
+  "/octomap/local_binary": "octomap_msgs/msg/Octomap",
+  "/octomap/local_markers": "visualization_msgs/msg/MarkerArray",
+  "/omstuns_99f9_353e_208c_4c44/rgb_rect_vga": "sensor_msgs/msg/Image",
+  "/ota/master/device/version": "std_msgs/msg/String",
+  "/ota/upgrade/otamaster/state": "std_msgs/msg/String",
+  "/parameter_events": "rcl_interfaces/msg/ParameterEvent",
+  "/patchworkpp/ground_convert": "sensor_msgs/msg/PointCloud2",
+  "/patchworkpp/ground_revert": "sensor_msgs/msg/PointCloud2",
+  "/patchworkpp/ground_seg": "sensor_msgs/msg/PointCloud2",
+  "/patchworkpp/ground_seg_intensity": "sensor_msgs/msg/PointCloud2",
+  "/patchworkpp/ncr": "sensor_msgs/msg/PointCloud2",
+  "/patchworkpp/patch": "sensor_msgs/msg/PointCloud2",
+  "/patchworkpp/patch_init": "visualization_msgs/msg/MarkerArray",
+  "/patchworkpp/patch_txt": "visualization_msgs/msg/MarkerArray",
+  "/patchworkpp/patch_txt_init": "visualization_msgs/msg/MarkerArray",
+  "/perception/lidar_3d/cloud": "sensor_msgs/msg/PointCloud2",
+  "/perception/lidar_3d/objects": "perception_interface/msg/LidarObjectArray",
+  "/perception/lidar_3d/predictions": "visualization_msgs/msg/MarkerArray",
+  "/perception/lidar_3d/tracks": "visualization_msgs/msg/MarkerArray",
+  "/perception/ptz_infrared_image": "sensor_msgs/msg/Image",
+  "/perception/ptz_ori_image": "sensor_msgs/msg/Image",
+  "/planning/debug/collision_checker": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/cost_map_production/grid_map": "grid_map_msgs/msg/GridMap",
+  "/planning/debug/cost_map_production/occmap": "nav_msgs/msg/OccupancyGrid",
+  "/planning/debug/diagnostic": "diagnostic_msgs/msg/DiagnosticArray",
+  "/planning/debug/focus_point": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/following": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/global_map_manager/occmap": "nav_msgs/msg/OccupancyGrid",
+  "/planning/debug/goal_pose": "visualization_msgs/msg/Marker",
+  "/planning/debug/gradient_vector": "visualization_msgs/msg/Marker",
+  "/planning/debug/path_tracking": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/plotjuggler/data_points": "plotjuggler_msgs/msg/DataPoints",
+  "/planning/debug/plotjuggler/dictionary": "plotjuggler_msgs/msg/Dictionary",
+  "/planning/debug/plotjuggler/string": "std_msgs/msg/String",
+  "/planning/debug/teb_planner": "visualization_msgs/msg/MarkerArray",
+  "/reflector_position": "geometry_msgs/msg/PoseStamped",
+  "/robot/topic/ptz/h264_video": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/ptz/infrared_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/ptz/infrared_h264_video": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/ptz/infrared_img_data": "sensor_msgs/msg/CompressedImage",
+  "/robot/topic/ptz/nav_take_photo_data": "sensor_msgs/msg/CompressedImage",
+  "/robot/topic/ptz/rgb_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/ptz/rgb_img_data": "sensor_msgs/msg/CompressedImage",
+  "/robot/topic/rdap/front_color_sensor_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/rdap/front_depth_sensor_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/rdap/front_point_cloud2": "sensor_msgs/msg/PointCloud2",
+  "/robot/topic/rdap/front_sensor_camera": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/rdap/h264_back_sensor_camera": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/rdap/h264_front_camera": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/rdap/h264_front_left_sensor_camera": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/rdap/h264_front_right_sensor_camera": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/rdap/imu_state": "sensor_msgs/msg/Imu",
+  "/robot/topic/rdap/joy": "sensor_msgs/msg/Joy",
+  "/robot/topic/rdap/left_sensor_camera": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/rdap/raw_back_sensor_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/rdap/raw_front_left_sensor_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/rdap/raw_front_right_sensor_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/rdap/raw_front_sensor_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/rdap/rear_point_cloud2": "sensor_msgs/msg/PointCloud2",
+  "/robot/topic/rdap/rear_sensor_camera": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/rdap/rect_back_sensor_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/rdap/rect_front_left_sensor_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/rdap/rect_front_right_sensor_camera": "sensor_msgs/msg/Image",
+  "/robot/topic/rdap/right_sensor_camera": "foxglove_msgs/msg/CompressedVideo",
+  "/robot/topic/rdap/top_point_cloud2": "sensor_msgs/msg/PointCloud2",
+  "/robot_rms_log_level": "std_msgs/msg/UInt8",
+  "/robot_rms_node/device_info": "std_msgs/msg/String",
+  "/robot_rms_node/topic/factory_reset": "std_msgs/msg/String",
+  "/robot_rms_slave/device_info": "std_msgs/msg/String",
+  "/rosout": "rcl_interfaces/msg/Log",
+  "/rte/rdap/rtk/gnss": "kygi665_msgs/msg/GNSS",
+  "/rte/rdap/rtk/imuAhrs": "",
+  "/rte/rdap/rtk/imus/data_raw": "sensor_msgs/msg/Imu",
+  "/rte/rdap/rtk/inspvax": "kygi665_msgs/msg/INSPVAX",
+  "/rte/rdap/rtk/odm": "kygi665_msgs/msg/ODM",
+  "/segment/mask_raw": "sensor_msgs/msg/Image",
+  "/tf": "tf2_msgs/msg/TFMessage",
+  "/tf_static": "tf2_msgs/msg/TFMessage",
+  "/web_calibration/mock": "std_msgs/msg/String"
+ },
+ "received": {
+  "/perception/lidar_3d/objects": 0,
+  "/perception/lidar_3d/tracks": 0,
+  "/robot/topic/rdap/top_point_cloud2": 10
+ },
+ "seconds": 10.0,
+ "missing": [],
+ "silent": [
+  "/perception/lidar_3d/objects",
+  "/perception/lidar_3d/tracks"
+ ],
+ "passed": false
+}
+PROBE:1
+BRIDGE_STOPPED
+active

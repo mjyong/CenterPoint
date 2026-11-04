@@ -1,0 +1,86 @@
+121:export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+122:export CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+123:export ROS_DOMAIN_ID=0
+126:export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+127:export CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+128:export ROS_DOMAIN_ID=0
+131:export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+132:export CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+133:export ROS_DOMAIN_ID=0
+136:export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+137:export CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+138:export ROS_DOMAIN_ID=0
+141:export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+142:export CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+143:export ROS_DOMAIN_ID=0
+146:export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+147:export CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+148:export ROS_DOMAIN_ID=0
+151:export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+152:export CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+153:export ROS_DOMAIN_ID=0
+---DEFAULT---
+# Environment of lidar-3d-detection.service (start_lidar_3d_detection.sh). Kept on upgrades.
+ROS_DOMAIN_ID=0
+RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+LIDAR3D_THREADS=4
+#LIDAR3D_CONFIG=/opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml
+#LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model
+#LIDAR3D_LOG_DIR=/tmp/lidar_3d_detection_logs
+# a viewer (Foxglove, RViz) on this node: TF and the detector's input cloud; not with the vehicle's own TF tree
+#LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true
+---PS---
+   1587 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /opt/seres/package/alarmapp/alarm_app_services.launch.py
+   1588 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /opt/seres/package/audioservice.launch.py mode:=0
+   1614 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch device_info_manager_master device_info_manager_master.launch.py
+   1629 root           14:07 /opt/ros/humble/bin/iox-roudi -c /etc/iceoryx/roudi_config.toml
+   1632 root           14:07 /opt/seres/perception/lidar_3d_detection/lib/lidar_3d_detection/lidar_3d_detection --ros-args -p threads:=4
+   1646 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /opt/seres/package/logservice.launch.py
+   1651 root           14:07 /bin/bash /opt/seres/nav_perception/start/start_nav_perception_bg.sh
+   1683 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 run planning planning
+   1689 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch robot_rms robot_rms.launch.py
+   1692 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /opt/seres/package/system/comm_agent/share/comm_agent/launch/comm_agent.launch.py mode:=0
+   1706 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch remote_control remote_control.launch.py
+   1710 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /opt/seres/package/rhr/rhr.launch.py
+   1715 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch robot_service robot_service.launch.py
+   1745 root           14:07 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch lightning model_switch_launch.py
+   1944 root           14:06 gdm-session-worker [pam/gdm-launch-environment]
+   2000 root           14:06 /bin/bash /opt/seres/start/hesai_lidar_start.sh
+   2065 root           14:06 /opt/seres/package/rte_rtk/lib/kygi665_rtk/kygi665_rtk_service
+   2308 rtkit          14:05 /usr/libexec/rtkit-daemon
+   3284 gdm            14:02 /usr/libexec/at-spi-bus-launcher
+   3354 root           14:01 /usr/bin/python3 /opt/ros/humble/bin/ros2 run hesai_ros_driver hesai_ros_driver_node
+   3426 root           14:01 /opt/seres/nav/planning/lib/planning/planning
+   3452 root           14:01 /opt/seres/package/device_info_manager/lib/device_info_manager_master/device_info_manager_master_node --ros-args -r __node:=device_info_manager_master --params-file /userdata/config/robot_rms/global_device_info_manager_master_node.yaml
+   3500 root           14:01 /opt/seres/package/hesai_lidar_driver/hesai_ros_driver/lib/hesai_ros_driver/hesai_ros_driver_node
+   3565 root           14:01 /opt/seres/nav/slam/lightning/lib/lightning/mode_switch_node --ros-args --params-file /tmp/launch_params_cnniobr1
+   3787 root           14:00 /usr/bin/python3 /opt/ros/humble/bin/ros2 run ptz_control rte_ptz_ros_driver_exe_node
+   3793 root           14:00 /usr/bin/python3 /opt/ros/humble/bin/ros2 run ptz_image rte_ptz_image_driver_exe_node
+   3797 root           14:00 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /opt/seres/video_rtc/video_rtc.launch.py mode:=0
+   3893 root           14:00 ./grid_map_memory_node
+   4015 root           14:00 /opt/seres/package/rte_ptz_control/lib/ptz_control/rte_ptz_ros_driver_exe_node
+   4076 root           14:00 /opt/seres/package/rte_ptz_control/lib/ptz_image/rte_ptz_image_driver_exe_node
+   4178 root           14:00 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch wifi_service wifi_service.launch.py
+   4193 root           14:00 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /opt/seres/package/light.launch.py mode:=0
+   4213 root           14:00 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch robot_webctr_system robot_webctr_system.launch.py
+   4214 root           14:00 tee -a /log/robot/robot_webctr/backend_launch.log
+   4326 root           13:59 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /opt/seres/package/cellulardata/cellular_data_service.launch.py
+   4397 root           13:59 /opt/seres/package/LogServer/lib/log_service/log_service_node --ros-args
+   4462 root           13:59 /opt/seres/package/AudioServer/lib/audio_service/AudioServer --ros-args
+   4464 root           13:59 /opt/seres/package/system/light/lib/led_service/led_service_node --ros-args
+   4472 root           13:59 /opt/seres/package/alarmapp/lib/robot_alarm_app/robot_alarm_app_node --ros-args
+   4482 root           13:59 /opt/seres/package/cellulardata/lib/cellular_data/cellular_data_node --ros-args --params-file /tmp/launch_params_7jiagxmq
+---DPKG---
+ii  ros-humble-foxglove-msgs                                  3.2.4-1jammy.20260217.063917                      arm64        foxglove_msgs provides visualization messages that are supported by Foxglove.
+ii  ros-humble-rmw-cyclonedds-cpp                             1.3.4-1jammy.20251219.095239                      arm64        Implement the ROS middleware interface using Eclipse CycloneDDS in C++.
+ii  ros-humble-rmw-fastrtps-cpp                               6.2.7-1jammy.20241128.022749                      arm64        Implement the ROS middleware interface using eProsima FastRTPS static code generation in C++.
+ii  ros-humble-rmw-fastrtps-shared-cpp                        6.2.7-1jammy.20241128.015024                      arm64        Code shared on static and dynamic type support of rmw_fastrtps_cpp.
+ii  ros-humble-rviz2                                          11.2.16-1jammy.20250121.162726                    arm64        3D visualization tool for ROS.
+---CLOCKS---
+clocks NOT locked (sudo jetson_clocks; latencies 2-3x higher): cpu0 729600 / 2201600 / 2201600 kHz, gpu 306000000 / 1300500000 / 306000000 Hz (min / max / current), power mode MAXN
+CLOCK_EXIT:1
+---UP---
+ 18:43:53 up 14 min,  0 users,  load average: 31.91, 29.53, 18.74
+---DF---
+/dev/nvme0n1p1  937G   55G  835G   7% /

@@ -160,18 +160,37 @@ sudo dpkg -i ros-humble-foxglove-bridge_*_arm64.deb
 
 Depends 不满足就停下，不要 `--force-depends`。
 
-**1. 狗上，确认检测已经在跑。** 从笔记本 `ssh nvidia@192.168.122.100`（密码不写进仓库）。
+**1. 狗上，看 `lidar-3d-detection` 的日志。** 从笔记本 `ssh nvidia@192.168.122.100`（密码不写进仓库）。服务以 root 跑，标准输出进 journald；glog 同时写 `/tmp/lidar_3d_detection_logs/`（`/etc/default/lidar-3d-detection` 里的 `LIDAR3D_LOG_DIR` 没有打开时就是这个目录）。两边都是这次开机的日志，重启就没了。`nvidia` 在 `adm` 组里，看 journal 不用 sudo。`/tmp/lidar3d_foxglove/node.log` 只在编译机上跑 `orin_foxglove.sh` 时才有，实车服务不写那里。
+
+先看服务在不在：
 
 ```bash
 systemctl is-active lidar-3d-detection
-journalctl -u lidar-3d-detection -n 20 --no-pager
+```
+
+要是 `active`。跟着刷（Ctrl-C 结束）：
+
+```bash
+journalctl -u lidar-3d-detection -f
+```
+
+只看最近 50 行：
+
+```bash
+journalctl -u lidar-3d-detection -n 50 --no-pager
+```
+
+同一份 glog，`INFO` 是当前这次启动的符号链接：
+
+```bash
+tail -f /tmp/lidar_3d_detection_logs/lidar_3d_detection.INFO
 ```
 
 要看到 `lidar_3d_detection up`，配置是 `/opt/seres/perception/...`，没有 `publishing TF`。一直是 `waiting for a good INS solution` 或 `no pose for scan yet`：定位还不是好解（`ins_status` 要是 3），出门固定后再看，这时还没有框。这时每秒还有一行 `no frames yet (waiting for a pose) | clouds N frames 0 skipped N`：`clouds` 约 10、`skipped` 0，说明点云收齐了，等的只是定位。
 
 狗走起来以后日志里出现 error `the robot walks backwards in the body frame`：配置里的天线接法（`ins_azimuth_offset_deg`，现在是 0921 接反时的 180）和这台狗的不一样，框会叠出重影。接正的狗要把 `ins_azimuth_offset_deg` 改成 0、`ins_lever_arm` 改成 IMU 中心 `[0.0213, -0.18, 0.0]`（`docs/LOCALIZATION.md` 第 10 节）。
 
-**2. 狗上，前台开桥。** 环境必须和检测服务一样（systemd 不读 `.bashrc`）。看完在这个终端 Ctrl-C。服务是 root 跑的，车上的 CycloneDDS 开了共享内存；`nvidia` 用户起的桥能不能接上还没试过（2026-11-04）。先在同一个环境里 `ros2 topic list | grep perception` 看得到 `/perception/lidar_3d/*` 再开桥，看不到就停下报告。
+**2. 狗上，前台开桥。** 环境必须和检测服务一样（systemd 不读 `.bashrc`）。看完在这个终端 Ctrl-C。服务是 root 跑的，车上的 CycloneDDS 开了共享内存。T34 用 `nvidia` 用户按这段环境起桥：`/perception/lidar_3d/*` 列得出来，三个话题都在桥的通道里；没有固定解时 objects、tracks 没有消息；原始点云 10 秒只收到 10 条，不是约 100 条。点云稀，再试把桥改成 root（和雷达节点同一个用户，才能走共享内存），试完停掉。先在同一个环境里 `ros2 topic list | grep perception` 看得到 `/perception/lidar_3d/*` 再开桥，看不到就停下报告。
 
 ```bash
 set -a
@@ -228,7 +247,7 @@ rviz2
 
 RViz 里：Global Options 的 Fixed Frame 填 `camera_init`。Add → By topic，加上 `/perception/lidar_3d/tracks` 和 `/perception/lidar_3d/predictions`，显示类型都是 MarkerArray。
 
-狗上要有 `ros-humble-rviz2`。没有的话不要在狗上 `apt install`（源出不去）。在能上网的机器下载和这台 Humble 匹配的 arm64 deb，`sudo dpkg -i`。依赖不满足或起不来就停下，不要 `--force-depends`。`ssh -X` 没有窗口时改 `-Y`。
+8 号狗上已经装着 `ros-humble-rviz2` 11.2.16（T34）。别的狗没有的话不要 `apt install`（源出不去）。在能上网的机器下载和这台 Humble 匹配的 arm64 deb，`sudo dpkg -i`。依赖不满足或起不来就停下，不要 `--force-depends`。`ssh -X` 没有窗口时改 `-Y`。
 
 **笔记本自己跑 `rviz2`：笔记本要接在狗的 eth1 那一侧。** `192.168.122.100` 是 eth0，从那边不行。笔记本上的网卡名通常不叫 eth1，不要把狗的 `/opt/ros/cyclonedds.xml` 原样拿来用，把 `name` 换成笔记本上接到狗的那块网卡。
 

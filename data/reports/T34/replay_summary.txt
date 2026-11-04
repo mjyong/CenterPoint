@@ -1,0 +1,10 @@
+=== A clocks ===
+clocks NOT locked (sudo jetson_clocks; latencies 2-3x higher): cpu0 729600 / 2201600 / 2201600 kHz, gpu 306000000 / 1300500000 / 306000000 Hz (min / max / current), power mode MAXN
+A_EXIT:0
+=== lock ===
+LOCK:0
+clocks locked: cpu0 2201600 / 2201600 / 2201600 kHz, gpu 1300500000 / 1300500000 / 1300500000 Hz (min / max / current), power mode MAXN
+B_EXIT:0
+=== restore ===
+RESTORE:0
+clocks NOT locked (sudo jetson_clocks; latencies 2-3x higher): cpu0 729600 / 2201600 / 2201600 kHz, gpu 306000000 / 1300500000 / 306000000 Hz (min / max / current), power mode MAXN

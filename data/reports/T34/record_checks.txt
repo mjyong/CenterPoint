@@ -1,0 +1,128 @@
+not found: "/home/nvidia/localization/lightning-lm-master/install/local_setup.bash"
+=== cloud ===
+average rate: 5.277
+	min: 0.087s max: 0.417s std dev: 0.12505s window: 6
+average rate: 7.695
+	min: 0.055s max: 0.417s std dev: 0.08777s window: 17
+average rate: 8.429
+	min: 0.055s max: 0.417s std dev: 0.07016s window: 28
+average rate: 8.397
+	min: 0.055s max: 0.417s std dev: 0.06787s window: 37
+average rate: 8.106
+	min: 0.055s max: 0.417s std dev: 0.07671s window: 44
+average rate: 8.147
+	min: 0.055s max: 0.417s std dev: 0.07388s window: 53
+average rate: 7.764
+	min: 0.055s max: 0.417s std dev: 0.08267s window: 59
+average rate: 7.796
+	min: 0.053s max: 0.417s std dev: 0.08134s window: 68
+=== front ===
+average rate: 25.154
+	min: 0.017s max: 0.055s std dev: 0.00932s window: 26
+average rate: 24.920
+	min: 0.017s max: 0.058s std dev: 0.00980s window: 51
+average rate: 25.051
+	min: 0.017s max: 0.058s std dev: 0.00892s window: 77
+average rate: 25.064
+	min: 0.017s max: 0.066s std dev: 0.00989s window: 103
+average rate: 25.048
+	min: 0.017s max: 0.066s std dev: 0.01047s window: 128
+average rate: 25.022
+	min: 0.017s max: 0.066s std dev: 0.01011s window: 153
+average rate: 25.054
+	min: 0.017s max: 0.072s std dev: 0.01026s window: 179
+average rate: 25.013
+	min: 0.017s max: 0.072s std dev: 0.01011s window: 204
+average rate: 25.003
+	min: 0.017s max: 0.072s std dev: 0.00971s window: 230
+=== left ===
+average rate: 24.741
+	min: 0.019s max: 0.068s std dev: 0.01136s window: 27
+average rate: 24.874
+	min: 0.019s max: 0.068s std dev: 0.01030s window: 53
+average rate: 25.064
+	min: 0.016s max: 0.068s std dev: 0.01083s window: 79
+average rate: 25.048
+	min: 0.016s max: 0.068s std dev: 0.01021s window: 104
+average rate: 25.038
+	min: 0.016s max: 0.068s std dev: 0.01010s window: 129
+average rate: 24.981
+	min: 0.016s max: 0.068s std dev: 0.01057s window: 154
+average rate: 25.018
+	min: 0.015s max: 0.068s std dev: 0.01064s window: 180
+average rate: 25.021
+	min: 0.015s max: 0.068s std dev: 0.01051s window: 206
+average rate: 24.996
+	min: 0.008s max: 0.068s std dev: 0.01083s window: 231
+average rate: 25.019
+	min: 0.008s max: 0.068s std dev: 0.01111s window: 257
+=== right ===
+average rate: 25.329
+	min: 0.013s max: 0.066s std dev: 0.01113s window: 27
+average rate: 25.113
+	min: 0.013s max: 0.066s std dev: 0.00985s window: 52
+average rate: 25.184
+	min: 0.010s max: 0.068s std dev: 0.01177s window: 78
+average rate: 25.174
+	min: 0.010s max: 0.068s std dev: 0.01191s window: 104
+average rate: 25.060
+	min: 0.009s max: 0.068s std dev: 0.01184s window: 129
+average rate: 25.059
+	min: 0.009s max: 0.068s std dev: 0.01146s window: 155
+average rate: 25.084
+	min: 0.009s max: 0.068s std dev: 0.01129s window: 181
+average rate: 25.067
+	min: 0.009s max: 0.068s std dev: 0.01144s window: 206
+average rate: 25.044
+	min: 0.009s max: 0.068s std dev: 0.01144s window: 231
+=== rear ===
+average rate: 24.620
+	min: 0.017s max: 0.067s std dev: 0.01329s window: 26
+average rate: 24.740
+	min: 0.014s max: 0.067s std dev: 0.01259s window: 52
+average rate: 24.949
+	min: 0.008s max: 0.067s std dev: 0.01382s window: 78
+average rate: 24.906
+	min: 0.008s max: 0.067s std dev: 0.01317s window: 103
+average rate: 24.854
+	min: 0.008s max: 0.067s std dev: 0.01293s window: 128
+average rate: 24.881
+	min: 0.008s max: 0.067s std dev: 0.01260s window: 154
+average rate: 24.933
+	min: 0.008s max: 0.067s std dev: 0.01230s window: 180
+average rate: 25.010
+	min: 0.008s max: 0.068s std dev: 0.01250s window: 206
+average rate: 24.943
+	min: 0.008s max: 0.068s std dev: 0.01273s window: 231
+=== imu ===
+average rate: 99.965
+	min: 0.003s max: 0.019s std dev: 0.00171s window: 101
+average rate: 99.770
+	min: 0.002s max: 0.022s std dev: 0.00187s window: 201
+average rate: 100.000
+	min: 0.002s max: 0.022s std dev: 0.00183s window: 302
+average rate: 99.990
+	min: 0.002s max: 0.022s std dev: 0.00192s window: 402
+average rate: 99.922
+	min: 0.002s max: 0.022s std dev: 0.00185s window: 503
+average rate: 99.994
+	min: 0.002s max: 0.022s std dev: 0.00181s window: 604
+average rate: 100.000
+	min: 0.002s max: 0.022s std dev: 0.00178s window: 705
+average rate: 99.997
+	min: 0.002s max: 0.022s std dev: 0.00175s window: 806
+average rate: 100.006
+	min: 0.002s max: 0.022s std dev: 0.00172s window: 907
+average rate: 100.005
+	min: 0.001s max: 0.023s std dev: 0.00186s window: 1007
+=== ins ===
+data: 1
+---
+=== pos ===
+data: 52
+---
+=== loss ===
+total_packet_count: 11207141
+total_packet_loss_count: 170
+---
+CHECKS_DONE

@@ -138,7 +138,7 @@
 | T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成，已复核。deb 装上后和 deploy/ 逐位相同，服务起停、卸载都对。复核：打包补了 patchelf、去掉编译目录的 RPATH、二进制不带源码路径、版本号带提交数；循环时 ID 不同是编号顺延（加了不看编号的 same_tracks_frames）；加了 publish_tf 和 Foxglove 实时看 |
 | T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 完成，已复核。删掉 deploy/ 以后服务器 CTest 27 项全过，升级前后、两条回放路径都逐位相同，TF、bridge 过。复核：板子重启后没锁频，节点慢 2–3 倍（每帧 55 ms，T31 是 15–21 ms），Foxglove 那次只有 5 Hz 的原因没分清（没锁频、DDS 缓冲、调试点云）；节点每秒那一行加了收到 / 发出 / 缺的帧数和最长回调，加了 orin_clocks.sh；板上服务的配置不是包里的 |
 | T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成，已复核。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置。复核："真狗是 CycloneDDS"没有依据，T34 核实；deb 带上 8 MB 的 Fast DDS profile，orin_foxglove.sh 默认用它；/etc/default 列了 DDS 选项 |
-| T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 待做 |
+| T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 完成。CycloneDDS 域 0、只绑 eth1、共享内存、socket 10 MB，节点 root。我们的话题各 1 个发布者、0 个订阅，TF 里没有 camera_init。deb `0.1.0+316.gdbde7ed`。室内 clouds 598 / skipped 0 / frames 0。和编译机比过门槛（匹配 0.998）。不锁频 total 中位 58.6 ms，锁频 37.1 ms（服务也在占 GPU），测完恢复未锁。录 64 s 点云 640 条，丢包计数没涨。nvidia 的 bridge 10 秒只收到 10 帧点云 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -6456,4 +6456,46 @@ R5 探针 `passed` true，65 s：cloud 452、原始点云 453、tracks 452、obj
 
 ### T34 结果
 
-（待填）
+（2026-11-04）8 号狗，室内，没有固定解。代码改动：无（收点云的那一行和 `build_deb.sh` 的 DDS 参数已经在拉下来的 `dbde7ed` 里）。pytest `22 passed`。
+
+**第 1 步。** `/opt/ros/cyclonedds.xml` 原样在 `data/reports/T34/cyclonedds_robot.xml`：`Domain Id="any"`，共享内存开着，只绑 `eth1`，`AllowMulticast` true，`SocketReceiveBufferSize` / `SocketSendBufferSize` 的 min 都是 10 MB。`~/.bashrc` 里反复写了 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`、`CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml`、`ROS_DOMAIN_ID=0`。机器人的 ROS 进程（雷达、RTK、SLAM、规划、导航感知，以及我们的 `lidar_3d_detection`）用户都是 root。装了 `rmw-cyclonedds-cpp` 1.3.4 和 `rmw-fastrtps-cpp` 6.2.7，还有 `ros-humble-rviz2` 11.2.16、`foxglove-msgs`。当时 `dpkg -l` 里没有 `foxglove-bridge`。时钟没锁：cpu0 729600 / 2201600 / 2201600 kHz，gpu 306 / 1300 / 306 MHz（min / max / current），电源模式 MAXN。刚启动 14 分钟，负载大约 32。
+
+**第 2 步。** `/perception/lidar_3d/objects`、`tracks`、`predictions` 各 1 个发布者、0 个订阅。节点名是 `_NODE_NAME_UNKNOWN_`（`nvidia` 的 `ros2 topic info` 看不到 root 的图），三个 GID 前缀相同，QoS 深度是 5、5、5，和节点里 `create_publisher(..., 5)` 一致；`/perception/lidar_3d/cloud` 也是这一个参与者，深度 2（发布器一直建着，`publish_cloud` 仍是关的）。没有第二个发布者。规划没有订 `/perception/lidar_3d/objects`。同名以外的感知话题是 `/perception/ptz_*`、`/perception/seg_det_result`。`/tf`、`/tf_static` 里的 frame 是 `map`、`base_link`、`ptz_infrared`、`ptz_visible`，没有 `camera_init`，也没有 `lidar_det`。
+
+**第 3 步。** 引擎按 `--opt-pillars 10000` 重建（没锁频，服务开着）：PFN GPU 中位 2.76 ms、p99 12.1 ms，轮廓 opt 是 10000；RPN GPU 中位 7.23 ms、p99 14.5 ms。DLA 那句 fallback 和以前一样，引擎在 GPU 上。deb `lidar-3d-detection_0.1.0+316.gdbde7ed`（35 MB）。报告里的 settings 是 `ROS_DOMAIN_ID=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml LIDAR3D_THREADS=4`。Depends 里两个 RMW 都有（`rmw-fastrtps-cpp >= 6.2.7-1jammy.20241128.022749`，`rmw-cyclonedds-cpp >= 1.3.4-1jammy.20251219.095239`）。`--force-confnew` 装上，从 `0.1.0+313.g5b2b6bd` 升上来。`/etc/default` 的 diff 只有新模板多出来的注释行（DDS 说明、注释掉的 Fast DDS profile），三个设置没变。服务 enabled、active。up 那一行没有 `publishing TF`。
+
+**第 4 步。** 重启后约 60 秒：56 行，clouds 598，frames 0，skipped 0。没有固定解，所以不出框。日志里仍是 `waiting for a good INS solution` / `no pose for scan yet`。点云在这台 CycloneDDS 上收得齐，不用改机器人的 XML。
+
+**第 5 步。** 离线回放 `bags/rosbag2_0921_600`，服务一直开着（多占 GPU）。两遍都是 12608 messages、600 clouds、599 frames、6044 tracks。不锁频（a）墙钟 51.0 s，锁频（b）37.2 s。和编译机 T33 的 `ref_c.npz` 比（各自检测）：599 / 599 帧，匹配 0.9983，`score_p99` 0.0067，`center_p99` 0.0038，漏 43、多 43，gates pass。延迟（中位 / p99，毫秒，热身 5 帧不算）：
+
+| 运行 | total | det_gpu | det_network | preprocess |
+|---|---|---|---|---|
+| a 不锁频 | 58.57 / 98.71 | 33.56 / 65.85 | 21.19 / 50.92 | 16.28 / 42.54 |
+| b 锁频 | 37.05 / 67.97 | 16.67 / 37.48 | 8.92 / 18.20 | 13.65 / 41.46 |
+
+比编译机锁频时在线的 17.7 ms 慢：这边服务也在用 GPU，而且没锁频时整机负载高。第 1 步原来没锁，`--store` 存过之后测完 `--restore`，结束时仍是没锁。
+
+**第 6 步。** `ins_status` 1、`pos_type` 52，固定解那一关不过，照任务照样录了 `1104_t34`，录完删了。丢包计数开始是 170（不是 0），录完还是 170，这段没有新的 UDP 丢包。时长 64.13 s：
+
+| 话题 | 条数 | 约 |
+|---|---|---|
+| `/robot/topic/rdap/top_point_cloud2` | 640 | 10.0 × T（10×T−5 = 636，不用再按车上的 XML 录一遍） |
+| `/rte/rdap/rtk/imus/data_raw` | 6419 | 100 × T |
+| `/rte/rdap/rtk/inspvax` | 6418 | 100 × T |
+| 四路 `*_sensor_camera` | 1585 / 1588 / 1583 / 1580 | 约 24.7 Hz。录之前 `topic hz` 就是约 25，不是录的时候丢掉的 |
+| `/lidar_packets_loss` | 641 | 约 10 Hz |
+
+录之前不设 `CYCLONEDDS_URI` 的 `topic hz` 只有约 7.8，间隔最大 0.42 s；bag 的条数是齐的（录包队列 256 MB、按发布者的 RELIABLE 订）。看收没收齐以 bag 条数为准。
+
+**第 7 步。** `ros-humble-foxglove-bridge` 3.6.0 arm64（sha256 `797ce436…9916`）`dpkg -i` 成功。装的时候显示是盖在已经有的同一个 3.6.0 上（第 1 步的列表里还没有这个包）。`nvidia` 用户、和服务相同的 `/etc/default` 起桥：三个话题都在通道里，objects、tracks 是 silent（没有固定解），原始点云 10 秒 10 条，不是约 100。桥已停，服务仍是 active。若干机器人自己的消息缺 `.msg`（`AMENT_PREFIX_PATH` 只有我们的安装和 `/opt/ros/humble`），不影响这几个话题。
+
+**第 8 步。** 服务 enabled、active。`/etc/default` 是第 3 步装上的那份。狗上 `data/*.npz`、室内这份 bag 删了。`~/dogperc/bags/rosbag2_0921_600` 留着。时钟恢复成没锁。
+
+**结论（要人定的）。**
+
+- 车上 `/etc/default` 就用现在这四行：域 0、CycloneDDS、`file:///opt/ros/cyclonedds.xml`、4 线程。新打的包已经写成这样。机器人的 XML 不用加缓冲（第 4 步 skipped 0，里面已经是 10 MB）。
+- 开机锁频：不锁时回放 total 中位 59 ms，锁了 37 ms，服务还在旁边占 GPU。要不要在服务里加可选的 `jetson_clocks` 仍是人定；这次测完已经恢复成没锁。
+- `camera_init` 现在不在车上的 TF 里，不用改名。实车继续不要开 `publish_tf`。
+- 天线接法这次看不了（没走、也没有固定解）。狗走起来以后若报 `walks backwards`，再改 `ins_azimuth_offset_deg`。
+- 笔记本上的 Foxglove：桥用 `nvidia` 起得起来，但原始点云只有大约 1 Hz。要看密的点云，桥改成 root 再试（这次没改成 root 起）。没有固定解时没有框。
+- `ros-humble-rviz2` 11.2.16 已经在 8 号狗上。从 `192.168.122.100` 看仍要 `ssh -X` 在狗上跑。

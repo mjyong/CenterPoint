@@ -1,0 +1,15 @@
+CLEAN:0
+enabled:enabled
+active:active
+=== default ===
+ROS_DOMAIN_ID=0
+RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+LIDAR3D_THREADS=4
+=== bags ===
+rosbag2_0921_600
+=== npz ===
+no_npz
+=== bridge ===
+19922 bash -c rm -rf ~/dogperc/data/*.npz /tmp/debx /home/nvidia/bags/1104_t34 /tmp/foxglove_bridge.log /tmp/foxglove_bridge.pid /tmp/ros-humble-foxglove-bridge_3.6.0-1jammy.20260929.215014_arm64.deb; echo CLEAN:$?; echo enabled:$(systemctl is-enabled lidar-3d-detection); echo active:$(systemctl is-active lidar-3d-detection); echo === default ===; grep -E "^(ROS_DOMAIN_ID|RMW_IMPLEMENTATION|CYCLONEDDS_URI|LIDAR3D_THREADS)=" /etc/default/lidar-3d-detection; echo === bags ===; ls ~/dogperc/bags; echo === npz ===; ls ~/dogperc/data/*.npz 2>/dev/null || echo no_npz; echo === bridge ===; pgrep -af foxglove_bridge || echo no_bridge; ~/dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_clocks.sh
+clocks NOT locked (sudo jetson_clocks; latencies 2-3x higher): cpu0 729600 / 2201600 / 1344000 kHz, gpu 306000000 / 1300500000 / 816000000 Hz (min / max / current), power mode MAXN

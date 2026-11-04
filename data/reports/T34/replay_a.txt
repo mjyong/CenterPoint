@@ -1,0 +1,2 @@
+cloud 600 stamp 1789980147.899 points_in 106880 points_out 195414 preprocess 15.4 ms
+12608 messages, 600 clouds, 599 frames, 6044 tracks, 51.0 s -> data/dog_a.npz

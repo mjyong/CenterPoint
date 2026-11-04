@@ -1,0 +1,6 @@
+Nov 04 19:01:59 tegra-ubuntu start_lidar_3d_detection.sh[16487]: I1104 19:01:59.196884 16487 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0
+Nov 04 19:02:00 tegra-ubuntu start_lidar_3d_detection.sh[16487]: I1104 19:02:00.325078 16487 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0
+Nov 04 19:02:01 tegra-ubuntu start_lidar_3d_detection.sh[16487]: I1104 19:02:01.319468 16487 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 10 frames 0 skipped 0
+Nov 04 19:02:02 tegra-ubuntu start_lidar_3d_detection.sh[16487]: I1104 19:02:02.395836 16487 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0
+Nov 04 19:02:03 tegra-ubuntu start_lidar_3d_detection.sh[16487]: I1104 19:02:03.397034 16487 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 10 frames 0 skipped 0
+lines 56 clouds 598 frames 0 skipped 0

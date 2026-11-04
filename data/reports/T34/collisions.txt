@@ -1,0 +1,80 @@
+==== /perception/lidar_3d/objects ====
+Type: perception_interface/msg/LidarObjectArray
+
+Publisher count: 1
+
+Node name: _NODE_NAME_UNKNOWN_
+Node namespace: _NODE_NAMESPACE_UNKNOWN_
+Topic type: perception_interface/msg/LidarObjectArray
+Endpoint type: PUBLISHER
+GID: 01.10.6d.e6.47.9c.49.d7.0f.1b.e8.4c.00.00.18.03.00.00.00.00.00.00.00.00
+QoS profile:
+  Reliability: RELIABLE
+  History (Depth): KEEP_LAST (5)
+  Durability: VOLATILE
+  Lifespan: Infinite
+  Deadline: Infinite
+  Liveliness: AUTOMATIC
+  Liveliness lease duration: Infinite
+
+Subscription count: 0
+
+==== /perception/lidar_3d/tracks ====
+Type: visualization_msgs/msg/MarkerArray
+
+Publisher count: 1
+
+Node name: _NODE_NAME_UNKNOWN_
+Node namespace: _NODE_NAMESPACE_UNKNOWN_
+Topic type: visualization_msgs/msg/MarkerArray
+Endpoint type: PUBLISHER
+GID: 01.10.6d.e6.47.9c.49.d7.0f.1b.e8.4c.00.00.19.03.00.00.00.00.00.00.00.00
+QoS profile:
+  Reliability: RELIABLE
+  History (Depth): KEEP_LAST (5)
+  Durability: VOLATILE
+  Lifespan: Infinite
+  Deadline: Infinite
+  Liveliness: AUTOMATIC
+  Liveliness lease duration: Infinite
+
+Subscription count: 0
+
+==== /perception/lidar_3d/predictions ====
+Type: visualization_msgs/msg/MarkerArray
+
+Publisher count: 1
+
+Node name: _NODE_NAME_UNKNOWN_
+Node namespace: _NODE_NAMESPACE_UNKNOWN_
+Topic type: visualization_msgs/msg/MarkerArray
+Endpoint type: PUBLISHER
+GID: 01.10.6d.e6.47.9c.49.d7.0f.1b.e8.4c.00.00.1a.03.00.00.00.00.00.00.00.00
+QoS profile:
+  Reliability: RELIABLE
+  History (Depth): KEEP_LAST (5)
+  Durability: VOLATILE
+  Lifespan: Infinite
+  Deadline: Infinite
+  Liveliness: AUTOMATIC
+  Liveliness lease duration: Infinite
+
+Subscription count: 0
+
+==== LIST ====
+/perception/lidar_3d/cloud
+/perception/lidar_3d/objects
+/perception/lidar_3d/predictions
+/perception/lidar_3d/tracks
+/perception/ptz_infrared_image
+/perception/ptz_ori_image
+/perception/seg_det_result
+/planning/debug/path_tracking
+      3   child_frame_id: base_link
+      3   child_frame_id: map
+      2   child_frame_id: ptz_infrared
+      2   child_frame_id: ptz_visible
+      3     frame_id: base_link
+      3     frame_id: map
+      2     frame_id: ptz_infrared
+      2     frame_id: ptz_visible

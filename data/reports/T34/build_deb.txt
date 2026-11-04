@@ -1,0 +1,40 @@
+Finished <<< kygi665_msgs [2.19s]
+Finished <<< common_interface [2.41s]
+Starting >>> perception_interface
+Finished <<< perception_interface [1.41s]
+Starting >>> lidar_3d_detection
+[Processing: lidar_3d_detection]
+[Processing: lidar_3d_detection]
+[Processing: lidar_3d_detection]
+Finished <<< lidar_3d_detection [1min 31s]
+
+Summary: 5 packages finished [1min 36s]
+package   /home/nvidia/dogperc/deb/lidar-3d-detection_0.1.0+316.gdbde7ed_arm64.deb
+built on  tegra-ubuntu R36 (release), REVISION: 4.0, GCID: 37537400, BOARD: generic, EABI: aarch64, DATE: Fri Sep 13 04:36:44 UTC 2024
+prefix    /opt/seres/perception
+git       none
+model     /home/nvidia/dogperc/models/nusc_pp_dyn
+settings  /etc/default/lidar-3d-detection: ROS_DOMAIN_ID=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml LIDAR3D_THREADS=4 
+bb68f41a0c3818baefc9e53c88ad1303507e9a74a41322525f0c602c964c8086  engines.json
+78ee0c5e7a2d1f6057ebdf35f3a6210dfbd8b85c977297ef590335714e5c0bfc  model_meta.json
+cf93905294d7aba4c531cca9eb89ac270ebf9805645064789d839ba4264a50c1  pfn.fp16.engine
+8e2d9ff48559635d7d59e4e4fc300572d4a549f8e0adf4e33b406563f0267be1  pfn.onnx
+686e614dfffaba869050bf6c9d70b82689144f486d5ece18f520dbc4c72d1f7d  rpn_head.fp16.engine
+8f8fe36fcaeeb3c4a4f44eadadffe75fda540ac44d9d1df33392c39f3c988c15  rpn_head.onnx
+
+ Package: lidar-3d-detection
+ Version: 0.1.0+316.gdbde7ed
+ Architecture: arm64
+ Maintainer: junyong.mou <junyong.mou@seres.cn>
+ Section: misc
+ Priority: optional
+ Installed-Size: 62044
+ Depends: python3, ros-humble-rmw-fastrtps-cpp (>= 6.2.7-1jammy.20241128.022749), ros-humble-rmw-cyclonedds-cpp (>= 1.3.4-1jammy.20251219.095239), cuda-cudart-12-6 (>= 12.6.68-1), libc6 (>= 2.35-0ubuntu3.8), libconsole-bridge1.0 (>= 1.0.1+dfsg2-3), libcudla-12-6 (>= 12.6.68-1), libexpat1 (>= 2.4.7-1ubuntu0.3), libfmt8 (>= 8.1.1+ds1-2), libgcc-s1 (>= 13.1.0-8ubuntu1~22.04), libgflags2.2 (>= 2.2.2-2), libgoogle-glog0v5 (>= 0.5.0+really0.4.0-2), libnvinfer10 (= 10.3.0.30-1+cuda12.5), libpython3.10 (>= 3.10.12-1~22.04.9), libspdlog1 (>= 1:1.9.2+ds-0.2), libstdc++6 (>= 13.1.0-8ubuntu1~22.04), libtinyxml2-9 (>= 9.0.0+dfsg-3), libyaml-cpp0.7 (>= 0.7.0+dfsg-8build1), nvidia-l4t-core (>= 36.4.0-20240912212859), nvidia-l4t-cuda (>= 36.4.0-20240912212859), nvidia-l4t-dla-compiler (>= 36.4.0-20240912212859), ros-humble-action-msgs (>= 1.2.1-1jammy.20241128.010818), ros-humble-ament-index-cpp (>= 1.4.0-2jammy.20241125.235754), ros-humble-builtin-interfaces (>= 1.2.1-1jammy.20241128.010521), ros-humble-class-loader (>= 2.2.0-3jammy.20241128.003556), ros-humble-fastcdr (>= 1.0.24-2jammy.20241125.212236), ros-humble-geometry-msgs (>= 4.2.4-1jammy.20241128.015401), ros-humble-libstatistics-collector (>= 1.3.4-1jammy.20241128.030151), ros-humble-libyaml-vendor (>= 1.2.2-2jammy.20241128.003548), ros-humble-nav-msgs (>= 4.2.4-1jammy.20241128.021918), ros-humble-rcl (>= 5.3.9-1jammy.20241128.024800), ros-humble-rcl-action (>= 5.3.9-1jammy.20241128.030322), ros-humble-rclcpp (>= 16.0.11-1jammy.20241128.035217), ros-humble-rclcpp-action (>= 16.0.11-1jammy.20241128.043804), ros-humble-rcl-interfaces (>= 1.2.1-1jammy.20241128.011502), ros-humble-rcl-logging-interface (>= 2.3.1-1jammy.20241128.003545), ros-humble-rcl-logging-spdlog (>= 2.3.1-1jammy.20241128.003843), ros-humble-rcl-yaml-param-parser (>= 5.3.9-1jammy.20241128.004536), ros-humble-rcpputils (>= 2.4.4-1jammy.20241128.002909), ros-humble-rcutils (>= 5.1.6-1jammy.20241128.001908), ros-humble-rmw (>= 6.1.2-1jammy.20241128.003608), ros-humble-rmw-implementation (>= 2.8.4-1jammy.20241128.023155), ros-humble-rosbag2-cpp (>= 0.15.13-1jammy.20241128.095006), ros-humble-rosbag2-storage (>= 0.15.13-1jammy.20241128.094215), ros-humble-rosgraph-msgs (>= 1.2.1-1jammy.20241128.011953), ros-humble-rosidl-runtime-c (>= 3.1.6-1jammy.20241128.002847), ros-humble-rosidl-typesupport-c (>= 2.0.2-1jammy.20241128.003903), ros-humble-rosidl-typesupport-cpp (>= 2.0.2-1jammy.20241128.004402), ros-humble-rosidl-typesupport-fastrtps-c (>= 2.2.2-2jammy.20241128.005028), ros-humble-rosidl-typesupport-fastrtps-cpp (>= 2.2.2-2jammy.20241128.004548), ros-humble-rosidl-typesupport-introspection-c (>= 3.1.6-1jammy.20241128.003456), ros-humble-rosidl-typesupport-introspection-cpp (>= 3.1.6-1jammy.20241128.003919), ros-humble-sensor-msgs (>= 4.2.4-1jammy.20241128.023014), ros-humble-statistics-msgs (>= 1.2.1-1jammy.20241128.012005), ros-humble-std-msgs (>= 4.2.4-1jammy.20241128.012402), ros-humble-tf2 (>= 0.25.12-1jammy.20250121.124005), ros-humble-tf2-msgs (>= 0.25.12-1jammy.20250121.123823), ros-humble-tf2-ros (>= 0.25.12-1jammy.20250121.125241), ros-humble-tracetools (>= 4.1.1-1jammy.20241126.020149), ros-humble-unique-identifier-msgs (>= 2.2.1-3jammy.20241128.010502), ros-humble-visualization-msgs (>= 4.2.4-1jammy.20241128.023854), zlib1g (>= 1:1.2.11.dfsg-2ubuntu9.2)
+ Recommends: ros-humble-ros2launch, ros-humble-ros2bag, ros-humble-rosbag2-storage-default-plugins
+ Description: lidar 3D detection, tracking and prediction (ROS 2 node lidar_3d_detection)
+  lidar_3d_detection and its interface packages (common_interface, nav2_interface,
+  perception_interface, kygi665_msgs) installed in /opt/seres/perception, with the model and the
+  TensorRT fp16 engines built on tegra-ubuntu (R36 (release), REVISION: 4.0, GCID: 37537400, BOARD: generic, EABI: aarch64, DATE: Fri Sep 13 04:36:44 UTC 2024), and the systemd unit
+  lidar-3d-detection.service (settings in /etc/default/lidar-3d-detection).
+
+wrote /home/nvidia/dogperc/deb/lidar-3d-detection_0.1.0+316.gdbde7ed_arm64.deb (35M), report /home/nvidia/dogperc/deb/lidar-3d-detection_0.1.0+316.gdbde7ed_arm64.txt

@@ -1,0 +1,40 @@
+not found: "/home/nvidia/localization/lightning-lm-master/install/local_setup.bash"
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1793790464.153474624] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1793790464.168557152] [rosbag2_storage]: Opened database '/home/nvidia/bags/1104_t34/1104_t34_0.db3' for READ_WRITE.
+[INFO] [1793790464.175109632] [rosbag2_recorder]: Listening for topics...
+[INFO] [1793790464.176696448] [rosbag2_recorder]: Recording...
+[INFO] [1793790464.184147808] [rosbag2_recorder]: Event publisher thread: Starting
+[INFO] [1793790464.230367872] [rosbag2_recorder]: Subscribed to topic '/rte/rdap/rtk/imus/data_raw'
+[INFO] [1793790464.238343168] [rosbag2_recorder]: Subscribed to topic '/rte/rdap/rtk/inspvax'
+[INFO] [1793790464.351105792] [rosbag2_recorder]: Subscribed to topic '/lidar_packets_loss'
+[INFO] [1793790464.360582976] [rosbag2_recorder]: Subscribed to topic '/robot/topic/rdap/right_sensor_camera'
+[INFO] [1793790464.375334496] [rosbag2_recorder]: Subscribed to topic '/robot/topic/rdap/front_sensor_camera'
+[INFO] [1793790464.386888192] [rosbag2_recorder]: Subscribed to topic '/robot/topic/rdap/left_sensor_camera'
+[INFO] [1793790464.391307296] [rosbag2_recorder]: Subscribed to topic '/robot/topic/rdap/rear_sensor_camera'
+[INFO] [1793790464.400224288] [rosbag2_recorder]: Subscribed to topic '/robot/topic/rdap/top_point_cloud2'
+[INFO] [1793790464.400311840] [rosbag2_recorder]: All requested topics are subscribed. Stopping discovery...
+[INFO] [1793790528.416347200] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[INFO] [1793790528.418186368] [rosbag2_recorder]: Event publisher thread: Exiting
+[INFO] [1793790528.418458208] [rosbag2_recorder]: Recording stopped
+RECORD1:124
+
+Files:             1104_t34_0.db3
+Bag size:          2.1 GiB
+Storage id:        sqlite3
+Duration:          64.130195680s
+Start:             Nov  4 2026 19:07:44.282891840 (1793790464.282891840)
+End:               Nov  4 2026 19:08:48.413087520 (1793790528.413087520)
+Messages:          20454
+Topic information: Topic: /robot/topic/rdap/top_point_cloud2 | Type: sensor_msgs/msg/PointCloud2 | Count: 640 | Serialization Format: cdr
+                   Topic: /robot/topic/rdap/rear_sensor_camera | Type: foxglove_msgs/msg/CompressedVideo | Count: 1580 | Serialization Format: cdr
+                   Topic: /robot/topic/rdap/left_sensor_camera | Type: foxglove_msgs/msg/CompressedVideo | Count: 1588 | Serialization Format: cdr
+                   Topic: /robot/topic/rdap/front_sensor_camera | Type: foxglove_msgs/msg/CompressedVideo | Count: 1585 | Serialization Format: cdr
+                   Topic: /robot/topic/rdap/right_sensor_camera | Type: foxglove_msgs/msg/CompressedVideo | Count: 1583 | Serialization Format: cdr
+                   Topic: /lidar_packets_loss | Type: hesai_ros_driver/msg/LossPacket | Count: 641 | Serialization Format: cdr
+                   Topic: /rte/rdap/rtk/inspvax | Type: kygi665_msgs/msg/INSPVAX | Count: 6418 | Serialization Format: cdr
+                   Topic: /rte/rdap/rtk/imus/data_raw | Type: sensor_msgs/msg/Imu | Count: 6419 | Serialization Format: cdr
+
+=== loss after ===
+total_packet_count: 11651141
+total_packet_loss_count: 170
+---

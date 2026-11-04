@@ -1,0 +1,52 @@
+/home/nvidia/dogperc/deb/lidar-3d-detection_0.1.0+316.gdbde7ed_arm64.deb
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages will be upgraded:
+  lidar-3d-detection
+1 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/35.8 MB of archives.
+After this operation, 176 kB of additional disk space will be used.
+Get:1 /home/nvidia/dogperc/deb/lidar-3d-detection_0.1.0+316.gdbde7ed_arm64.deb lidar-3d-detection arm64 0.1.0+316.gdbde7ed [35.8 MB]
+debconf: delaying package configuration, since apt-utils is not installed
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 345437 files and directories currently installed.)
+Preparing to unpack .../lidar-3d-detection_0.1.0+316.gdbde7ed_arm64.deb ...
+Unpacking lidar-3d-detection (0.1.0+316.gdbde7ed) over (0.1.0+313.g5b2b6bd) ...
+Setting up lidar-3d-detection (0.1.0+316.gdbde7ed) ...
+
+Configuration file '/etc/default/lidar-3d-detection'
+ ==> Modified (by you or by a script) since installation.
+ ==> Package distributor has shipped an updated version.
+ ==> Using new file as you requested.
+Installing new version of config file /etc/default/lidar-3d-detection ...
+lidar-3d-detection: installed in /opt/seres/perception
+  the service is enabled (at boot) and started: systemctl status lidar-3d-detection
+  by hand:      /opt/seres/perception/lidar_3d_detection/bin/start_lidar_3d_detection.sh (stop the service first)
+  settings:     /etc/default/lidar-3d-detection
+APT_EXIT:0
+==== DIFF ====
+2a3,4
+> # DDS: the same middleware and settings as the robot's other nodes, or they do not hear each other (README "DDS")
+> #RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+4a7,8
+> # Fast DDS: 8 MB socket buffers, else ~3 MB clouds are lost (T33); the lidar driver needs them as well
+> #FASTRTPS_DEFAULT_PROFILES_FILE=/opt/seres/perception/lidar_3d_detection/share/lidar_3d_detection/fastdds_large_buffers.xml
+==== STATUS ====
+Version: 0.1.0+316.gdbde7ed
+enabled
+active
+==== DEFAULT ====
+# Environment of lidar-3d-detection.service (start_lidar_3d_detection.sh). Kept on upgrades.
+ROS_DOMAIN_ID=0
+# DDS: the same middleware and settings as the robot's other nodes, or they do not hear each other (README "DDS")
+#RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+# Fast DDS: 8 MB socket buffers, else ~3 MB clouds are lost (T33); the lidar driver needs them as well
+#FASTRTPS_DEFAULT_PROFILES_FILE=/opt/seres/perception/lidar_3d_detection/share/lidar_3d_detection/fastdds_large_buffers.xml
+LIDAR3D_THREADS=4
+#LIDAR3D_CONFIG=/opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml
+#LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model
+#LIDAR3D_LOG_DIR=/tmp/lidar_3d_detection_logs
+# a viewer (Foxglove, RViz) on this node: TF and the detector's input cloud; not with the vehicle's own TF tree
+#LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true
