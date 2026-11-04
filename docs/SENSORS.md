@@ -376,7 +376,7 @@ base 系（x 前、y 左、z 上）下的位置，单位 m：
 
 ### 7.2 按这个顺序做
 
-下面命令里的 `NAME` 换成这一次的名字，全文用同一个，例如 `1104_1540`。检查命令大约 12 秒后自己结束，看最后一行 `average rate`。第 4 步不是规定的两个数，就不要做第 6 步。
+下面命令里的 `NAME` 换成这一次的名字，全文用同一个，例如 `1104_1540`。检查命令大约 12 秒后自己结束，`topic hz` 看最后一行 `average rate`。第 4 步不是规定的两个数，就不要做第 6 步。
 
 在服务器上进狗：
 
@@ -394,15 +394,20 @@ export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export ROS_DOMAIN_ID=0
 ```
 
-**1. 雷达，约 10 Hz**
+**1. 雷达，约 10 Hz：录 12 秒数条数**
+
+不要用 `ros2 topic hz` 看雷达。它按 best effort 订，用 `nvidia` 和这里的环境只看到约 7.8 Hz、间隔最大 0.42 s；同一时间 `ros2 bag record`（按雷达的 RELIABLE 订）录到的条数是齐的（T34：64 s 640 条）。以录包的条数为准：
 
 ```bash
-timeout 12 ros2 topic hz /robot/topic/rdap/top_point_cloud2
+rm -rf /tmp/lidar_check
+timeout -s INT 12 ros2 bag record --max-cache-size 268435456 -o /tmp/lidar_check /robot/topic/rdap/top_point_cloud2
+ros2 bag info /tmp/lidar_check | grep -E "Duration|top_point_cloud2"
+rm -rf /tmp/lidar_check
 ```
 
-`average rate` 约 10。低于 9，或中间打印的间隔超过 0.3 s，先不要录。
+条数约 10 × Duration（差 5 条以内）。明显少，先不要录。
 
-**2. 四路相机，各约 27 Hz**
+**2. 四路相机，各约 25 Hz**
 
 ```bash
 timeout 12 ros2 topic hz /robot/topic/rdap/front_sensor_camera
@@ -411,7 +416,7 @@ timeout 12 ros2 topic hz /robot/topic/rdap/right_sensor_camera
 timeout 12 ros2 topic hz /robot/topic/rdap/rear_sensor_camera
 ```
 
-某一路没有 `average rate`，或远低于 20，这一路没有画面，先不要录。
+某一路没有 `average rate`，或远低于 20，这一路没有画面，先不要录。2026-11-04 先后看到 27 Hz 和 25 Hz（T34 录包里是 24.7 Hz），都正常。
 
 **3. IMU，约 100 Hz**
 
@@ -487,7 +492,7 @@ ros2 bag info /home/nvidia/bags/NAME
 |---|---|
 | `/robot/topic/rdap/top_point_cloud2` | 约 10 × T，差几个以内 |
 | `/rte/rdap/rtk/imus/data_raw`、`/rte/rdap/rtk/inspvax` | 各约 100 × T |
-| 四路 `*_sensor_camera` | 各约 27 × T |
+| 四路 `*_sensor_camera` | 各约 25 × T（25–27 Hz） |
 | `/lidar_packets_loss` | 大约 9 × T |
 
 雷达条数明显少一截（例如只有一半）：这份不要拿去标。删掉刚才的目录，用下面这一条重录。Humble 的 `ros2 bag record` 本来就按发布者的可靠性订（雷达是 RELIABLE），这条主要是把队列加深到 20；还是少，就停下来报告，不要反复重录（T34 会比较用车上的 `CYCLONEDDS_URI` 录）：

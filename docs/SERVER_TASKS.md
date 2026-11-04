@@ -138,7 +138,8 @@
 | T31 | Orin 部署 P8：车上部署包。板上用 `deploy_deb` 编译、打 deb；不装先解开跑；装上（要 root）后离线回放和 `deploy/` 逐位比、在线回放查不丢帧、服务起停、卸载 | Agent（安装要人或免密） | T30 | 1.5 小时 | 完成，已复核。deb 装上后和 deploy/ 逐位相同，服务起停、卸载都对。复核：打包补了 patchelf、去掉编译目录的 RPATH、二进制不带源码路径、版本号带提交数；循环时 ID 不同是编号顺延（加了不看编号的 same_tracks_frames）；加了 publish_tf 和 Foxglove 实时看 |
 | T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 完成，已复核。删掉 deploy/ 以后服务器 CTest 27 项全过，升级前后、两条回放路径都逐位相同，TF、bridge 过。复核：板子重启后没锁频，节点慢 2–3 倍（每帧 55 ms，T31 是 15–21 ms），Foxglove 那次只有 5 Hz 的原因没分清（没锁频、DDS 缓冲、调试点云）；节点每秒那一行加了收到 / 发出 / 缺的帧数和最长回调，加了 orin_clocks.sh；板上服务的配置不是包里的 |
 | T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成，已复核。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置。复核："真狗是 CycloneDDS"没有依据，T34 核实；deb 带上 8 MB 的 Fast DDS profile，orin_foxglove.sh 默认用它；/etc/default 列了 DDS 选项 |
-| T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 完成。CycloneDDS 域 0、只绑 eth1、共享内存、socket 10 MB，节点 root。我们的话题各 1 个发布者、0 个订阅，TF 里没有 camera_init。deb `0.1.0+316.gdbde7ed`。室内 clouds 598 / skipped 0 / frames 0。和编译机比过门槛（匹配 0.998）。不锁频 total 中位 58.6 ms，锁频 37.1 ms（服务也在占 GPU），测完恢复未锁。录 64 s 点云 640 条，丢包计数没涨。nvidia 的 bridge 10 秒只收到 10 帧点云 |
+| T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 完成，已复核。CycloneDDS 域 0、只绑 eth1、共享内存、socket 10 MB，节点 root。我们的话题各 1 个发布者、0 个订阅，TF 里没有 camera_init。deb `0.1.0+316.gdbde7ed`。室内 clouds 598 / skipped 0 / frames 0。和编译机比过门槛（匹配 0.998）。不锁频 total 中位 58.6 ms，锁频 37.1 ms（服务也在占 GPU），测完恢复未锁。录 64 s 点云 640 条，丢包计数没涨。nvidia 的 bridge 10 秒只收到 10 帧点云。复核：慢的原因是机器人自己的负载（load 32），不是我们的服务；不锁频 p99 99 ms 贴着帧间隔；nvidia 用户拿到的数据不全（root 的共享内存），撞车检查和 bridge 要用 root 再看；SENSORS 7.2 的雷达检查改成录 12 秒数条数 |
+| T35 | 8 号狗出门实跑：A 段室内（root 视角撞车、root 起 bridge、负载和 GPU）；B 段室外有固定解（在线每秒的帧数和延迟、天线接法、录包和离线回放对比、Foxglove） | Agent + 人（带狗出门） | T34 复核 | 1.5 小时 | 待做 |
 
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -6499,3 +6500,122 @@ R5 探针 `passed` true，65 s：cloud 452、原始点云 453、tracks 452、obj
 - 天线接法这次看不了（没走、也没有固定解）。狗走起来以后若报 `walks backwards`，再改 `ins_azimuth_offset_deg`。
 - 笔记本上的 Foxglove：桥用 `nvidia` 起得起来，但原始点云只有大约 1 Hz。要看密的点云，桥改成 root 再试（这次没改成 root 起）。没有固定解时没有框。
 - `ros-humble-rviz2` 11.2.16 已经在 8 号狗上。从 `192.168.122.100` 看仍要 `ssh -X` 在狗上跑。
+
+### T34 复核
+
+**结论认可**：8 号狗上车前室内能查的都查了。
+- 机器人的 DDS 有了原始证据（`cyclonedds_robot.xml`、进程、`~/.bashrc`），和 80a9546 说的一致；
+- 我们的三个话题各只有一个发布者，没有订阅者；TF 里只有 `map`、`base_link`、`ptz_*`，没有 `camera_init` 和 `lidar_det`；
+- 用 dbde7ed 在狗上重建引擎（`--opt-pillars 10000`），打出带车上 DDS 设置的 deb（`0.1.0+316`），升级后 `/etc/default` 只多了注释；
+- CycloneDDS 下真雷达 60 s 收到 598 帧、skipped 0。机器人的 XML 不用改；
+- 狗上回放 60 s 的 bag，和编译机比过门槛（匹配 0.998，599 / 599 帧）；录 64 s，雷达 640 条，丢包计数没涨。
+
+**看法不同或要补的**：
+1. **延迟慢的原因不是"服务也在占 GPU"**。没有定位时，服务每帧只做去重、去自身点，在去畸变那里就停了（`PoseOutOfRange`），不上 GPU。慢的是机器人自己的负载：开机 14 分钟时 load average 31.9（12 核），进程里有导航感知、`seg_det_result`、PTZ、规划、SLAM。锁频时各段和编译机比：
+
+   | 段（中位，ms） | 编译机（T28B / T33，锁频） | 8 号狗（锁频，机器人的程序都在跑） |
+   |---|---|---|
+   | 去重 | 2.6 | 6.2 |
+   | 体素化 | 1.6 | 3.4 |
+   | RPN | 4.75 | 6.84 |
+   | 预处理合计 | 6.2 | 13.7 |
+   | 检测 GPU | 约 9 | 16.7 |
+   | total | 17.7 | 37.1（p99 68） |
+
+   不锁频是 58.6 ms，p99 98.7 ms，已经贴着 100 ms 的帧间隔，尾巴上会连着丢帧。所以 8 号狗开机锁频比编译机更要紧。负载是不是一直这么高（开机 14 分钟可能还在起）、GPU 被谁占着，要在开机一小时以后用 tegrastats 再看一次（T35）。
+2. **`nvidia` 用户看到的不全**：狗上有 root 的 `iox-roudi`（CycloneDDS 的共享内存）。`nvidia` 的进程拿到的数据不全：
+   - `ros2 topic info` 里的节点名是 `_NODE_NAME_UNKNOWN_`；
+   - bridge 10 秒只收到 10 帧原始点云；
+   - `ros2 topic hz` 只有约 7.8 Hz（录包按 RELIABLE 订，是齐的）。
+
+   所以第 2 步"没有订阅者""TF 里没有 camera_init"是从 `nvidia` 这边看的，要用 root 再看一次（T35）。README 已经加了用 root 起 bridge 的命令（标明还没试过）。
+3. **SENSORS 7.2 的录前检查会误判**：第 1 步用 `ros2 topic hz` 看雷达，门槛是"低于 9 先不要录"，可这一侧只看得到 7.8 Hz。已改成录 12 秒数条数（约 10 × Duration）。相机实测 24.7–27 Hz，表里改成"各约 25 × T"。
+4. 引擎是在没锁频、机器人的程序都在跑的时候建的。TensorRT 建引擎时要逐个量战术的耗时，GPU 被别人占着时可能挑到慢的。下次建引擎前先锁频，不强求。
+
+**要人定的**（T34 的结论里也列了）：
+- **开机锁频**：8 号狗不锁时 p99 接近 100 ms。我建议在服务里加一个可选的开机 `jetson_clocks`（`/etc/default` 里一个开关，默认关，打包时可以打开），也可以交给机器人团队的系统设置；
+- **天线接法**：室内看不了，T35 出门时看；
+- 实车不发 TF、不发调试点云，维持现状。
+
+## T35 8 号狗：出门实跑（RTK 固定解，人带狗走）
+
+到这一步，室内能验的都验过了。还没见过的是有固定解时节点在真狗上实际出框：每秒的帧数、延迟、天线接法对不对、在线和离线回放是否一致，以及笔记本上 Foxglove 看到的样子。
+
+分两段：
+- **A 段**：室内，Agent 自己做，什么时候做都行；
+- **B 段**：要人把狗带到室外开阔处、等 RTK 固定解，按 Agent 的提示走一段（直走、转弯、急停各几次）。Agent 在服务器上通过 ssh 看日志、录包。
+
+规矩同 T34：域 0 上除了我们的服务不发任何东西；不停、不改机器人别的服务；狗上不 `apt install`。
+
+本任务可以改的范围（通用约定 9）：`deploy_deb/`、`tools/deploy/`。另外，B 段的证据表明天线接法和配置不一致时，可以改狗上装好的配置 `/opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml`（先备份），见 B5。
+
+```text
+任务 T35：8 号狗出门实跑。A 段（室内，Agent）：root 视角的撞车检查、root 起 bridge、负载和 GPU 占用。
+B 段（室外，人带狗）：有固定解时的在线结果、天线接法、录包和离线回放对比、笔记本上 Foxglove。
+先按通用约定做（第 9 条，范围见本节开头；第 10 条）。前置：T34 复核。在服务器上 ssh dog。
+
+0. mkdir -p data/reports/T35 data/deploy/T35；N=data/deploy/T35；L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection
+   I=/opt/seres/perception；B=$I/lidar_3d_detection/lib/lidar_3d_detection
+   狗上 root 的 ROS 环境（下文 RR，用 sudo bash -c "$RR && <命令>"）：
+     RR='set -a; source /etc/default/lidar-3d-detection; set +a; source /opt/ros/humble/setup.bash; source /opt/seres/perception/local_setup.bash'
+   git pull 之后同步代码（不重打 deb：dbde7ed 之后节点没改）：ORIN_HOST=dog tools/deploy/sync_to_orin.sh
+
+A1. root 视角的撞车检查（只读），输出 collisions_root.txt：
+     ssh dog "sudo bash -c \"$RR && for t in /perception/lidar_3d/objects /perception/lidar_3d/tracks /perception/lidar_3d/predictions; do \
+         timeout 10 ros2 topic info -v \\\$t; done; timeout 5 ros2 topic echo --once /tf_static; timeout 5 ros2 topic echo --once /tf\"" \
+         2>&1 | tee data/reports/T35/collisions_root.txt
+   - 发布者的节点名应是 lidar_3d_detection（不是 _NODE_NAME_UNKNOWN_）；记下订阅者（和 T34 的 nvidia 视角比）；
+   - TF 里有没有 camera_init、lidar_det。有的话停下问人（同名坐标系）。
+A2. root 起 bridge（README"车上实车"第 2 步里 root 的那条命令），在狗上另开一个 ssh 跑探针：
+     python3 ~/dogperc/repo/tools/deploy/foxglove_probe.py --url ws://127.0.0.1:8765 --seconds 10 \
+         --topics /perception/lidar_3d/objects /perception/lidar_3d/tracks /robot/topic/rdap/top_point_cloud2
+   - 原始点云 10 秒约 100 条（T34 nvidia 起的桥只有 10 条）；检测话题没有固定解时 silent，正常。停掉桥，服务仍 active。
+   - 还是只有十几条：换成 nvidia 起的桥同样跑一遍，两次的数并排写，不用再试别的。
+A3. 负载（开机一小时以后）：
+     ssh dog 'uptime; ~/dogperc/repo/'$L'/scripts/orin_clocks.sh; top -b -n 1 -o %CPU | head -25; \
+         timeout 30 tegrastats --interval 1000' 2>&1 | tee data/reports/T35/load.txt
+   - 记下 load average、CPU 最高的 10 个进程、GR3D_FREQ 的范围（GPU 有多忙）、EMC。
+
+B0. 等人：人在聊天里说"狗在室外、可以开始"再往下做。先确认固定解：
+     ssh dog "sudo bash -c \"$RR && timeout 5 ros2 topic echo --once /rte/rdap/rtk/inspvax --field ins_status; \
+         timeout 5 ros2 topic echo --once /rte/rdap/rtk/inspvax --field pos_type\""
+   - 要是 3 和 56。不是就告诉人等一等（开阔处、几分钟），不要往下做。
+B1. 锁频（这次实跑用；结束时恢复原状）：sudo -n jetson_clocks --store /tmp/clocks_default（第一次）；sudo -n jetson_clocks；orin_clocks.sh 一行进 run.txt。
+B2. 开始录（狗上，nvidia，SENSORS 7.2 第 6 步的话题，再加上我们的 /perception/lidar_3d/objects），NAME=1105_t35：
+     timeout -s INT 200 ros2 bag record --max-cache-size 268435456 -o /home/nvidia/bags/1105_t35 <SENSORS 7.2 第 6 步的 8 个话题> \
+         /perception/lidar_3d/objects
+   同时告诉人按这个顺序走（每段之间停 5 秒）：直走约 20 m → 原地左转 180° → 直走回来 → 急停两次 → 绕一个约 5 m 的圈 → 停。
+B3. 录的同时看日志（每 30 s 抄一次每秒那一行），结束后整段存下来：
+     ssh dog 'journalctl -u lidar-3d-detection --since "-4min" --no-pager' > $N/journal_live.txt
+     grep -cE "walks backwards" $N/journal_live.txt；grep -E "dets, .* tracks" $N/journal_live.txt | tail -20 > data/reports/T35/live_lines.txt
+     python tools/deploy/soak_report.py 用不了 journal 的格式时，照 T34 第 4 步的 python 合计 clouds / frames / skipped，再取 total_ms 的中位和 p99。
+B4. 恢复锁频原状（sudo -n jetson_clocks --restore /tmp/clocks_default，如果开始时没锁）。告诉人可以带狗回来。
+B5. 天线接法，两个证据：
+   a. 日志里有没有 error "the robot walks backwards in the body frame"；
+   b. 服务器上：scp -r dog:/home/nvidia/bags/1105_t35 /public/zjst/robot/cp_data/；用 rosbag_to_sequence.py（--azimuth-offset auto，
+      --inspvax-topic 等同 BAG_SPLIT 第 2 步）转成 data/seq/1105_t35，看打印的 "INS azimuth offset ... deg"。
+   - a 有 error 且 b 打印 0：天线是接正的。备份狗上的配置，把 node: 里的 ins_azimuth_offset_deg 改成 0.0、ins_lever_arm 改成
+     [0.0213, -0.18, 0.0]，sudo -n systemctl restart lidar-3d-detection；人如果还在外面，再走 30 s 确认不再报错；
+   - a 没有、b 打印 180：维持现状；两者对不上：停下报告，不要改。
+B6. 在线对离线：录下的 bag 在狗上离线回放（装好的 lidar_3d_bag_replay、装好的配置和模型，--gpu --threads 4，输出 data/t35_replay.npz），
+    拷回来以后：
+     python tools/deploy/objects_bag.py --bag /public/zjst/robot/cp_data/1105_t35 --replay $N/t35_replay.npz \
+         --out data/reports/T35/live_vs_replay.json | tail -25 > data/reports/T35/live_vs_replay.txt
+   - B5 改过配置的话，只比改完以后的那一段（或者用改之前的配置回放改之前的那一段），报告里写明；
+   - missing_frames、same_tracks_frames 记下（T33 编译机上锁频时 86–89%）。
+B7. 人看 Foxglove（可选，人愿意时）：A2 的 root 桥开着，人在笔记本上按 README"车上实车"第 3 步连上，导入布局，说一句看到了什么
+    （框跟不跟车、有没有重影）。Agent 抄进报告。看完停桥。
+B8. 结束：服务 active；锁频是开始时的状态；狗上的 bag 删掉（服务器上留着，以后可以拿去标）。
+
+停止条件：A1 有同名坐标系，或我们的话题有别的发布者；B0 一直没有固定解；B5 两个证据对不上；任何一步要停机器人别的服务。
+提交：data/reports/T35/、本文档，以及按约定 9 改的代码。不提交 bag、data/deploy/T35/。
+报告（写进"T35 结果"）：
+- A1 的发布者 / 订阅者 / TF（和 T34 并排）；A2 两种桥的原始点云条数；A3 的负载、最忙的进程、GR3D；
+- B：固定解时刻、每秒那一行的合计（clouds / frames / skipped）和 total_ms 中位、p99；walks backwards 的次数；
+  B5 的结论和改了什么；B6 的 objects_bag 输出；B7 人说的话；
+- 结论：8 号狗能不能交给规划用；还差什么（开机锁频、负载、天线配置写进哪里）。
+```
+
+### T35 结果
+
+（待填）

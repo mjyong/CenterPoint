@@ -201,6 +201,14 @@ source /opt/seres/perception/local_setup.bash
 ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765
 ```
 
+要看原始点云时用 root 起（车上的共享内存是 root 的 `iox-roudi`，机器人的节点和检测服务都是 root；`nvidia` 的进程只拿到一部分数据，T34 里连节点名都是 `_NODE_NAME_UNKNOWN_`）。还没在狗上试过：
+
+```bash
+sudo bash -c 'set -a; source /etc/default/lidar-3d-detection; set +a; \
+    source /opt/ros/humble/setup.bash; source /opt/seres/perception/local_setup.bash; \
+    ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765'
+```
+
 **3. 笔记本上打开 Foxglove 桌面版。**
 
 - Open connection → Foxglove WebSocket → `ws://192.168.122.100:8765`。笔记本不在这个网段、但能 SSH 上去时，先在笔记本执行 `ssh -N -L 8765:127.0.0.1:8765 nvidia@192.168.122.100`，再连 `ws://127.0.0.1:8765`；

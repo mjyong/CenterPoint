@@ -31,7 +31,8 @@
 - T32（11-01 完成，已复核）：删掉 `deploy/` 以后服务器、板上各验一遍，CTest 全过、升级前后逐位相同，TF 和 Foxglove bridge 过。复核发现板子重启后没锁频、节点慢 2–3 倍；
 - T33（11-01 完成，已复核）：丢帧来自没锁频和 Fast DDS 默认缓冲装不下 3 MB 的点云，锁频或 8 MB 缓冲各自都能收齐；deb 带上了这份缓冲配置；
 - 11-04：8 号狗上装好了在狗上打的 deb（域 0、CycloneDDS、root），机器人用 CycloneDDS 已核实；室内没有固定解，还没出过框；
-- T34：8 号狗上车前的检查：话题和坐标系撞车、CycloneDDS 下收真雷达点云、回放和编译机比、录 60 s；
+- T34（11-04 完成，已复核）：8 号狗室内检查都过（CycloneDDS 下收齐点云、不撞车、回放和编译机一致、录包齐）；机器人自己的负载让我们慢一倍，不锁频 p99 99 ms；
+- T35：8 号狗出门实跑（要人带狗），看在线出框、天线接法、在线对离线；
 - 上车实时跑：要人（校时，板子时钟停在 1970）；
 - 规划确认 `ObjectArray` 的字段；
 - 厂区新数据的下一轮采集和训练；
@@ -41,7 +42,7 @@
 - 流水线库 `dog_perception/` 约 1 万行 Python，工具约 9 千行，测试约 5 千行；
 - C++ 核心库约 7 千行，含 24 个 GoogleTest；
 - ROS 2 包约 600 行；
-- 服务器任务 T0–T34 共 30 多个，人工步骤 H1–H5。
+- 服务器任务 T0–T35 共 30 多个，人工步骤 H1–H5。
 
 ---
 
@@ -437,7 +438,8 @@
 | T31：车上部署包：板上编 `deploy_deb`、打 deb、安装、和 `deploy/` 逐位比、卸载 | Agent（安装要 root） | 10-30 完成，已复核 |
 | T32：删掉 `deploy/` 以后的验证（服务器 CTest、板上升级前后逐位比），板上准备 Foxglove 实时看 | Agent，人看 | 11-01 完成，已复核；60 s 的 bag 留在板上 |
 | T33：板上实时性：锁频与否、DDS 缓冲、发不发调试点云 | Agent | 11-01 完成，已复核 |
-| T34：8 号狗上车前的检查（室内） | Agent | 任务已写好（11-04 改写） |
+| T34：8 号狗上车前的检查（室内） | Agent | 11-04 完成，已复核 |
+| T35：8 号狗出门实跑（固定解、天线接法、在线对离线、Foxglove） | Agent + 人 | 任务已写好 |
 | 8 号狗的天线接法（`ins_azimuth_offset_deg`）、开机锁频、同名坐标系 | 人、机器人团队 | 上车前定 |
 | 车上开机锁频、服务的 RMW 和 DDS 配置 | 人、机器人团队 | 等 T34 |
 | 上车实时跑：10 Hz 不丢帧、和别的进程抢资源 | 人（上车、校时） | P7 剩下的部分 |
@@ -483,6 +485,6 @@
 | [DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md) | 为什么 v1 不如教师；下一批数据的采集计划 |
 | [PIPELINE_TUNING.md](PIPELINE_TUNING.md) | 后处理、跟踪、预测调参的计划和指标 |
 | [TRACKING_PREDICTION.md](TRACKING_PREDICTION.md) | 跟踪和预测的设计 |
-| [SERVER_TASKS.md](SERVER_TASKS.md) | 服务器任务 T0–T34：命令、结果、复核 |
+| [SERVER_TASKS.md](SERVER_TASKS.md) | 服务器任务 T0–T35：命令、结果、复核 |
 | [DEPLOY_ORIN.md](DEPLOY_ORIN.md) | Orin 部署：通道、环境、转换、INT8、验收、C++ 核心库、ROS 2 节点 |
 | [SENSORS.md](SENSORS.md) | 传感器参数和外参 |

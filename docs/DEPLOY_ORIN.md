@@ -585,6 +585,13 @@ ssh dog 'sudo -n sed -i \
 
 备份（不进 git）在 `data/deploy/deb/r36.4.0/`：同一份 deb 和它的报告。包里的 `/etc/default` 仍是注释掉的，复制到下一台同样环境的狗上之后还要做上面的 sed，再启动。0 号狗今天不在线上，没有逐项对过包版本；这份 deb 要求对方的 L4T、TensorRT 和那些 ROS 包不低于 8 号。它用的固定解编号是仓库里的 56，不是 0 号那只改成 58 的二进制。
 
+**T34（2026-11-04，8 号狗，室内）**：
+- 用 dbde7ed 在狗上重建引擎、打包（`0.1.0+316`，`/etc/default` 带域 0、CycloneDDS、机器人的 XML），升级以后服务 active；
+- CycloneDDS 下真雷达 60 s 收到 598 帧、skipped 0；我们的话题只有一个发布者，TF 里没有 `camera_init`（`nvidia` 视角，T35 用 root 再看）；
+- 回放 60 s 的 bag 和编译机比过门槛（匹配 0.998）；
+- 延迟：锁频 37 ms（p99 68），不锁频 59 ms（p99 99，贴着 100 ms 的帧间隔），比编译机慢一倍。原因是机器人自己的负载（开机 14 分钟 load 32，导航感知、分割检测、PTZ、SLAM），所以 8 号狗开机锁频更要紧；
+- 狗上的共享内存是 root 的 `iox-roudi`，`nvidia` 用户的进程（`ros2 topic hz`、bridge）拿到的数据不全：点云只有 1–8 Hz。看点云、做检查用 root；录包按 RELIABLE 订，`nvidia` 录的也是齐的。
+
 **另一台笔记本看实车检测**（不要跑 `orin_foxglove.sh`，那个是编译机上播 bag、域 77）。服务开机已经在跑。车上 CycloneDDS 只绑 eth1，笔记本从 `192.168.122.100` 进来订不到 DDS。Foxglove：在狗上开 `foxglove_bridge`（公开源现在的包是 3.6.0，和编译机那份相同；狗的 apt 出不去，把 deb 拷过去装），笔记本连 `ws://192.168.122.100:8765`，导入 `foxglove/lidar_3d_detection.json`。RViz 也是 ROS 节点，从 `192.168.122.100` 看就在狗上跑 `rviz2` 并用 `ssh -X` 把画面转出来；笔记本自己跑 `rviz2` 必须接在 eth1 那一侧。Fixed Frame 用 `camera_init`，加 `/perception/lidar_3d/tracks` 和 `/perception/lidar_3d/predictions` 两个 MarkerArray。实车上不要开 `publish_tf`。步骤在节点 README 的「车上实车，用另一台笔记本看」和「用 RViz 看」。
 
 ## 10. 文件一览
