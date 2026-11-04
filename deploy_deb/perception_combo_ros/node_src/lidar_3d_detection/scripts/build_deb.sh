@@ -6,7 +6,7 @@
 #   node_src/lidar_3d_detection/scripts/build_deb.sh --model ~/dogperc/models/nusc_pp_dyn [--out DIR]
 #       [--prefix /opt/seres/perception] [--version V] [--service-user USER]
 #       [--precision fp16] [--cuda-arch 87] [--jobs N] [--work DIR] [--skip-build]
-#       [--no-enable-service]
+#       [--no-enable-service] [--ros-domain-id N] [--rmw RMW] [--cyclonedds-uri URI]
 #
 #   --model           model_meta.json, pfn.onnx, rpn_head.onnx and the <precision> engines built on this board
 #                     (tools/deploy/build_engines.py). Engines only load on the TensorRT that built them, so the
@@ -15,6 +15,11 @@
 #   --enable-service  postinst enables and starts the service (the default)
 #   --no-enable-service  install the unit, do not enable or start it
 #   --skip-build      package <work>/install as it is
+#   --ros-domain-id, --rmw, --cyclonedds-uri
+#                     written (uncommented) into the packaged /etc/default/lidar-3d-detection, so the service
+#                     joins the robot's DDS on install, e.g. the kygi dogs (DEPLOY_ORIN.md 2):
+#                     --ros-domain-id 0 --rmw rmw_cyclonedds_cpp --cyclonedds-uri file:///opt/ros/cyclonedds.xml
+#                     (systemd does not read ~/.bashrc). The RMW's package must be installed on this board
 #
 # No root needed (dpkg-deb --root-owner-group); installing is `sudo apt install ./lidar-3d-detection_*.deb`.
 # Needs patchelf (the interface packages' Python extensions carry an RPATH into the build tree; T31): on PATH, in
@@ -26,7 +31,7 @@ NODE=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)        # node_src/lidar_
 WS=$(dirname "$(dirname "$NODE")")                               # perception_combo_ros
 SLAM=$(dirname "$WS")/slam/interface                             # kygi665_msgs
 MODEL="" OUT=$PWD PREFIX=/opt/seres/perception VERSION="" SERVICE_USER=$(id -un) ENABLE=yes PRECISION=fp16
-CUDA_ARCH=87 JOBS=$(nproc) WORK=$WS/build_deb SKIP_BUILD=0
+CUDA_ARCH=87 JOBS=$(nproc) WORK=$WS/build_deb SKIP_BUILD=0 DOMAIN_ID="" RMW="" CYCLONE_URI=""
 while [ $# -gt 0 ]; do
   case $1 in
     --model) MODEL=$(readlink -f "$2"); shift 2 ;;
@@ -41,11 +46,24 @@ while [ $# -gt 0 ]; do
     --jobs) JOBS=$2; shift 2 ;;
     --work) WORK=$2; shift 2 ;;
     --skip-build) SKIP_BUILD=1; shift ;;
-    *) sed -n '2,19p' "$0"; exit 2 ;;
+    --ros-domain-id) DOMAIN_ID=$2; shift 2 ;;
+    --rmw) RMW=$2; shift 2 ;;
+    --cyclonedds-uri) CYCLONE_URI=$2; shift 2 ;;
+    *) sed -n '2,24p' "$0"; exit 2 ;;
   esac
 done
 die() { echo "build_deb.sh: $*" >&2; exit 1; }
 case $PREFIX in /*) ;; *) die "--prefix must be absolute" ;; esac
+if [ -n "$DOMAIN_ID" ]; then
+  case $DOMAIN_ID in *[!0-9]*) die "--ros-domain-id must be 0-232" ;; esac
+  [ "$DOMAIN_ID" -le 232 ] || die "--ros-domain-id must be 0-232"
+fi
+case $RMW in
+  "") ;;
+  rmw_fastrtps_cpp | rmw_cyclonedds_cpp)
+    dpkg-query -W "ros-humble-${RMW//_/-}" > /dev/null 2>&1 || die "--rmw $RMW: ros-humble-${RMW//_/-} is not installed here" ;;
+  *) die "--rmw must be rmw_fastrtps_cpp or rmw_cyclonedds_cpp" ;;
+esac
 mkdir -p "$OUT" "$WORK"
 OUT=$(cd "$OUT" && pwd)
 WORK=$(cd "$WORK" && pwd)
@@ -128,6 +146,22 @@ sub() { sed -e "s|@PREFIX@|$PREFIX|g" -e "s|@USER@|$SERVICE_USER|g" -e "s|@ENABL
 mkdir -p "$STAGE/lib/systemd/system" "$STAGE/etc/default" "$STAGE/DEBIAN"
 sub "$NODE/packaging/lidar-3d-detection.service" > "$STAGE/lib/systemd/system/lidar-3d-detection.service"
 sub "$NODE/packaging/lidar-3d-detection.default" > "$STAGE/etc/default/lidar-3d-detection"
+# KEY=VALUE in place of its commented line ("#KEY=VALUE" if there is one, else the first "#KEY="), else at the end
+set_default() {
+  local f=$STAGE/etc/default/lidar-3d-detection
+  awk -v k="$1" -v v="$2" '
+    { line[NR] = $0 }
+    !exact && $0 == "#" k "=" v { exact = NR }
+    !first && index($0, "#" k "=") == 1 { first = NR }
+    END {
+      at = exact ? exact : first
+      for (i = 1; i <= NR; i++) print (i == at ? k "=" v : line[i])
+      if (!at) print k "=" v
+    }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+}
+if [ -n "$DOMAIN_ID" ]; then set_default ROS_DOMAIN_ID "$DOMAIN_ID"; fi
+if [ -n "$RMW" ]; then set_default RMW_IMPLEMENTATION "$RMW"; fi
+if [ -n "$CYCLONE_URI" ]; then set_default CYCLONEDDS_URI "$CYCLONE_URI"; fi
 for s in postinst prerm postrm; do
   sub "$NODE/packaging/debian/$s" > "$STAGE/DEBIAN/$s"
   chmod 755 "$STAGE/DEBIAN/$s"
@@ -215,6 +249,7 @@ REPORT=${DEB%.deb}.txt
   echo "prefix    $PREFIX"
   echo "git       $(git -C "$NODE" rev-parse HEAD 2> /dev/null || echo none)"
   echo "model     $MODEL"
+  echo "settings  /etc/default/lidar-3d-detection: $(grep -v '^#' "$STAGE/etc/default/lidar-3d-detection" | grep . | tr '\n' ' ')"
   (cd "$STAGE$PREFIX/lidar_3d_detection/model" && sha256sum -- *)
   echo
   dpkg-deb --info "$DEB" | sed -n '/Package:/,$p'

@@ -462,7 +462,7 @@ ros2 topic echo --once /lidar_packets_loss
 点云约 32 MB/s，缓存加大到 256 MiB。这条会一直跑，录完在这个终端按 Ctrl-C。不要加 `/robot/topic/rdap/front_point_cloud2`。
 
 ```bash
-mkdir -p /home/nvidia/bags1104
+mkdir -p /home/nvidia/bags
 ros2 bag record --max-cache-size 268435456 \
   /robot/topic/rdap/front_sensor_camera \
   /robot/topic/rdap/left_sensor_camera \
@@ -472,7 +472,7 @@ ros2 bag record --max-cache-size 268435456 \
   /rte/rdap/rtk/imus/data_raw \
   /rte/rdap/rtk/inspvax \
   /lidar_packets_loss \
-  -o /home/nvidia/bags1104/cp01 
+  -o /home/nvidia/bags/NAME
 ```
 
 **7. 看条数**
@@ -480,7 +480,7 @@ ros2 bag record --max-cache-size 268435456 \
 把 `ros2 bag info` 里的 `Duration` 记成 T 秒。
 
 ```bash
-ros2 bag info /home/nvidia/bags1104/cp01
+ros2 bag info /home/nvidia/bags/NAME
 ```
 
 | 话题 | 正常条数 |
@@ -490,10 +490,10 @@ ros2 bag info /home/nvidia/bags1104/cp01
 | 四路 `*_sensor_camera` | 各约 27 × T |
 | `/lidar_packets_loss` | 大约 9 × T |
 
-雷达条数明显少一截（例如只有一半）：这份不要拿去标。删掉刚才的目录，用下面这一条重录（订阅改成和雷达一样的 RELIABLE）：
+雷达条数明显少一截（例如只有一半）：这份不要拿去标。删掉刚才的目录，用下面这一条重录。Humble 的 `ros2 bag record` 本来就按发布者的可靠性订（雷达是 RELIABLE），这条主要是把队列加深到 20；还是少，就停下来报告，不要反复重录（T34 会比较用车上的 `CYCLONEDDS_URI` 录）：
 
 ```bash
-rm -rf /home/nvidia/bags1104/cp01
+rm -rf /home/nvidia/bags/NAME
 cat > /tmp/bag_qos.yaml << 'EOF'
 /robot/topic/rdap/top_point_cloud2:
   reliability: reliable

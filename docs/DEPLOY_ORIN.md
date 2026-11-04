@@ -84,7 +84,7 @@ Host orin
 | CUDA / TensorRT | CUDA 12.6，`libnvinfer10` **10.3.0.30-1+cuda12.5** | 同一大版本 | 相同：`cuda-cudart-12-6` 12.6.68，`libnvinfer10` 10.3.0.30。`trtexec` 和 `python3-libnvinfer` 都在，`import tensorrt` 是 10.3.0 |
 | ROS 2 | Humble，编译 deb 时的包是 2026-07 前后的快照（`rclcpp` 16.0.19，`rmw-fastrtps-cpp` 6.2.10） | 车载 Humble | Humble，包更旧：`ros-base` `0.10.0-1jammy.20250121`，`rclcpp` 16.0.11（2024-11-28），`rmw-fastrtps-cpp` 6.2.7（2024-11-28）。Fast DDS 和 CycloneDDS 的库都装了 |
 | 中间件 | 没设 `RMW_IMPLEMENTATION` 时是 Fast DDS。给这台看结果时服务用域 **77** | 域 **0**，CycloneDDS，`/opt/ros/cyclonedds.xml` | 同调试狗。`~/.bashrc` 里写了 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`、`CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml`、`ROS_DOMAIN_ID=0`。配置只绑 **eth1**，开了共享内存，socket 收发缓冲至少 10 MB。systemd 不读 `.bashrc` |
-| 我们的服务 | `lidar-3d-detection` 已装，用户 `seres`，域 77，不发 TF、不发调试点云。deb `0.1.0+312.gb7dc5c6` 在 `~/dogperc/deb/` | 已经装过，服务以 root 跑。那只二进制把 `kInsRtkFixed` 改成了 58，改动不在 git 里 | 2026-11-04 装上 `0.1.0+313.g5b2b6bd`，`User=root`，域 0 + CycloneDDS，不发 TF。active。`nav_perception`、`slam`、`hesai_lidar_driver`、`rte_rtk` 仍在跑。`sudo -n` 免密 |
+| 我们的服务 | `lidar-3d-detection` 已装，用户 `seres`，域 77，不发 TF、不发调试点云。deb `0.1.0+312.gb7dc5c6` 在 `~/dogperc/deb/` | 已经装过，服务以 root 跑。那只二进制把 `kInsRtkFixed` 改成了 58，改动不在 git 里（这个常数在我们的代码里只决定要不要打 "RTK not fixed" 的告警，不影响用不用这一解）。不要把那只二进制拷到别的狗上，换成仓库里打的包 | 2026-11-04 装上 `0.1.0+313.g5b2b6bd`，`User=root`，域 0 + CycloneDDS，不发 TF。active。`nav_perception`、`slam`、`hesai_lidar_driver`、`rte_rtk` 仍在跑。`sudo -n` 免密 |
 | 频率 | MAXN。不跑 `jetson_clocks` 时节点慢 2–3 倍；重启就掉 | 同样要锁频才按 T31 的延迟算 | MAXN。建引擎前执行了 `jetson_clocks`，重启会掉 |
 | 引擎 | 在主机名 `ubuntu`、R36.4.4 上建的，打进了那个 deb | 不能拿编译机的引擎来用 | 在这台 `tegra-ubuntu`、R36.4.0、TensorRT 10.3.0 上建的，打进了 `0.1.0+313.g5b2b6bd` |
 
@@ -555,22 +555,31 @@ ORIN_HOST=dog tools/deploy/sync_to_orin.sh --model data/deploy/nusc_pp_dyn
 # 狗上。先有 patchelf，再在这台 L4T 上建引擎、打包。--no-enable-service：装上先别启动。
 ssh dog 'sudo -n apt-get install -y patchelf'
 ssh dog 'cd ~/dogperc/repo && python3 tools/deploy/build_engines.py \
-    --model-dir ~/dogperc/models/nusc_pp_dyn --precision fp16'
+    --model-dir ~/dogperc/models/nusc_pp_dyn --precision fp16 --opt-pillars 10000'
+# 车上的 DDS 直接写进包里的 /etc/default（2026-11-04 复核起 build_deb.sh 有这三个选项），装上就是域 0 + CycloneDDS
 ssh dog 'cd ~/dogperc/repo && deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/build_deb.sh \
     --model ~/dogperc/models/nusc_pp_dyn --service-user root --no-enable-service \
+    --ros-domain-id 0 --rmw rmw_cyclonedds_cpp --cyclonedds-uri file:///opt/ros/cyclonedds.xml \
     --out ~/dogperc/deb'
+# 报告里 "settings" 一行应是 ROS_DOMAIN_ID=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=... LIDAR3D_THREADS=4
 
-# 装上之后先改配置，再启动。不要把编译机那份域 77、发 TF 的配置拷过来。
 ssh dog 'sudo -n apt-get install -y ~/dogperc/deb/lidar-3d-detection_*_arm64.deb'
-ssh dog 'sudo -n sed -i \
-    -e "s/^#ROS_DOMAIN_ID=0/ROS_DOMAIN_ID=0/" \
-    -e "s|^#RMW_IMPLEMENTATION=rmw_fastrtps_cpp|RMW_IMPLEMENTATION=rmw_cyclonedds_cpp\nCYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml|" \
-    /etc/default/lidar-3d-detection'
 ssh dog 'sudo -n systemctl enable --now lidar-3d-detection'
 ssh dog 'systemctl is-active lidar-3d-detection; journalctl -u lidar-3d-detection -n 20 --no-pager'
 ```
 
-`~/.ssh/config` 里 `Host dog` 要是这条隧道（`localhost`、端口 5038、用户 `nvidia`）。起来之后看 journal 里的 `lidar_3d_detection up`：配置应是 `/opt/seres/perception/...`，没有 `publishing TF`。`ins_status` 还不是 3 时，点云会被丢掉，日志里是 `no pose for scan yet`，这不是没装上。
+不带这三个选项打的包（`0.1.0+313.g5b2b6bd` 和更早的），包里的 `/etc/default` 是注释掉的，装上以后、启动以前要手动改：
+
+```bash
+ssh dog 'sudo -n sed -i \
+    -e "s/^#ROS_DOMAIN_ID=0/ROS_DOMAIN_ID=0/" \
+    -e "s|^#RMW_IMPLEMENTATION=rmw_fastrtps_cpp|RMW_IMPLEMENTATION=rmw_cyclonedds_cpp\nCYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml|" \
+    /etc/default/lidar-3d-detection'
+```
+
+升级时板上的 `/etc/default` 改过、包里的也变了，dpkg 会停下来问留哪个：`apt-get install` 加 `-o Dpkg::Options::=--force-confnew`（用包里的，旧的存成 `.dpkg-old`）或 `--force-confold`（留板上的，新的存成 `.dpkg-dist`），装完 diff 一下。
+
+`~/.ssh/config` 里 `Host dog` 要是这条隧道（`localhost`、端口 5038、用户 `nvidia`）。起来之后看 journal 里的 `lidar_3d_detection up`：配置应是 `/opt/seres/perception/...`，没有 `publishing TF`。`ins_status` 还不是 3 时，点云会被丢掉，日志里是 `no pose for scan yet`，这不是没装上。2026-11-04 复核以后的节点这时每秒还有一行 `no frames yet (waiting for a pose) | clouds N frames 0 skipped N`：`clouds` 约 10、`skipped` 是 0，就说明 CycloneDDS 下点云收齐了。
 
 **2026-11-04 已在 8 号狗上做完。** 狗上 apt 源出不去，patchelf 用的是 `~/bin/patchelf` 0.14.3。引擎在这台上建（PFN 75.6 s，RPN 136.6 s，TensorRT 10.3.0）。deb `lidar-3d-detection_0.1.0+313.g5b2b6bd_arm64.deb`（35 MB），`User=root`，Depends 按 R36.4.0 和这台的 ROS 包写（`nvidia-l4t-core >= 36.4.0-20240912212859`，`libnvinfer10 = 10.3.0.30-1+cuda12.5`）。`dpkg -i` 之后改了 `/etc/default`（域 0、CycloneDDS），再 `enable --now`。服务 active，up 那一行没有 `publishing TF`。点云和 INSPVAX 都在进：日志是 `waiting for a good INS solution` 和 `no pose for scan yet`，因为当时 `ins_status` 不是 3，没有检出框。
 

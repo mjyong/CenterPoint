@@ -174,7 +174,17 @@ void Lidar3dDetection::OnCloud(const sensor_msgs::msg::PointCloud2::SharedPtr ms
     }
     return;
   }
-  if (!out) return;
+  if (!out) {
+    // no pose yet (no good INS fix, ins_status != 3): still say once a second whether the clouds arrive
+    if (now - last_stats_ >= std::chrono::seconds(1)) {
+      last_stats_ = now;
+      LOG(INFO) << "no frames yet (waiting for a pose) | clouds " << stat_clouds_ << " frames " << stat_frames_
+                << " skipped " << stat_skipped_;
+      stat_clouds_ = stat_frames_ = stat_skipped_ = 0;
+      stat_callback_max_ms_ = 0.0;
+    }
+    return;
+  }
   objects_pub_->publish(lidar3d::ros::object_array(*pipe_, *out, local_frame_, world_frame_));
   if (publish_markers_) {
     tracks_pub_->publish(lidar3d::ros::track_markers(*out, world_frame_));

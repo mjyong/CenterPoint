@@ -167,9 +167,11 @@ systemctl is-active lidar-3d-detection
 journalctl -u lidar-3d-detection -n 20 --no-pager
 ```
 
-要看到 `lidar_3d_detection up`，配置是 `/opt/seres/perception/...`，没有 `publishing TF`。一直是 `waiting for a good INS solution` 或 `no pose for scan yet`：定位还不是好解（`ins_status` 要是 3），出门固定后再看，这时还没有框。
+要看到 `lidar_3d_detection up`，配置是 `/opt/seres/perception/...`，没有 `publishing TF`。一直是 `waiting for a good INS solution` 或 `no pose for scan yet`：定位还不是好解（`ins_status` 要是 3），出门固定后再看，这时还没有框。这时每秒还有一行 `no frames yet (waiting for a pose) | clouds N frames 0 skipped N`：`clouds` 约 10、`skipped` 0，说明点云收齐了，等的只是定位。
 
-**2. 狗上，前台开桥。** 环境必须和检测服务一样（systemd 不读 `.bashrc`）。看完在这个终端 Ctrl-C。
+狗走起来以后日志里出现 error `the robot walks backwards in the body frame`：配置里的天线接法（`ins_azimuth_offset_deg`，现在是 0921 接反时的 180）和这台狗的不一样，框会叠出重影。接正的狗要把 `ins_azimuth_offset_deg` 改成 0、`ins_lever_arm` 改成 IMU 中心 `[0.0213, -0.18, 0.0]`（`docs/LOCALIZATION.md` 第 10 节）。
+
+**2. 狗上，前台开桥。** 环境必须和检测服务一样（systemd 不读 `.bashrc`）。看完在这个终端 Ctrl-C。服务是 root 跑的，车上的 CycloneDDS 开了共享内存；`nvidia` 用户起的桥能不能接上还没试过（2026-11-04）。先在同一个环境里 `ros2 topic list | grep perception` 看得到 `/perception/lidar_3d/*` 再开桥，看不到就停下报告。
 
 ```bash
 set -a
