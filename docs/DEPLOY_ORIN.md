@@ -73,6 +73,23 @@ Host orin
 - sudo 密码不写进仓库，执行时由人给；
 - 板上只有 `nvpmodel`、`jetson_clocks` 和 apt 安装需要 sudo。
 
+**三台 Orin 不是同一台**（2026-11-04 看过 8 号狗；编译机和之前那台调试狗按 T25–T33 的记录）。上面这台「Orin」是编译机。车上的两台是车载镜像，主机名都是 `tegra-ubuntu`，用户 `nvidia`。密码不写进仓库，也不写进 `~/.ssh/config`。
+
+| | 编译机（T25 的 Orin） | 之前的调试狗 | 8 号狗（2026-11-04 第一次连） |
+|---|---|---|---|
+| 怎么连 | 反向隧道 `localhost:5037`，`ssh orin`，用户 `seres`，密钥 | 当时的反向隧道 `localhost:5038`，用户 `nvidia` | 同一条 `5038` 现在落到这台。本机地址 `192.168.122.100`（eth0）。服务器上 `ssh -p 5038 nvidia@127.0.0.1` |
+| 板子 | AGX Orin 64GB 开发套件，`p3701-0005`，SKU `699-13701-0005-501 G.0`，主机名 `ubuntu` | 车载 Orin，主机名 `tegra-ubuntu` | 同一款开发套件模组，`p3701-0005`，SKU `699-13701-0005-502 K.0`，主机名 `tegra-ubuntu`。12 核 Cortex-A78AE，61 GiB |
+| 系统 | Ubuntu 22.04.5，L4T **R36.4.4**（2025-06-16），普通内核。时钟停在 1970 | L4T **R36.4.0** | Ubuntu 22.04.4，L4T **R36.4.0**（2024-09-13），内核 `5.15.148-rt-tegra` PREEMPT_RT。时钟是对的（2026-11-04） |
+| 盘 | eMMC，根分区大约 54 GB，T33 结束时剩 2.0 GB | 车载盘 | NVMe `/dev/nvme0n1p1` 937 GB，已用 51 GB，剩 839 GB |
+| CUDA / TensorRT | CUDA 12.6，`libnvinfer10` **10.3.0.30-1+cuda12.5** | 同一大版本 | 相同：`cuda-cudart-12-6` 12.6.68，`libnvinfer10` 10.3.0.30。`trtexec` 和 `python3-libnvinfer` 都在，`import tensorrt` 是 10.3.0 |
+| ROS 2 | Humble，编译 deb 时的包是 2026-07 前后的快照（`rclcpp` 16.0.19，`rmw-fastrtps-cpp` 6.2.10） | 车载 Humble | Humble，包更旧：`ros-base` `0.10.0-1jammy.20250121`，`rclcpp` 16.0.11（2024-11-28），`rmw-fastrtps-cpp` 6.2.7（2024-11-28）。Fast DDS 和 CycloneDDS 的库都装了 |
+| 中间件 | 没设 `RMW_IMPLEMENTATION` 时是 Fast DDS。给这台看结果时服务用域 **77** | 域 **0**，CycloneDDS，`/opt/ros/cyclonedds.xml` | 同调试狗。`~/.bashrc` 里写了 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`、`CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml`、`ROS_DOMAIN_ID=0`。配置只绑 **eth1**，开了共享内存，socket 收发缓冲至少 10 MB。systemd 不读 `.bashrc` |
+| 我们的服务 | `lidar-3d-detection` 已装，用户 `seres`，域 77，不发 TF、不发调试点云。deb `0.1.0+312.gb7dc5c6` 在 `~/dogperc/deb/` | 已经装过，服务以 root 跑。那只二进制把 `kInsRtkFixed` 改成了 58，改动不在 git 里 | 2026-11-04 装上 `0.1.0+313.g5b2b6bd`，`User=root`，域 0 + CycloneDDS，不发 TF。active。`nav_perception`、`slam`、`hesai_lidar_driver`、`rte_rtk` 仍在跑。`sudo -n` 免密 |
+| 频率 | MAXN。不跑 `jetson_clocks` 时节点慢 2–3 倍；重启就掉 | 同样要锁频才按 T31 的延迟算 | MAXN。建引擎前执行了 `jetson_clocks`，重启会掉 |
+| 引擎 | 在主机名 `ubuntu`、R36.4.4 上建的，打进了那个 deb | 不能拿编译机的引擎来用 | 在这台 `tegra-ubuntu`、R36.4.0、TensorRT 10.3.0 上建的，打进了 `0.1.0+313.g5b2b6bd` |
+
+8 号狗上现成的 deb **装不上去**，原因和做法在第 9 节末尾。连上时抽了一条 `/rte/rdap/rtk/inspvax`：`ins_status` 1，`pos_type` 52，纬度 40、经度 116。节点只收 `ins_status == 3` 的解，这一条会被丢掉；`pos_type` 不是 56 时只告警。仓库里的固定解是 56，不是调试狗上改过的 58。
+
 **同步**：`tools/deploy/sync_to_orin.sh`（2026-11-01 前在 `deploy/scripts/`）。
 - 拷代码；
 - 拷一个模型目录：只拷 ONNX 和元数据，引擎在板上建；
@@ -521,8 +538,45 @@ colcon 那一步和真机运行要在板上做（T31）。
 - 没锁频：节点每帧 50 ms，默认 Fast DDS 缓冲下只出 341 帧；只加大到 8 MB 缓冲就是 592 帧，只锁频就是 598 帧（每帧 17.7 ms）；
 - 锁频以后多一个订阅者（发调试点云、开 bridge）：默认缓冲 452 帧，8 MB 缓冲 597 帧。约 3 MB 的点云比共享内存的段大，走 UDP；
 - deb 带上 `share/lidar_3d_detection/fastdds_large_buffers.xml`（send / listen 各 8 MB），`orin_foxglove.sh` 在 Fast DDS 下默认用它；`/etc/default` 列了 RMW、`CYCLONEDDS_URI`、这份 profile 的选项（默认都不开）；Depends 写打包板上装着的每个 RMW；
-- **车上的 DDS 还没定**：T33 说机器人用 CycloneDDS（域 0，`/opt/ros/cyclonedds.xml`），没有依据，T34 核实。服务的 RMW 要和机器人的节点一样；CycloneDDS 下大点云的缓冲在那份 XML 里配；
+- **车上的 DDS**（8 号狗，2026-11-04）：CycloneDDS、域 0、`/opt/ros/cyclonedds.xml`。这份 XML 只绑 eth1，开了共享内存，socket 收发至少 10 MB。服务的 RMW 要和这个一样。Fast DDS 的 8 MB profile 在 CycloneDDS 下不起作用；
 - 车上开机锁不锁频，由人定（不锁时慢 3 倍）。
+
+**8 号狗上装**（2026-11-04 试过，现成的 deb 没装）：
+
+编译机上的 `lidar-3d-detection_0.1.0+312.gb7dc5c6_arm64.deb` 不能 `dpkg -i` 到 8 号狗上。Depends 是按编译机写的：`nvidia-l4t-core`、`nvidia-l4t-cuda`、`nvidia-l4t-dla-compiler` 都要 `>= 36.4.4-20250616085344`，狗上是 `36.4.0-20240912212859`；`ros-humble-rmw-fastrtps-cpp` 要 `>= 6.2.10-1jammy.20260725`，狗上是 6.2.7；`ros-humble-rclcpp` 要 `>= 16.0.19-1jammy.20260725`，狗上是 16.0.11。里面的引擎也是 R36.4.4 上建的。不要加 `--force-depends`。这个文件在编译机的 `~/dogperc/deb/`，2026-11-04 编译机的隧道（5037）没开，服务器上没有这份 deb。
+
+在狗上重新打。`ORIN_HOST` 指这台狗（不要指编译机），只同步代码和 ONNX，引擎在狗上建。`build_deb.sh` 会把打包装的人写成服务的 `User=`；车上别的 ROS 节点是 root，Cyclone 开了共享内存，服务也要用 root。包里的 `/etc/default` 把域和 RMW 注释掉了，systemd 不读 `~/.bashrc`，不改的话起来是 Fast DDS，和车上的 CycloneDDS 对不上。`publish_tf`、`publish_cloud` 保持关掉。先不要让 postinst 把服务拉起来，改完配置再 start。狗上还没有 patchelf，打包之前要有（编译机是 `~/bin/patchelf` 0.14.3，apt 源当时解析不了）。
+
+```bash
+# 服务器上，CenterPoint 仓库根目录。隧道已经指到 8 号狗。
+# 不要把密码写进仓库或 ssh config。不要带 --engines ubuntu。
+ORIN_HOST=dog tools/deploy/sync_to_orin.sh --model data/deploy/nusc_pp_dyn
+
+# 狗上。先有 patchelf，再在这台 L4T 上建引擎、打包。--no-enable-service：装上先别启动。
+ssh dog 'sudo -n apt-get install -y patchelf'
+ssh dog 'cd ~/dogperc/repo && python3 tools/deploy/build_engines.py \
+    --model-dir ~/dogperc/models/nusc_pp_dyn --precision fp16'
+ssh dog 'cd ~/dogperc/repo && deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/build_deb.sh \
+    --model ~/dogperc/models/nusc_pp_dyn --service-user root --no-enable-service \
+    --out ~/dogperc/deb'
+
+# 装上之后先改配置，再启动。不要把编译机那份域 77、发 TF 的配置拷过来。
+ssh dog 'sudo -n apt-get install -y ~/dogperc/deb/lidar-3d-detection_*_arm64.deb'
+ssh dog 'sudo -n sed -i \
+    -e "s/^#ROS_DOMAIN_ID=0/ROS_DOMAIN_ID=0/" \
+    -e "s|^#RMW_IMPLEMENTATION=rmw_fastrtps_cpp|RMW_IMPLEMENTATION=rmw_cyclonedds_cpp\nCYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml|" \
+    /etc/default/lidar-3d-detection'
+ssh dog 'sudo -n systemctl enable --now lidar-3d-detection'
+ssh dog 'systemctl is-active lidar-3d-detection; journalctl -u lidar-3d-detection -n 20 --no-pager'
+```
+
+`~/.ssh/config` 里 `Host dog` 要是这条隧道（`localhost`、端口 5038、用户 `nvidia`）。起来之后看 journal 里的 `lidar_3d_detection up`：配置应是 `/opt/seres/perception/...`，没有 `publishing TF`。`ins_status` 还不是 3 时，点云会被丢掉，日志里是 `no pose for scan yet`，这不是没装上。
+
+**2026-11-04 已在 8 号狗上做完。** 狗上 apt 源出不去，patchelf 用的是 `~/bin/patchelf` 0.14.3。引擎在这台上建（PFN 75.6 s，RPN 136.6 s，TensorRT 10.3.0）。deb `lidar-3d-detection_0.1.0+313.g5b2b6bd_arm64.deb`（35 MB），`User=root`，Depends 按 R36.4.0 和这台的 ROS 包写（`nvidia-l4t-core >= 36.4.0-20240912212859`，`libnvinfer10 = 10.3.0.30-1+cuda12.5`）。`dpkg -i` 之后改了 `/etc/default`（域 0、CycloneDDS），再 `enable --now`。服务 active，up 那一行没有 `publishing TF`。点云和 INSPVAX 都在进：日志是 `waiting for a good INS solution` 和 `no pose for scan yet`，因为当时 `ins_status` 不是 3，没有检出框。
+
+备份（不进 git）在 `data/deploy/deb/r36.4.0/`：同一份 deb 和它的报告。包里的 `/etc/default` 仍是注释掉的，复制到下一台同样环境的狗上之后还要做上面的 sed，再启动。0 号狗今天不在线上，没有逐项对过包版本；这份 deb 要求对方的 L4T、TensorRT 和那些 ROS 包不低于 8 号。它用的固定解编号是仓库里的 56，不是 0 号那只改成 58 的二进制。
+
+**另一台笔记本看实车检测**（不要跑 `orin_foxglove.sh`，那个是编译机上播 bag、域 77）。服务开机已经在跑。车上 CycloneDDS 只绑 eth1，笔记本从 `192.168.122.100` 进来订不到 DDS。Foxglove：在狗上开 `foxglove_bridge`（公开源现在的包是 3.6.0，和编译机那份相同；狗的 apt 出不去，把 deb 拷过去装），笔记本连 `ws://192.168.122.100:8765`，导入 `foxglove/lidar_3d_detection.json`。RViz 也是 ROS 节点，从 `192.168.122.100` 看就在狗上跑 `rviz2` 并用 `ssh -X` 把画面转出来；笔记本自己跑 `rviz2` 必须接在 eth1 那一侧。Fixed Frame 用 `camera_init`，加 `/perception/lidar_3d/tracks` 和 `/perception/lidar_3d/predictions` 两个 MarkerArray。实车上不要开 `publish_tf`。步骤在节点 README 的「车上实车，用另一台笔记本看」和「用 RViz 看」。
 
 ## 10. 文件一览
 

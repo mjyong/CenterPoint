@@ -16,7 +16,7 @@
 | 激光雷达 | 禾赛 Hesai PandarXT-32（XT32），车顶 | `/robot/topic/rdap/top_point_cloud2`（`sensor_msgs/PointCloud2`） | 10 Hz | 检测的输入；激光里程计 |
 | 组合导航 | kygi665 RTK 组合导航（双天线 GNSS + IMU），输出 NovAtel INSPVAX 格式 | `/rte/rdap/rtk/inspvax`（`kygi665_msgs/INSPVAX`） | 100 Hz | 位置、航向、速度 |
 | IMU | 同一台组合导航的 IMU | `/rte/rdap/rtk/imus/data_raw`（`sensor_msgs/Imu`） | 100 Hz | 角速度：去畸变、位姿插值 |
-| 鱼眼相机 ×4（录前、左、右 3 路） | 森云智能 SG3S-ISX031C-GMSL2F-**H190XA** | `/robot/topic/rdap/{front,left,right}_sensor_camera`（`foxglove_msgs/CompressedVideo`，H.264）；后视不录 | 24 Hz | 人工审核时对照，不进网络 |
+| 鱼眼相机 ×4 | 森云智能 SG3S-ISX031C-GMSL2F-**H190XA** | `/robot/topic/rdap/{front,left,right,rear}_sensor_camera`（`foxglove_msgs/CompressedVideo`，H.264） | 1016 为 24 Hz；2026-11-04 这台狗约 27 Hz | 人工审核时对照，不进网络 |
 | （前置雷达） | Livox Mid-360，倒装 | `/robot/topic/rdap/front_point_cloud2` | 10 Hz | **不用**：1016 那批误录成了它，见第 5 节 |
 
 **检测只用车顶的 XT32**（2026-10-22 确认）。
@@ -219,7 +219,7 @@ base 系（x 前、y 左、z 上）下的位置，单位 m：
 - 关键帧大约每 30 帧（1.25 s）一个，每条消息都带 SPS。每路每帧 7–20 KB，三路合计约 1.2 MB/s（约 4.3 GB/小时），是 XT32 数据量的 4%。
 - `timestamp` 比写入 bag 的时间早约 1 ms。
 - **三路的 `frame_id` 都是 `camera`**，建议改成 `front_camera` / `left_camera` / `right_camera`，否则以后标定后无法区分。
-- 机器人上共 **4 个**鱼眼（前、后、左、右），只录前、左、右三路，后视不录。
+- 机器人上共 **4 个**鱼眼（前、后、左、右）。2026-11-04 起四路都录，后视话题是 `/robot/topic/rdap/rear_sensor_camera`（4.3 节）。
 - 安装位置见 1.2、1.3 节。从画面看：
   - 前视在机头，朝前略向下，画面下沿能看到机身前部的把手；
   - 左、右在机身两侧，朝两侧，画面下方两角能看到腿。
@@ -228,7 +228,7 @@ base 系（x 前、y 左、z 上）下的位置，单位 m：
 
 ### 4.3 要录几路？
 
-**录前、左、右三路**（后视不录），审核以前视为主，左、右用来确认侧面的车。
+**四路都录**（2026-11-04 改）。审核以前视为主，左、右确认侧面的车，后视补正后方。这台狗上 `/robot/topic/rdap/rear_sensor_camera` 和另外三路一样是 H.264，约 27 Hz，一帧大约 10 KB，四路合计仍只有 XT32 的百分之几。原先不录后视，是因为 0921 没有这个话题，而且正后方只占车辆框的 16%，左、右相机的边缘勉强能看到。现在话题在发，正后方不再只靠点云猜。
 
 - XT32 是 360° 的，标注覆盖机器人周围 ±40.8 m 的全部范围。前视鱼眼只看得到前方 ±98°，后方 164° 的扇区看不到。
 - 0921 的自动标注里，车辆框按方位分布：
@@ -352,34 +352,209 @@ base 系（x 前、y 左、z 上）下的位置，单位 m：
 
 ## 7. 录制清单
 
-下一批厂区数据请录（录哪些场景、录多少见 [DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md)）：
+下一批厂区数据在狗上录（录哪些场景、录多少见 [DATA_COLLECTION_PLAN.md](DATA_COLLECTION_PLAN.md)）。检测和位姿只用 XT32、IMU、INSPVAX；相机只给审核看，不进网络。2026-11-04 在这台真狗上对过正在发的话题（`tegra-ubuntu`，ROS 2 Humble，`ROS_DOMAIN_ID=0`，`rmw_cyclonedds_cpp`）。
 
-| 话题 | 必须 | 说明 |
-|---|---|---|
-| `/robot/topic/rdap/top_point_cloud2` | 是 | XT32；1016 漏录的就是它 |
-| `/rte/rdap/rtk/imus/data_raw` | 是 | |
-| `/rte/rdap/rtk/inspvax` | 是 | |
-| `/robot/topic/rdap/front_sensor_camera` | 是 | 审核主视图 |
-| `/robot/topic/rdap/left_sensor_camera`、`right_sensor_camera` | 建议 | 侧面的车（4.3 节） |
-| 后视鱼眼 | 不录 | |
-| `/robot/topic/rdap/front_point_cloud2` | 否 | 不用 |
+### 7.1 录哪些
 
-录完先用体检确认：
+| 话题 | 录 | 2026-11-04 实测 | 说明 |
+|---|---|---|---|
+| `/robot/topic/rdap/top_point_cloud2` | 必须 | 10.0 Hz（消息头间隔中位数 0.100 s），128000 点 × 26 字节，`frame_id` = `hesai_lidar`，字段 `x y z intensity ring timestamp`。发布者 `hesai_ros_driver_node`，QoS 为 RELIABLE | XT32 双回波。1016 漏录的就是它 |
+| `/rte/rdap/rtk/imus/data_raw` | 必须 | 约 103 Hz，`frame_id` = `imu_link`。静止时角速度约 0（单位 deg/s），加速度 z 约 1.0（单位 g） | 和 3.3 节一致 |
+| `/rte/rdap/rtk/inspvax` | 必须 | 约 100 Hz，`frame_id` = `gps`。当时 `ins_status` = 1、`pos_type` = 52 | 正式录制要等固定解，见 7.2 |
+| `/robot/topic/rdap/front_sensor_camera` | 必须 | `foxglove_msgs/CompressedVideo`，`format` = h264，约 27 Hz，`frame_id` 都是 `camera` | 审核主视图。1016 那批是 24 Hz |
+| `/robot/topic/rdap/left_sensor_camera`、`right_sensor_camera` | 必须 | 同上，约 27 Hz | 侧面的车（4.3 节） |
+| `/robot/topic/rdap/rear_sensor_camera` | 必须 | 同上，约 27 Hz，一帧约 10 KB | 2026-11-04 改为要录。正后方的车左、右相机只在边缘看得到 |
+| `/lidar_packets_loss` | 要录 | `hesai_ros_driver/LossPacket`，约 9 Hz，字段 `total_packet_count`、`total_packet_loss_count`。当时丢包数是 0 | 同一个雷达节点。用来确认 UDP 没丢包。不进网络，体积可以忽略 |
+| `/robot/topic/rdap/front_point_cloud2` | 不录 | 在发，约 10 Hz，约 2 万点，字段是 `x y z intensity tag line timestamp`，`frame_id` = `frame_default` | Livox Mid-360。1016 误录过，检测不用（第 5 节） |
+| `/robot/topic/rdap/rear_point_cloud2`、`/lidar_points`、`/lidar_imu` | 不录 | 话题在列表里，数秒内 0 条 | 不是这套检测的输入。在线节点默认的 `/lidar_points` 在这台狗上没有数据，要用上面的 `top_point_cloud2` |
+| `/robot/topic/rdap/h264_front_camera`、`h264_front_left_sensor_camera`、`h264_front_right_sensor_camera`、`h264_back_sensor_camera` | 不录 | 数秒内 0 条 | 正在发的是四路 `*_sensor_camera`，不要再录一套空话题 |
+| `raw_*`、`rect_*`、`front_color_sensor_camera`、`front_depth_sensor_camera` | 不录 | 未压缩图或另一路相机 | 和 H.264 重复，体积大得多 |
+| `/rte/rdap/rtk/gnss` | 不录 | 约 10 Hz，但 `position_status` = 0、参与解算和跟踪的星数都是 0、经纬度是 0 | 体检只看 INSPVAX。星数不够时 `pos_type` 会离开 56，这段会被丢掉 |
+| `/lightning/odom`、`/robot/topic/rdap/imu_state`、`/tf` | 不录 | 当时没有数据 | 训练位姿用 INSPVAX，外参在代码里，不靠 tf |
+
+点云约 32 MB/s（约 114 GB/小时）。四路 H.264 大约再加 5 GB/小时。2026-11-04 系统盘还剩约 839 GB，够录 6 小时左右。bag 写到 `/home/nvidia/bags`（和系统盘同一块 nvme）。
+
+### 7.2 按这个顺序做
+
+下面命令里的 `NAME` 换成这一次的名字，全文用同一个，例如 `1104_1540`。检查命令大约 12 秒后自己结束，看最后一行 `average rate`。第 4 步不是规定的两个数，就不要做第 6 步。
+
+在服务器上进狗：
 
 ```bash
-python tools/dog/bag_survey.py --bag <bag> --out data/survey/<名字> --prefix <名字>
+ssh dog
 ```
 
-- 雷达 10 Hz，每帧 128,000 个槽位；
-- `ins_status` = 3，`pos_type` 大部分为 56；
-- 三个时钟检查（写入时间 − 消息时间）正常：雷达约 0.105 s，IMU、INS 约 1 ms；
-- 转换时打印的 INS 航向偏置是 0（天线已接对）；
-- 体检的 `survey.png` 里，路线和速度合理。
+每个新开的终端先贴这一段（登录后的 shell 不一定带 ROS）：
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/nvidia/perception/install/setup.bash
+source /home/nvidia/ros2/hesai/install/setup.bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export ROS_DOMAIN_ID=0
+```
+
+**1. 雷达，约 10 Hz**
+
+```bash
+timeout 12 ros2 topic hz /robot/topic/rdap/top_point_cloud2
+```
+
+`average rate` 约 10。低于 9，或中间打印的间隔超过 0.3 s，先不要录。
+
+**2. 四路相机，各约 27 Hz**
+
+```bash
+timeout 12 ros2 topic hz /robot/topic/rdap/front_sensor_camera
+timeout 12 ros2 topic hz /robot/topic/rdap/left_sensor_camera
+timeout 12 ros2 topic hz /robot/topic/rdap/right_sensor_camera
+timeout 12 ros2 topic hz /robot/topic/rdap/rear_sensor_camera
+```
+
+某一路没有 `average rate`，或远低于 20，这一路没有画面，先不要录。
+
+**3. IMU，约 100 Hz**
+
+```bash
+timeout 12 ros2 topic hz /rte/rdap/rtk/imus/data_raw
+```
+
+`average rate` 约 100。
+
+**4. INSPVAX，必须是固定解**
+
+两条各看一行。`kygi665_msgs` 里常量名把 55 和 56 写反了，以打印出来的数字为准（3.1 节）。
+
+```bash
+ros2 topic echo --once /rte/rdap/rtk/inspvax --field ins_status
+```
+
+通过时是：
+
+```text
+data: 3
+```
+
+这是 `INS_SOLUTION_GOOD`。
+
+```bash
+ros2 topic echo --once /rte/rdap/rtk/inspvax --field pos_type
+```
+
+通过时是：
+
+```text
+data: 56
+```
+
+这是 RTK 固定解。2026-11-04 在室内看到的是 `data: 1`（正在对准）和 `data: 52`，同时 GNSS 星数为 0。那不是固定解，录下来体检会整段丢掉。两个数都对上再继续。
+
+**5. 记下雷达丢包数**
+
+```bash
+ros2 topic echo --once /lidar_packets_loss
+```
+
+看 `total_packet_loss_count`，把这个整数记下来。当时是 0。
+
+**6. 开始录**
+
+点云约 32 MB/s，缓存加大到 256 MiB。这条会一直跑，录完在这个终端按 Ctrl-C。不要加 `/robot/topic/rdap/front_point_cloud2`。
+
+```bash
+mkdir -p /home/nvidia/bags1104
+ros2 bag record --max-cache-size 268435456 \
+  /robot/topic/rdap/front_sensor_camera \
+  /robot/topic/rdap/left_sensor_camera \
+  /robot/topic/rdap/right_sensor_camera \
+  /robot/topic/rdap/rear_sensor_camera \
+  /robot/topic/rdap/top_point_cloud2 \
+  /rte/rdap/rtk/imus/data_raw \
+  /rte/rdap/rtk/inspvax \
+  /lidar_packets_loss \
+  -o /home/nvidia/bags1104/cp01 
+```
+
+**7. 看条数**
+
+把 `ros2 bag info` 里的 `Duration` 记成 T 秒。
+
+```bash
+ros2 bag info /home/nvidia/bags1104/cp01
+```
+
+| 话题 | 正常条数 |
+|---|---|
+| `/robot/topic/rdap/top_point_cloud2` | 约 10 × T，差几个以内 |
+| `/rte/rdap/rtk/imus/data_raw`、`/rte/rdap/rtk/inspvax` | 各约 100 × T |
+| 四路 `*_sensor_camera` | 各约 27 × T |
+| `/lidar_packets_loss` | 大约 9 × T |
+
+雷达条数明显少一截（例如只有一半）：这份不要拿去标。删掉刚才的目录，用下面这一条重录（订阅改成和雷达一样的 RELIABLE）：
+
+```bash
+rm -rf /home/nvidia/bags1104/cp01
+cat > /tmp/bag_qos.yaml << 'EOF'
+/robot/topic/rdap/top_point_cloud2:
+  reliability: reliable
+  history: keep_last
+  depth: 20
+  durability: volatile
+EOF
+ros2 bag record --qos-profile-overrides-path /tmp/bag_qos.yaml --max-cache-size 268435456 \
+  -o /home/nvidia/bags/NAME \
+  /robot/topic/rdap/front_sensor_camera \
+  /robot/topic/rdap/left_sensor_camera \
+  /robot/topic/rdap/right_sensor_camera \
+  /robot/topic/rdap/rear_sensor_camera \
+  /robot/topic/rdap/top_point_cloud2 \
+  /rte/rdap/rtk/imus/data_raw \
+  /rte/rdap/rtk/inspvax \
+  /lidar_packets_loss
+```
+
+Ctrl-C 之后再跑一次上面的 `ros2 bag info`。
+
+**8. 再看丢包**
+
+```bash
+ros2 topic echo --once /lidar_packets_loss
+```
+
+`total_packet_loss_count` 比第 5 步大，说明录的过程中雷达 UDP 丢了包，点云有洞，重录。
+
+**9. 拷回服务器做体检**
+
+先 `exit` 离开狗。下面在服务器上执行。`bag_survey.py` 不读相机，多出来的相机和丢包话题不影响。
+
+```bash
+scp -r dog:/home/nvidia/bags/NAME /public/zjst/robot/cp_data/NAME
+cd /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint
+export PYTHONPATH=.
+python tools/dog/bag_survey.py \
+  --bag /public/zjst/robot/cp_data/NAME \
+  --out data/survey/NAME \
+  --prefix NAME
+```
+
+屏幕摘要和 `data/survey/NAME/survey.png` 按这个表看。图怎么读、后面怎么切场景，见 [BAG_SPLIT.md](BAG_SPLIT.md) 第 1 节。
+
+| 项 | 正常 | 不正常时 |
+|---|---|---|
+| 雷达 | 10 Hz，每帧 128,000 个槽位，最大间隔约 0.1 s | 空档多：回到第 7 步看条数，回到第 8 步看丢包 |
+| IMU、INS | 各约 100 Hz | 同上 |
+| `ins_status`、`pos_type` | 3，并且大部分是 56 | 整段都不是 56：开录时第 4 步没过。非 56 的时段会被切掉 |
+| 时钟（写入时间 − 消息时间） | 雷达约 +0.105 s，IMU、INS 约 1 ms；5–95% 宽度 < 50 ms | 差几秒或区间很宽：授时没锁上（6.2 节），不要转序列 |
+| 航向偏置 | 转换时打印 0 | 不是 0：天线又接反了（3.2 节） |
+| `survey.png` | 路线连续，速度和当天走法一致 | 轨迹跳变是 INS 跳了，那段 `keep = 0` |
+
+过了体检再按 BAG_SPLIT.md 切场景，跑 `sequence_preview.py`。墙变成双线或 `align` FAIL，再查雷达和 INS 的时间差（6.2 节，BAG_SPLIT.md 3.2 节）。
 
 **其他建议：**
-- XT32 改成单回波（最强或最后），数据量减半（约 57 GB/小时）。网络的预训练数据（nuScenes）就是单回波，我们的预处理本来也会去掉重复的回波。
-- 相机 `frame_id` 改成各自的名字（4.2 节）。
-- 录制前确认雷达授时已锁定（6.2 节）。
+
+- XT32 改成单回波（最强或最后），数据量减半（约 57 GB/小时）。网络的预训练数据（nuScenes）就是单回波，预处理本来也会去掉重复回波。
+- 相机 `frame_id` 改成各自的名字（4.2 节）。2026-11-04 四路仍都是 `camera`。
+- 录制前确认雷达授时已锁定（6.2 节）。新的一批看第 9 步表格里的时钟一行。
 
 ## 8. 已确认和待补充
 
@@ -388,7 +563,7 @@ python tools/dog/bag_survey.py --bag <bag> --out data/survey/<名字> --prefix <
 | 项目 | 结论 |
 |---|---|
 | "本体中心" | 就是 IMU → 本体外参的 base 原点；鱼眼位置和其他外参可以直接放在一起用 |
-| 后视鱼眼 | 不录 |
+| 后视鱼眼 | 录。2026-11-04 这台狗 `/robot/topic/rdap/rear_sensor_camera` 在发，格式和另外三路相同 |
 | INS 输出点 | IMU 中心 |
 | 鱼眼内参 | 暂时三路都用 H190XA-G12161021 的出厂标定（4.4 节） |
 | 检测用的雷达 | 车顶 XT32；1016 那批误录了前置 Mid-360，不用 |
@@ -404,7 +579,7 @@ python tools/dog/bag_survey.py --bag <bag> --out data/survey/<名字> --prefix <
 | 雷达授时方式：GPS（PPS + NMEA）/ PTP / 没接；时间源是哪台设备；怎么看锁定状态（6.2 节） | 0921 数据显示和 INS 对得上，方式未知 | |
 | 相机触发方式：自由运行 / 硬件触发（触发源是什么）（6.3 节） | 未知 | |
 | 相机时间戳的含义：曝光开始 / 曝光中间 / 到达电脑 / 编码完成 | 1016 里比写入 bag 早约 1 ms，像是到达时间 | |
-| 相机 `frame_id` 是否改成各自的名字 | 三路都是 `camera` | |
+| 相机 `frame_id` 是否改成各自的名字 | 2026-11-04 四路都是 `camera` | |
 | XT32 的回波模式和帧率（是否改成单回波） | 双回波，10 Hz | |
 
 **可选的**（备查，或者以后调参数时用）：
@@ -425,4 +600,4 @@ python tools/dog/bag_survey.py --bag <bag> --out data/survey/<名字> --prefix <
 | 项目 | 用途 |
 |---|---|
 | 在 0921 的转弯场景上，用推算的接反杠杆臂 (0.021, −0.474, 0) 重跑 `refine_poses.py --lever-arm`，和拟合值比残差（SERVER_TASKS.md 的 T10，可选） | 决定接反数据以后用推算值还是拟合值 |
-| 下一批录制（XT32 + 三路相机）到了以后，用点云和画面对齐的方法估相机朝向，或者用 8.2 节填的设计值 | 把 3D 框画到相机画面上 |
+| 下一批录制（XT32 + 四路相机）到了以后，用点云和画面对齐的方法估相机朝向，或者用 8.2 节填的设计值 | 把 3D 框画到相机画面上 |

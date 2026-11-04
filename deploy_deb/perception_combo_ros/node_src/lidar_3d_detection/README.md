@@ -142,7 +142,103 @@ sudo systemctl stop lidar-3d-detection
 - **缓冲**：同一份点云多一个订阅的（比如 bridge），发的那一边要多发一份，默认缓冲又不够了（R5 里 bridge 收到的原始点云也只有 453 帧，丢在发的那一边）；
 - **用法**：`share/lidar_3d_detection/fastdds_large_buffers.xml`（send / listen 各 8 MB），`FASTRTPS_DEFAULT_PROFILES_FILE=<这个文件>`。路上的每个进程都要有：发点云的（雷达驱动、`ros2 bag play`）、本节点、看点云的（bridge）。内核会截到 `net.core.rmem_max` / `wmem_max`（板上是 16 MB，够）；
 - `scripts/orin_foxglove.sh` 在 Fast DDS 下默认用它（`FASTRTPS_DEFAULT_PROFILES_FILE=none` 关掉）；`orin_soak.sh` 不改，把用的 DDS 设置记进 `clocks.txt`；
-- **服务**：`/etc/default/lidar-3d-detection` 里 RMW 要和机器人上别的节点一样，不然互相收不到。机器人用 CycloneDDS 时，写 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` 和机器人的 `CYCLONEDDS_URI`（大点云的缓冲在那份 XML 里配，Fast DDS 的这个文件不起作用）；deb 依赖打包板上装着的每个 RMW。
+- **服务**：`/etc/default/lidar-3d-detection` 里 RMW 要和机器人上别的节点一样，不然互相收不到。8 号狗（2026-11-04）是 CycloneDDS、域 0、`CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml`（只绑 eth1，共享内存，socket 至少 10 MB）。Fast DDS 的这个文件在那边不起作用。deb 依赖打包板上装着的每个 RMW。
+
+上面「用 Foxglove 看」是编译机上播 bag。实车不要跑 `orin_foxglove.sh`：它会停掉车上的服务，域默认是 77，播的是 bag 不是雷达。
+
+## 车上实车，用另一台笔记本看
+
+8 号狗（以及同一套车载镜像）上，`lidar-3d-detection` 开机已经在跑：域 0、CycloneDDS、不发 TF、不发调试点云。检测框在世界系，笔记本只连 WebSocket，不用装 ROS。
+
+车上的 CycloneDDS 只绑 eth1。笔记本如果从 `192.168.122.100`（eth0）进来，直接订 DDS 看不到话题。桥要开在狗上，笔记本连狗的 8765。
+
+**狗上还没有 `foxglove_bridge`**（2026-11-04）。这台狗的 apt 源出不去，不要在狗上 `apt install`。公开源里现在的包就是 `ros-humble-foxglove-bridge` 3.6.0（和编译机上那份同一个），Depends 没有把 `rclcpp` 锁死。把这个 arm64 deb 拷到狗上：
+
+```bash
+sudo dpkg -i ros-humble-foxglove-bridge_*_arm64.deb
+```
+
+Depends 不满足就停下，不要 `--force-depends`。
+
+**1. 狗上，确认检测已经在跑。** 从笔记本 `ssh nvidia@192.168.122.100`（密码不写进仓库）。
+
+```bash
+systemctl is-active lidar-3d-detection
+journalctl -u lidar-3d-detection -n 20 --no-pager
+```
+
+要看到 `lidar_3d_detection up`，配置是 `/opt/seres/perception/...`，没有 `publishing TF`。一直是 `waiting for a good INS solution` 或 `no pose for scan yet`：定位还不是好解（`ins_status` 要是 3），出门固定后再看，这时还没有框。
+
+**2. 狗上，前台开桥。** 环境必须和检测服务一样（systemd 不读 `.bashrc`）。看完在这个终端 Ctrl-C。
+
+```bash
+set -a
+source /etc/default/lidar-3d-detection
+set +a
+source /opt/ros/humble/setup.bash
+source /opt/seres/perception/local_setup.bash
+ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765
+```
+
+**3. 笔记本上打开 Foxglove 桌面版。**
+
+- Open connection → Foxglove WebSocket → `ws://192.168.122.100:8765`。笔记本不在这个网段、但能 SSH 上去时，先在笔记本执行 `ssh -N -L 8765:127.0.0.1:8765 nvidia@192.168.122.100`，再连 `ws://127.0.0.1:8765`；
+- Layout → Import from file。布局在狗上：
+
+  ```bash
+  scp nvidia@192.168.122.100:dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.json .
+  ```
+
+  仓库里的同一份是 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.json`。显示坐标系用 `camera_init`。
+
+**能看到什么。** 有定位、有目标之后：
+
+- 3D 里的框、ID、速度是 `/perception/lidar_3d/tracks`，预测路径是 `/perception/lidar_3d/predictions`，都在 `camera_init`；
+- 右边 Raw Messages 是给规划的 `/perception/lidar_3d/objects`；
+- 布局里的点云 `/perception/lidar_3d/cloud` 默认没有。实车上不要开 `publish_tf`：车上的 TF 树里已经有雷达的 frame，再发 `camera_init → hesai_lidar` 会有两个父节点。只看框就不要改 `/etc/default`。
+
+桥 3.x 的握手是 `foxglove.sdk.v1`，用 Foxglove 桌面版。看完停掉桥即可，检测服务继续留着。`dpkg` 报依赖不满足，或桥进程起不来，就停下，不要 `--force-depends`。
+
+## 用 RViz 看
+
+RViz 自己是 ROS 节点，要和检测在同一个域、同一种 DDS 里。Foxglove 的 WebSocket 帮不上。框在 `/perception/lidar_3d/tracks`，预测在 `/perception/lidar_3d/predictions`，类型都是 `visualization_msgs/MarkerArray`，坐标系 `camera_init`。`/perception/lidar_3d/objects` 是自定义消息，RViz 没有现成显示器。点云默认不发，实车上不要开 `publish_tf`。
+
+定位还不是好解时没有框，先看服务日志（上一节第 1 步）。
+
+**从 `192.168.122.100` 看：在狗上跑 `rviz2`，画面转到笔记本。** 车上的 CycloneDDS 只绑 eth1，笔记本接在 eth0 上订不到话题。狗上的进程用的是车上的配置（共享内存 + eth1），所以 RViz 要跑在狗上。
+
+笔记本：
+
+```bash
+ssh -X nvidia@192.168.122.100
+```
+
+狗上：
+
+```bash
+set -a
+source /etc/default/lidar-3d-detection
+set +a
+source /opt/ros/humble/setup.bash
+source /opt/seres/perception/local_setup.bash
+rviz2
+```
+
+RViz 里：Global Options 的 Fixed Frame 填 `camera_init`。Add → By topic，加上 `/perception/lidar_3d/tracks` 和 `/perception/lidar_3d/predictions`，显示类型都是 MarkerArray。
+
+狗上要有 `ros-humble-rviz2`。没有的话不要在狗上 `apt install`（源出不去）。在能上网的机器下载和这台 Humble 匹配的 arm64 deb，`sudo dpkg -i`。依赖不满足或起不来就停下，不要 `--force-depends`。`ssh -X` 没有窗口时改 `-Y`。
+
+**笔记本自己跑 `rviz2`：笔记本要接在狗的 eth1 那一侧。** `192.168.122.100` 是 eth0，从那边不行。笔记本上的网卡名通常不叫 eth1，不要把狗的 `/opt/ros/cyclonedds.xml` 原样拿来用，把 `name` 换成笔记本上接到狗的那块网卡。
+
+```bash
+export ROS_DOMAIN_ID=0
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces><NetworkInterface name="接狗的网卡" priority="default" multicast="default"/></Interfaces><AllowMulticast>true</AllowMulticast></General></Domain></CycloneDDS>'
+source /opt/ros/humble/setup.bash
+rviz2
+```
+
+Fixed Frame 和两个 MarkerArray 话题同上。笔记本要装 ROS 2 Humble 和 `ros-humble-rviz2`。
 
 ## 和算法仓库对齐
 
