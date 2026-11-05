@@ -1,0 +1,41 @@
+azimuth-offset given=0; lever arm IMU center [0.0213, -0.18, 0.0]; meta ins_azimuth_offset_from=given
+
+cameras -> <seq>/cameras.mcap: /robot/topic/rdap/rear_sensor_camera, /robot/topic/rdap/left_sensor_camera, /robot/topic/rdap/front_sensor_camera, /robot/topic/rdap/right_sensor_camera
+INS lever arm [0.0213, -0.18, 0.0] m (body frame)
+wrote 306 scans, 3162 imu, 3162 odom, 3150 camera messages -> data/seq/1104_cp01_s000
+wrote 307 scans, 3262 imu, 3262 odom, 3311 camera messages -> data/seq/1104_cp01_s001
+wrote 306 scans, 3171 imu, 3171 odom, 3221 camera messages -> data/seq/1104_cp01_s003
+cameras -> <seq>/cameras.mcap: /robot/topic/rdap/front_sensor_camera, /robot/topic/rdap/left_sensor_camera, /robot/topic/rdap/rear_sensor_camera, /robot/topic/rdap/right_sensor_camera
+INS lever arm [0.0213, -0.18, 0.0] m (body frame)
+wrote 285 scans, 2953 imu, 2952 odom, 2969 camera messages -> data/seq/1104_cp02_s000
+wrote 285 scans, 3051 imu, 3051 odom, 3101 camera messages -> data/seq/1104_cp02_s001
+wrote 286 scans, 3051 imu, 3051 odom, 3102 camera messages -> data/seq/1104_cp02_s002
+wrote 285 scans, 3051 imu, 3051 odom, 3101 camera messages -> data/seq/1104_cp02_s004
+wrote 285 scans, 2959 imu, 2959 odom, 3008 camera messages -> data/seq/1104_cp02_s005
+cameras -> <seq>/cameras.mcap: /robot/topic/rdap/front_sensor_camera, /robot/topic/rdap/left_sensor_camera, /robot/topic/rdap/rear_sensor_camera, /robot/topic/rdap/right_sensor_camera
+INS lever arm [0.0213, -0.18, 0.0] m (body frame)
+wrote 305 scans, 3145 imu, 3145 odom, 3167 camera messages -> data/seq/1104_cp03_s000
+wrote 304 scans, 3245 imu, 3245 odom, 3295 camera messages -> data/seq/1104_cp03_s001
+wrote 305 scans, 3244 imu, 3244 odom, 3294 camera messages -> data/seq/1104_cp03_s002
+wrote 304 scans, 3245 imu, 3245 odom, 3294 camera messages -> data/seq/1104_cp03_s003
+wrote 305 scans, 3244 imu, 3244 odom, 3294 camera messages -> data/seq/1104_cp03_s004
+wrote 304 scans, 3245 imu, 3245 odom, 3294 camera messages -> data/seq/1104_cp03_s005
+wrote 304 scans, 3244 imu, 3244 odom, 3294 camera messages -> data/seq/1104_cp03_s006
+wrote 305 scans, 3245 imu, 3245 odom, 3294 camera messages -> data/seq/1104_cp03_s007
+wrote 304 scans, 3244 imu, 3244 odom, 3296 camera messages -> data/seq/1104_cp03_s008
+wrote 305 scans, 3245 imu, 3245 odom, 3294 camera messages -> data/seq/1104_cp03_s009
+wrote 304 scans, 3244 imu, 3244 odom, 3294 camera messages -> data/seq/1104_cp03_s010
+wrote 305 scans, 3245 imu, 3245 odom, 3294 camera messages -> data/seq/1104_cp03_s011
+wrote 305 scans, 3245 imu, 3245 odom, 3293 camera messages -> data/seq/1104_cp03_s013
+wrote 304 scans, 3244 imu, 3244 odom, 3294 camera messages -> data/seq/1104_cp03_s014
+wrote 305 scans, 3245 imu, 3245 odom, 3294 camera messages -> data/seq/1104_cp03_s015
+wrote 304 scans, 3151 imu, 3151 odom, 3201 camera messages -> data/seq/1104_cp03_s016
+cameras -> <seq>/cameras.mcap: /robot/topic/rdap/right_sensor_camera, /robot/topic/rdap/rear_sensor_camera, /robot/topic/rdap/left_sensor_camera, /robot/topic/rdap/front_sensor_camera
+INS lever arm [0.0213, -0.18, 0.0] m (body frame)
+wrote 306 scans, 3163 imu, 3162 odom, 3166 camera messages -> data/seq/1104_cp04_s000
+wrote 306 scans, 3259 imu, 3258 odom, 3308 camera messages -> data/seq/1104_cp04_s001
+wrote 306 scans, 3259 imu, 3259 odom, 3308 camera messages -> data/seq/1104_cp04_s002
+wrote 306 scans, 3258 imu, 3258 odom, 3308 camera messages -> data/seq/1104_cp04_s003
+wrote 306 scans, 3258 imu, 3258 odom, 3308 camera messages -> data/seq/1104_cp04_s004
+wrote 306 scans, 3258 imu, 3258 odom, 3308 camera messages -> data/seq/1104_cp04_s006
+wrote 306 scans, 3172 imu, 3172 odom, 3222 camera messages -> data/seq/1104_cp04_s007

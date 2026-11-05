@@ -140,7 +140,7 @@
 | T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成，已复核。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置。复核："真狗是 CycloneDDS"没有依据，T34 核实；deb 带上 8 MB 的 Fast DDS profile，orin_foxglove.sh 默认用它；/etc/default 列了 DDS 选项 |
 | T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 完成，已复核。CycloneDDS 域 0、只绑 eth1、共享内存、socket 10 MB，节点 root。我们的话题各 1 个发布者、0 个订阅，TF 里没有 camera_init。deb `0.1.0+316.gdbde7ed`。室内 clouds 598 / skipped 0 / frames 0。和编译机比过门槛（匹配 0.998）。不锁频 total 中位 58.6 ms，锁频 37.1 ms（服务也在占 GPU），测完恢复未锁。录 64 s 点云 640 条，丢包计数没涨。nvidia 的 bridge 10 秒只收到 10 帧点云。复核：慢的原因是机器人自己的负载（load 32），不是我们的服务；不锁频 p99 99 ms 贴着帧间隔；nvidia 用户拿到的数据不全（root 的共享内存），撞车检查和 bridge 要用 root 再看；SENSORS 7.2 的雷达检查改成录 12 秒数条数 |
 | T35 | 8 号狗出门实跑：A 段室内（root 视角撞车、root 起 bridge、负载和 GPU）；B 段室外有固定解（在线每秒的帧数和延迟、天线接法、录包和离线回放对比、Foxglove） | Agent + 人（带狗出门） | T34 复核 | 1.5 小时 | 待做 |
-| T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 停在第 2 步，已复核：RTK 100% 固定、时钟正常、四路相机齐；狗全程几乎没动（合计约 7 m），定不了天线接法，但静止时偏置不影响检测系里的数据（实测差 3 mm）。按偏置 0 续做（T36 续） |
+| T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 完成（2026-11-05；续：偏置 0 重转，31 场景两遍预览全 OK，时间差跳过） |
 | T37 | 1104：双教师推理和自动标注、上线模型对教师、每个场景的统计和挑场景、带四路相机的审核材料、0921 + 1104 的两个划分方案（不写入） | Agent | T36 续 | 3 小时 | 待做 |
 | H6 | 审 1104 挑出的场景（SUSTechPOINTS 逐框，只审车；Foxglove 里对照四路相机），定划分 | 人 | T37 | 1–2 天 | 待做 |
 | T38 | 导回 H6，和 0921 合并，写入划分，导出 v3 数据集 | Agent | H6 | 1 小时 | 计划 |
@@ -6793,6 +6793,37 @@ BAGS=bags1104（软链，指向 /public/zjst/robot/bags1104）
 报告（写进"T36 结果"的后面）：convert2.txt 的要点；两遍预览的 OK / WARN / FAIL；refine 汇总（shift p90 ins / lo / fused、bad_share）；
 离地高度；场景总数和帧数；用掉的磁盘。
 ```
+
+
+### T36 续结果
+
+**完成（2026-11-05）。** 按复核用 `--azimuth-offset 0` 重转 4 份，跳过时间差；两遍预览、融合、离地高度都跑完。
+
+**第 0 步**：删掉了上次不完整的 `data/seq/1104_cp01_*`、`1104_cp02_*`（含 convert.log）。相关测试 `test_bag_split` / `test_refine_poses` 通过（`data/reports/T36/pytest_续.txt`）。
+
+**第 1 步转换**（`data/reports/T36/convert2.txt`）
+- 四份都是 lever arm `[0.0213, -0.18, 0.0]`；`meta.json`：`ins_azimuth_offset_deg=0`，`ins_azimuth_offset_from=given`。
+- 四路相机都进 `cameras.mcap`；31 个 keep 场景的 wrote 帧数与 `segments.csv` 的 scans 列一致，合计 **9 359** 帧。
+- 场景磁盘约 **7.3 GB**（`data/seq/1104_*`，不提交）。
+
+**第 2 步预览 / 融合**
+- INS 预览 `data/preview/1104_ins/`：**31 OK / 0 WARN / 0 FAIL**；静止场景 shift p90 约 0.00 m。
+- `refine_poses.py`：几乎全部场景 correction p90 ≤ 0.01 m、`ins_unhealthy_share=0`、`bad_share=0`；航向修正最大 0.4°。
+  - 唯一略动的是 `1104_cp03_s000`（体检路径 1.9 m）：shift p90 ins / lo / fused = 0.12 / 0.06 / 0.07 m，LO bad 1.3%，仍无 pose bad。
+  - "INS lever arm left over"：这批几乎不转，`lever_residual_m` 全是 null（预期）。
+- 融合后预览 `data/preview/1104/`：**31 OK / 0 WARN / 0 FAIL**；无 shift_p90 FAIL。
+
+**第 3 步离地高度**（`data/reports/T36/base_height.txt`）
+
+| bag | 场景数 | base_height 中位 | 判断 |
+|---|---|---|---|
+| cp01 | 3 | 0.48 m | 介于趴下（约 0.3 m）与站立（0.65–0.80 m）之间 |
+| cp02 | 5 | 0.48 m | 同上 |
+| cp03 | 16 | 0.63 m | 接近站立下限 |
+| cp04 | 7 | 0.63 m | 接近站立下限 |
+
+**耗时**：重转约 4.7 min；INS 预览约 1.2 min；refine 约 1.6 min；融合预览约 1.2 min；离地高度约 1 s。
+
 
 ## T37 1104：两个教师、自动标注、挑场景、审核材料、划分方案
 

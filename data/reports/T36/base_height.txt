@@ -1,0 +1,36 @@
+sequence                   split scans  base_height [m]          sweeps p10-p90  lidar_time_offset [s]  imu axes
+1104_cp01.convert.log       no meta.json (unfinished conversion) - skipped
+1104_cp01_s000             train   306  0.481                    0.48-0.48 (n 31) +0.000                 body
+1104_cp01_s001             train   307  0.482                    0.48-0.48 (n 31) +0.000                 body
+1104_cp01_s003             val     306  0.482                    0.48-0.48 (n 31) +0.000                 body
+1104_cp02.convert.log       no meta.json (unfinished conversion) - skipped
+1104_cp02_s000             train   285  0.482                    0.48-0.48 (n 29) +0.000                 body
+1104_cp02_s001             train   285  0.482                    0.48-0.48 (n 29) +0.000                 body
+1104_cp02_s002             train   286  0.482                    0.48-0.48 (n 29) +0.000                 body
+1104_cp02_s004             val     285  0.482                    0.48-0.48 (n 29) +0.000                 body
+1104_cp02_s005             val     285  0.482                    0.48-0.48 (n 29) +0.000                 body
+1104_cp03.convert.log       no meta.json (unfinished conversion) - skipped
+1104_cp03_s000             train   305  0.632                    0.63-0.71 (n 31) +0.000                 body
+1104_cp03_s001             train   304  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s002             train   305  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s003             train   304  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s004             train   305  0.633                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s005             train   304  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s006             train   304  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s007             train   305  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s008             train   304  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s009             train   305  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s010             train   304  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s011             train   305  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s013             val     305  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s014             val     304  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s015             val     305  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp03_s016             val     304  0.634                    0.62-0.63 (n 31) +0.000                 body
+1104_cp04.convert.log       no meta.json (unfinished conversion) - skipped
+1104_cp04_s000             train   306  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp04_s001             train   306  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp04_s002             train   306  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp04_s003             train   306  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp04_s004             train   306  0.634                    0.63-0.63 (n 31) +0.000                 body
+1104_cp04_s006             val     306  0.634                    0.62-0.63 (n 31) +0.000                 body
+1104_cp04_s007             val     306  0.631                    0.62-0.63 (n 31) +0.000                 body

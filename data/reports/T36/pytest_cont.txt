@@ -1,0 +1,21 @@
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[33m                                                            [100%][0m
+[33m=============================== warnings summary ===============================[0m
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/numba/core/decorators.py:159: NumbaDeprecationWarning: [1mThe keyword argument 'nopython=False' was supplied. From Numba 0.59.0 the default is True and supplying this argument has no effect.[0m
+    warnings.warn(msg, NumbaDeprecationWarning)
+
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488: DeprecationWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 5 durations ==============================
+11.14s call     d20car_predict/CenterPoint/tests/dog/test_refine_poses.py::test_sample_bag_shift_check_before_and_after
+3.47s setup    d20car_predict/CenterPoint/tests/dog/test_bag_split.py::test_survey_proposes_scenes_with_val_and_buffer
+3.12s call     d20car_predict/CenterPoint/tests/dog/test_bag_split.py::test_preview_passes_good_data_and_fails_a_wrong_extrinsic
+0.84s setup    d20car_predict/CenterPoint/tests/dog/test_refine_poses.py::test_sample_bag_shift_check_before_and_after
+0.44s call     d20car_predict/CenterPoint/tests/dog/test_bag_split.py::test_one_pass_split_matches_the_whole_bag
+[33m[32m13 passed[0m, [33m[1m5 warnings[0m[33m in 19.83s[0m[0m
