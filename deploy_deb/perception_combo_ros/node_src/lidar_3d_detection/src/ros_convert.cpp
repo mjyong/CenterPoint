@@ -189,7 +189,14 @@ visualization_msgs::msg::MarkerArray prediction_markers(const PipelineOutput& ou
   visualization_msgs::msg::MarkerArray arr;
   arr.markers.push_back(delete_all());
   int k = 0;
-  for (const Prediction& p : out.predictions)
+  for (const Prediction& p : out.predictions) {
+    const TrackState* track = nullptr;
+    for (const TrackState& s : out.tracks)
+      if (s.track_id == p.track_id) track = &s;
+    // The rollout starts one step ahead and only has xy. A fixed z (the old 0.2) sits on the
+    // grid while the cube follows the track center, so the line leaves the box as soon as the
+    // vehicle is not at that height.
+    const double z = track ? track->position[2] : 0.2;
     for (size_t j = 0; j < p.modes.size(); ++j) {
       visualization_msgs::msg::Marker m;
       m.header.frame_id = world_frame;
@@ -203,9 +210,11 @@ visualization_msgs::msg::MarkerArray prediction_markers(const PipelineOutput& ou
       m.color.g = 0.2f;
       m.color.b = 0.2f;
       m.color.a = static_cast<float>(0.2 + 0.8 * p.probs[j]);
-      for (const Vec2& xy : p.modes[j]) m.points.push_back(point(xy[0], xy[1], 0.2));
+      if (track) m.points.push_back(point(track->position[0], track->position[1], z));
+      for (const Vec2& xy : p.modes[j]) m.points.push_back(point(xy[0], xy[1], z));
       arr.markers.push_back(m);
     }
+  }
   return arr;
 }
 

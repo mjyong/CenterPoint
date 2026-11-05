@@ -250,10 +250,18 @@ source /etc/default/lidar-3d-detection
 set +a
 source /opt/ros/humble/setup.bash
 source /opt/seres/perception/local_setup.bash
-rviz2
+rviz2 -d ~/dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.rviz
 ```
 
-RViz 里：Global Options 的 Fixed Frame 填 `camera_init`。Add → By topic，加上 `/perception/lidar_3d/tracks` 和 `/perception/lidar_3d/predictions`，显示类型都是 MarkerArray。
+这份配置已经设好：Fixed Frame 是 `camera_init`，Tracks 订 `/perception/lidar_3d/tracks`，Predictions 订 `/perception/lidar_3d/predictions`，都是 MarkerArray。格子 5 m 一格。两条都在 `camera_init`，平面位置是同一套世界坐标。已经装上车的包把预测折线画在固定高度 `z=0.2`，而且第一个点是 0.5 s 之后的位置，框则画在航迹中心，所以高度一对不上线就离开框。源码里的折线已经改成从框中心出发、用框的高度；车上的服务还是旧包，要重新打 deb 装上去才变。
+
+Top XT32（`/robot/topic/rdap/top_point_cloud2`，坐标系 `hesai_lidar`）在列表里但默认关着，打开也画不出来，三件事叠在一起：
+
+- 点在 `hesai_lidar`，Fixed Frame 是 `camera_init`，车上没有这条变换。检测节点的 `publish_tf` 不能开，它还会发 `camera_init → hesai_lidar`，雷达 frame 就有两个父节点；
+- 雷达按传感器 QoS 发（best effort）。配置里这个显示器是 `Unreliable: true`，和它一致；改成可靠就订不上；
+- 一帧几兆，共享内存是 root 的 `iox-roudi`。用 `nvidia` 起的 RViz 经常对不上这条点云，T34 里同一个用户看原始点云只有零星几帧。
+
+`/perception/lidar_3d/objects` 仍然没有显示器。
 
 8 号狗上已经装着 `ros-humble-rviz2` 11.2.16（T34）。别的狗没有的话不要 `apt install`（源出不去）。在能上网的机器下载和这台 Humble 匹配的 arm64 deb，`sudo dpkg -i`。依赖不满足或起不来就停下，不要 `--force-depends`。`ssh -X` 没有窗口时改 `-Y`。
 
@@ -264,10 +272,10 @@ export ROS_DOMAIN_ID=0
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces><NetworkInterface name="接狗的网卡" priority="default" multicast="default"/></Interfaces><AllowMulticast>true</AllowMulticast></General></Domain></CycloneDDS>'
 source /opt/ros/humble/setup.bash
-rviz2
+rviz2 -d lidar_3d_detection.rviz
 ```
 
-Fixed Frame 和两个 MarkerArray 话题同上。笔记本要装 ROS 2 Humble 和 `ros-humble-rviz2`。
+配置文件先从狗上拷下来：`scp nvidia@192.168.122.100:dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.rviz .`。Fixed Frame 和两个 MarkerArray 话题同上。笔记本要装 ROS 2 Humble 和 `ros-humble-rviz2`。
 
 ## 和算法仓库对齐
 

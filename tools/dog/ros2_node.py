@@ -127,16 +127,24 @@ class DogPerceptionNode(Node):
 
         parr = MarkerArray()
         parr.markers.append(clear)
+        tracks = {s.track_id: s for s in out.tracks}
         k = 0
         for pr in out.predictions:
+            track = tracks.get(pr.track_id)
+            z = float(track.position[2]) if track is not None else 0.2
             for mode, prob in zip(pr.modes, pr.probs):
                 m = Marker()
                 m.header.frame_id, m.header.stamp = self.world_frame, stamp
                 m.ns, m.id, m.type = "pred", k, Marker.LINE_STRIP
                 k += 1
+                m.pose.orientation.w = 1.0
                 m.scale.x = 0.08
                 m.color.r, m.color.g, m.color.b, m.color.a = 1.0, 0.2, 0.2, float(0.2 + 0.8 * prob)
-                m.points = [Point(x=float(x), y=float(y), z=0.2) for x, y in mode]
+                pts = []
+                if track is not None:
+                    pts.append(Point(x=float(track.position[0]), y=float(track.position[1]), z=z))
+                pts.extend(Point(x=float(x), y=float(y), z=z) for x, y in mode)
+                m.points = pts
                 parr.markers.append(m)
         self.pub_preds.publish(parr)
 
