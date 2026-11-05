@@ -1,0 +1,5 @@
+1104_cp01_s002                           OK    306 scans   30.5 s  align 0.002 m  shift p90 0.00 m  ground 0.010 m  tilt 0.45 deg  INS step 0.00 m  
+1104_cp02_s003                           OK    285 scans   28.4 s  align 0.003 m  shift p90 0.00 m  ground 0.006 m  tilt 0.45 deg  INS step 0.00 m  
+1104_cp03_s012                           OK    304 scans   30.3 s  align 0.001 m  shift p90 0.00 m  ground 0.015 m  tilt 0.79 deg  INS step 0.00 m  
+1104_cp04_s005                           OK    305 scans   30.4 s  align 0.001 m  shift p90 0.00 m  ground 0.019 m  tilt 0.78 deg  INS step 0.00 m  
+4 sequences: 4 OK, 0 WARN, 0 FAIL -> data/preview/1104/index.html

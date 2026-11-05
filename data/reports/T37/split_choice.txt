@@ -1,0 +1,2 @@
+default cp02+cp04 moving_30m share=48.54% in [25%,60%]
+val=('1104_cp02', '1104_cp04') train=('1104_cp01', '1104_cp03')

@@ -1,0 +1,4 @@
+Filesystem                Size  Used Avail Use% Mounted on
+cqzjst.seres.cn:/mnt/hpc  950T  260T  691T  28% /public
+/dev/sdc3                 877G  799G   34G  97% /
+/dev/sdc3                 877G  799G   34G  97% /

@@ -1,0 +1,98 @@
+gpu  name                          memory MB   util  procs  use
+0    NVIDIA GeForce RTX 4090      18980/23028   100%    yes  busy
+1    NVIDIA GeForce RTX 4090      20979/23028     0%    yes  busy
+2    NVIDIA GeForce RTX 4090      21165/23028     0%    yes  busy
+3    NVIDIA GeForce RTX 4090      16565/23028    39%    yes  busy
+4    NVIDIA GeForce RTX 4090      15295/23028    20%    yes  busy
+5    NVIDIA GeForce RTX 4090      14035/23028    99%    yes  busy
+6    NVIDIA GeForce RTX 4090      18539/23028     0%    yes  busy
+7    NVIDIA GeForce RTX 4090       8071/23028     0%    yes  FREE
+35 scenes on 1 worker(s): cuda:7#0; auto_label 16 at once
+CPU threads per process: 32
+1104_cp01_s001             -> cuda:7#0
+1104_cp01_s001             inference ok on cuda:7#0 in 159 s
+1104_cp01_s000             -> cuda:7#0
+1104_cp01_s001             labelled ok
+1104_cp01_s000             inference ok on cuda:7#0 in 163 s
+1104_cp01_s002             -> cuda:7#0
+1104_cp01_s000             labelled ok
+1104_cp01_s002             inference ok on cuda:7#0 in 139 s
+1104_cp01_s003             -> cuda:7#0
+1104_cp01_s002             labelled ok
+1104_cp01_s003             inference ok on cuda:7#0 in 157 s
+1104_cp04_s000             -> cuda:7#0
+1104_cp01_s003             labelled ok
+1104_cp04_s000             inference ok on cuda:7#0 in 164 s
+1104_cp04_s001             -> cuda:7#0
+1104_cp04_s000             labelled ok
+1104_cp04_s001             inference ok on cuda:7#0 in 138 s
+1104_cp04_s002             -> cuda:7#0
+1104_cp04_s001             labelled ok
+1104_cp04_s002             inference ok on cuda:7#0 in 146 s
+1104_cp04_s003             -> cuda:7#0
+1104_cp04_s002             labelled ok
+1104_cp04_s003             inference ok on cuda:7#0 in 144 s
+1104_cp04_s004             -> cuda:7#0
+1104_cp04_s003             labelled ok
+1104_cp04_s004             inference ok on cuda:7#0 in 149 s
+1104_cp04_s006             -> cuda:7#0
+1104_cp04_s004             labelled ok
+1104_cp04_s006             inference ok on cuda:7#0 in 155 s
+1104_cp04_s007             -> cuda:7#0
+1104_cp04_s006             labelled ok
+1104_cp04_s007             inference ok on cuda:7#0 in 161 s
+1104_cp03_s000             -> cuda:7#0
+1104_cp04_s007             labelled ok
+1104_cp03_s000             inference ok on cuda:7#0 in 174 s
+1104_cp03_s002             -> cuda:7#0
+1104_cp03_s000             labelled ok
+1104_cp03_s002             inference ok on cuda:7#0 in 160 s
+1104_cp03_s004             -> cuda:7#0
+1104_cp03_s002             labelled ok
+1104_cp03_s004             inference FAILED on cuda:7#0 in 20 s
+1104_cp03_s007             -> cuda:7#0
+1104_cp03_s007             inference FAILED on cuda:7#0 in 10 s
+1104_cp03_s009             -> cuda:7#0
+1104_cp03_s009             inference FAILED on cuda:7#0 in 10 s
+1104_cp03_s011             -> cuda:7#0
+1104_cp03_s011             inference FAILED on cuda:7#0 in 9 s
+1104_cp03_s013             -> cuda:7#0
+1104_cp03_s013             inference ok on cuda:7#0 in 146 s
+1104_cp03_s015             -> cuda:7#0
+1104_cp03_s015             inference FAILED on cuda:7#0 in 10 s
+1104_cp04_s005             -> cuda:7#0
+1104_cp04_s005             inference FAILED on cuda:7#0 in 10 s
+1104_cp03_s001             -> cuda:7#0
+1104_cp03_s013             labelled ok
+1104_cp03_s001             inference FAILED on cuda:7#0 in 10 s
+1104_cp03_s003             -> cuda:7#0
+1104_cp03_s003             inference FAILED on cuda:7#0 in 9 s
+1104_cp03_s005             -> cuda:7#0
+1104_cp03_s005             inference FAILED on cuda:7#0 in 10 s
+1104_cp03_s006             -> cuda:7#0
+1104_cp03_s006             inference FAILED on cuda:7#0 in 9 s
+1104_cp03_s008             -> cuda:7#0
+1104_cp03_s008             inference FAILED on cuda:7#0 in 9 s
+1104_cp03_s010             -> cuda:7#0
+1104_cp03_s010             inference FAILED on cuda:7#0 in 9 s
+1104_cp03_s012             -> cuda:7#0
+1104_cp03_s012             inference FAILED on cuda:7#0 in 11 s
+1104_cp03_s014             -> cuda:7#0
+1104_cp03_s014             inference FAILED on cuda:7#0 in 9 s
+1104_cp03_s016             -> cuda:7#0
+1104_cp03_s016             inference FAILED on cuda:7#0 in 10 s
+1104_cp02_s002             -> cuda:7#0
+1104_cp02_s002             inference FAILED on cuda:7#0 in 10 s
+1104_cp02_s000             -> cuda:7#0
+1104_cp02_s000             inference FAILED on cuda:7#0 in 10 s
+1104_cp02_s001             -> cuda:7#0
+1104_cp02_s001             inference FAILED on cuda:7#0 in 10 s
+1104_cp02_s003             -> cuda:7#0
+1104_cp02_s003             inference FAILED on cuda:7#0 in 10 s
+1104_cp02_s004             -> cuda:7#0
+1104_cp02_s004             inference FAILED on cuda:7#0 in 10 s
+1104_cp02_s005             -> cuda:7#0
+1104_cp02_s005             inference FAILED on cuda:7#0 in 10 s
+35 scenes in 2369 s on 1 worker(s); 21 failed: 1104_cp03_s004 1104_cp03_s007 1104_cp03_s009 1104_cp03_s011 1104_cp03_s015 1104_cp04_s005 1104_cp03_s001 1104_cp03_s003 1104_cp03_s005 1104_cp03_s006 1104_cp03_s008 1104_cp03_s010 1104_cp03_s012 1104_cp03_s014 1104_cp03_s016 1104_cp02_s002 1104_cp02_s000 1104_cp02_s001 1104_cp02_s003 1104_cp02_s004 1104_cp02_s005 -> data/labels/batch_summary.csv
+EXIT:0
+Thu Nov  5 06:20:11 PM CST 2026

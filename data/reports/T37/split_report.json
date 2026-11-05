@@ -1,0 +1,39 @@
+{
+  "val_bags": [
+    "1104_cp02",
+    "1104_cp04"
+  ],
+  "train_bags": [
+    "1104_cp01",
+    "1104_cp03"
+  ],
+  "why": "default cp02+cp04 moving_30m share=48.54% in [25%,60%]",
+  "val_seconds": 415.8000000000001,
+  "train_seconds": 639.1999999999998,
+  "val_stats": {
+    "moving_30m": 50.0,
+    "moving_15m": 24.0,
+    "truck": 48.0,
+    "bus": 0.0
+  },
+  "train_stats": {
+    "moving_30m": 53.0,
+    "moving_15m": 32.0,
+    "truck": 50.0,
+    "bus": 0.0
+  },
+  "near_0921_train_10m": 0.0,
+  "val_train_viewpoint_m": 0.4269101104507135,
+  "0921_val": {
+    "moving_30m": 15.0,
+    "moving_15m": 5.0,
+    "truck": 10.0,
+    "bus": 0.0
+  },
+  "0921_train": {
+    "moving_30m": 14.0,
+    "moving_15m": 6.0,
+    "truck": 10.0,
+    "bus": 0.0
+  }
+}

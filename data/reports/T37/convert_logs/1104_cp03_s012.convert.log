@@ -1,0 +1,14 @@
+lidar XT32 on /robot/topic/rdap/top_point_cloud2 (time timestamp absolute)
+topics:
+  /rte/rdap/rtk/inspvax  kygi665_msgs/msg/INSPVAX  51764
+  /rte/rdap/rtk/imus/data_raw  sensor_msgs/msg/Imu  51764
+  /robot/topic/rdap/top_point_cloud2  sensor_msgs/msg/PointCloud2  5178
+  /robot/topic/rdap/front_sensor_camera  foxglove_msgs/msg/CompressedVideo  12945
+  /robot/topic/rdap/left_sensor_camera  foxglove_msgs/msg/CompressedVideo  12946
+  /robot/topic/rdap/rear_sensor_camera  foxglove_msgs/msg/CompressedVideo  12947
+  /lidar_packets_loss  hesai_ros_driver/msg/LossPacket  5178
+  /robot/topic/rdap/right_sensor_camera  foxglove_msgs/msg/CompressedVideo  12946
+cameras -> <seq>/cameras.mcap: /robot/topic/rdap/front_sensor_camera, /robot/topic/rdap/left_sensor_camera, /robot/topic/rdap/rear_sensor_camera, /robot/topic/rdap/right_sensor_camera
+INS lever arm [0.0213, -0.18, 0.0] m (body frame)
+1104_cp03_s012: odom t 1793794525.149 .. 1793794557.579  span 32.4s  pos_type {56: 3244}  base_height 0.63
+wrote 304 scans, 3244 imu, 3244 odom, 3294 camera messages -> data/seq/1104_cp03_s012

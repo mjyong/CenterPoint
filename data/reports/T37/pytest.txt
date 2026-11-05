@@ -1,0 +1,18 @@
+[32m.[0m[33m                                                                        [100%][0m
+[33m=============================== warnings summary ===============================[0m
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/numba/core/decorators.py:159: NumbaDeprecationWarning: [1mThe keyword argument 'nopython=False' was supplied. From Numba 0.59.0 the default is True and supplying this argument has no effect.[0m
+    warnings.warn(msg, NumbaDeprecationWarning)
+
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488: DeprecationWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 30 durations =============================
+
+(3 durations < 0.005s hidden.  Use -vv to show these durations.)
+[33m[32m1 passed[0m, [33m[1m5 warnings[0m[33m in 0.02s[0m[0m

@@ -1,0 +1,29 @@
+1104_cp02_s000: 367 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s000/dog_dets
+1104_cp02_s000: 0 candidate boxes (0 objects); already labelled 64, beyond max range 110, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 4, no points 0
+1104_cp02_s001: 277 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s001/dog_dets
+1104_cp02_s001: 0 candidate boxes (0 objects); already labelled 17, beyond max range 176, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 2, no points 0
+1104_cp02_s002: 416 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s002/dog_dets
+1104_cp02_s002: 0 candidate boxes (0 objects); already labelled 26, beyond max range 239, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 2, no points 0
+1104_cp02_s003: 431 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s003/dog_dets
+1104_cp02_s003: 0 candidate boxes (0 objects); already labelled 49, beyond max range 224, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp02_s004: 393 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s004/dog_dets
+1104_cp02_s004: 0 candidate boxes (0 objects); already labelled 39, beyond max range 210, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 3, no points 0
+1104_cp02_s005: 461 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s005/dog_dets
+1104_cp02_s005: 0 candidate boxes (0 objects); already labelled 57, beyond max range 222, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s000: 262 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s000/dog_dets
+1104_cp04_s000: 3 candidate boxes (1 objects); already labelled 40, at a place labelled in another frame 0, beyond max range 42, earlier candidates confirmed 0, earlier candidates replaced 0, found by pillar 3, found by pillar only 3, left out: in fewer than 2 keyframes 4, no points 0
+1104_cp04_s001: 91 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s001/dog_dets
+1104_cp04_s001: 0 candidate boxes (0 objects); beyond max range 3, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s002: 267 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s002/dog_dets
+1104_cp04_s002: 0 candidate boxes (0 objects); already labelled 51, beyond max range 48, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s003: 315 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s003/dog_dets
+1104_cp04_s003: 0 candidate boxes (0 objects); already labelled 53, beyond max range 63, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s004: 438 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s004/dog_dets
+1104_cp04_s004: 0 candidate boxes (0 objects); already labelled 77, beyond max range 100, earlier candidates confirmed 0, earlier candidates replaced 0
+1104_cp04_s005: 168 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s005/dog_dets
+1104_cp04_s005: 0 candidate boxes (0 objects); already labelled 22, beyond max range 22, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 2, no points 0
+1104_cp04_s006: 433 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s006/dog_dets
+1104_cp04_s006: 2 candidate boxes (1 objects); already labelled 55, at a place labelled in another frame 0, beyond max range 115, earlier candidates confirmed 0, earlier candidates replaced 0, found by pillar 2, found by pillar only 2, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s007: 420 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s007/dog_dets
+1104_cp04_s007: 2 candidate boxes (1 objects); already labelled 71, at a place labelled in another frame 0, beyond max range 82, earlier candidates confirmed 0, earlier candidates replaced 0, found by pillar 2, found by pillar only 2, left out: in fewer than 2 keyframes 3, no points 0
+total: 7 candidate boxes (3 objects); already labelled 621, at a place labelled in another frame 0, beyond max range 1656, earlier candidates confirmed 0, earlier candidates replaced 0, found by pillar 7, found by pillar only 7, left out: in fewer than 2 keyframes 26, no points 0

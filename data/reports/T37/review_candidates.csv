@@ -1,0 +1,33 @@
+scene,split,为什么,moving_30m,moving_30m_truck,ap2_30m,keyframes
+1104_cp02_s000,val,val bag full review,5.0,4.0,0.951,57
+1104_cp02_s001,val,val bag full review,2.0,1.0,0.991,57
+1104_cp02_s002,val,val bag full review,3.0,3.0,0.872,58
+1104_cp02_s003,val,val bag full review,3.0,3.0,0.979,57
+1104_cp02_s004,val,val bag full review,3.0,3.0,0.953,57
+1104_cp02_s005,val,val bag full review,4.0,4.0,0.895,57
+1104_cp04_s000,val,val bag full review,3.0,3.0,0.770,62
+1104_cp04_s001,val,val bag full review,0.0,0.0,-,62
+1104_cp04_s002,val,val bag full review,3.0,3.0,0.977,62
+1104_cp04_s003,val,val bag full review,5.0,5.0,0.986,62
+1104_cp04_s004,val,val bag full review,7.0,7.0,0.889,62
+1104_cp04_s005,val,val bag full review,3.0,3.0,0.967,61
+1104_cp04_s006,val,val bag full review,5.0,5.0,0.664,62
+1104_cp04_s007,val,val bag full review,4.0,4.0,0.909,62
+1104_cp03_s001,train,low_ap2;moving_30m>=1;truck,7.0,7.0,0.735,61
+1104_cp01_s003,train,moving_30m>=1;truck,6.0,6.0,0.938,62
+1104_cp03_s004,train,moving_30m>=1;truck,6.0,6.0,0.938,61
+1104_cp03_s002,train,moving_30m>=1;truck,5.0,5.0,0.968,61
+1104_cp03_s011,train,low_ap2;moving_30m>=1;truck,4.0,2.0,0.861,61
+1104_cp01_s000,train,moving_30m>=1;truck,3.0,3.0,0.981,62
+1104_cp01_s001,train,moving_30m>=1;truck,3.0,3.0,0.929,62
+1104_cp03_s010,train,moving_30m>=1;truck,3.0,3.0,0.974,61
+1104_cp03_s015,train,moving_30m>=1;truck,3.0,3.0,0.891,61
+1104_cp03_s016,train,low_ap2;moving_30m>=1;truck,3.0,3.0,0.890,61
+1104_cp03_s005,train,moving_30m>=1;truck,2.0,2.0,0.909,61
+1104_cp03_s008,train,moving_30m>=1;truck,2.0,2.0,0.948,61
+1104_cp01_s002,train,moving_30m>=1;truck,1.0,1.0,0.989,62
+1104_cp03_s000,train,moving_30m>=1;truck,1.0,1.0,0.981,61
+1104_cp03_s009,train,moving_30m>=1;truck,1.0,1.0,0.972,61
+1104_cp03_s012,train,moving_30m>=1,1.0,0.0,0.983,61
+1104_cp03_s013,train,moving_30m>=1;truck,1.0,1.0,0.961,61
+1104_cp03_s014,train,moving_30m>=1;truck,1.0,1.0,0.944,61

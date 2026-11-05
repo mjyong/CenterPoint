@@ -1,0 +1,18 @@
+lidar XT32 on /robot/topic/rdap/top_point_cloud2 (time timestamp absolute)
+topics:
+  /robot/topic/rdap/rear_sensor_camera  foxglove_msgs/msg/CompressedVideo  3061
+  /robot/topic/rdap/left_sensor_camera  foxglove_msgs/msg/CompressedVideo  3061
+  /robot/topic/rdap/front_sensor_camera  foxglove_msgs/msg/CompressedVideo  3062
+  /rte/rdap/rtk/inspvax  kygi665_msgs/msg/INSPVAX  12257
+  /rte/rdap/rtk/imus/data_raw  sensor_msgs/msg/Imu  12257
+  /robot/topic/rdap/right_sensor_camera  foxglove_msgs/msg/CompressedVideo  3061
+  /lidar_packets_loss  hesai_ros_driver/msg/LossPacket  1227
+  /robot/topic/rdap/top_point_cloud2  sensor_msgs/msg/PointCloud2  1227
+cameras -> <seq>/cameras.mcap: /robot/topic/rdap/rear_sensor_camera, /robot/topic/rdap/left_sensor_camera, /robot/topic/rdap/front_sensor_camera, /robot/topic/rdap/right_sensor_camera
+INS lever arm [0.0213, -0.18, 0.0] m (body frame)
+1104_cp01_s000: odom t 1793793776.795 .. 1793793808.405  span 31.6s  pos_type {56: 3162}  base_height 0.48
+wrote 306 scans, 3162 imu, 3162 odom, 3150 camera messages -> data/seq/1104_cp01_s000
+1104_cp01_s001: odom t 1793793806.415 .. 1793793839.025  span 32.6s  pos_type {56: 3262}  base_height 0.48
+wrote 307 scans, 3262 imu, 3262 odom, 3311 camera messages -> data/seq/1104_cp01_s001
+1104_cp01_s003: odom t 1793793867.655 .. 1793793899.354  span 31.7s  pos_type {56: 3171}  base_height 0.48
+wrote 306 scans, 3171 imu, 3171 odom, 3221 camera messages -> data/seq/1104_cp01_s003

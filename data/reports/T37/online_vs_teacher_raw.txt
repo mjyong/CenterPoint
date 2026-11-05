@@ -1,0 +1,181 @@
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.844 | 0.973 | 0.981 | 0.262 | 0.100 | 0.180 | 1.653 | 0.986 | 0.946 | 0.975 | 0.945 | 0.994 | 241 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 237 | 235 | 1.10 | 100% | 1.29 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | 0.946 | 11.2 | 114.8 | 0.0 | 3 | 107.0 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.713 | 0.899 | 0.929 | 0.321 | 0.095 | 0.086 | 1.238 | 0.929 | 0.868 | - | 0.996 | 0.820 | 144 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 144 | 140 | 1.19 | 100% | 1.13 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 307 | 0.868 | 12.3 | 129.0 | 0.0 | 7 | 54.7 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.520 | 0.983 | 0.989 | 0.413 | 0.099 | 0.132 | 1.614 | 0.989 | 0.870 | - | 0.910 | 0.922 | 149 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 149 | 148 | 1.42 | 100% | 1.56 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | 0.870 | 11.3 | 128.9 | 0.0 | 3 | 88.0 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.631 | 0.892 | 0.938 | 0.370 | 0.101 | 0.086 | 1.768 | 0.941 | 0.850 | - | 0.993 | 0.840 | 274 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 274 | 264 | 1.06 | 100% | 1.59 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | 0.850 | 14.3 | 119.9 | 0.0 | 8 | 70.2 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.618 | 0.981 | 0.981 | 0.390 | 0.065 | 0.018 | 3.549 | 0.983 | 0.891 | - | 0.968 | 0.902 | 98 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 98 | 97 | 2.09 | 100% | 3.69 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 305 | 0.891 | 16.9 | 137.6 | 0.0 | 5 | 87.4 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.163 | 0.911 | 0.968 | 0.542 | 0.105 | 0.085 | 3.093 | 0.970 | 0.753 | 0.975 | 0.934 | 0.890 | 170 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 170 | 165 | 2.74 | 99% | 3.55 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 305 | 0.753 | 14.0 | 105.5 | 0.0 | 6 | 98.7 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.874 | 0.948 | 0.961 | 0.261 | 0.112 | 0.033 | 0.930 | 0.981 | 0.941 | - | 0.977 | 0.901 | 78 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 78 | 76 | 1.06 | 100% | 0.91 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 305 | 0.941 | 20.6 | 148.4 | 0.0 | 3 | 40.0 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.399 | 0.682 | 0.770 | 0.517 | 0.252 | 0.802 | 2.577 | 0.804 | 0.664 | 0.667 | 0.920 | 0.731 | 176 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 171 | 164 | 1.07 | 99% | 1.98 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | 0.664 | 15.9 | 138.9 | 0.0 | 10 | 31.4 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | - | - | - | - | - | - | - | - | 0 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | nan | 21.1 | 143.9 | 0.0 | 1 | 28.0 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.665 | 0.904 | 0.977 | 0.380 | 0.135 | 0.054 | 1.806 | 0.985 | 0.883 | - | 0.974 | 0.970 | 242 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 242 | 238 | 1.18 | 100% | 1.33 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | 0.883 | 12.4 | 143.4 | 0.0 | 5 | 70.0 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.602 | 0.890 | 0.986 | 0.365 | 0.121 | 0.043 | 2.142 | 0.986 | 0.866 | - | 0.968 | 0.973 | 170 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 170 | 168 | 1.32 | 99% | 2.09 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | 0.866 | 15.7 | 142.9 | 0.0 | 9 | 43.9 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.434 | 0.804 | 0.889 | 0.457 | 0.118 | 0.197 | 2.384 | 0.933 | 0.765 | 0.933 | 0.941 | 0.774 | 325 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 325 | 305 | 1.21 | 100% | 2.17 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | 0.765 | 12.3 | 126.4 | 0.0 | 10 | 54.2 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.471 | 0.552 | 0.664 | 0.480 | 0.216 | 0.067 | 1.566 | 0.805 | 0.623 | 0.969 | 0.740 | 0.228 | 270 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 199 | 141 | 1.32 | 97% | 1.74 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | 0.623 | 15.8 | 144.4 | 0.0 | 7 | 81.3 |
+
+| model | class | AP@0.5 | AP@1.0 | AP@2.0 | ATE | ASE | AOE | AVE | AP@4.0 | mAP | AP@2.0[0-10m] | AP@2.0[10-20m] | AP@2.0[20-40m] | #gt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| online | vehicle | 0.580 | 0.837 | 0.909 | 0.377 | 0.158 | 0.186 | 2.183 | 0.942 | 0.817 | 0.979 | 0.952 | 0.681 | 334 |
+
+velocity head on moving labels (> 1.0 m/s, matched within 2 m at any score; the auto-labeller calls a frame moving when the teacher's head reads > 0.15 m/s):
+| model | class | moving labels | matched | median speed det / label | head > 0.15 m/s | median error m/s |
+|---|---|---|---|---|---|---|
+| online | vehicle | 227 | 215 | 2.28 | 97% | 3.00 |
+
+| model | frames | mAP | net ms (median) | net ms (p95) | preprocess ms | #tracks | mean track len |
+|---|---|---|---|---|---|---|---|
+| online | 306 | 0.817 | 12.3 | 128.2 | 0.0 | 6 | 62.3 |
+

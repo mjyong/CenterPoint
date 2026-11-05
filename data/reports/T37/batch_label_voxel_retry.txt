@@ -1,0 +1,68 @@
+21 scenes on 1 worker(s): cuda:5#0; auto_label 16 at once
+CPU threads per process: 32
+1104_cp03_s004             -> cuda:5#0
+1104_cp03_s004             inference ok on cuda:5#0 in 83 s
+1104_cp03_s007             -> cuda:5#0
+1104_cp03_s004             labelled ok
+1104_cp03_s007             inference ok on cuda:5#0 in 77 s
+1104_cp03_s009             -> cuda:5#0
+1104_cp03_s007             labelled ok
+1104_cp03_s009             inference ok on cuda:5#0 in 78 s
+1104_cp03_s011             -> cuda:5#0
+1104_cp03_s009             labelled ok
+1104_cp03_s011             inference ok on cuda:5#0 in 79 s
+1104_cp03_s015             -> cuda:5#0
+1104_cp03_s011             labelled ok
+1104_cp03_s015             inference ok on cuda:5#0 in 77 s
+1104_cp04_s005             -> cuda:5#0
+1104_cp03_s015             labelled ok
+1104_cp04_s005             inference ok on cuda:5#0 in 78 s
+1104_cp03_s001             -> cuda:5#0
+1104_cp04_s005             labelled ok
+1104_cp03_s001             inference ok on cuda:5#0 in 83 s
+1104_cp03_s003             -> cuda:5#0
+1104_cp03_s001             labelled ok
+1104_cp03_s003             inference ok on cuda:5#0 in 79 s
+1104_cp03_s005             -> cuda:5#0
+1104_cp03_s003             labelled ok
+1104_cp03_s005             inference ok on cuda:5#0 in 78 s
+1104_cp03_s006             -> cuda:5#0
+1104_cp03_s005             labelled ok
+1104_cp03_s006             inference ok on cuda:5#0 in 76 s
+1104_cp03_s008             -> cuda:5#0
+1104_cp03_s006             labelled ok
+1104_cp03_s008             inference ok on cuda:5#0 in 82 s
+1104_cp03_s010             -> cuda:5#0
+1104_cp03_s008             labelled ok
+1104_cp03_s010             inference ok on cuda:5#0 in 80 s
+1104_cp03_s012             -> cuda:5#0
+1104_cp03_s010             labelled ok
+1104_cp03_s012             inference ok on cuda:5#0 in 96 s
+1104_cp03_s014             -> cuda:5#0
+1104_cp03_s012             labelled ok
+1104_cp03_s014             inference ok on cuda:5#0 in 76 s
+1104_cp03_s016             -> cuda:5#0
+1104_cp03_s014             labelled ok
+1104_cp03_s016             inference ok on cuda:5#0 in 85 s
+1104_cp02_s002             -> cuda:5#0
+1104_cp03_s016             labelled ok
+1104_cp02_s002             inference ok on cuda:5#0 in 73 s
+1104_cp02_s000             -> cuda:5#0
+1104_cp02_s002             labelled ok
+1104_cp02_s000             inference ok on cuda:5#0 in 78 s
+1104_cp02_s001             -> cuda:5#0
+1104_cp02_s000             labelled ok
+1104_cp02_s001             inference ok on cuda:5#0 in 76 s
+1104_cp02_s003             -> cuda:5#0
+1104_cp02_s001             labelled ok
+1104_cp02_s003             inference ok on cuda:5#0 in 78 s
+1104_cp02_s004             -> cuda:5#0
+1104_cp02_s003             labelled ok
+1104_cp02_s004             inference ok on cuda:5#0 in 76 s
+1104_cp02_s005             -> cuda:5#0
+1104_cp02_s004             labelled ok
+1104_cp02_s005             inference ok on cuda:5#0 in 76 s
+1104_cp02_s005             labelled ok
+21 scenes in 1668 s on 1 worker(s); 0 failed -> data/labels/batch_summary.csv
+EXIT:0
+Thu Nov  5 06:49:12 PM CST 2026

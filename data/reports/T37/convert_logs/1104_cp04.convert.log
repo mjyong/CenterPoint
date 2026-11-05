@@ -1,0 +1,28 @@
+lidar XT32 on /robot/topic/rdap/top_point_cloud2 (time timestamp absolute)
+topics:
+  /robot/topic/rdap/top_point_cloud2  sensor_msgs/msg/PointCloud2  2447
+  /rte/rdap/rtk/inspvax  kygi665_msgs/msg/INSPVAX  24483
+  /rte/rdap/rtk/imus/data_raw  sensor_msgs/msg/Imu  24484
+  /lidar_packets_loss  hesai_ros_driver/msg/LossPacket  2447
+  /robot/topic/rdap/right_sensor_camera  foxglove_msgs/msg/CompressedVideo  6121
+  /robot/topic/rdap/rear_sensor_camera  foxglove_msgs/msg/CompressedVideo  6122
+  /robot/topic/rdap/left_sensor_camera  foxglove_msgs/msg/CompressedVideo  6121
+  /robot/topic/rdap/front_sensor_camera  foxglove_msgs/msg/CompressedVideo  6122
+cameras -> <seq>/cameras.mcap: /robot/topic/rdap/right_sensor_camera, /robot/topic/rdap/rear_sensor_camera, /robot/topic/rdap/left_sensor_camera, /robot/topic/rdap/front_sensor_camera
+  1000 scans decoded, t = 1793794838.8
+  2000 scans decoded, t = 1793794968.3
+INS lever arm [0.0213, -0.18, 0.0] m (body frame)
+1104_cp04_s000: odom t 1793794738.777 .. 1793794770.388  span 31.6s  pos_type {56: 3162}  base_height 0.63
+wrote 306 scans, 3163 imu, 3162 odom, 3166 camera messages -> data/seq/1104_cp04_s000
+1104_cp04_s001: odom t 1793794768.398 .. 1793794800.967  span 32.6s  pos_type {56: 3258}  base_height 0.63
+wrote 306 scans, 3259 imu, 3258 odom, 3308 camera messages -> data/seq/1104_cp04_s001
+1104_cp04_s002: odom t 1793794798.977 .. 1793794831.557  span 32.6s  pos_type {56: 3259}  base_height 0.63
+wrote 306 scans, 3259 imu, 3259 odom, 3308 camera messages -> data/seq/1104_cp04_s002
+1104_cp04_s003: odom t 1793794829.567 .. 1793794862.137  span 32.6s  pos_type {56: 3258}  base_height 0.63
+wrote 306 scans, 3258 imu, 3258 odom, 3308 camera messages -> data/seq/1104_cp04_s003
+1104_cp04_s004: odom t 1793794860.146 .. 1793794892.716  span 32.6s  pos_type {56: 3258}  base_height 0.63
+wrote 306 scans, 3258 imu, 3258 odom, 3308 camera messages -> data/seq/1104_cp04_s004
+1104_cp04_s006: odom t 1793794921.306 .. 1793794953.876  span 32.6s  pos_type {56: 3258}  base_height 0.63
+wrote 306 scans, 3258 imu, 3258 odom, 3308 camera messages -> data/seq/1104_cp04_s006
+1104_cp04_s007: odom t 1793794951.885 .. 1793794983.595  span 31.7s  pos_type {56: 3172}  base_height 0.63
+wrote 306 scans, 3172 imu, 3172 odom, 3222 camera messages -> data/seq/1104_cp04_s007

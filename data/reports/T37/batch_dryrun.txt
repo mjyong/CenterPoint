@@ -1,0 +1,53 @@
+gpu  name                          memory MB   util  procs  use
+0    NVIDIA GeForce RTX 4090      18980/23028   100%    yes  busy
+1    NVIDIA GeForce RTX 4090      20979/23028     0%    yes  busy
+2    NVIDIA GeForce RTX 4090      21165/23028     0%    yes  busy
+3    NVIDIA GeForce RTX 4090      16565/23028   100%    yes  busy
+4    NVIDIA GeForce RTX 4090      15295/23028     0%    yes  busy
+5    NVIDIA GeForce RTX 4090      14035/23028    90%    yes  busy
+6    NVIDIA GeForce RTX 4090      18539/23028     0%    yes  busy
+7    NVIDIA GeForce RTX 4090       8071/23028     0%    yes  FREE
+43 scenes on 1 worker(s): cuda:7#0; auto_label 16 at once
+  1104_cp01_s001              307 scans  -> cuda:7#0 (first round)
+  1104_cp01_s000              306 scans  -> next free worker
+  1104_cp01_s002              306 scans  -> next free worker
+  1104_cp01_s003              306 scans  -> next free worker
+  1104_cp04_s000              306 scans  -> next free worker
+  1104_cp04_s001              306 scans  -> next free worker
+  1104_cp04_s002              306 scans  -> next free worker
+  1104_cp04_s003              306 scans  -> next free worker
+  1104_cp04_s004              306 scans  -> next free worker
+  1104_cp04_s006              306 scans  -> next free worker
+  1104_cp04_s007              306 scans  -> next free worker
+  1104_cp03_s000              305 scans  -> next free worker
+  1104_cp03_s002              305 scans  -> next free worker
+  1104_cp03_s004              305 scans  -> next free worker
+  1104_cp03_s007              305 scans  -> next free worker
+  1104_cp03_s009              305 scans  -> next free worker
+  1104_cp03_s011              305 scans  -> next free worker
+  1104_cp03_s013              305 scans  -> next free worker
+  1104_cp03_s015              305 scans  -> next free worker
+  1104_cp04_s005              305 scans  -> next free worker
+  1104_cp03_s001              304 scans  -> next free worker
+  1104_cp03_s003              304 scans  -> next free worker
+  1104_cp03_s005              304 scans  -> next free worker
+  1104_cp03_s006              304 scans  -> next free worker
+  1104_cp03_s008              304 scans  -> next free worker
+  1104_cp03_s010              304 scans  -> next free worker
+  1104_cp03_s012              304 scans  -> next free worker
+  1104_cp03_s014              304 scans  -> next free worker
+  1104_cp03_s016              304 scans  -> next free worker
+  1104_cp02_s002              286 scans  -> next free worker
+  1104_cp02_s000              285 scans  -> next free worker
+  1104_cp02_s001              285 scans  -> next free worker
+  1104_cp02_s003              285 scans  -> next free worker
+  1104_cp02_s004              285 scans  -> next free worker
+  1104_cp02_s005              285 scans  -> next free worker
+  1104_cp01.convert.log         0 scans  -> next free worker
+  1104_cp01_s002.convert.log    0 scans  -> next free worker
+  1104_cp02.convert.log         0 scans  -> next free worker
+  1104_cp02_s003.convert.log    0 scans  -> next free worker
+  1104_cp03.convert.log         0 scans  -> next free worker
+  1104_cp03_s012.convert.log    0 scans  -> next free worker
+  1104_cp04.convert.log         0 scans  -> next free worker
+  1104_cp04_s005.convert.log    0 scans  -> next free worker

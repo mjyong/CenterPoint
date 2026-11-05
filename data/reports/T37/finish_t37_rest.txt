@@ -1,0 +1,312 @@
+Fri Nov  6 12:06:03 AM CST 2026
+==== split 0921+1104 ====
+VAL ('1104_cp02', '1104_cp04') default cp02+cp04 moving_30m share=48.54% in [25%,60%]
+TRAIN ('1104_cp01', '1104_cp03')
+wrote split n= 70
+1104 val path within 10m of 0921 train: 0.000
+1104 val vs train viewpoint distance: 0.43 m
+{
+  "val_bags": [
+    "1104_cp02",
+    "1104_cp04"
+  ],
+  "train_bags": [
+    "1104_cp01",
+    "1104_cp03"
+  ],
+  "why": "default cp02+cp04 moving_30m share=48.54% in [25%,60%]",
+  "val_seconds": 415.8000000000001,
+  "train_seconds": 639.1999999999998,
+  "val_stats": {
+    "moving_30m": 50.0,
+    "moving_15m": 24.0,
+    "truck": 48.0,
+    "bus": 0.0
+  },
+  "train_stats": {
+    "moving_30m": 53.0,
+    "moving_15m": 32.0,
+    "truck": 50.0,
+    "bus": 0.0
+  },
+  "near_0921_train_10m": 0.0,
+  "val_train_viewpoint_m": 0.4269101104507135,
+  "0921_val": {
+    "moving_30m": 15.0,
+    "moving_15m": 5.0,
+    "truck": 10.0,
+    "bus": 0.0
+  },
+  "0921_train": {
+    "moving_30m": 14.0,
+    "moving_15m": 6.0,
+    "truck": 10.0,
+    "bus": 0.0
+  }
+}
+cross_bag {'cp03_last': '1104_cp03_s016', 'cp03_last_10s_frames_tracks': (101, 4), 'cp04_first': '1104_cp04_s000', 'cp04_first_10s_frames_tracks': (101, 5)}
+==== review candidates ====
+candidates 32 val_kf=838 train_kf=1102 total_kf=1940
+1104_cp02_s000 val val bag full review 5.0 0.951 57
+1104_cp02_s001 val val bag full review 2.0 0.991 57
+1104_cp02_s002 val val bag full review 3.0 0.872 58
+1104_cp02_s003 val val bag full review 3.0 0.979 57
+1104_cp02_s004 val val bag full review 3.0 0.953 57
+1104_cp02_s005 val val bag full review 4.0 0.895 57
+1104_cp04_s000 val val bag full review 3.0 0.770 62
+1104_cp04_s001 val val bag full review 0.0 - 62
+1104_cp04_s002 val val bag full review 3.0 0.977 62
+1104_cp04_s003 val val bag full review 5.0 0.986 62
+1104_cp04_s004 val val bag full review 7.0 0.889 62
+1104_cp04_s005 val val bag full review 3.0 0.967 61
+1104_cp04_s006 val val bag full review 5.0 0.664 62
+1104_cp04_s007 val val bag full review 4.0 0.909 62
+1104_cp03_s001 train low_ap2;moving_30m>=1;truck 7.0 0.735 61
+1104_cp01_s003 train moving_30m>=1;truck 6.0 0.938 62
+1104_cp03_s004 train moving_30m>=1;truck 6.0 0.938 61
+1104_cp03_s002 train moving_30m>=1;truck 5.0 0.968 61
+1104_cp03_s011 train low_ap2;moving_30m>=1;truck 4.0 0.861 61
+1104_cp01_s000 train moving_30m>=1;truck 3.0 0.981 62
+1104_cp01_s001 train moving_30m>=1;truck 3.0 0.929 62
+1104_cp03_s010 train moving_30m>=1;truck 3.0 0.974 61
+1104_cp03_s015 train moving_30m>=1;truck 3.0 0.891 61
+1104_cp03_s016 train low_ap2;moving_30m>=1;truck 3.0 0.890 61
+1104_cp03_s005 train moving_30m>=1;truck 2.0 0.909 61
+1104_cp03_s008 train moving_30m>=1;truck 2.0 0.948 61
+1104_cp01_s002 train moving_30m>=1;truck 1.0 0.989 62
+1104_cp03_s000 train moving_30m>=1;truck 1.0 0.981 61
+1104_cp03_s009 train moving_30m>=1;truck 1.0 0.972 61
+1104_cp03_s012 train moving_30m>=1 1.0 0.983 61
+1104_cp03_s013 train moving_30m>=1;truck 1.0 0.961 61
+1104_cp03_s014 train moving_30m>=1;truck 1.0 0.944 61
+==== review materials ====
+review candidates: 32
+-- 1104_cp02_s000 split=val
+7 tracks (1 flagged for review, 1 to decide: train_as = ignore) -> data/labels/1104_cp02_s000/labels_tracks_vehicle.csv
+4010 messages -> data/labels/1104_cp02_s000/1104_cp02_s000_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+57 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s000
+-- 1104_cp02_s001 split=val
+3 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp02_s001/labels_tracks_vehicle.csv
+4130 messages -> data/labels/1104_cp02_s001/1104_cp02_s001_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+57 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s001
+-- 1104_cp02_s002 split=val
+5 tracks (1 flagged for review, 1 to decide: train_as = ignore) -> data/labels/1104_cp02_s002/labels_tracks_vehicle.csv
+4146 messages -> data/labels/1104_cp02_s002/1104_cp02_s002_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+58 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s002
+-- 1104_cp02_s003 split=val
+4 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp02_s003/labels_tracks_vehicle.csv
+4129 messages -> data/labels/1104_cp02_s003/1104_cp02_s003_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+57 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s003
+-- 1104_cp02_s004 split=val
+5 tracks (1 flagged for review, 1 to decide: train_as = ignore) -> data/labels/1104_cp02_s004/labels_tracks_vehicle.csv
+4131 messages -> data/labels/1104_cp02_s004/1104_cp02_s004_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+57 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s004
+-- 1104_cp02_s005 split=val
+6 tracks (1 flagged for review, 1 to decide: train_as = ignore) -> data/labels/1104_cp02_s005/labels_tracks_vehicle.csv
+4130 messages -> data/labels/1104_cp02_s005/1104_cp02_s005_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+57 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s005
+-- 1104_cp04_s000 split=val
+4 tracks (2 flagged for review, 2 to decide: train_as = ignore) -> data/labels/1104_cp04_s000/labels_tracks_vehicle.csv
+4294 messages -> data/labels/1104_cp04_s000/1104_cp04_s000_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s000
+-- 1104_cp04_s001 split=val
+0 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp04_s001/labels_tracks_vehicle.csv
+4424 messages -> data/labels/1104_cp04_s001/1104_cp04_s001_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s001
+-- 1104_cp04_s002 split=val
+3 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp04_s002/labels_tracks_vehicle.csv
+4424 messages -> data/labels/1104_cp04_s002/1104_cp04_s002_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s002
+-- 1104_cp04_s003 split=val
+5 tracks (2 flagged for review, 2 to decide: train_as = ignore) -> data/labels/1104_cp04_s003/labels_tracks_vehicle.csv
+4425 messages -> data/labels/1104_cp04_s003/1104_cp04_s003_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s003
+-- 1104_cp04_s004 split=val
+7 tracks (2 flagged for review, 2 to decide: train_as = ignore) -> data/labels/1104_cp04_s004/labels_tracks_vehicle.csv
+4426 messages -> data/labels/1104_cp04_s004/1104_cp04_s004_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s004
+-- 1104_cp04_s005 split=val
+4 tracks (2 flagged for review, 2 to decide: train_as = ignore) -> data/labels/1104_cp04_s005/labels_tracks_vehicle.csv
+4412 messages -> data/labels/1104_cp04_s005/1104_cp04_s005_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s005
+-- 1104_cp04_s006 split=val
+6 tracks (1 flagged for review, 1 to decide: train_as = ignore) -> data/labels/1104_cp04_s006/labels_tracks_vehicle.csv
+4424 messages -> data/labels/1104_cp04_s006/1104_cp04_s006_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s006
+-- 1104_cp04_s007 split=val
+4 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp04_s007/labels_tracks_vehicle.csv
+4425 messages -> data/labels/1104_cp04_s007/1104_cp04_s007_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s007
+-- 1104_cp03_s001 split=train
+9 tracks (5 flagged for review, 5 to decide: train_as = ignore) -> data/labels/1104_cp03_s001/labels_tracks_vehicle.csv
+4401 messages -> data/labels/1104_cp03_s001/1104_cp03_s001_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s001
+-- 1104_cp01_s003 split=train
+8 tracks (5 flagged for review, 5 to decide: train_as = ignore) -> data/labels/1104_cp01_s003/labels_tracks_vehicle.csv
+4430 messages -> data/labels/1104_cp01_s003/1104_cp01_s003_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp01_s003
+-- 1104_cp03_s004 split=train
+7 tracks (3 flagged for review, 3 to decide: train_as = ignore) -> data/labels/1104_cp03_s004/labels_tracks_vehicle.csv
+4414 messages -> data/labels/1104_cp03_s004/1104_cp03_s004_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s004
+-- 1104_cp03_s002 split=train
+5 tracks (3 flagged for review, 3 to decide: train_as = ignore) -> data/labels/1104_cp03_s002/labels_tracks_vehicle.csv
+4413 messages -> data/labels/1104_cp03_s002/1104_cp03_s002_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s002
+-- 1104_cp03_s011 split=train
+8 tracks (2 flagged for review, 2 to decide: train_as = ignore) -> data/labels/1104_cp03_s011/labels_tracks_vehicle.csv
+4412 messages -> data/labels/1104_cp03_s011/1104_cp03_s011_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s011
+-- 1104_cp01_s000 split=train
+3 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp01_s000/labels_tracks_vehicle.csv
+4274 messages -> data/labels/1104_cp01_s000/1104_cp01_s000_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp01_s000
+-- 1104_cp01_s001 split=train
+6 tracks (3 flagged for review, 3 to decide: train_as = ignore) -> data/labels/1104_cp01_s001/labels_tracks_vehicle.csv
+4440 messages -> data/labels/1104_cp01_s001/1104_cp01_s001_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp01_s001
+-- 1104_cp03_s010 split=train
+4 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp03_s010/labels_tracks_vehicle.csv
+4396 messages -> data/labels/1104_cp03_s010/1104_cp03_s010_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s010
+-- 1104_cp03_s015 split=train
+5 tracks (2 flagged for review, 2 to decide: train_as = ignore) -> data/labels/1104_cp03_s015/labels_tracks_vehicle.csv
+4412 messages -> data/labels/1104_cp03_s015/1104_cp03_s015_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s015
+-- 1104_cp03_s016 split=train
+4 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp03_s016/labels_tracks_vehicle.csv
+4396 messages -> data/labels/1104_cp03_s016/1104_cp03_s016_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s016
+-- 1104_cp03_s005 split=train
+2 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp03_s005/labels_tracks_vehicle.csv
+4397 messages -> data/labels/1104_cp03_s005/1104_cp03_s005_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s005
+-- 1104_cp03_s008 split=train
+2 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp03_s008/labels_tracks_vehicle.csv
+4397 messages -> data/labels/1104_cp03_s008/1104_cp03_s008_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s008
+-- 1104_cp01_s002 split=train
+3 tracks (1 flagged for review, 1 to decide: train_as = ignore) -> data/labels/1104_cp01_s002/labels_tracks_vehicle.csv
+4425 messages -> data/labels/1104_cp01_s002/1104_cp01_s002_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+62 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp01_s002
+-- 1104_cp03_s000 split=train
+2 tracks (1 flagged for review, 1 to decide: train_as = ignore) -> data/labels/1104_cp03_s000/labels_tracks_vehicle.csv
+4294 messages -> data/labels/1104_cp03_s000/1104_cp03_s000_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s000
+-- 1104_cp03_s009 split=train
+1 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp03_s009/labels_tracks_vehicle.csv
+4410 messages -> data/labels/1104_cp03_s009/1104_cp03_s009_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s009
+-- 1104_cp03_s012 split=train
+1 tracks (0 flagged for review, 0 to decide: train_as = ignore) -> data/labels/1104_cp03_s012/labels_tracks_vehicle.csv
+4396 messages -> data/labels/1104_cp03_s012/1104_cp03_s012_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s012
+-- 1104_cp03_s013 split=train
+2 tracks (1 flagged for review, 1 to decide: train_as = ignore) -> data/labels/1104_cp03_s013/labels_tracks_vehicle.csv
+4411 messages -> data/labels/1104_cp03_s013/1104_cp03_s013_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s013
+-- 1104_cp03_s014 split=train
+3 tracks (2 flagged for review, 2 to decide: train_as = ignore) -> data/labels/1104_cp03_s014/labels_tracks_vehicle.csv
+4398 messages -> data/labels/1104_cp03_s014/1104_cp03_s014_review.mcap (3D panel: display frame world or det; topics /lidar /labels /teacher, Log panel on /log lists the tracks to review)
+61 frames -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s014
+1104_cp02_s000: 367 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s000/dog_dets
+1104_cp02_s000: 0 candidate boxes (0 objects); already labelled 64, beyond max range 110, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 4, no points 0
+1104_cp02_s001: 277 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s001/dog_dets
+1104_cp02_s001: 0 candidate boxes (0 objects); already labelled 17, beyond max range 176, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 2, no points 0
+1104_cp02_s002: 416 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s002/dog_dets
+1104_cp02_s002: 0 candidate boxes (0 objects); already labelled 26, beyond max range 239, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 2, no points 0
+1104_cp02_s003: 431 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s003/dog_dets
+1104_cp02_s003: 0 candidate boxes (0 objects); already labelled 49, beyond max range 224, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp02_s004: 393 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s004/dog_dets
+1104_cp02_s004: 0 candidate boxes (0 objects); already labelled 39, beyond max range 210, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 3, no points 0
+1104_cp02_s005: 461 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s005/dog_dets
+1104_cp02_s005: 0 candidate boxes (0 objects); already labelled 57, beyond max range 222, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s000: 262 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s000/dog_dets
+1104_cp04_s000: 3 candidate boxes (1 objects); already labelled 40, at a place labelled in another frame 0, beyond max range 42, earlier candidates confirmed 0, earlier candidates replaced 0, found by pillar 3, found by pillar only 3, left out: in fewer than 2 keyframes 4, no points 0
+1104_cp04_s001: 91 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s001/dog_dets
+1104_cp04_s001: 0 candidate boxes (0 objects); beyond max range 3, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s002: 267 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s002/dog_dets
+1104_cp04_s002: 0 candidate boxes (0 objects); already labelled 51, beyond max range 48, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s003: 315 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s003/dog_dets
+1104_cp04_s003: 0 candidate boxes (0 objects); already labelled 53, beyond max range 63, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s004: 438 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s004/dog_dets
+1104_cp04_s004: 0 candidate boxes (0 objects); already labelled 77, beyond max range 100, earlier candidates confirmed 0, earlier candidates replaced 0
+1104_cp04_s005: 168 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s005/dog_dets
+1104_cp04_s005: 0 candidate boxes (0 objects); already labelled 22, beyond max range 22, earlier candidates confirmed 0, earlier candidates replaced 0, left out: in fewer than 2 keyframes 2, no points 0
+1104_cp04_s006: 433 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s006/dog_dets
+1104_cp04_s006: 2 candidate boxes (1 objects); already labelled 55, at a place labelled in another frame 0, beyond max range 115, earlier candidates confirmed 0, earlier candidates replaced 0, found by pillar 2, found by pillar only 2, left out: in fewer than 2 keyframes 1, no points 0
+1104_cp04_s007: 420 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s007/dog_dets
+1104_cp04_s007: 2 candidate boxes (1 objects); already labelled 71, at a place labelled in another frame 0, beyond max range 82, earlier candidates confirmed 0, earlier candidates replaced 0, found by pillar 2, found by pillar only 2, left out: in fewer than 2 keyframes 3, no points 0
+total: 7 candidate boxes (3 objects); already labelled 621, at a place labelled in another frame 0, beyond max range 1656, earlier candidates confirmed 0, earlier candidates replaced 0, found by pillar 7, found by pillar only 7, left out: in fewer than 2 keyframes 26, no points 0
+1104_cp02_s000: 367 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s000/dog_dets
+1104_cp02_s001: 277 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s001/dog_dets
+1104_cp02_s002: 416 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s002/dog_dets
+1104_cp02_s003: 431 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s003/dog_dets
+1104_cp02_s004: 393 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s004/dog_dets
+1104_cp02_s005: 461 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp02_s005/dog_dets
+1104_cp04_s000: 262 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s000/dog_dets
+1104_cp04_s001: 91 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s001/dog_dets
+1104_cp04_s002: 267 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s002/dog_dets
+1104_cp04_s003: 315 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s003/dog_dets
+1104_cp04_s004: 438 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s004/dog_dets
+1104_cp04_s005: 168 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s005/dog_dets
+1104_cp04_s006: 433 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s006/dog_dets
+1104_cp04_s007: 420 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp04_s007/dog_dets
+1104_cp03_s001: 497 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s001/dog_dets
+1104_cp01_s003: 476 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp01_s003/dog_dets
+1104_cp03_s004: 309 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s004/dog_dets
+1104_cp03_s002: 328 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s002/dog_dets
+1104_cp03_s011: 311 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s011/dog_dets
+1104_cp01_s000: 282 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp01_s000/dog_dets
+1104_cp01_s001: 317 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp01_s001/dog_dets
+1104_cp03_s010: 312 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s010/dog_dets
+1104_cp03_s015: 241 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s015/dog_dets
+1104_cp03_s016: 277 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s016/dog_dets
+1104_cp03_s005: 266 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s005/dog_dets
+1104_cp03_s008: 220 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s008/dog_dets
+1104_cp01_s002: 251 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp01_s002/dog_dets
+1104_cp03_s000: 348 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s000/dog_dets
+1104_cp03_s009: 202 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s009/dog_dets
+1104_cp03_s012: 104 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s012/dog_dets
+1104_cp03_s013: 150 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s013/dog_dets
+1104_cp03_s014: 172 model boxes for Ctrl + drag -> /public/zjst/robot/centerpoint_data/sustech_1104/1104_cp03_s014/dog_dets
+scene split frames boxes review
+1104_cp01_s000 train 62 68 0
+1104_cp01_s001 train 62 87 19
+1104_cp01_s002 train 62 58 2
+1104_cp01_s003 train 62 137 67
+1104_cp02_s000 val 57 97 2
+1104_cp02_s001 val 57 80 0
+1104_cp02_s002 val 58 118 14
+1104_cp02_s003 val 57 151 0
+1104_cp02_s004 val 57 125 8
+1104_cp02_s005 val 57 166 28
+1104_cp03_s000 train 61 59 25
+1104_cp03_s001 train 61 158 56
+1104_cp03_s002 train 61 117 51
+1104_cp03_s004 train 61 85 12
+1104_cp03_s005 train 61 51 0
+1104_cp03_s008 train 61 56 0
+1104_cp03_s009 train 61 44 0
+1104_cp03_s010 train 61 83 0
+1104_cp03_s011 train 61 84 4
+1104_cp03_s012 train 61 12 0
+1104_cp03_s013 train 61 27 2
+1104_cp03_s014 train 61 30 18
+1104_cp03_s015 train 61 55 10
+1104_cp03_s016 train 61 64 0
+1104_cp04_s000 val 62 65 26
+1104_cp04_s001 val 62 0 0
+1104_cp04_s002 val 62 82 0
+1104_cp04_s003 val 62 90 38
+1104_cp04_s004 val 62 141 19
+1104_cp04_s005 val 61 31 6
+1104_cp04_s006 val 62 125 13
+1104_cp04_s007 val 62 121 2
+total train: 1102 frames, 1275 boxes, 266 marked review
+total val: 838 frames, 1392 boxes, 156 marked review
+example scene: 1104_cp03_s001
+total 220M
+-rw------- 1 junyongmou engineers 220M Nov  6 00:14 1104_cp03_s001_review.mcap
+Fri Nov  6 12:14:13 AM CST 2026
+FINISH_T37_OK

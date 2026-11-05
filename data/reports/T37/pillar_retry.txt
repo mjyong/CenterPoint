@@ -1,0 +1,44 @@
+==== 1104_cp02_s000 on cuda:7 ====
+OK 1104_cp02_s000
+==== 1104_cp02_s001 on cuda:7 ====
+OK 1104_cp02_s001
+==== 1104_cp02_s002 on cuda:7 ====
+OK 1104_cp02_s002
+==== 1104_cp02_s003 on cuda:7 ====
+OK 1104_cp02_s003
+==== 1104_cp02_s004 on cuda:7 ====
+OK 1104_cp02_s004
+==== 1104_cp02_s005 on cuda:7 ====
+OK 1104_cp02_s005
+==== 1104_cp03_s001 on cuda:7 ====
+OK 1104_cp03_s001
+==== 1104_cp03_s003 on cuda:7 ====
+OK 1104_cp03_s003
+==== 1104_cp03_s004 on cuda:7 ====
+OK 1104_cp03_s004
+==== 1104_cp03_s005 on cuda:7 ====
+OK 1104_cp03_s005
+==== 1104_cp03_s006 on cuda:7 ====
+OK 1104_cp03_s006
+==== 1104_cp03_s007 on cuda:7 ====
+OK 1104_cp03_s007
+==== 1104_cp03_s008 on cuda:7 ====
+OK 1104_cp03_s008
+==== 1104_cp03_s009 on cuda:7 ====
+OK 1104_cp03_s009
+==== 1104_cp03_s010 on cuda:7 ====
+OK 1104_cp03_s010
+==== 1104_cp03_s011 on cuda:7 ====
+OK 1104_cp03_s011
+==== 1104_cp03_s012 on cuda:7 ====
+OK 1104_cp03_s012
+==== 1104_cp03_s014 on cuda:7 ====
+OK 1104_cp03_s014
+==== 1104_cp03_s015 on cuda:7 ====
+OK 1104_cp03_s015
+==== 1104_cp03_s016 on cuda:7 ====
+OK 1104_cp03_s016
+==== 1104_cp04_s005 on cuda:7 ====
+OK 1104_cp04_s005
+pillar done ok=21 fail=0
+Thu Nov  5 10:40:47 PM CST 2026
