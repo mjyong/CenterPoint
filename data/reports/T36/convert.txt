@@ -1,0 +1,15 @@
+==== 1104_cp01 ====
+cameras -> <seq>/cameras.mcap: /robot/topic/rdap/rear_sensor_camera, /robot/topic/rdap/left_sensor_camera, /robot/topic/rdap/front_sensor_camera, /robot/topic/rdap/right_sensor_camera
+INS azimuth offset 180 deg (antennas swapped as on 0921; median forward speed - m/s)
+WARNING: the robot hardly moves; offset 180 is the 0921 default. Pass --azimuth-offset as decided on the other recordings of the same day
+INS lever arm [-0.06, -0.54, 0.0] m (body frame)
+wrote 306 scans, 3162 imu, 3162 odom, 3150 camera messages -> data/seq/1104_cp01_s000
+wrote 307 scans, 3262 imu, 3262 odom, 3311 camera messages -> data/seq/1104_cp01_s001
+wrote 306 scans, 3171 imu, 3171 odom, 3221 camera messages -> data/seq/1104_cp01_s003
+
+==== 1104_cp02 ====
+cameras -> <seq>/cameras.mcap: /robot/topic/rdap/front_sensor_camera, /robot/topic/rdap/left_sensor_camera, /robot/topic/rdap/rear_sensor_camera, /robot/topic/rdap/right_sensor_camera
+  1000 scans decoded, t = 1793794084.2
+
+STOPPED after cp01: azimuth auto fell back to 180 with 'hardly moves' WARNING; lever arm is the 0921 swapped default.
+cp02 conversion killed mid-decode (before azimuth print); later bags not started.

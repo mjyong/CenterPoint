@@ -1,0 +1,9 @@
+reading bags1104/cp04 ...
+  2000 lidar frames read (200 s into the bag)
+bag 245 s: lidar 2447 frames (10.0 Hz, max gap 0.10 s, 3.2 MB/msg), imu 100 Hz, ins 100 Hz
+  /robot/topic/rdap/top_point_cloud2       log - header stamp: median +0.103 s (5-95%: +0.102 .. +0.112)
+  /rte/rdap/rtk/imus/data_raw              log - header stamp: median +0.000 s (5-95%: +0.000 .. +0.003)
+  /rte/rdap/rtk/inspvax                    log - header stamp: median +0.000 s (5-95%: +0.000 .. +0.002)
+INS good 100%, pos_type {56: 24483}, path 1 m; usable 245 s in 1 stretches
+8 scenes (7 kept): train 153 s, val 61 s; val path within 10 m of train: 100%
+-> data/survey/1104_cp04/{segments.csv,survey.png,survey.json}

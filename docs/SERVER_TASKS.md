@@ -140,7 +140,7 @@
 | T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成，已复核。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置。复核："真狗是 CycloneDDS"没有依据，T34 核实；deb 带上 8 MB 的 Fast DDS profile，orin_foxglove.sh 默认用它；/etc/default 列了 DDS 选项 |
 | T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 完成，已复核。CycloneDDS 域 0、只绑 eth1、共享内存、socket 10 MB，节点 root。我们的话题各 1 个发布者、0 个订阅，TF 里没有 camera_init。deb `0.1.0+316.gdbde7ed`。室内 clouds 598 / skipped 0 / frames 0。和编译机比过门槛（匹配 0.998）。不锁频 total 中位 58.6 ms，锁频 37.1 ms（服务也在占 GPU），测完恢复未锁。录 64 s 点云 640 条，丢包计数没涨。nvidia 的 bridge 10 秒只收到 10 帧点云。复核：慢的原因是机器人自己的负载（load 32），不是我们的服务；不锁频 p99 99 ms 贴着帧间隔；nvidia 用户拿到的数据不全（root 的共享内存），撞车检查和 bridge 要用 root 再看；SENSORS 7.2 的雷达检查改成录 12 秒数条数 |
 | T35 | 8 号狗出门实跑：A 段室内（root 视角撞车、root 起 bridge、负载和 GPU）；B 段室外有固定解（在线每秒的帧数和延迟、天线接法、录包和离线回放对比、Foxglove） | Agent + 人（带狗出门） | T34 复核 | 1.5 小时 | 待做 |
-| T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 待做 |
+| T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 停在第 2 步（2026-11-05）：四份几乎静止，航向偏置 auto 回落到 180 并打出 hardly moves |
 | T37 | 1104：双教师推理和自动标注、上线模型对教师、每个场景的统计和挑场景、带四路相机的审核材料、0921 + 1104 的划分方案（不写入） | Agent | T36 复核 | 3 小时 | 待做 |
 | H6 | 审 1104 挑出的场景（SUSTechPOINTS 逐框，只审车；Foxglove 里对照四路相机），定划分 | 人 | T37 | 1–2 天 | 待做 |
 | T38 | 导回 H6，和 0921 合并，写入划分，导出 v3 数据集 | Agent | H6 | 1 小时 | 计划 |
@@ -6704,7 +6704,41 @@ BAGS=bags1104（软链，指向 /public/zjst/robot/bags1104）
 
 ### T36 结果
 
-（待填）
+**停在第 2 步（2026-11-05）。** 第 0、1 步完成；转换 `cp01` 时触发停止条件，后面的 bag 未继续转。
+
+**第 0 步**
+- 快速测试：180 passed（约 111 s），见 `data/reports/T36/pytest.txt`。
+- 磁盘：仓库盘 `/` 剩 34 G；公共盘 `/public` 剩 691 T。`data/seq` 已链到公共盘。
+- 话题：四份各 8 个，与 RECORDED_DATA.md 2.2 一致（雷达、IMU、INSPVAX、四路鱼眼、`/lidar_packets_loss`）。原始输出 `data/reports/T36/topics.txt`。
+
+**第 1 步体检**（每份摘要在 `data/reports/T36/survey_1104_cpNN.txt`，完整图/表在 `data/survey/1104_cpNN/`）
+
+| bag | 时长 | 雷达 | IMU / INS | 时钟 log−header（中位，5–95%） | pos_type | 路径 | 可用 | 场景（keep） |
+|---|---|---|---|---|---|---|---|---|
+| cp01 | 123 s | 10.0 Hz，max gap 0.10 s | 100 / 100 Hz | 雷达 +0.103（0.102..0.112）；IMU/INS ≈ 0 | 56: 100% | 0.56 m | 122 s / 123 s | 4（3） |
+| cp02 | 171 s | 同上 | 同上 | 雷达 +0.104（0.102..0.113）；IMU/INS ≈ 0 | 56: 100% | 0.82 m | 171 s / 171 s | 6（5） |
+| cp03 | 518 s | 同上 | 同上 | 雷达 +0.103（0.102..0.113）；IMU/INS ≈ 0 | 56: 100% | 4.36 m | 518 s / 518 s | 17（16） |
+| cp04 | 245 s | 同上 | 同上 | 雷达 +0.103（0.102..0.112）；IMU/INS ≈ 0 | 56: 100% | 1.20 m | 245 s / 245 s | 8（7） |
+
+- 时钟正常（雷达约 +0.10 s，和 0921 一样；IMU/INS 近 0，区间窄）。
+- RTK 固定解 100%，四份合计可用约 1056 / 1057 s（远高于一半），未触发第 1 步停止条件。
+- **四份几乎都没动**：所有 keep 场景的 `note` 都是 `static (robot not moving)`，平均速度 0，合计路程约 7 m。后面转换无法用前进速度判断天线接法。
+
+**第 2 步转换（停下）**
+- `cp01`：四路相机都进了 `cameras.mcap`（front / left / right / rear）。
+- 打印：`INS azimuth offset 180 deg (antennas swapped as on 0921; median forward speed - m/s)`；
+  `WARNING: the robot hardly moves; offset 180 is the 0921 default. Pass --azimuth-offset as decided on the other recordings of the same day`；
+  `INS lever arm [-0.06, -0.54, 0.0] m`（0921 接反时的拟合值，不是任务要求的 IMU 中心 `[0.0213, -0.18, 0.0]`）。
+- 三个 keep 场景的 wrote 帧数与 `segments.csv` 的 scans 列一致（306 / 307 / 306）。
+- 停止条件命中后杀掉了正在转的 `cp02`（解到约 1000 帧、尚未打印 azimuth）；`cp03`、`cp04` 未开转。
+- 公共盘上留下不完整的 `data/seq/1104_cp01_*`、`data/seq/1104_cp02_*`（约 2 GB）。**重跑前请删掉这些目录**，再按人定的 `--azimuth-offset` 整批重转。不提交 `data/seq`。
+
+**需要人定**
+1. 8 号狗这天的天线接法：偏置用 `0` 还是 `180`？本批四份都几乎静止，auto 不可信，只能靠同天有走动的录制（例如待做的 T35 室外）或车上确认接线。
+2. 定了以后重跑第 2 步起：`--azimuth-offset 0|180`（lever arm 会跟着 `default_lever_arm` 选 IMU 中心或 0921 拟合值），再做预览 / 时间差 / 融合。
+3. 本批全是静止场景，即使用对了偏置，时间差检查（要航向变化大的场景）和运动标注价值也有限；要不要补录走动的 1104 段，一并定。
+
+**耗时**：pytest 约 2 min；四份体检约 2 min；`cp01` 转换约 1 min 后停下。第 3–7 步未做。
 
 ## T37 1104：两个教师、自动标注、挑场景、审核材料、划分方案
 

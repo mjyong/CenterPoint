@@ -1,0 +1,5 @@
+name,t_start,t_end,duration,scans,path_m,mean_speed,moving_share,pos_types,split,keep,note
+1104_cp01_s000,1793793776.795350,1793793807.414145,30.6,306,0.1,0.00,0.00,56:3062,train,1,static (robot not moving)
+1104_cp01_s001,1793793807.414145,1793793838.032940,30.6,307,0.1,0.00,0.00,56:3062,train,1,static (robot not moving)
+1104_cp01_s002,1793793838.032940,1793793868.651735,30.6,306,0.1,0.00,0.00,56:3062,train,0,buffer before val; static (robot not moving)
+1104_cp01_s003,1793793868.651735,1793793899.270530,30.6,306,0.1,0.00,0.00,56:3062,val,1,static (robot not moving)

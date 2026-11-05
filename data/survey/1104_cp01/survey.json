@@ -1,0 +1,96 @@
+{
+ "bag": "bags1104/cp01",
+ "duration_s": 122.6066427230835,
+ "topics": [
+  {
+   "topic": "/robot/topic/rdap/rear_sensor_camera",
+   "type": "foxglove_msgs/msg/CompressedVideo",
+   "count": 3061
+  },
+  {
+   "topic": "/robot/topic/rdap/left_sensor_camera",
+   "type": "foxglove_msgs/msg/CompressedVideo",
+   "count": 3061
+  },
+  {
+   "topic": "/robot/topic/rdap/front_sensor_camera",
+   "type": "foxglove_msgs/msg/CompressedVideo",
+   "count": 3062
+  },
+  {
+   "topic": "/rte/rdap/rtk/inspvax",
+   "type": "kygi665_msgs/msg/INSPVAX",
+   "count": 12257
+  },
+  {
+   "topic": "/rte/rdap/rtk/imus/data_raw",
+   "type": "sensor_msgs/msg/Imu",
+   "count": 12257
+  },
+  {
+   "topic": "/robot/topic/rdap/right_sensor_camera",
+   "type": "foxglove_msgs/msg/CompressedVideo",
+   "count": 3061
+  },
+  {
+   "topic": "/lidar_packets_loss",
+   "type": "hesai_ros_driver/msg/LossPacket",
+   "count": 1227
+  },
+  {
+   "topic": "/robot/topic/rdap/top_point_cloud2",
+   "type": "sensor_msgs/msg/PointCloud2",
+   "count": 1227
+  }
+ ],
+ "lidar": {
+  "frames": 1227,
+  "rate_hz": 10.000078379263691,
+  "max_gap_s": 0.10168004035949707,
+  "gaps_over_limit": 0,
+  "mean_msg_mb": 3.174015998840332
+ },
+ "imu": {
+  "msgs": 12257,
+  "rate_hz": 100.00089957135121,
+  "max_gap_s": 0.023297548294067383
+ },
+ "ins": {
+  "msgs": 12257,
+  "rate_hz": 100.00096688072463,
+  "good_share": 1.0,
+  "pos_type": {
+   "56": 12257
+  },
+  "path_m": 0.5561940146510609
+ },
+ "log_minus_header": {
+  "/robot/topic/rdap/top_point_cloud2": {
+   "median_s": 0.10333037376403809,
+   "p5_s": 0.10163004398345947,
+   "p95_s": 0.11208510398864746
+  },
+  "/rte/rdap/rtk/imus/data_raw": {
+   "median_s": 0.0004737377166748047,
+   "p5_s": 0.0001914501190185547,
+   "p95_s": 0.0024631977081298823
+  },
+  "/rte/rdap/rtk/inspvax": {
+   "median_s": 0.00035643577575683594,
+   "p5_s": 0.00011444091796875,
+   "p95_s": 0.0023139953613281242
+  }
+ },
+ "usable_s": 122.42517971992493,
+ "usable_intervals": [
+  [
+   0.045654296875,
+   122.47083401679993
+  ]
+ ],
+ "scenes": 4,
+ "scenes_kept": 3,
+ "train_s": 61.2,
+ "val_s": 30.6,
+ "val_path_within_10m_of_train": 1.0
+}
