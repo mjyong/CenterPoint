@@ -1,6 +1,6 @@
 # 长 bag 切分成多个序列（场景）
 
-把一段很长的录制（例如 4090 服务器上 30 GB 的 `d20car_predict/rosbag0921/rosbag2_2026_09_21-16_56_59`）切成多个 30 s 左右的序列，转换并逐个检查，再进入 [DOG_FINETUNE.md](DOG_FINETUNE.md) 的 ② 教师推理、③ 自动标注。最后一节是可以直接交给服务器上 AI Agent 的任务说明。
+把一段很长的录制（例如 4090 服务器上 30 GB 的 `bags0921/rosbag2_2026_09_21-16_56_59`）切成多个 30 s 左右的序列，转换并逐个检查，再进入 [DOG_FINETUNE.md](DOG_FINETUNE.md) 的 ② 教师推理、③ 自动标注。最后一节是可以直接交给服务器上 AI Agent 的任务说明。
 
 三个工具，都在样例 bag 上测过（`tests/dog/test_bag_split.py`）：
 
@@ -41,7 +41,7 @@
 cd <仓库目录> && git pull origin claude/me/v01
 pip install -r requirements_dog.txt
 export PYTHONPATH=.
-BAG=/<路径>/d20car_predict/rosbag0921/rosbag2_2026_09_21-16_56_59
+BAG=/<路径>/bags0921/rosbag2_2026_09_21-16_56_59
 NAME=0921_165659                      # 场景名前缀，场景为 ${NAME}_s000、${NAME}_s001 ...
 df -h .                               # 序列约 6 GB；之后教师的帧（第 4 步）约 35 GB
 head -60 $BAG/metadata.yaml           # 话题、条数、时长、分成几个 .db3 文件
@@ -538,7 +538,7 @@ python tools/dog/export_dataset.py $REC --val-recordings $VAL --out data/dog_v00
 下面整段可以直接复制给 Agent（路径按服务器实际情况改）：
 
 ```text
-任务：把 d20car_predict/rosbag0921/rosbag2_2026_09_21-16_56_59（约 30 GB 的 ROS 2 bag）切成多个 30 s 左右的序列，并做可视化验证。
+任务：把 bags0921/rosbag2_2026_09_21-16_56_59（约 30 GB 的 ROS 2 bag）切成多个 30 s 左右的序列，并做可视化验证。
 仓库：CenterPoint，分支 claude/me/v01。先 git pull，再 pip install -r requirements_dog.txt，所有命令在仓库根目录执行，export PYTHONPATH=.。
 按 docs/BAG_SPLIT.md 第 0–3 节执行，NAME=0921_165659：
 

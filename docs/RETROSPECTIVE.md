@@ -479,6 +479,7 @@
 | [DOG_PIPELINE.md](DOG_PIPELINE.md) | 方案评审、四段流水线的设计、仿真和样例 bag 的结果、Orin 部署的早期设想 |
 | [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) | 一轮迭代的完整做法：数据 → 标注 → 训练 → 评估 → 部署 |
 | [BAG_SPLIT.md](BAG_SPLIT.md) | bag 体检、切场景、位姿融合；0921 数据准备的十一轮记录 |
+| [RECORDED_DATA.md](RECORDED_DATA.md) | 各批录制的元信息（目前 0921、1104 两份） |
 | [DATA_LINEAGE.md](DATA_LINEAGE.md) | 每一步读写哪些文件、哪些字段 |
 | [LOCALIZATION.md](LOCALIZATION.md) | 定位优化：INS 的问题、离线位姿融合的设计和六版迭代、在线定位、验收和下一步 |
 | [DOG_FINETUNE.md](DOG_FINETUNE.md) | 自动标注、审核、导出、训练的参考；只检车辆的做法；标注规则 |

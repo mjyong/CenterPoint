@@ -7,6 +7,7 @@
 2. 后面怎么采数据（第 2–4 节）。
 
 服务器上已经做完的部分见 [SERVER_TASKS.md](SERVER_TASKS.md)，采集和体检的操作见 [SENSORS.md](SENSORS.md) 第 7 节和 [BAG_SPLIT.md](BAG_SPLIT.md)。
+已落盘的各批 bag（0921、1104）的路径、时长、话题见 [RECORDED_DATA.md](RECORDED_DATA.md)。
 
 ---
 
