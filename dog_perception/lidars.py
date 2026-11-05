@@ -48,9 +48,10 @@ LIDARS = {
         provisional=True),
 }
 
-# cameras recorded with the Mid-360 (1016): 1920 x 1536 fisheye, H.264 at 24 Hz (foxglove_msgs/CompressedVideo)
+# the fisheye cameras: 1920 x 1536, H.264 (foxglove_msgs/CompressedVideo), 24 Hz on 1016, 25-27 Hz on 1104; the rear
+# one is recorded since 1104
 KYGI_CAMERA_TOPICS = ("/robot/topic/rdap/front_sensor_camera", "/robot/topic/rdap/left_sensor_camera",
-                      "/robot/topic/rdap/right_sensor_camera")
+                      "/robot/topic/rdap/right_sensor_camera", "/robot/topic/rdap/rear_sensor_camera")
 COMPRESSED_VIDEO_MSG = "builtin_interfaces/Time timestamp\nstring frame_id\nuint8[] data\nstring format\n"
 
 

@@ -11,7 +11,7 @@ Mounting: positions in the base frame (x forward, y left, z up, origin the body 
 origin of the robot's IMU -> body extrinsic) from the robot team. The rotations are not calibrated
 yet: each camera is taken to look level along its axis (front +x, left +y, right -y, rear -x).
 The front camera looks roughly 6-7 deg down (road vanishing point on a 1016 frame), so boxes
-drawn with these rotations are only a guide. The rear camera is not recorded.
+drawn with these rotations are only a guide. The rear camera is recorded since 1104 (docs/SENSORS.md 4.3).
 
 Camera frame: OpenCV optical frame (x right in the image, y down, z along the optical axis).
 """
@@ -79,7 +79,7 @@ KYGI_FISHEYES = {
     "front": FisheyeMount("front", "/robot/topic/rdap/front_sensor_camera", (0.4476, 0.0, 0.0424), 0.0),
     "left": FisheyeMount("left", "/robot/topic/rdap/left_sensor_camera", (0.0, 0.1165, -0.0279), 90.0),
     "right": FisheyeMount("right", "/robot/topic/rdap/right_sensor_camera", (0.0, -0.1165, -0.0279), -90.0),
-    "rear": FisheyeMount("rear", None, (-0.4475, 0.0, 0.0424), 180.0),
+    "rear": FisheyeMount("rear", "/robot/topic/rdap/rear_sensor_camera", (-0.4475, 0.0, 0.0424), 180.0),
 }
 
 # the code's body frame B (x right, y forward, z up, origin the XT32) in the base frame: robot

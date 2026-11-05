@@ -44,4 +44,4 @@ def test_mounting_looks_along_each_axis():
     # XT32 at (0.319, 0.043, 0.143) in the base frame; the front camera 0.13 m ahead of it, 0.10 m lower
     assert np.allclose(T_BASE_BODY[:3, 3], [0.319, 0.0426, 0.143], atol=1e-3)
     assert np.allclose(T_body_camera(front)[:3, 3], [0.0426, 0.1286, -0.1006], atol=1e-3)
-    assert KYGI_FISHEYES["rear"].topic is None
+    assert KYGI_FISHEYES["rear"].topic == "/robot/topic/rdap/rear_sensor_camera"      # recorded since 1104

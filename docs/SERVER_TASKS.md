@@ -140,7 +140,16 @@
 | T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成，已复核。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置。复核："真狗是 CycloneDDS"没有依据，T34 核实；deb 带上 8 MB 的 Fast DDS profile，orin_foxglove.sh 默认用它；/etc/default 列了 DDS 选项 |
 | T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 完成，已复核。CycloneDDS 域 0、只绑 eth1、共享内存、socket 10 MB，节点 root。我们的话题各 1 个发布者、0 个订阅，TF 里没有 camera_init。deb `0.1.0+316.gdbde7ed`。室内 clouds 598 / skipped 0 / frames 0。和编译机比过门槛（匹配 0.998）。不锁频 total 中位 58.6 ms，锁频 37.1 ms（服务也在占 GPU），测完恢复未锁。录 64 s 点云 640 条，丢包计数没涨。nvidia 的 bridge 10 秒只收到 10 帧点云。复核：慢的原因是机器人自己的负载（load 32），不是我们的服务；不锁频 p99 99 ms 贴着帧间隔；nvidia 用户拿到的数据不全（root 的共享内存），撞车检查和 bridge 要用 root 再看；SENSORS 7.2 的雷达检查改成录 12 秒数条数 |
 | T35 | 8 号狗出门实跑：A 段室内（root 视角撞车、root 起 bridge、负载和 GPU）；B 段室外有固定解（在线每秒的帧数和延迟、天线接法、录包和离线回放对比、Foxglove） | Agent + 人（带狗出门） | T34 复核 | 1.5 小时 | 待做 |
+| T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 待做 |
+| T37 | 1104：双教师推理和自动标注、上线模型对教师、每个场景的统计和挑场景、带四路相机的审核材料、0921 + 1104 的划分方案（不写入） | Agent | T36 复核 | 3 小时 | 待做 |
+| H6 | 审 1104 挑出的场景（SUSTechPOINTS 逐框，只审车；Foxglove 里对照四路相机），定划分 | 人 | T37 | 1–2 天 | 待做 |
+| T38 | 导回 H6，和 0921 合并，写入划分，导出 v3 数据集 | Agent | H6 | 1 小时 | 计划 |
+| T39 | 训练 v3（Pillar、Voxel），在新验证集上和 nuScenes Pillar 比，定上线模型和上报阈值 | Agent，人定 | T38 | 半天 | 计划 |
 
+- **2026-11-05 起的顺序**：两条线并行。
+  - 部署：T35（A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频、天线配置；
+  - 数据：T36 → T37 → H6（人审）→ T38 → T39。T36 的 RTK、天线、时钟三项任何一项不对就先停，人定；
+  - 1104 只有一个晚上，测试集等下一批（另一天、另一片区域，DATA_COLLECTION_PLAN 3.5）。
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
 - 2026-10-22 标注规则改了三处（[DOG_FINETUNE.md](DOG_FINETUNE.md) 第 14 节）：遮挡和远处的框按点数处理；待审核改为"平均分 < 0.5 并且 ≥ 0.6 分的帧不到 5 帧"；短暂的假运动去掉。T1、T2 的材料和数据集都是旧规则做的，要在 T1R 里重做。
@@ -6558,7 +6567,9 @@ B 段（室外，人带狗）：有固定解时的在线结果、天线接法、
    I=/opt/seres/perception；B=$I/lidar_3d_detection/lib/lidar_3d_detection
    狗上 root 的 ROS 环境（下文 RR，用 sudo bash -c "$RR && <命令>"）：
      RR='set -a; source /etc/default/lidar-3d-detection; set +a; source /opt/ros/humble/setup.bash; source /opt/seres/perception/local_setup.bash'
-   git pull 之后同步代码（不重打 deb：dbde7ed 之后节点没改）：ORIN_HOST=dog tools/deploy/sync_to_orin.sh
+   git pull 之后同步代码：ORIN_HOST=dog tools/deploy/sync_to_orin.sh
+   7432c90 改了预测线（从框中心、按框的高度画），节点要重打：同 T34 第 3 步（锁频后重建引擎可选，打包、--force-confnew 升级），
+   装完 journal 里 up 那一行和 settings 不变。
 
 A1. root 视角的撞车检查（只读），输出 collisions_root.txt：
      ssh dog "sudo bash -c \"$RR && for t in /perception/lidar_3d/objects /perception/lidar_3d/tracks /perception/lidar_3d/predictions; do \
@@ -6617,5 +6628,138 @@ B8. 结束：服务 active；锁频是开始时的状态；狗上的 bag 删掉�
 ```
 
 ### T35 结果
+
+（待填）
+
+## T36 1104：体检、切场景、转换、位姿融合（第二批数据）
+
+1104 是 8 号狗（或同一套车载镜像的狗）2026-11-04 晚上 20:02–20:23 录的 4 份 bag（cp01–cp04），共 17.6 分钟、10,565 帧雷达，四路鱼眼都录了（[RECORDED_DATA.md](RECORDED_DATA.md) 第 2 节）。和 0921 比有三处不同：
+- 天线应该已经接正（航向偏置 0，杠杆臂是 IMU 中心）；
+- 地点很可能不一样（T34 在狗上看到的是北纬 40°、东经 116°，0921 是 29.7°、106.8°）；
+- 是晚上录的：相机画面可能太暗，审核时靠不上。
+
+这一轮只走 BAG_SPLIT 的前几步：体检、切场景、转换、预览、时间差、位姿融合、再预览。不跑教师，不划分。三件事会决定后面怎么做，所以设了停止条件：有没有 RTK 固定解、天线接法、时钟。
+
+本任务可以改的范围（通用约定 9）：`tools/dog/`、`dog_perception/` 里工具的 bug（Python 流水线的行为不改）。
+
+```text
+任务 T36：1104 的 4 份 bag：体检、切场景、转换（四路相机进 cameras.mcap）、预览、时间差、位姿融合、再预览。不跑教师，不划分。
+先按通用约定做（第 9 条，范围见本节开头；第 10 条）。前置：无（不用等 T35）。仓库根目录，export PYTHONPATH=.。
+BAGS=bags1104（软链，指向 /public/zjst/robot/bags1104）
+
+0. mkdir -p data/reports/T36
+   python -m pytest tests/dog -m "not slow" -n 8 -q 2>&1 | tail -3 | tee data/reports/T36/pytest.txt
+   df -h data | tee data/reports/T36/df.txt          （序列约 0.6 MB / 帧，约 7 GB；相机的 cameras.mcap 另算，预留 15 GB）
+   for b in $BAGS/cp0*; do echo "== $b"; grep -E "duration|message_count|name:" $b/metadata.yaml; done > data/reports/T36/topics.txt
+   （每份应有 RECORDED_DATA.md 2.2 的 8 个话题）
+1. 体检（每份一个前缀 1104_cpNN）：
+     for b in $BAGS/cp0*; do n=1104_$(basename $b)
+       python tools/dog/bag_survey.py --bag $b --out data/survey/$n --prefix $n 2>&1 | tail -8 | tee data/reports/T36/survey_$n.txt
+     done
+   - 记下：时长；雷达 / IMU / INS 的频率和最大间隔；时钟（log − header）；pos_type 的分布；可用秒数和场景数；
+   - 时钟异常（几秒的偏差、5–95% 区间很宽、前后两段不一样）：停下报告（BAG_SPLIT 第 1 节）；
+   - 四份加起来的可用时间不到总时长的一半（RTK 固定解太少：夜里、楼边、没开 RTK 都可能）：停下报告。不要加
+     --pos-types 放宽，要人定。
+2. 转换（相机默认 auto，四路都进 <序列>/cameras.mcap）：
+     for b in $BAGS/cp0*; do n=1104_$(basename $b)
+       python tools/dog/rosbag_to_sequence.py --bag $b --inspvax-topic /rte/rdap/rtk/inspvax \
+           --lidar-topic /robot/topic/rdap/top_point_cloud2 --imu-topic /rte/rdap/rtk/imus/data_raw \
+           --segments data/survey/$n/segments.csv --out data/seq 2>&1 | tee data/seq/$n.convert.log
+       grep -E "INS azimuth offset|INS lever arm|cameras ->|WARNING|skipped|wrote" data/seq/$n.convert.log \
+           | tee -a data/reports/T36/convert.txt
+     done
+   - "INS azimuth offset" 应是 0（天线接正），lever arm 是 IMU 中心 [0.0213, -0.18, 0.0]。四份不一样，或打印了
+     "hardly moves" 的 WARNING：停下报告（这是 8 号狗天线接法的证据，T35 B5 要用）；
+   - "cameras ->" 要列出四路（front、left、right、rear）；每个场景的 wrote 帧数等于 segments.csv 的 scans 列。
+3. 第一遍预览（INS 位姿）：
+     python tools/dog/sequence_preview.py --seq "data/seq/1104_*" --out data/preview/1104_ins --jobs 8
+4. 时间差：挑航向变化最大的 3 个场景（第 3 步之后用 python 读各场景 odom.npy 的航向 ptp，同 T10 第 1 步的写法）：
+     python tools/dog/time_offset_check.py --seq <这 3 个> --out data/preview/time_offset_1104 | tee data/reports/T36/time_offset.txt
+   - 结论不是"没有固定偏差"就停下报告（BAG_SPLIT 3.2）。
+5. 位姿融合：
+     python tools/dog/refine_poses.py --seq data/seq/1104_* --plots data/preview/poses_1104 2>&1 | tee data/reports/T36/refine.txt
+   - 最后一行 "INS lever arm left over" 应接近 0（两个分量都 < 0.1 m）。不是的话把它加到 --lever-arm 上重跑这一步，
+     两次的数都写进报告；
+   - 汇总每个场景的 shift p90（ins / lo / fused）、heading_correction_max_deg、ins_unhealthy_share、bad_share。
+     天线接正以后 INS 应该比 0921 好很多（0921：急停时超前 0.45 m，航向修正最大 9.9°，不可靠 1.7%）。
+6. 第二遍预览（融合后的位姿）：
+     python tools/dog/sequence_preview.py --seq "data/seq/1104_*" --out data/preview/1104 --jobs 8
+   - 汇总 OK / WARN / FAIL 和非 OK 场景的 problems；shift_p90_m 有 FAIL 就停下报告。
+7. 离地高度：python tools/dog/sequence_meta.py --seq data/seq/1104_* | tee data/reports/T36/base_height.txt
+   （站着走应在 0.65–0.80 m；不在的场景写进报告，不用改）
+8. 提交：data/survey/1104_cp0*/（segments.csv、survey.png、survey.json）、data/preview/1104/（index.html、checks.csv、checks.json、png）、
+   data/preview/1104_ins/checks.csv、data/preview/poses_1104/（refine_summary.csv、png，不要 _diag.npz）、
+   data/preview/time_offset_1104/、data/reports/T36/、本文档。不提交 data/seq。
+
+停止条件（按约定 9 修不好的时候）：第 1 步时钟异常或可用时间不到一半；第 2 步航向偏置不是 0 或四份不一致；
+第 4 步有固定的时间差；第 6 步 shift_p90_m FAIL。
+报告（写进"T36 结果"）：
+- 第 0 步的话题表；
+- 每份 bag 体检的摘要（时长、速度、pos_type、可用秒数、场景数、时钟）；
+- 转换的 azimuth offset、lever arm、cameras 行；场景总数和帧数；
+- 时间差的结论；refine 的汇总和 "lever arm left over"；
+- 两遍预览的 OK / WARN / FAIL（INS 对融合），非 OK 的原因；离地高度；
+- 用掉的磁盘（du -sh data/seq/1104_*），每步耗时。
+```
+
+### T36 结果
+
+（待填）
+
+## T37 1104：两个教师、自动标注、挑场景、审核材料、划分方案
+
+T36 复核以后做。教师不换（T12、T15）：nuScenes Voxel + TTA、nuScenes Pillar + TTA，双教师自动标注。另外跑一遍上线模型（nuScenes Pillar，不加 TTA），看它和教师哪里不一样。然后按 DATA_COLLECTION_PLAN 3.4 给场景排序，选出要人审的，生成带四路相机的审核文件，再给出 0921 + 1104 的训练 / 验证 / 测试划分方案（不写入）。
+
+```text
+任务 T37：1104 的场景：双教师推理和自动标注、上线模型对教师、每个场景的统计和挑场景、审核材料、0921 + 1104 的划分方案（不写入）。
+先按通用约定做（第 9 条：可以改 tools/dog/ 里工具的 bug；第 10 条）。前置：T36 复核。仓库根目录，export PYTHONPATH=.。
+
+0. mkdir -p data/reports/T37；python -m pytest tests/dog/test_scene_stats.py -q；
+   df -h（--save-frames 每帧约 3.6 MB，1104 约 1 万帧，约 36 GB）；nvidia-smi。
+1. 双教师（Voxel + TTA、Pillar + TTA，存帧，自动标注一起做）：
+     python tools/dog/batch_label.py --seq data/seq/1104_* --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --dry-run   （先看卡怎么分）
+     python tools/dog/batch_label.py --seq data/seq/1104_* --ckpt-pillar work_dirs/pretrained/nusc_pp.pth
+     mv data/labels/batch_summary.csv data/labels/batch_summary_1104.csv && git checkout data/labels/batch_summary.csv
+2. 上线模型（nuScenes Pillar，不加 TTA），重放存好的帧：
+     python tools/dog/run_sequence.py --replay $(ls -d data/runs/1104_*) --detectors pillar \
+         --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --no-predict --no-mcap --jobs 3 --device cuda:0 \
+         --out "data/runs_online/{scene}" 2>&1 | tail -5 | tee data/reports/T37/online.txt
+   然后每个场景：
+     python tools/dog/compare_detectors.py --labels data/labels/<场景>/labels.pkl \
+         --results online=data/runs_online/<场景>/pillar/results.pkl --classes vehicle --max-range 30
+   抄 AP@2.0 那一行，写成 data/reports/T37/online_vs_teacher.csv（scene, ap2_30m）。越低说明上线模型和教师越不一致。
+3. 每个场景的统计（30 m / 15 m 内运动的车、按子类、起步、待审核轨迹数）：
+     python tools/dog/scene_stats.py --labels data/labels/1104_*/labels.pkl --out data/reports/T37/scene_stats.csv \
+         | tee data/reports/T37/scene_stats.txt
+   对照：0921 的自动标注合计 moving_30m 29、moving_15m 11（同一脚本，data/labels/0921_*/labels.pkl）。
+4. 挑场景（DATA_COLLECTION_PLAN 3.4），写成 data/reports/T37/review_candidates.csv（scene, 为什么, moving_30m, moving_30m_truck,
+   ap2_30m）：
+   a. moving_30m ≥ 1 的场景全要；
+   b. 有 truck 或 bus 轨迹的；
+   c. ap2_30m 最低的 3 个（上线模型和教师差得最多）；
+   d. 其余每份 bag 随机 1 个（numpy 种子 0）。
+   合计的关键帧数（每 5 帧取 1 帧）写在最后一行，超过 2,000 就把 d 去掉。
+5. 审核材料（只看车；Foxglove 文件带四路相机）：只做第 4 步挑出的场景，同 BAG_SPLIT 5.15 第 6 步：
+     review_labels.py table --classes vehicle → data/labels/<场景>/labels_tracks_vehicle.csv
+     review_labels.py mcap --vehicles-only --labels data/labels/<场景>/labels.pkl --frames data/runs/<场景>/frames \
+         --results data/runs/<场景>/voxel/results.pkl --cameras data/seq/<场景>/cameras.mcap --out data/labels/<场景>/<场景>_review.mcap
+   SUSTechPOINTS 场景：同 T16（sustechpoints_convert.py，双教师的框，只留车；每 5 帧一个关键帧）。
+   挑一个车最多的场景的 review mcap，复制到 data/examples/runs/<场景>/ 提交，人先用它看相机够不够亮（晚上录的）。
+6. 划分方案（只看，不 --apply）：
+     python tools/dog/split_check.py --seq data/seq/0921_* data/seq/1104_* --out data/survey/split_0921_1104 \
+         --holdout 0921_165659 --holdout-s 90 --no-drop --val-from 1104_ --val-share 0.3 \
+         2>&1 | tee data/reports/T37/split.txt
+   - 1104 只有一个晚上，测试集先不留（DATA_COLLECTION_PLAN 3.5：测试集要另一天、另一片区域），等下一批；
+   - 报告里写清楚：验证集里 1104 占多少秒、多少段运动的车（scene_stats 里 moving_30m 的合计）。
+7. 提交：data/labels/batch_summary_1104.csv、data/labels/1104_*/labels.pkl、labels_tracks.csv、labels_tracks_vehicle.csv、
+   data/reports/T37/、data/survey/split_0921_1104/、data/examples/runs/<那一个场景>/、本文档。
+   不提交 data/runs、data/runs_online、review mcap（除了那一个）、SUSTechPOINTS 的场景目录（在服务器上给人用）。
+
+停止条件：任何报错；第 1 步待审核的轨迹超过一半（教师在这批数据上明显不行，先停下看）。
+报告（写进"T37 结果"）：batch_summary_1104.csv 全文；scene_stats 的合计（和 0921 并排）；online_vs_teacher；
+review_candidates.csv 和关键帧总数；split.txt 的表和合计；每步耗时、显存、磁盘。
+```
+
+### T37 结果
 
 （待填）
