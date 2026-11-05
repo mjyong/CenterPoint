@@ -140,8 +140,8 @@
 | T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成，已复核。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置。复核："真狗是 CycloneDDS"没有依据，T34 核实；deb 带上 8 MB 的 Fast DDS profile，orin_foxglove.sh 默认用它；/etc/default 列了 DDS 选项 |
 | T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 完成，已复核。CycloneDDS 域 0、只绑 eth1、共享内存、socket 10 MB，节点 root。我们的话题各 1 个发布者、0 个订阅，TF 里没有 camera_init。deb `0.1.0+316.gdbde7ed`。室内 clouds 598 / skipped 0 / frames 0。和编译机比过门槛（匹配 0.998）。不锁频 total 中位 58.6 ms，锁频 37.1 ms（服务也在占 GPU），测完恢复未锁。录 64 s 点云 640 条，丢包计数没涨。nvidia 的 bridge 10 秒只收到 10 帧点云。复核：慢的原因是机器人自己的负载（load 32），不是我们的服务；不锁频 p99 99 ms 贴着帧间隔；nvidia 用户拿到的数据不全（root 的共享内存），撞车检查和 bridge 要用 root 再看；SENSORS 7.2 的雷达检查改成录 12 秒数条数 |
 | T35 | 8 号狗出门实跑：A 段室内（root 视角撞车、root 起 bridge、负载和 GPU）；B 段室外有固定解（在线每秒的帧数和延迟、天线接法、录包和离线回放对比、Foxglove） | Agent + 人（带狗出门） | T34 复核 | 1.5 小时 | 待做 |
-| T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 完成（2026-11-05；续：偏置 0 重转，31 场景两遍预览全 OK，时间差跳过） |
-| T37 | 1104：双教师推理和自动标注、上线模型对教师、每个场景的统计和挑场景、带四路相机的审核材料、0921 + 1104 的两个划分方案（不写入） | Agent | T36 续 | 3 小时 | 待做 |
+| T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 完成，已复核（2026-11-05；续：偏置 0 重转，31 场景两遍预览全 OK、位姿基本不用修，时间差跳过。人补了现场：三叉路口，车很多、基本在动） |
+| T37 | 1104：转出 4 个缓冲场景；双教师推理和自动标注、上线模型对教师、每个场景的统计；按 bag 划分（两份验证、两份训练，人定）；挑场景、带四路相机的审核材料 | Agent | T36 续 | 3 小时 | 待做 |
 | H6 | 审 1104 挑出的场景（SUSTechPOINTS 逐框，只审车；Foxglove 里对照四路相机），定划分 | 人 | T37 | 1–2 天 | 待做 |
 | T38 | 导回 H6，和 0921 合并，写入划分，导出 v3 数据集 | Agent | H6 | 1 小时 | 计划 |
 | T39 | 训练 v3（Pillar、Voxel），在新验证集上和 nuScenes Pillar 比，定上线模型和上报阈值 | Agent，人定 | T38 | 半天 | 计划 |
@@ -6635,7 +6635,7 @@ B8. 结束：服务 active；锁频是开始时的状态；狗上的 bag 删掉�
 
 1104 是 8 号狗（或同一套车载镜像的狗）2026-11-04 晚上 20:02–20:23 录的 4 份 bag（cp01–cp04），共 17.6 分钟、10,565 帧雷达，四路鱼眼都录了（[RECORDED_DATA.md](RECORDED_DATA.md) 第 2 节）。和 0921 比有三处不同：
 - 天线应该已经接正（航向偏置 0，杠杆臂是 IMU 中心）；
-- 地点很可能不一样（T34 在狗上看到的是北纬 40°、东经 116°，0921 是 29.7°、106.8°）；
+- 地点：人补的现场信息是和 0921 同一个厂区，相距几百米（T34 在狗上抽的那一条 INSPVAX 是北纬 40°、东经 116°，但那条 `ins_status` 是 1，没有解，经纬度不作数）；
 - 是晚上录的：相机画面可能太暗，审核时靠不上。
 
 这一轮只走 BAG_SPLIT 的前几步：体检、切场景、转换、预览、时间差、位姿融合、再预览。不跑教师，不划分。三件事会决定后面怎么做，所以设了停止条件：有没有 RTK 固定解、天线接法、时钟。
@@ -6824,17 +6824,42 @@ BAGS=bags1104（软链，指向 /public/zjst/robot/bags1104）
 
 **耗时**：重转约 4.7 min；INS 预览约 1.2 min；refine 约 1.6 min；融合预览约 1.2 min；离地高度约 1 s。
 
+### T36 续复核
 
-## T37 1104：两个教师、自动标注、挑场景、审核材料、划分方案
+结果认可：
+- 35 个场景里 keep 的 31 个，转换（偏置 0、杠杆臂 IMU 中心、`ins_azimuth_offset_from = given`）、两遍预览（全 OK）、位姿融合都正常；
+- 狗不动，位姿基本不用修（修正量 p90 ≤ 0.01 m，航向修正最大 0.4°），唯一挪了 1.9 m 的 cp03_s000 融合后 shift 0.07 m。
 
-T36 复核以后做。教师不换（T12、T15）：nuScenes Voxel + TTA、nuScenes Pillar + TTA，双教师自动标注。另外跑一遍上线模型（nuScenes Pillar，不加 TTA），看它和教师哪里不一样。然后按 DATA_COLLECTION_PLAN 3.4 给场景排序，选出要人审的，生成带四路相机的审核文件，再给出 0921 + 1104 的训练 / 验证 / 测试划分方案（不写入）。
+人补的现场信息改变了对这批的看法：
+- 狗站在三叉路口看车，货车、客车很多，基本都在动。狗不动、车在动，正好补上 0921 缺的"运动的车进入 30 m"（0921 自动标注只有 29 条）；
+- 地点和 0921 是同一个厂区，相距几百米。T36 开头"地点很可能不一样"的说法来自 T34 抽的一条没有解的 INSPVAX，已更正；
+- 离地高度 0.48 m（cp01、cp02）和 0.63 m（cp03、cp04），人说趴着和站着都有。在线节点的基准是 0.72 m，`auto_ground` 最多修 ±0.3 m，0.48 m 在范围内。
+
+划分人定：1104 按整份 bag 分，两份验证、两份训练。T37 按这个改了：
+- 体检留的 4 个缓冲场景按整份 bag 分以后不需要了，先转出来；
+- 验证的两份整份审，训练的两份按统计挑；
+- 默认验证 cp02 + cp04（各有一份趴着、一份站着），运动的车太偏时换 cp01 + cp04。
+
+## T37 1104：两个教师、自动标注、划分、挑场景、审核材料
+
+T36 续以后做。1104 是 8 号狗在 0921 同一个厂区（相距几百米）的一个三叉路口站着（有时趴着）看车，路过的货车、客车很多，基本都在动（RECORDED_DATA.md 2.2）。狗不动，路过的车在动，正好补上 0921 缺的"运动的车进入 30 m"。
+
+- **教师**不换（T12、T15）：nuScenes Voxel + TTA、nuScenes Pillar + TTA，双教师自动标注。另外跑一遍上线模型（nuScenes Pillar，不加 TTA），看它和教师哪里不一样；
+- **划分（人定，2026-11-05）**：1104 按整份 bag 分，两份做验证、两份做训练；0921 的划分不变；
+- **挑场景**：验证的两份整份都审，训练的两份按 DATA_COLLECTION_PLAN 3.4 挑；
+- 生成带四路相机的审核文件。
 
 ```text
-任务 T37：1104 的场景：双教师推理和自动标注、上线模型对教师、每个场景的统计和挑场景、审核材料、0921 + 1104 的划分方案（不写入）。
-先按通用约定做（第 9 条：可以改 tools/dog/ 里工具的 bug；第 10 条）。前置：T36 续。仓库根目录，export PYTHONPATH=.。
+任务 T37：1104：转出 4 个缓冲场景；双教师推理和自动标注；上线模型对教师；每个场景的统计；按 bag 划分（不写入 meta）；挑场景；审核材料。
+先按通用约定做（第 9 条：可以改 tools/dog/ 里工具的 bug；第 10 条）。前置：T36 续。仓库根目录，export PYTHONPATH=.。BAGS=bags1104
 
 0. mkdir -p data/reports/T37；python -m pytest tests/dog/test_scene_stats.py -q；
    df -h（--save-frames 每帧约 3.6 MB，1104 约 1 万帧，约 36 GB）；nvidia-smi。
+   缓冲场景：体检给每份 bag 留了一个 keep = 0 的缓冲（1104_cp01_s002、1104_cp02_s003、1104_cp03_s012、1104_cp04_s005），
+   那是为 bag 内部分训练 / 验证留的。现在按整份 bag 分，不需要了，转出来（每个约 30 s）：
+     把这 4 行 segments.csv 的 keep 改成 1，然后每份：
+     python tools/dog/rosbag_to_sequence.py --bag $BAGS/cpNN ...（同 T36 续第 1 步，--azimuth-offset 0）--only <那个场景>
+   再对这 4 个跑 refine_poses.py 和 sequence_preview.py（同 T36 续第 2 步），都要 OK。合计 35 个场景。
 1. 双教师（Voxel + TTA、Pillar + TTA，存帧，自动标注一起做）：
      python tools/dog/batch_label.py --seq data/seq/1104_* --ckpt-pillar work_dirs/pretrained/nusc_pp.pth --dry-run   （先看卡怎么分）
      python tools/dog/batch_label.py --seq data/seq/1104_* --ckpt-pillar work_dirs/pretrained/nusc_pp.pth
@@ -6851,36 +6876,38 @@ T36 复核以后做。教师不换（T12、T15）：nuScenes Voxel + TTA、nuSce
      python tools/dog/scene_stats.py --labels data/labels/1104_*/labels.pkl --out data/reports/T37/scene_stats.csv \
          | tee data/reports/T37/scene_stats.txt
    对照：0921 的自动标注合计 moving_30m 29、moving_15m 11（同一脚本，data/labels/0921_*/labels.pkl）。
-4. 挑场景（DATA_COLLECTION_PLAN 3.4），写成 data/reports/T37/review_candidates.csv（scene, 为什么, moving_30m, moving_30m_truck,
-   ap2_30m）：
-   a. moving_30m ≥ 1 的场景全要；
-   b. 有 truck 或 bus 轨迹的；
-   c. ap2_30m 最低的 3 个（上线模型和教师差得最多）；
-   d. 其余每份 bag 随机 1 个（numpy 种子 0）：T36 复核，这批狗都没动，一份 bag 里的场景是同一个视角，多了没用。
-   合计的关键帧数（每 5 帧取 1 帧）写在最后一行，超过 2,000 就把 d 去掉。
-5. 审核材料（只看车；Foxglove 文件带四路相机）：只做第 4 步挑出的场景，同 BAG_SPLIT 5.15 第 6 步：
+   另按 bag 合计一张表（cp01–cp04：秒数、moving_30m、moving_15m、truck、bus），写进 scene_stats_by_bag.txt。
+4. 按 bag 划分（只写方案，不改 meta.json，T38 才写入）：
+   - 0921 照旧：data/survey/split/split.csv（训练 25、验证 10）；
+   - 1104 默认：验证 cp02 + cp04，训练 cp01 + cp03。这样两边各有一份趴着的（cp01、cp02，离地高度约 0.48 m）、
+     一份站着的（cp03、cp04，约 0.63 m）；验证 416 s，占 1104 的 39%；
+   - 第 3 步按 bag 的表里，cp02 + cp04 的 moving_30m 不在 1104 合计的 25–60% 之间：换成 cp01 + cp04（368 s）验证、cp02 + cp03 训练；
+   - 写 data/survey/split_0921_1104/split.csv（name, split, reason；reason 写 "1104 val clip" / "1104 train clip" / 0921 的原值）；
+   - 空间重叠只报告、不改（同一个路口，两边的背景一定重叠；路过的车不同）：用 split_check.py 的 load、near_share
+     （import tools/dog/split_check.py）算 1104 验证场景的路线有多少落在 0921 训练路线 10 m 以内，以及 1104 验证和训练的机位相距多远；
+   - 报告：训练 / 验证的秒数，各自 moving_30m、moving_15m、truck、bus 的合计（0921 + 1104 并排）。
+   - 提醒：cp03 结束（20:17:59）到 cp04 开始（20:18:59）只隔 1 分钟，同一辆车可能跨两份 bag，报告里看 cp03 末尾、cp04 开头各 10 s
+     有没有轨迹（scene_stats 不管这个，用 labels.pkl 看）。
+5. 挑场景，写成 data/reports/T37/review_candidates.csv（scene, split, 为什么, moving_30m, moving_30m_truck, ap2_30m, keyframes）：
+   a. 验证的两份 bag：全部场景（验证标签都要人审）；
+   b. 训练的两份 bag：moving_30m ≥ 1 的；有 truck 或 bus 的；ap2_30m 最低的 3 个；
+   c. 关键帧（每 5 帧取 1 帧）合计超过 2,000：b 里按 moving_30m 从多到少留，直到 2,000；a 不减。
+6. 审核材料（只看车；Foxglove 文件带四路相机）：只做第 5 步挑出的场景，同 BAG_SPLIT 5.15 第 6 步：
      review_labels.py table --classes vehicle → data/labels/<场景>/labels_tracks_vehicle.csv
      review_labels.py mcap --vehicles-only --labels data/labels/<场景>/labels.pkl --frames data/runs/<场景>/frames \
          --results data/runs/<场景>/voxel/results.pkl --cameras data/seq/<场景>/cameras.mcap --out data/labels/<场景>/<场景>_review.mcap
-   SUSTechPOINTS 场景：同 T16（sustechpoints_convert.py，双教师的框，只留车；每 5 帧一个关键帧）。
-   挑一个车最多的场景的 review mcap，复制到 data/examples/runs/<场景>/ 提交，人先用它看相机够不够亮（晚上录的）。
-6. 划分方案（只看，不 --apply）。1104 的狗没动，每份 bag 内部是同一个位置，只能整份进一个集合。给两个方案：
-     A（1104 整批做新地方的验证集）：
-     python tools/dog/split_check.py --seq data/seq/0921_* data/seq/1104_* --out data/survey/split_0921_1104_A \
-         --holdout 0921_165659 --holdout-s 90 --no-drop --val-from 1104_ --val-share 1.0 2>&1 | tee data/reports/T37/split_A.txt
-     B（1104 整批进训练，验证集还是 0921 的）：
-     python tools/dog/split_check.py --seq data/seq/0921_* data/seq/1104_* --out data/survey/split_0921_1104_B \
-         --holdout 0921_165659 --holdout-s 90 --no-drop 2>&1 | tee data/reports/T37/split_B.txt
-   - --no-drop：静止的验证场景按默认规则会全被去掉（运动时间 < 30%）；
-   - 1104 只有一个晚上，测试集先不留（DATA_COLLECTION_PLAN 3.5），等下一批；
-   - 报告里写清楚：两个方案各自的验证集秒数、运动的车（scene_stats 的 moving_30m 合计）。人在 H6 定用哪个。
+   SUSTechPOINTS 场景：同 T16（sustechpoints_convert.py，双教师的框，只留车；每 5 帧一个关键帧）。验证场景同时放候选框
+   （DATA_COLLECTION_PLAN 3.5：两个教师在关键帧上检出、又和已有标注对不上的车，红框候选，`sustechpoints_convert.py candidates`）。
+   挑一个车最多的场景的 review mcap，复制到 data/examples/runs/<场景>/ 提交，人先用它看路灯下相机够不够看清车型。
 7. 提交：data/labels/batch_summary_1104.csv、data/labels/1104_*/labels.pkl、labels_tracks.csv、labels_tracks_vehicle.csv、
-   data/reports/T37/、data/survey/split_0921_1104/、data/examples/runs/<那一个场景>/、本文档。
+   data/reports/T37/、data/survey/split_0921_1104/、data/survey/1104_cp0*/segments.csv（keep 改过的）、data/preview/1104/（4 个缓冲场景加进去）、
+   data/examples/runs/<那一个场景>/、本文档。
    不提交 data/runs、data/runs_online、review mcap（除了那一个）、SUSTechPOINTS 的场景目录（在服务器上给人用）。
 
 停止条件：任何报错；第 1 步待审核的轨迹超过一半（教师在这批数据上明显不行，先停下看）。
-报告（写进"T37 结果"）：batch_summary_1104.csv 全文；scene_stats 的合计（和 0921 并排）；online_vs_teacher；
-review_candidates.csv 和关键帧总数；split.txt 的表和合计；每步耗时、显存、磁盘。
+报告（写进"T37 结果"）：缓冲场景的转换和预览；batch_summary_1104.csv 全文；scene_stats 的合计和按 bag 的表（和 0921 并排）；
+online_vs_teacher；第 4 步用的是哪两份做验证、为什么，秒数和运动的车的合计，空间重叠，跨 bag 的车；
+review_candidates.csv 和关键帧总数；每步耗时、显存、磁盘。
 ```
 
 ### T37 结果

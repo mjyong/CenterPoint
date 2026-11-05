@@ -88,7 +88,7 @@ Host orin
 | 频率 | MAXN。不跑 `jetson_clocks` 时节点慢 2–3 倍；重启就掉 | 同样要锁频才按 T31 的延迟算 | MAXN。建引擎前执行了 `jetson_clocks`，重启会掉 |
 | 引擎 | 在主机名 `ubuntu`、R36.4.4 上建的，打进了那个 deb | 不能拿编译机的引擎来用 | 在这台 `tegra-ubuntu`、R36.4.0、TensorRT 10.3.0 上建的，打进了 `0.1.0+313.g5b2b6bd` |
 
-8 号狗上现成的 deb **装不上去**，原因和做法在第 9 节末尾。连上时抽了一条 `/rte/rdap/rtk/inspvax`：`ins_status` 1，`pos_type` 52，纬度 40、经度 116。节点只收 `ins_status == 3` 的解，这一条会被丢掉；`pos_type` 不是 56 时只告警。仓库里的固定解是 56，不是调试狗上改过的 58。
+8 号狗上现成的 deb **装不上去**，原因和做法在第 9 节末尾。连上时抽了一条 `/rte/rdap/rtk/inspvax`：`ins_status` 1，`pos_type` 52，纬度 40、经度 116（没有解时的值，不是狗的位置；1104 证实狗在 0921 同一个厂区）。节点只收 `ins_status == 3` 的解，这一条会被丢掉；`pos_type` 不是 56 时只告警。仓库里的固定解是 56，不是调试狗上改过的 58。
 
 **同步**：`tools/deploy/sync_to_orin.sh`（2026-11-01 前在 `deploy/scripts/`）。
 - 拷代码；
