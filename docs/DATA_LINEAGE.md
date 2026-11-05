@@ -287,6 +287,7 @@ mindmap
 | `det_frame` | 转换器 | kygi 是 `{"auto_ground": true, "auto_level": true}`：检测系用近处地面在线修正高度和倾斜 |
 | `imu_axes` | 转换器 / `sequence_meta.py --fix-imu-axes` | `body`：`imu.npy` 的陀螺按机身系的轴存。没有这个字段的 kygi 老序列 x、y 是反的 |
 | `ins_azimuth_offset_deg` | 转换器 | 航向 = 这个值 − azimuth：180（双天线接反，0921）或 0（接正后） |
+| `ins_azimuth_offset_from` | 转换器 | 偏置怎么来的：`auto`（狗往前走，自动判断的）、`given`（`--azimuth-offset` 给的）、`default (the robot hardly moves)`（狗没动，用了 0921 的默认值，没核实）。没有这个字段的是 2026-11-05 之前转的 |
 | `ins_lever_arm` | 转换器 | 转换时已经从 INS 位置里扣掉的杠杆臂（机身系，m）。没有这个字段的老序列没扣过，`refine_poses.py` 会补上 |
 | `segment` | 转换器 / `split_check.py` | `name, t_start, t_end, split`；`split_check.py --apply` 会改 `split`，体检给的原值存在 `split_survey` |
 | `lidar_time_offset` | `sequence_meta.py`（可选） | 读取时加到所有雷达时间上的秒数，用来把雷达时钟对齐到 INS 时钟，默认 0 |

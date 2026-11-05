@@ -304,7 +304,7 @@ def main():
                     if t.wants_row(tm):
                         t.w().odom.append(odom_row(tm, R, [p.x, p.y, p.z], v))
 
-    az_off = None
+    az_off, az_from = None, None
     if kygi:
         rows = [np.asarray(t.writer.odom, np.float64).reshape(-1, 11) for t in targets if t.writer is not None]
         rows = np.concatenate(rows) if rows else np.zeros((0, 11))
@@ -313,6 +313,7 @@ def main():
             if fwd is None:     # a slow recording: walking > 0.15 m/s for at least 2 s (turning in place
                 fwd, how = forward_speed(rows, 0.15, min_rows=200), "> 0.15 m/s, less certain"  # moves the INS sideways)
             az_off = KYGI_AZIMUTH_OFFSET_DEG if fwd is None or fwd >= 0 else (KYGI_AZIMUTH_OFFSET_DEG + 180.0) % 360
+            az_from = "auto" if fwd is not None else "default (the robot hardly moves)"
             print("INS azimuth offset %.0f deg (%s; median forward speed %s m/s%s)" % (
                 az_off, "antennas swapped as on 0921" if az_off == 180 else "antennas fixed",
                 "-" if fwd is None else "%+.2f" % fwd, "" if fwd is None else " while moving " + how))
@@ -320,7 +321,7 @@ def main():
                 print("WARNING: the robot hardly moves; offset %.0f is the 0921 default. Pass --azimuth-offset as "
                       "decided on the other recordings of the same day" % az_off)
         else:
-            az_off = float(args.azimuth_offset)
+            az_off, az_from = float(args.azimuth_offset), "given"
         if args.ins_lever_arm is None:
             if args.lidar == "xt32":
                 args.ins_lever_arm = list(default_lever_arm(az_off))
@@ -356,6 +357,8 @@ def main():
             meta["det_frame"] = dict(auto_ground=True, auto_level=True)    # INS attitude is heading only
             meta["ins_lever_arm"] = [float(a) for a in args.ins_lever_arm]  # already applied to odom.npy
             meta["ins_azimuth_offset_deg"] = az_off                         # heading = offset - azimuth
+            # auto: the robot walks forwards with it; given: --azimuth-offset; default: not checked by this data
+            meta["ins_azimuth_offset_from"] = az_from
             meta["imu_axes"] = "body"                                        # gyro_from_kygi_imu
         h, info = median_base_height(t.heights)
         if h is not None:

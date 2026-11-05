@@ -466,6 +466,8 @@ ros2 topic echo --once /lidar_packets_loss
 
 点云约 32 MB/s，缓存加大到 256 MiB。这条会一直跑，录完在这个终端按 Ctrl-C。不要加 `/robot/topic/rdap/front_point_cloud2`。
 
+**开录以后先让狗往前直走 10–20 m**（速度 > 0.5 m/s，至少 5 s），再去做要录的事。转换器靠这一段判断天线接法（航向偏置 0 还是 180）。1104 的四份狗全程没动，就判断不了（SERVER_TASKS.md T36 复核）。整份都要狗站着不动的录制（比如狗站在路口看车），也在开头走这一段。
+
 ```bash
 mkdir -p /home/nvidia/bags
 ros2 bag record --max-cache-size 268435456 \

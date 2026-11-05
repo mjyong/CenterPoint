@@ -249,6 +249,7 @@ def test_sample_bag_shift_check_before_and_after(moving_seq, tmp_path):
     rd = SequenceReader(str(root / "refined"))
     assert rd.meta["pose_source"] == "kiss-icp+ins" and np.array_equal(np.load(root / "refined" / "odom_ins.npy"), odom0)
     assert rd.meta["ins_lever_arm"] == rd.meta["pose_refine"]["lever_arm"] == [-0.06, -0.54, 0.0]   # applied once
+    assert rd.meta["ins_azimuth_offset_deg"] == 180 and rd.meta["ins_azimuth_offset_from"] == "auto"  # it walks
     assert rd.meta["pose_refine"]["correction_max_m"] > 0.4                 # the braking at the end of the bag
     first = rd.odom.copy()
     refine_poses.refine(str(root / "refined"))                              # input stays odom_ins.npy
