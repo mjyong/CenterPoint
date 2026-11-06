@@ -547,3 +547,56 @@ def test_carry_review_to_a_fresh_export(tmp_path):
     assert "review" in by_id["15"]["obj_attr"] and "review" in by_id["16"]["obj_attr"]
     old_d = {a["obj_id"]: a for a in json.load(open(root / "label" / names[2]))}["4"]["psr"]["position"]["x"]
     assert by_id["14"]["psr"]["position"]["x"] == pytest.approx(old_d)
+
+
+def test_camera_calib_puts_the_scene_ground_below_the_camera():
+    pytest.importorskip("cv2")
+    from dog_perception.cameras import KYGI_FISHEYES, T_body_camera, undistort_pinhole_K
+    from dog_perception.geometry import inv_T, transform_points
+    from dog_perception.sustechpoints import LIDAR_HEIGHT, sustech_camera_calib
+
+    front, h = KYGI_FISHEYES["front"], 0.6                      # lidar 0.6 m above the ground
+    calib = sustech_camera_calib(front, base_height=h)
+    E = np.array(calib["extrinsic"]).reshape(4, 4)
+    K = np.array(calib["intrinsic"]).reshape(3, 3)
+    assert np.allclose(K, undistort_pinhole_K(front.intrinsics))
+    # a point on the ground 3 m ahead (body / det y is forward), as the scene stores it
+    det = np.array([[0.0, 3.0, 0.0]])
+    scene = det - [0.0, 0.0, LIDAR_HEIGHT]
+    cam = transform_points(E, scene)
+    want = transform_points(inv_T(T_body_camera(front)), det - [0.0, 0.0, h])
+    assert np.allclose(cam, want)
+    uv = (K @ cam[0])[:2] / cam[0, 2]
+    cam_above_ground = h + T_body_camera(front)[2, 3]
+    assert uv[1] - K[1, 2] == pytest.approx(K[1, 1] * cam_above_ground / cam[0, 2], rel=1e-3)
+    assert uv[1] - K[1, 2] > 20                                # well below the image centre row
+
+
+def test_camera_frames_are_matched_to_their_own_message():
+    av = pytest.importorskip("av")
+    if "libx264" not in av.codecs_available:
+        pytest.skip("PyAV without libx264")
+    from fractions import Fraction
+
+    from dog_perception.sustechpoints import _decode_h264_nearest
+
+    def encode(n, bframes):
+        enc = av.CodecContext.create("libx264", "w")
+        enc.width, enc.height, enc.pix_fmt, enc.time_base = 64, 48, "yuv420p", Fraction(1, 25)
+        enc.options = {"bf": str(bframes), "g": "25", "qp": "0"}      # lossless: grey = 8 * index
+        out = []
+        for i in range(n):
+            frame = av.VideoFrame.from_ndarray(np.full((48, 64, 3), 8 * i, np.uint8), format="bgr24")
+            frame.pts = i
+            out += [bytes(p) for p in enc.encode(frame)]
+        return out + [bytes(p) for p in enc.encode(None)]
+
+    for bframes in (0, 2):
+        msgs = [(0.04 * i, d) for i, d in enumerate(encode(30, bframes))]
+        got = _decode_h264_nearest(msgs, [0.04 * i + 0.01 for i in range(0, 30, 5)] + [5.0])
+        assert sorted(got) == [0.04 * i + 0.01 for i in range(0, 30, 5)]       # 5.0 s: no image that close
+        for s, img in got.items():
+            assert round(img.mean() / 8.0) == round((s - 0.01) / 0.04)        # the frame of that message
+        # a clip cut between key frames: the messages before the next key frame are skipped
+        late = _decode_h264_nearest(msgs[3:], [0.04 * 10, 0.04 * 26])
+        assert list(late) == [0.04 * 26] and round(late[0.04 * 26].mean() / 8.0) == 26

@@ -199,6 +199,9 @@ def main():
     cam.add_argument("--mcap", default=None,
                      help="one cameras.mcap for every --scenes entry (default: each scene's own file)")
     cam.add_argument("--jpeg-quality", type=int, default=85)
+    cam.add_argument("--focal", type=float, default=None,
+                     help="[px] focal of the undistorted view; default the fisheye's fx (509: 124 x 113 deg, "
+                          "full resolution in the middle); 0: cv2 balance 0 (187: 158 deg, 2.7x smaller)")
     v = sub.add_parser("serve", help="start SUSTechPOINTS (works without TensorFlow)")
     v.add_argument("--app", default=VENDORED, help="SUSTechPOINTS checkout (default: the vendored copy)")
     v.add_argument("--host", default="127.0.0.1")
@@ -214,7 +217,7 @@ def main():
             if not os.path.isfile(mcap):
                 print("%s: no cameras.mcap at %s" % (scene, mcap))
                 continue
-            written = export_cameras(scene_dir, mcap, jpeg_quality=args.jpeg_quality)
+            written = export_cameras(scene_dir, mcap, jpeg_quality=args.jpeg_quality, focal=args.focal)
             print("%s: %s <- %s" % (scene, ", ".join("%s=%d" % kv for kv in written.items()) or "nothing", mcap))
     elif args.cmd in ("candidates", "detections"):
         candidates(args)

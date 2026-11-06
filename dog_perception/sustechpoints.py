@@ -842,19 +842,23 @@ def propagate_keyframes(full, keyed, max_gap=1.0, link_dist=2.0, classes=None):
 _CAM_ORDER = ("front", "left", "right", "rear")
 
 
-def sustech_camera_calib(mount, z_offset=-LIDAR_HEIGHT, K=None):
+def sustech_camera_calib(mount, z_offset=-LIDAR_HEIGHT, K=None, base_height=0.0):
     """Pinhole calib dict for SUSTechPOINTS (level mount; images are fisheye-undistorted).
 
     Points / boxes in the scene are in the detection frame shifted by ``z_offset`` (export writes
-    ``-LIDAR_HEIGHT``). ``extrinsic`` maps those points into the camera optical frame. ``K`` defaults
-    to the pinhole matrix after the default H190XA undistort (same as the written JPEGs); rotations
-    are not factory-calibrated, so overlays are still a guide.
+    ``-LIDAR_HEIGHT``). The detection frame has its origin on the ground below the body origin (the
+    lidar), which is ``base_height`` above it (the sequence's meta.json), and the body's roll / pitch
+    removed; the body is taken as level here. ``extrinsic`` maps scene points into the camera
+    optical frame. ``K`` is the pinhole matrix of the written JPEGs (``export_cameras`` passes it);
+    None takes cv2's balance-0 matrix of the H190XA. Rotations are not calibrated, so overlays are
+    still a guide.
     """
     from .cameras import T_body_camera, undistort_pinhole_K
     from .geometry import inv_T, make_T
 
     T_cam_body = inv_T(T_body_camera(mount))
-    T_body_scene = make_T(t=[0.0, 0.0, -z_offset])   # scene -> body (undo the export shift)
+    # scene -> det (undo the export shift) -> body (origin base_height above the det origin)
+    T_body_scene = make_T(t=[0.0, 0.0, -z_offset - base_height])
     T_cam_scene = T_cam_body @ T_body_scene
     if K is None:
         K = undistort_pinhole_K(mount.intrinsics)
@@ -865,36 +869,55 @@ def sustech_camera_calib(mount, z_offset=-LIDAR_HEIGHT, K=None):
     }
 
 
-def _decode_h264_nearest(packets, stamps):
-    """Decode foxglove H.264 annex-B packets with PyAV; for each stamp return the nearest frame (BGR).
+def _decode_h264_nearest(packets, stamps, max_dt=0.25):
+    """Decode foxglove H.264 annex-B messages with PyAV; for each stamp return the frame (BGR) of the
+    message nearest in time, or nothing when none is within ``max_dt`` seconds.
 
-    ``packets``: list of (t, bytes). ``stamps``: iterable of floats. Returns {stamp: ndarray}.
+    ``packets``: list of (t, bytes) in the recorded order, one frame per message (as foxglove
+    CompressedVideo requires). ``stamps``: iterable of floats. Returns {stamp: ndarray}.
+
+    Each message goes to the decoder as its own packet with its index as pts, and a decoded frame is
+    matched to its message by that pts. The decoder (and an H.264 parser in front of it) holds frames
+    back, so tagging a frame with the message that was just fed in pairs it with a later stamp (one
+    frame, 40 ms at 25 Hz, with or without B-frames), and a clip cut between key frames made the
+    parser path fail. Messages before the first key frame are skipped. Only the frames asked for are
+    converted to BGR.
     """
     import av
 
-    want = sorted(float(s) for s in stamps)
+    want = sorted(set(float(s) for s in stamps))
     if not packets or not want:
         return {}
-    codec = av.CodecContext.create("h264", "r")
-    decoded = []  # (t, bgr)
-    for t, data in packets:
-        for packet in codec.parse(data):
-            for frame in codec.decode(packet):
-                decoded.append((t, frame.to_ndarray(format="bgr24")))
-    for frame in codec.decode(None):
-        if decoded:
-            decoded.append((decoded[-1][0], frame.to_ndarray(format="bgr24")))
-        else:
-            decoded.append((want[0], frame.to_ndarray(format="bgr24")))
-    if not decoded:
-        return {}
-    ts = np.array([t for t, _ in decoded], np.float64)
-    out = {}
+    ts = np.array([t for t, _ in packets], np.float64)
+    need = {}                                   # message index -> stamps it answers
     for s in want:
         i = int(np.argmin(np.abs(ts - s)))
-        if abs(ts[i] - s) > 0.25:          # >250 ms: no usable image for this lidar frame
+        if abs(ts[i] - s) <= max_dt:
+            need.setdefault(i, []).append(s)
+    if not need:
+        return {}
+    last, n_need = max(need), sum(len(v) for v in need.values())
+    codec = av.CodecContext.create("h264", "r")
+    out = {}
+
+    def take(frames):
+        for frame in frames:
+            if frame.pts in need:
+                img = frame.to_ndarray(format="bgr24")
+                for s in need[frame.pts]:
+                    out[s] = img
+
+    for i, (_, data) in enumerate(packets):
+        packet = av.Packet(data)
+        packet.pts = packet.dts = i
+        try:
+            take(codec.decode(packet))
+        except av.error.InvalidDataError:       # before the first key frame of the clip
             continue
-        out[s] = decoded[i][1]
+        if len(out) == n_need or i > last + 16:     # past the last frame asked for, plus decoder delay
+            break
+    else:
+        take(codec.decode(None))
     return out
 
 
@@ -925,12 +948,18 @@ def _read_compressed_video_mcap(path):
     return {k: v for k, v in by_cam.items() if v}
 
 
-def export_cameras(scene_dir, cameras_mcap, jpeg_quality=85, undistort=True, balance=0.0):
+def export_cameras(scene_dir, cameras_mcap, jpeg_quality=85, undistort=True, balance=0.0, focal=None,
+                   base_height=None):
     """Write ``camera/<name>/<frame>.jpg`` and ``calib/camera/<name>.json`` for an exported scene.
 
     Frame names come from ``dog_meta.json`` (same as the lidar files). Needs PyAV (``av``) to decode
     foxglove CompressedVideo H.264. With ``undistort`` (default), JPEGs are rectified with the
-    shared H190XA fisheye model so SUSTechPOINTS can show a pinhole view. Returns
+    shared H190XA fisheye model so SUSTechPOINTS can show a pinhole view: ``focal`` [px] is the
+    pinhole focal length, by default the fisheye's own ``fx`` (509 px: 124 x 113 deg, the middle of
+    the image at full resolution); 0 takes cv2's ``balance`` instead (187 px at balance 0: 158 deg
+    wide, the middle shrunk 2.7 times, far vehicles a few pixels in the tool). ``base_height`` (lidar
+    above the ground) defaults to the one in the sequence's meta.json next to ``cameras_mcap``.
+    Only ``camera/`` and ``calib/`` are written; the labels are not touched. Returns
     {camera_name: n_images_written}.
     """
     import cv2
@@ -945,6 +974,12 @@ def export_cameras(scene_dir, cameras_mcap, jpeg_quality=85, undistort=True, bal
         return {}
     stamps = [t for _, t in frames]
     z_offset = float(meta.get("z_offset", -LIDAR_HEIGHT))
+    if base_height is None:
+        seq_meta = os.path.join(os.path.dirname(os.path.abspath(cameras_mcap)), "meta.json")
+        if not os.path.isfile(seq_meta):
+            raise FileNotFoundError("base_height: no %s (pass base_height)" % seq_meta)
+        with open(seq_meta) as fh:
+            base_height = float(json.load(fh)["base_height"])
 
     streams = _read_compressed_video_mcap(cameras_mcap)
     written = {}
@@ -956,7 +991,12 @@ def export_cameras(scene_dir, cameras_mcap, jpeg_quality=85, undistort=True, bal
         cam_dir = os.path.join(scene_dir, "camera", cam)
         os.makedirs(cam_dir, exist_ok=True)
         mount = KYGI_FISHEYES.get(cam)
-        maps = fisheye_undistort_maps(mount.intrinsics, balance=balance) if (undistort and mount) else None
+        maps = None
+        if undistort and mount:
+            f = mount.intrinsics.fx if focal is None else float(focal)
+            Kpin = None if f == 0 else np.array([[f, 0.0, mount.intrinsics.cx], [0.0, f, mount.intrinsics.cy],
+                                                 [0.0, 0.0, 1.0]])
+            maps = fisheye_undistort_maps(mount.intrinsics, balance=balance, Knew=Kpin)
         Knew = maps[2] if maps else (mount.intrinsics.K if mount else None)
         keep = set()
         n = 0
@@ -977,6 +1017,6 @@ def export_cameras(scene_dir, cameras_mcap, jpeg_quality=85, undistort=True, bal
             calib_dir = os.path.join(scene_dir, "calib", "camera")
             os.makedirs(calib_dir, exist_ok=True)
             with open(os.path.join(calib_dir, cam + ".json"), "w") as fh:
-                json.dump(sustech_camera_calib(mount, z_offset=z_offset, K=Knew), fh)
+                json.dump(sustech_camera_calib(mount, z_offset=z_offset, K=Knew, base_height=base_height), fh)
         written[cam] = n
     return written
