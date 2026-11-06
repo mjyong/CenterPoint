@@ -37,6 +37,7 @@ be changed together with the converter (`tools/dog/sustechpoints_convert.py`).
 | 2026-11-06 | `public/js/config.js`, `public/js/lidar.js` | default mono brighter (`point_brightness` 1.0, `point_size` 1.5); older sweeps at 65 % instead of 30 % |
 | 2026-11-06 | `public/js/image.js`, `public/css/main.css`, `scene_reader.py`, `public/js/editor.js` | camera strip: default front only (top-right, small); left/right open only when the selected box projects into that camera; folders ordered front/left/right/rear |
 | 2026-11-06 | `public/js/image.js`, `public/js/editor.js` | redraw image panes when camera JPEGs finish loading (preload does not wait for cameras, so the first paint used to hide an empty pane) |
+| 2026-11-06 | `public/js/image.js` | right camera pane opens at bottom-right instead of mid-right |
 
 Mark further changes in this table and in the changed file (GPL-3.0 section 5a asks for a notice with
 the date).

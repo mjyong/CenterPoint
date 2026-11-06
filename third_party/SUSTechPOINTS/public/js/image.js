@@ -970,14 +970,21 @@ class ImageContextManager {
     }
 
     layoutReviewCamera(image, slot){
-        // slot: "front" | "left" | "right" — thin strip on the far right, stacked top→down.
+        // slot: "front" | "left" | "right" — front/left top-right; right at bottom-right (less lidar blocked).
+        // 2026-11-06
         const ui = image.ui;
         ui.classList.add("image-wrapper-grid");
         ui.style.width = "22%";
         ui.style.height = "18%";
         ui.style.left = "77%";
-        const top = {front: "2%", left: "21%", right: "40%"};
-        ui.style.top = top[slot] || "2%";
+        if (slot === "right"){
+            ui.style.top = "auto";
+            ui.style.bottom = "2%";
+        } else {
+            ui.style.bottom = "auto";
+            const top = {front: "2%", left: "21%"};
+            ui.style.top = top[slot] || "2%";
+        }
     }
 
     boxVisibleInCamera(box, camName){
