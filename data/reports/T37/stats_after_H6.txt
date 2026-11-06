@@ -1,7 +1,7 @@
 scene split frames boxes review
 1104_cp01_s000 train 62 68 0
 1104_cp01_s001 train 62 87 0
-1104_cp01_s002 train 62 58 2
+1104_cp01_s002 train 62 58 0
 1104_cp01_s003 train 62 76 0
 1104_cp02_s000 val 57 95 0
 1104_cp02_s001 val 57 80 0
@@ -12,7 +12,7 @@ scene split frames boxes review
 1104_cp03_s000 train 61 59 0
 1104_cp03_s001 train 61 157 0
 1104_cp03_s002 train 61 117 0
-1104_cp03_s004 train 61 81 3
+1104_cp03_s004 train 61 81 0
 1104_cp03_s005 train 61 51 0
 1104_cp03_s008 train 61 56 0
 1104_cp03_s009 train 61 44 0
@@ -20,8 +20,8 @@ scene split frames boxes review
 1104_cp03_s011 train 61 82 2
 1104_cp03_s012 train 61 12 0
 1104_cp03_s013 train 61 25 0
-1104_cp03_s014 train 61 28 1
-1104_cp03_s015 train 61 55 10
+1104_cp03_s014 train 61 28 0
+1104_cp03_s015 train 61 55 2
 1104_cp03_s016 train 61 64 0
 1104_cp04_s000 val 62 58 0
 1104_cp04_s001 val 62 0 0
@@ -31,5 +31,5 @@ scene split frames boxes review
 1104_cp04_s005 val 61 31 2
 1104_cp04_s006 val 62 123 0
 1104_cp04_s007 val 62 121 2
-total train: 1102 frames, 1203 boxes, 18 marked review
+total train: 1102 frames, 1203 boxes, 4 marked review
 total val: 838 frames, 1382 boxes, 4 marked review
