@@ -141,14 +141,15 @@
 | T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 完成，已复核。CycloneDDS 域 0、只绑 eth1、共享内存、socket 10 MB，节点 root。我们的话题各 1 个发布者、0 个订阅，TF 里没有 camera_init。deb `0.1.0+316.gdbde7ed`。室内 clouds 598 / skipped 0 / frames 0。和编译机比过门槛（匹配 0.998）。不锁频 total 中位 58.6 ms，锁频 37.1 ms（服务也在占 GPU），测完恢复未锁。录 64 s 点云 640 条，丢包计数没涨。nvidia 的 bridge 10 秒只收到 10 帧点云。复核：慢的原因是机器人自己的负载（load 32），不是我们的服务；不锁频 p99 99 ms 贴着帧间隔；nvidia 用户拿到的数据不全（root 的共享内存），撞车检查和 bridge 要用 root 再看；SENSORS 7.2 的雷达检查改成录 12 秒数条数 |
 | T35 | 8 号狗出门实跑：A 段室内（root 视角撞车、root 起 bridge、负载和 GPU）；B 段室外有固定解（在线每秒的帧数和延迟、天线接法、录包和离线回放对比、Foxglove） | Agent + 人（带狗出门） | T34 复核 | 1.5 小时 | 待做 |
 | T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 完成，已复核（2026-11-05；续：偏置 0 重转，31 场景两遍预览全 OK、位姿基本不用修，时间差跳过。人补了现场：三叉路口，车很多、基本在动） |
-| T37 | 1104：转出 4 个缓冲场景；双教师推理和自动标注、上线模型对教师、每个场景的统计；按 bag 划分（两份验证、两份训练，人定）；挑场景、带四路相机的审核材料 | Agent | T36 续 | 3 小时 | 完成（2026-11-05/06） |
-| H6 | 审 1104 挑出的场景（SUSTechPOINTS 逐框，只审车；Foxglove 里对照四路相机），定划分 | 人 | T37 | 1–2 天 | 待做 |
-| T38 | 导回 H6，和 0921 合并，写入划分，导出 v3 数据集 | Agent | H6 | 1 小时 | 计划 |
+| T37 | 1104：转出 4 个缓冲场景；双教师推理和自动标注、上线模型对教师、每个场景的统计；按 bag 划分（两份验证、两份训练，人定）；挑场景、带四路相机的审核材料 | Agent | T36 续 | 3 小时 | 完成，已复核（2026-11-06）：30 m 内运动的车 103 条（0921 是 29）；验证 cp02 + cp04；待审 32 个场景、1,940 个关键帧；没接进 SUSTechPOINTS，补在 T37 续 |
+| T37 续 | 1104 的 32 个场景接进 SUSTechPOINTS，备份审核前的标注，重新起服务 | Agent | T37 | 10 分钟 | 待做 |
+| H6 | 审 1104 挑出的场景：验证 14 个逐框、训练 18 个看红框（SUSTechPOINTS，只审车；Foxglove 里对照四路相机） | 人 | T37 续 | 1 天 | 待做 |
+| T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 任务已写好 |
 | T39 | 训练 v3（Pillar、Voxel），在新验证集上和 nuScenes Pillar 比，定上线模型和上报阈值 | Agent，人定 | T38 | 半天 | 计划 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T35（A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频、天线配置；
-  - 数据：T36（停在转换，已复核）→ T36 续 → T37 → H6（人审）→ T38 → T39。1104 全是静止的狗，值不值得审看 T37 的 scene_stats；
+  - 数据：T36 → T36 续 → T37（已复核，值得审：30 m 内运动的车 103 条）→ T37 续 → H6（人审）→ T38 → T39；
   - 1104 只有一个晚上，测试集等下一批（另一天、另一片区域，DATA_COLLECTION_PLAN 3.5）。
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
 - H1 完成后（2026-10-23）的顺序：T5 → T6（训练 v1，同时跑基线）→ T7（对比、选模型）→ T8（部署）。导出数据集的任务（T5、以后的重导）不要和读这个数据集的训练、评估同时跑，除非导到新目录（通用约定 3）。
@@ -6932,3 +6933,198 @@ review_candidates.csv 和关键帧总数；每步耗时、显存、磁盘。
 **第 5–6 步挑场景与审核材料**：`review_candidates.csv` 32 个场景（验证 14 个全要 + 训练 18 个），关键帧 838+1102=1940（≤2000）。SUSTechPOINTS 在 `/public/zjst/robot/centerpoint_data/sustech_1104/`（不提交）；验证集候选红框合计 7 框 / 3 物体。示例 review mcap：`data/examples/runs/1104_cp03_s001/`（车最多，220 MB，路灯下看相机）。
 
 **耗时**：缓冲转换约 1 min；双教师首轮约 40 min（后半 OOM）+ Voxel 补约 28 min + 等 GPU + Pillar 补约 24 min；上线约 16 min；统计/划分/审核材料约 10 min。磁盘：`data/runs/1104_*` 约 18 GB+（公共盘）。
+
+### T37 复核（2026-11-06）
+
+- **结果可用，1104 值得审。**
+  - 30 m 内运动的车：1104 有 103 条，0921 只有 29 条；15 m 内 56 对 11。
+  - 新的验证集（0921 的 10 个场景 + 1104 的 14 个）：
+    - 30 m 内运动的车 65 条（0921 15 + 1104 50），达到 DATA_COLLECTION_PLAN 3.5 的 ≥ 50；15 m 内 29 条；
+    - 有车的场景 21 个（8 + 13），还没到 ≥ 30，等下一批（另一天、另一片区域）。
+  - 唯一缺的一步：没把 `sustech_1104/` 接进 SUSTechPOINTS，也没重新起服务。补在下面的 T37 续，几分钟的事，之后就可以开始 H6。
+- **待审 41.4% 主要来自骑车的，不是车。**
+  - 按类别数 `labels.pkl` 里的待审轨迹：车 42 / 140（30%），骑车 59 / 73，行人 9 / 53。
+  - 只检车的模型只审车，停止条件按车算也没到一半。
+  - 骑车的待审多，大概是晚上厂区里的电动车。以后做行人、骑车时再看。
+- **bus = 0 是设计如此，不是漏了。**
+  - `dog_perception/detection/boxes.py` 的 `NUSC_TO_SUBCLASS` 把教师的 bus、trailer 都归到 truck（0921 上 nuScenes 的 bus 头总落在长货车上）；
+  - 只检车的模型又按尺寸分 car / truck 两个头（长 ≥ 5.5 m 或高 ≥ 2.5 m 是 truck）。
+  - 1104 里路过的客车，标签上是 truck，训练进 truck 头，这是对的。H6 里不用改类型。
+- **划分**：用默认的 cp02 + cp04 做验证，运动的车占 48.5%，在 25–60% 之间，可以。
+  - 四份 bag 机位只差 0.43 m，验证和训练是同一个路口、同一个视角。
+  - 本地查了自动标注，40 m 内的车框：
+    - 训练的 18 个场景 5,380 个，在动的 5,243 个（97%）；
+    - 验证的 14 个场景 6,065 个，在动的 4,451 个（73%）。
+  - 训练里几乎没有停着的车，所以"同一辆停着的车两边都有"的问题很小。
+  - 两边真正共享的是背景：路口的楼、杆子、路沿。训练里这些都当负样本学过，所以 1104 验证上的误检会偏少，偏乐观。
+  - T39 要分开报 0921 验证和 1104 验证。1104 上主要看两样：30 m 内的 AP@2.0；运动的车被检出了多少（compare_detectors 的 moving labels / matched 那张表）。1104 上的误检和假轨迹不代表别处。
+  - 跨 bag：cp03 末尾有 4 条轨迹，cp04 开头有 5 条。两份中间隔 1 分钟，按 1 m/s 算，一辆在动的车这段时间也开出了 60 m。能两边都出现的只会是停着的车或很慢的车，而训练里停着的车本来就很少，影响小。
+- **online_vs_teacher**：较低的 3 个场景里，2 个在验证集（cp04_s006 0.664、cp04_s000 0.770），1 个在训练集（cp03_s001 0.735，已挑上）。
+  - 这是对着没审的教师标签算的，不知道是谁的错。H6 里这 3 个场景看仔细些，T39 在审过的标签上重算。
+- **审核量**：
+  - 验证 14 个场景：838 个关键帧、1,392 框（红 156），每个框都看；
+  - 训练 18 个场景：1,102 个关键帧、1,275 框（红 266），看红框和漏掉的车；
+  - 验证候选红框 7 框 / 3 个物体，都是只有 Pillar 检出的。
+  - H3 开始时红框是 780 个，这次合计 422 个，但验证要逐框看。估计 1 天。
+- **没挑上的 3 个训练场景**：`1104_cp03_s003`（2 条车轨迹，1 条待审）、`s006`、`s007`（没有车），合计 91 s，30 m 内都没有运动的车。没人审过，T38 里改成 drop，不进 v3。
+- 示例 review mcap 是 LFS 文件（220 MB）。本地要看的话：`git lfs pull --include "data/examples/runs/1104_cp03_s001/*"`。
+
+---
+
+## T37 续 1104 的场景接进 SUSTechPOINTS（H6 之前）
+
+```text
+任务 T37 续：把 sustech_1104/ 的 32 个场景接进 SUSTechPOINTS，备份审核前的标注，重新起服务，给 H6 用。
+先按通用约定做。前置：T37。仓库根目录，export PYTHONPATH=.。
+NEW=/public/zjst/robot/centerpoint_data/sustech_1104; BK=/public/zjst/robot/centerpoint_data/sustech_backup
+0921 的 35 个场景不动（third_party/SUSTechPOINTS/data/0921_* 仍指向 sustech_dual/，H3 的结果在里面）。
+
+1. 记下正在跑的 serve 命令，然后停掉：
+     ps aux | grep "sustechpoints_convert.py serve" | grep -v grep
+2. 接进去：
+     R1104=$(ls -d $NEW/1104_* | xargs -n1 basename); echo $R1104 | wc -w          （应为 32）
+     for r in $R1104; do ln -sfn $NEW/$r third_party/SUSTechPOINTS/data/$r; done
+     ls third_party/SUSTechPOINTS/data | grep -c '^1104_'                             （应为 32）
+3. 备份审核前的标注（照 T11 第 2 步）：
+     mkdir -p $BK; tar -C $NEW -cf $BK/H6_before.tar $(for r in $R1104; do echo $r/label $r/dog_meta.json $r/dog_info; done)
+4. 统计：python tools/dog/sustechpoints_convert.py stats --root $NEW | tail -2 | tee data/reports/T37/stats_before_H6.txt
+   应和 T37 的 sustech_stats.txt 一样：验证 838 帧、1392 框、156 红；训练 1102 帧、1275 框、266 红。不一样就停下报告。
+5. 用第 1 步记下的命令重新起（后台，日志写到 data/reports/T37/serve.log），浏览器打开，看列表里有 1104 的场景。
+
+停止条件：任何报错；第 2 步不是 32；第 4 步对不上。
+提交：data/reports/T37/stats_before_H6.txt、本文档（不提交 serve.log、tar）。
+报告（写进"T37 续 结果"）：SUSTechPOINTS 地址；第 4 步两行；备份文件的大小。
+```
+
+---
+
+## H6 审 1104 挑出的场景（人做）
+
+T37 续之后。在 SUSTechPOINTS 里审 1104 的 32 个场景（先验证集 14 个，再训练集 18 个），浏览器重新打开页面（Ctrl+F5）。
+
+- 列表里也有 0921 的 35 个场景，H3 已审完，不用动，只选 `1104_` 开头的。
+- **只审车辆**，行人、骑车的不审。
+- 划分已定（2026-11-05）：验证 cp02 + cp04，训练 cp01 + cp03。
+
+**先看相机**（10 分钟）：Foxglove 打开 `data/examples/runs/1104_cp03_s001/1104_cp03_s001_review.mcap`（本地先 `git lfs pull`；服务器上每个场景都有 `data/labels/<场景>/<场景>_review.mcap`）。
+
+- 看路灯下四路相机能不能认出是不是车、是不是叉车。
+- 能认出的话，审核时拿不准就对照相机；认不出就只看点云。结论记到下面"H6 结果"。
+
+**验证集（cp02、cp04 的 14 个场景）：每个关键帧的每个框都看**，不只是红框。
+
+- 验证标签决定以后选哪个模型，漏一辆车、多一个假框，都直接算进 AP。
+- 逐帧检查三件事：
+  - 是不是车；
+  - 框偏出车 0.5 m 以上就调；
+  - 有没有车没框（翻帧时留意 30 m 以内）。
+- 红框里有 7 个是候选：两个教师在关键帧上检出、又和已有标注对不上（都只有 Pillar 检出）。和别的红框一样判。
+
+**训练集（cp01、cp03 的 18 个场景）**：只看红框，加上翻帧时看到的漏掉的车（同 H3）。
+
+| 看到的 | 操作 |
+|---|---|
+| 是车（含停着的、挂车厢、客车） | 右键 → 确认（整条轨迹）。框明显歪了（偏出车 0.5 m 以上）就调一下 |
+| 叉车 | 右键 → 看不清（作忽略框）。叉车不要求检出（2026-10-26），不要确认成车 |
+| 不是车（墙角、集装箱、货堆、岗亭、路灯杆……） | 右键 → Delete this object (in all frames)。**删，不要标忽略** |
+| 看不清（点太少、只看到一角） | 右键 → 看不清（作忽略框） |
+| 同一个 ID 有几帧是车、有几帧不是 | 按 `v` 进批量窗口逐帧看，不是车的那几帧单独删 |
+
+- **漏掉的车**：按住 Ctrl 拖矩形框进去，自动出框（两个教师的模型框），检查后类别选 Car 或 Truck。
+  - 类型只影响记录，只检车的模型按尺寸分 car / truck。客车不用改成 Bus，教师给的 Truck 留着就行。
+- **多看这 3 个场景**：`1104_cp04_s006`、`1104_cp04_s000`、`1104_cp03_s001`，上线模型和教师差得最多（T37 第 2 步）。
+- **狗正后方**约 76° 的扇区没有点（机身系方位角 |θ| > 142°，SENSORS.md）。车开进、开出这个扇区时只剩半边点，是车就确认，别删。
+- **收尾**：审完还红着的框改成"看不清"。T38 导回时，红框超过 20 个会停下来问。
+
+做完把状态表的 H6 改成"完成"，在下面"H6 结果"里写：审核人、日期；确认、删除、改忽略、补画的大致数量；相机够不够用；遇到的拿不准的东西（像 0921 的叉车那样，以后可以定一条规则）。
+
+### H6 结果
+
+（人填）
+
+---
+
+## T38 导回 H6，和 0921 合并，导出 v3 数据集
+
+```text
+任务 T38：导回 H6 在 sustech_1104/ 里的审核结果；训练场景把关键帧传播到每一帧，再补停着的车的空档；叉车的尺寸规则兜底；
+1104 的划分写进 meta.json；0921 + 1104 一起导出 v3 数据集（新目录）；统计新验证集。
+先按通用约定做。前置：H6 完成。仓库根目录，export PYTHONPATH=.。
+SPLIT=data/survey/split_0921_1104/split.csv; NEW=/public/zjst/robot/centerpoint_data/sustech_1104
+BK=/public/zjst/robot/centerpoint_data/sustech_backup; R1104=$(ls -d $NEW/1104_* | xargs -n1 basename)
+1104 的新文件和 0921 现在用的同名（labels_sustech2.pkl、labels_full2.pkl、labels_train2.pkl），按 {scene} 找标签的脚本两批通用。
+0921 的标签不动。
+
+0. mkdir -p data/reports/T38；pytest tests/dog -m "not slow" -n 8 | tail -1。
+   停掉 SUSTechPOINTS（审完了，免得导回时还有人在改），备份：
+     tar -C $NEW -cf $BK/H6_after.tar $(for r in $R1104; do echo $r/label $r/dog_meta.json $r/dog_info; done)
+   没审的 3 个训练场景（T37 复核）改成 drop：
+     awk -F, -v OFS=, '$1=="1104_cp03_s003"||$1=="1104_cp03_s006"||$1=="1104_cp03_s007" {$2="drop"; $3="1104 train clip, not reviewed"} 1' \
+         $SPLIT > $SPLIT.tmp && mv $SPLIT.tmp $SPLIT
+     awk -F, 'NR>1 {print substr($1,1,4), $2}' $SPLIT | sort | uniq -c        （0921 train 25 / val 10；1104 train 18 / val 14 / drop 3）
+1. 32 个场景导回（照 T17 第 1 步）：
+     for r in $R1104; do
+       echo "== $r"
+       python tools/dog/sustechpoints_convert.py import --scene-dir $NEW/$r --frames data/runs/$r/frames \
+           --out data/labels/$r/labels_sustech2.pkl
+     done 2>&1 | tee data/reports/T38/import.txt
+   每个场景的帧数要和 data/reports/T37/sustech_stats.txt 一样。"still marked review" 合计超过 20 个框就停下问人（H6 没审完）。
+2. 训练场景（18 个）：关键帧传播到每一帧，再补停着的车的空档（照 T17 第 2 步，--full 用 T37 的双教师自动标注）：
+     T1104=$(awk -F, 'NR>1 && $2=="train" && $1 ~ /^1104_/ {print $1}' $SPLIT); echo $T1104 | wc -w   （应为 18）
+     for r in $T1104; do
+       echo "== $r"
+       python tools/dog/sustechpoints_convert.py propagate --full data/labels/$r/labels.pkl \
+           --keyframes data/labels/$r/labels_sustech2.pkl --out data/labels/$r/labels_full2.pkl
+       python tools/dog/merge_labels.py --reviewed data/labels/$r/labels_full2.pkl --frames data/runs/$r/frames \
+           --out data/labels/$r/labels_train2.pkl
+     done 2>&1 | tee data/reports/T38/propagate.txt
+   某个场景留下的帧少于 90% 就停下报告（pose_bad 的帧不算在分母里，同 T17 的 s024）。
+3. 叉车兜底（2026-10-26 的规则，和 0921 一样；H6 里人已经手工改过的不会再列出来）：
+     python tools/dog/ignore_tracks.py --scenes $R1104 --keyframes "data/labels/{scene}/labels_sustech2.pkl" \
+         --also "data/labels/{scene}/labels_full2.pkl" "data/labels/{scene}/labels_train2.pkl" \
+         --length 2.3 3.6 --width 1.3 1.85 --height 1.95 2.6 --reason forklift --dry-run | tee data/reports/T38/forklift_dryrun.txt
+   列出的轨迹里，有标 moving、位置离狗 30 m 内的，就停下报告：路口上在动的这种尺寸的车，可能是三轮货车，要人看一眼。
+   否则去掉 --dry-run 再跑一遍，输出写到 data/reports/T38/forklift.txt。没列出轨迹就跳过。
+4. 1104 的划分写进 meta.json（segment.split；原来的值留在 segment.split_survey，同 split_check.py --apply）。
+   下面的 Python 从行首开始写，整段复制：
+python - $SPLIT <<'EOF'
+import csv, json, os, sys
+for r in csv.DictReader(open(sys.argv[1])):
+    p = os.path.join("data/seq", r["name"], "meta.json")
+    if not r["name"].startswith("1104_"):
+        continue
+    meta = json.load(open(p))
+    seg = meta.setdefault("segment", dict(name=r["name"]))
+    seg.setdefault("split_survey", seg.get("split", ""))
+    seg["split"] = r["split"]
+    json.dump(meta, open(p + ".tmp", "w"), indent=2)
+    os.replace(p + ".tmp", p)
+    print(r["name"], seg["split_survey"], "->", seg["split"])
+EOF
+5. 导出 v3 到新目录（照 T17 第 3 步）：验证场景用 labels_sustech2.pkl，训练场景用 labels_train2.pkl，0921 和 1104 一样：
+     VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT); TRAIN=$(awk -F, 'NR>1 && $2=="train" {print $1}' $SPLIT)
+     echo $VAL | wc -w; echo $TRAIN | wc -w                                     （24、43）
+     REC=$(for r in $VAL; do echo --recording data/runs/$r data/labels/$r/labels_sustech2.pkl; done
+           for r in $TRAIN; do echo --recording data/runs/$r data/labels/$r/labels_train2.pkl; done)
+     NEWDS=$(dirname $(readlink -f data/dog_veh))/dog_veh_$(date +%m%d_%H%M)
+     python tools/dog/export_dataset.py $REC --val-recordings $VAL --classes vehicle \
+         --out $NEWDS --gt-db --jobs 8 2>&1 | tee data/reports/T38/export.txt
+   换链接前确认没有训练、评估在读 data/dog_veh（ps aux | grep -E "train|eval|compare_detectors" | grep -v grep）。
+   GT 库是按路径读的，训练中途换链接会读到新目录。有就等它结束：
+     OLD=$(readlink -f data/dog_veh); ln -sfn $NEWDS data/dog_veh; echo "data/dog_veh: $OLD -> $NEWDS"
+   旧目录（v2）写进报告，先不删，T39 还要对照。
+6. 新验证集的统计（关键帧 2 Hz，--min-frames 2 就是 1 s）：
+     python tools/dog/scene_stats.py --labels $(for r in $VAL; do echo data/labels/$r/labels_sustech2.pkl; done) \
+         --min-frames 2 --out data/reports/T38/val_stats.csv | tee data/reports/T38/val_stats.txt
+   按批次（0921 / 1104）合计：场景数、有车的场景数、moving_30m、moving_15m。
+   1104 的 14 个验证场景再和 T37 的自动标注比一下：用同一条命令，标签换成 data/labels/$r/labels.pkl，--min-frames 10。
+
+停止条件：任何报错；第 0 步数量不对；第 1 步帧数对不上或红框超过 20；第 2 步某个场景少于 90%；第 3 步有在动的近处轨迹。
+提交：data/labels/1104_*/labels_sustech2.pkl（32 个）、labels_full2.pkl、labels_train2.pkl（18 个）、$SPLIT（3 个 drop）、
+data/reports/T38/、本文档。不提交 tar、data/seq、数据集目录。
+报告（写进"T38 结果"）：
+- import 的计数合计（车辆框、still marked review、moved or new），按验证 / 训练分开；
+- propagate 和补空档的合计；叉车（列出的轨迹、改了多少框）；
+- export 的 train / val 帧数，car / truck 正样本和忽略数，和 T17（v2）并排；新数据集目录和旧目录；
+- 第 6 步按批次的表，以及 1104 验证场景审前、审后的 moving_30m。
+```
