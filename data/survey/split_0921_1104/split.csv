@@ -47,11 +47,11 @@ name,split,reason
 1104_cp03_s000,train,1104 train clip
 1104_cp03_s001,train,1104 train clip
 1104_cp03_s002,train,1104 train clip
-1104_cp03_s003,train,1104 train clip
+1104_cp03_s003,drop,1104 train clip, not reviewed
 1104_cp03_s004,train,1104 train clip
 1104_cp03_s005,train,1104 train clip
-1104_cp03_s006,train,1104 train clip
-1104_cp03_s007,train,1104 train clip
+1104_cp03_s006,drop,1104 train clip, not reviewed
+1104_cp03_s007,drop,1104 train clip, not reviewed
 1104_cp03_s008,train,1104 train clip
 1104_cp03_s009,train,1104 train clip
 1104_cp03_s010,train,1104 train clip

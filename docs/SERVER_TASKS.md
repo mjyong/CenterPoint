@@ -7270,3 +7270,28 @@ data/reports/T38/、本文档。不提交 tar、data/seq、数据集目录。
 - export 的 train / val 帧数，car / truck 正样本和忽略数，和 T17（v2）并排；新数据集目录和旧目录；
 - 第 6 步按批次的表，以及 1104 验证场景审前、审后的 moving_30m。
 ```
+
+### T38 结果
+
+32 个场景导回帧数和 T37 `sustech_stats.txt` 一致（合计 1,940 关键帧）。车辆框 **2,646**，still marked review **8**（<22），moved or new **3**。按划分：验证 14 场景车辆框 1,382 / review 4 / moved 3；训练 18 场景车辆框 1,264 / review 4 / moved 0。`1104_cp01_s003` 从 H6_before 恢复 #5/#17/#18 共 61 个 ignore 框。3 个未审训练场景改成 drop。
+
+- propagate（18 个训练场景）：留下 **5,438 / 5,488** 帧（99.1%），最低也 ≥98%。keyframe boxes 1,264，interpolated boxes 4,772。补停着的车的空档：parked places **5**。
+- 叉车兜底：dry-run 无轨迹，跳过。
+- 导出到新目录 `/public/zjst/robot/centerpoint_data/dog_veh_1106_1811`（61G）。`data/dog_veh`：`/public/zjst/robot/centerpoint_data/dog_veh_1026_1410`（v2）→ 这个新目录（v3）。旧目录先不删，T39 对照用。train **12,670** / val **1,418** 帧。
+
+  | | train car | train truck | val car | val truck |
+  |---|---|---|---|---|
+  | v3（T38） | 14,382（+3,018 ignored） | 10,636（+1,973 ignored） | 811（+528 ignored） | 2,446（+160 ignored） |
+  | v2（T17） | 14,339（+2,893 ignored） | 5,073（+1,418 ignored） | 1,100（+217 ignored） | 1,091（+155 ignored） |
+
+  note：few points 1,056；no points 362；subclass disagrees 34。GT 库：car 14,382、truck 10,636。
+
+- 新验证集（关键帧，`--min-frames 2`）按批次：
+
+  | batch | scenes | with vehicle | moving_30m | moving_15m |
+  |---|---|---|---|---|
+  | 0921 | 10 | 9 | 21 | 8 |
+  | 1104 | 14 | 13 | 51 | 27 |
+  | total | 24 | 22 | 72 | 35 |
+
+- 1104 的 14 个验证场景，审前（`labels.pkl`，`--min-frames 10`）moving_30m **50**；审后（`labels_sustech2.pkl`，同参）moving_30m **31**。

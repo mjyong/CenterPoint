@@ -1,0 +1,54 @@
+== 1104_cp01_s000
+306 of 306 frames, {'other classes, copied as they are': 544, 'keyframe boxes': 68, 'interpolated boxes': 260, 'ignore: reviewed at one end': 17} -> data/labels/1104_cp01_s000/labels_full2.pkl
+data/labels/1104_cp01_s000/labels_full2.pkl -> data/labels/1104_cp01_s000/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp01_s001
+306 of 307 frames, {'other classes, copied as they are': 511, 'keyframe boxes': 87, 'interpolated boxes': 324, 'ignore: reviewed at one end': 30, 'frames left out (outside the keyframes)': 1} -> data/labels/1104_cp01_s001/labels_full2.pkl
+data/labels/1104_cp01_s001/labels_full2.pkl -> data/labels/1104_cp01_s001/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp01_s002
+306 of 306 frames, {'other classes, copied as they are': 90, 'keyframe boxes': 58, 'interpolated boxes': 220, 'ignore: reviewed at one end': 6} -> data/labels/1104_cp01_s002/labels_full2.pkl
+data/labels/1104_cp01_s002/labels_full2.pkl -> data/labels/1104_cp01_s002/labels_train2.pkl {'fill': {'parked places': 1, 'parked places split into several tracks': 0}}
+== 1104_cp01_s003
+306 of 306 frames, {'other classes, copied as they are': 650, 'keyframe boxes': 137, 'interpolated boxes': 516, 'ignore: reviewed at one end': 23} -> data/labels/1104_cp01_s003/labels_full2.pkl
+data/labels/1104_cp01_s003/labels_full2.pkl -> data/labels/1104_cp01_s003/labels_train2.pkl {'fill': {'parked places': 1, 'parked places split into several tracks': 0}}
+== 1104_cp03_s000
+301 of 305 frames, {'other classes, copied as they are': 469, 'keyframe boxes': 59, 'interpolated boxes': 228, 'ignore: reviewed at one end': 5, 'frames left out (outside the keyframes)': 4} -> data/labels/1104_cp03_s000/labels_full2.pkl
+data/labels/1104_cp03_s000/labels_full2.pkl -> data/labels/1104_cp03_s000/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s001
+301 of 304 frames, {'other classes, copied as they are': 869, 'keyframe boxes': 157, 'interpolated boxes': 596, 'ignore: reviewed at one end': 28, 'left out: removed by the reviewer': 4, 'frames left out (outside the keyframes)': 3} -> data/labels/1104_cp03_s001/labels_full2.pkl
+data/labels/1104_cp03_s001/labels_full2.pkl -> data/labels/1104_cp03_s001/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s002
+301 of 305 frames, {'other classes, copied as they are': 646, 'keyframe boxes': 117, 'interpolated boxes': 448, 'ignore: reviewed at one end': 15, 'frames left out (outside the keyframes)': 4} -> data/labels/1104_cp03_s002/labels_full2.pkl
+data/labels/1104_cp03_s002/labels_full2.pkl -> data/labels/1104_cp03_s002/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s004
+301 of 305 frames, {'other classes, copied as they are': 664, 'keyframe boxes': 81, 'interpolated boxes': 300, 'ignore: reviewed at one end': 21, 'left out: removed by the reviewer': 14, 'frames left out (outside the keyframes)': 4} -> data/labels/1104_cp03_s004/labels_full2.pkl
+data/labels/1104_cp03_s004/labels_full2.pkl -> data/labels/1104_cp03_s004/labels_train2.pkl {'fill': {'parked places': 2, 'parked places split into several tracks': 0}}
+== 1104_cp03_s005
+301 of 304 frames, {'other classes, copied as they are': 1127, 'keyframe boxes': 51, 'interpolated boxes': 196, 'ignore: reviewed at one end': 5, 'frames left out (outside the keyframes)': 3} -> data/labels/1104_cp03_s005/labels_full2.pkl
+data/labels/1104_cp03_s005/labels_full2.pkl -> data/labels/1104_cp03_s005/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s008
+301 of 304 frames, {'other classes, copied as they are': 912, 'keyframe boxes': 56, 'interpolated boxes': 216, 'ignore: reviewed at one end': 5, 'frames left out (outside the keyframes)': 3} -> data/labels/1104_cp03_s008/labels_full2.pkl
+data/labels/1104_cp03_s008/labels_full2.pkl -> data/labels/1104_cp03_s008/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s009
+301 of 305 frames, {'other classes, copied as they are': 712, 'keyframe boxes': 44, 'interpolated boxes': 172, 'ignore: reviewed at one end': 6, 'frames left out (outside the keyframes)': 4} -> data/labels/1104_cp03_s009/labels_full2.pkl
+data/labels/1104_cp03_s009/labels_full2.pkl -> data/labels/1104_cp03_s009/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s010
+301 of 304 frames, {'other classes, copied as they are': 586, 'keyframe boxes': 83, 'interpolated boxes': 316, 'ignore: reviewed at one end': 11, 'frames left out (outside the keyframes)': 3} -> data/labels/1104_cp03_s010/labels_full2.pkl
+data/labels/1104_cp03_s010/labels_full2.pkl -> data/labels/1104_cp03_s010/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s011
+301 of 305 frames, {'other classes, copied as they are': 564, 'keyframe boxes': 82, 'interpolated boxes': 300, 'ignore: reviewed at one end': 20, 'left out: removed by the reviewer': 11, 'frames left out (outside the keyframes)': 4} -> data/labels/1104_cp03_s011/labels_full2.pkl
+data/labels/1104_cp03_s011/labels_full2.pkl -> data/labels/1104_cp03_s011/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s012
+301 of 304 frames, {'other classes, copied as they are': 638, 'keyframe boxes': 12, 'interpolated boxes': 44, 'ignore: reviewed at one end': 3, 'frames left out (outside the keyframes)': 3} -> data/labels/1104_cp03_s012/labels_full2.pkl
+data/labels/1104_cp03_s012/labels_full2.pkl -> data/labels/1104_cp03_s012/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s013
+301 of 305 frames, {'other classes, copied as they are': 972, 'keyframe boxes': 25, 'interpolated boxes': 96, 'ignore: reviewed at one end': 7, 'left out: removed by the reviewer': 10, 'frames left out (outside the keyframes)': 4} -> data/labels/1104_cp03_s013/labels_full2.pkl
+data/labels/1104_cp03_s013/labels_full2.pkl -> data/labels/1104_cp03_s013/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s014
+301 of 304 frames, {'other classes, copied as they are': 539, 'keyframe boxes': 28, 'interpolated boxes': 100, 'ignore: reviewed at one end': 21, 'frames left out (outside the keyframes)': 3} -> data/labels/1104_cp03_s014/labels_full2.pkl
+data/labels/1104_cp03_s014/labels_full2.pkl -> data/labels/1104_cp03_s014/labels_train2.pkl {'fill': {'parked places': 1, 'parked places split into several tracks': 0}}
+== 1104_cp03_s015
+301 of 305 frames, {'other classes, copied as they are': 869, 'keyframe boxes': 55, 'interpolated boxes': 200, 'ignore: reviewed at one end': 19, 'frames left out (outside the keyframes)': 4} -> data/labels/1104_cp03_s015/labels_full2.pkl
+data/labels/1104_cp03_s015/labels_full2.pkl -> data/labels/1104_cp03_s015/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
+== 1104_cp03_s016
+301 of 304 frames, {'other classes, copied as they are': 709, 'keyframe boxes': 64, 'interpolated boxes': 240, 'ignore: reviewed at one end': 12, 'frames left out (outside the keyframes)': 3} -> data/labels/1104_cp03_s016/labels_full2.pkl
+data/labels/1104_cp03_s016/labels_full2.pkl -> data/labels/1104_cp03_s016/labels_train2.pkl {'fill': {'parked places': 0, 'parked places split into several tracks': 0}}
