@@ -144,8 +144,8 @@
 | T37 | 1104：转出 4 个缓冲场景；双教师推理和自动标注、上线模型对教师、每个场景的统计；按 bag 划分（两份验证、两份训练，人定）；挑场景、带四路相机的审核材料 | Agent | T36 续 | 3 小时 | 完成，已复核（2026-11-06）：30 m 内运动的车 103 条（0921 是 29）；验证 cp02 + cp04；待审 32 个场景、1,940 个关键帧；没接进 SUSTechPOINTS，补在 T37 续 |
 | T37 续 | 1104 的 32 个场景接进 SUSTechPOINTS，备份审核前的标注，重新起服务 | Agent | T37 | 10 分钟 | 完成，已复核（2026-11-06）：32 个场景接好，统计和 T37 一致，可以开始 H6 |
 | T37 续 2 | 1104 的 32 个场景导出相机图（068342b 的 cameras 命令，复核修了图早一帧、视野太宽、框偏高），重新起服务 | Agent | T37 续 | 30 分钟 | 完成，已复核（2026-11-06） |
-| H6 | 审 1104 挑出的场景：验证 14 个逐框、训练 18 个看红框（SUSTechPOINTS，只审车；Foxglove 里对照四路相机） | 人 | T37 续 | 1 天 | 完成，已复核（2026-11-06）：红框 422 → 22（导回后是忽略框）；`cp01_s003` 删掉的一辆像在慢行的货车，要人再看一眼（H6 补，10 分钟） |
-| T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 补 | 1 小时 | 任务已写好，等 H6 补的结论 |
+| H6 | 审 1104 挑出的场景：验证 14 个逐框、训练 18 个看红框（SUSTechPOINTS，只审车；Foxglove 里对照四路相机） | 人 | T37 续 | 1 天 | 完成，已复核（2026-11-06）：红框 422 → 22（导回后是忽略框）；H6 补：`cp01_s003` 删掉的是牵引车拉的一串置物架，可要可不要，T38 恢复成忽略框 |
+| T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 任务已写好（第 0 步含 H6 补：cp01_s003 的三条恢复成忽略框） |
 | T39 | 训练 v3（Pillar、Voxel），在新验证集上和 nuScenes Pillar 比，定上线模型和上报阈值 | Agent，人定 | T38 | 半天 | 计划 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -7110,7 +7110,7 @@ T37 续之后。在 SUSTechPOINTS 里审 1104 的 32 个场景（先验证集 14
 | 看到的 | 操作 |
 |---|---|
 | 是车（含停着的、挂车厢、客车） | 右键 → 确认（整条轨迹）。框明显歪了（偏出车 0.5 m 以上）就调一下 |
-| 叉车 | 右键 → 看不清（作忽略框）。叉车不要求检出（2026-10-26），不要确认成车 |
+| 叉车、牵引车拉的一串料架 | 右键 → 看不清（作忽略框）。不要求检出（叉车 2026-10-26，料架车 2026-11-06），不要确认成车，也不要删 |
 | 不是车（墙角、集装箱、货堆、岗亭、路灯杆……） | 右键 → Delete this object (in all frames)。**删，不要标忽略** |
 | 看不清（点太少、只看到一角） | 右键 → 看不清（作忽略框） |
 | 同一个 ID 有几帧是车、有几帧不是 | 按 `v` 进批量窗口逐帧看，不是车的那几帧单独删 |
@@ -7156,7 +7156,11 @@ T37 续之后。在 SUSTechPOINTS 里审 1104 的 32 个场景（先验证集 14
   - 其他场景删的大多是短轨迹或长货车拆出来的半截。比如 `cp04_s006` #12 离另一辆车的框只有 0.9–3.6 m，`cp02_s000` #14 离另一辆车 6 m，删除合理。
 - **H6 补（人，10 分钟）**：Foxglove 打开服务器上的 `data/labels/1104_cp01_s003/1104_cp01_s003_review.mcap`，看 0–30 s 狗左边约 27 m、右边约 30 m 的那几条轨迹，对照左右相机。
   - 结论写到下面一行：是车 → T38 第 0 步从 `H6_before.tar` 恢复这几条（不用重画）；不是车 → 不动。
-  - **H6 补 结论**：（人填：#5/#17/#18 是车 / 不是车；#8/#9 是车 / 不是车）
+  - **H6 补 结论**（人，2026-11-06）：#5/#17/#18 不是货车，是一辆很小的车拉着一串置物架，开得慢，**可要可不要**。
+    - 可要可不要，就作忽略框（同叉车）：不要求检出，检出了也不算误检。
+    - 删掉不对：删了就是背景，模型检出它反而算误检。T38 第 0 步把这三条从 `H6_before.tar` 恢复成忽略框。
+    - #8/#9 人没提，照审核时的决定，保持删除。
+    - 以后同类的（牵引车拉的一串料架、物料车）都按这条：右键 → 看不清（作忽略框），写进了 LABELING_TUTORIAL 5.1、DOG_FINETUNE 的叉车那条。
 
 ---
 
@@ -7174,8 +7178,8 @@ BK=/public/zjst/robot/centerpoint_data/sustech_backup; R1104=$(ls -d $NEW/1104_*
 0. mkdir -p data/reports/T38；pytest tests/dog -m "not slow" -n 8 | tail -1。
    停掉 SUSTechPOINTS（审完了，免得导回时还有人在改），备份：
      tar -C $NEW -cf $BK/H6_after.tar $(for r in $R1104; do echo $r/label $r/dog_meta.json $r/dog_info; done)
-   H6 补（H6 复核）：结论是"是车"的轨迹，从 H6_before.tar 恢复成确认过的框（只加回现在没有的；不是车就跳过）。
-   下面的 Python 从行首开始写，参数是场景和轨迹号（例：#5/#17/#18 是车、#8/#9 不是）：
+   H6 补（H6 复核）：1104_cp01_s003 的 #5/#17/#18 是牵引车拉的一串置物架，可要可不要，从 H6_before.tar 恢复成忽略框
+   （obj_attr = ignore；只加回现在没有的）。下面的 Python 从行首开始写，参数是场景和轨迹号：
 NEW=$NEW BK=$BK python - 1104_cp01_s003 5 17 18 <<'EOF' | tee data/reports/T38/restore.txt
 import json, os, sys, tarfile
 NEW, BK = os.environ["NEW"], os.environ["BK"]
@@ -7189,13 +7193,13 @@ with tarfile.open(os.path.join(BK, "H6_before.tar")) as tar:
         p = os.path.join(NEW, m.name)
         cur = json.load(open(p))
         have = {str(o["obj_id"]) for o in cur}
-        add = [dict(o, obj_attr="") for o in old if str(o["obj_id"]) not in have]
+        add = [dict(o, obj_attr="ignore") for o in old if str(o["obj_id"]) not in have]
         if add:
             json.dump(cur + add, open(p, "w"))
             n += len(add)
-print(scene, "restored", n, "boxes of", sorted(ids, key=int))
+print(scene, "restored", n, "boxes as ignore of", sorted(ids, key=int))
 EOF
-   #5/#17/#18 三条应恢复 50–61 框（T37 的自动标注里约 57 个关键帧）。
+   应恢复约 55 框（50–61；这个场景删的 61 框里，#8/#9 约 6 框不恢复）。第 1 步导回后，这些是忽略框，不是车。
    没审的 3 个训练场景（T37 复核）改成 drop：
      awk -F, -v OFS=, '$1=="1104_cp03_s003"||$1=="1104_cp03_s006"||$1=="1104_cp03_s007" {$2="drop"; $3="1104 train clip, not reviewed"} 1' \
          $SPLIT > $SPLIT.tmp && mv $SPLIT.tmp $SPLIT
