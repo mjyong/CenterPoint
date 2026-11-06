@@ -142,7 +142,7 @@
 | T35 | 8 号狗出门实跑：A 段室内（root 视角撞车、root 起 bridge、负载和 GPU）；B 段室外有固定解（在线每秒的帧数和延迟、天线接法、录包和离线回放对比、Foxglove） | Agent + 人（带狗出门） | T34 复核 | 1.5 小时 | 待做 |
 | T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 完成，已复核（2026-11-05；续：偏置 0 重转，31 场景两遍预览全 OK、位姿基本不用修，时间差跳过。人补了现场：三叉路口，车很多、基本在动） |
 | T37 | 1104：转出 4 个缓冲场景；双教师推理和自动标注、上线模型对教师、每个场景的统计；按 bag 划分（两份验证、两份训练，人定）；挑场景、带四路相机的审核材料 | Agent | T36 续 | 3 小时 | 完成，已复核（2026-11-06）：30 m 内运动的车 103 条（0921 是 29）；验证 cp02 + cp04；待审 32 个场景、1,940 个关键帧；没接进 SUSTechPOINTS，补在 T37 续 |
-| T37 续 | 1104 的 32 个场景接进 SUSTechPOINTS，备份审核前的标注，重新起服务 | Agent | T37 | 10 分钟 | 待做 |
+| T37 续 | 1104 的 32 个场景接进 SUSTechPOINTS，备份审核前的标注，重新起服务 | Agent | T37 | 10 分钟 | 完成（2026-11-06） |
 | H6 | 审 1104 挑出的场景：验证 14 个逐框、训练 18 个看红框（SUSTechPOINTS，只审车；Foxglove 里对照四路相机） | 人 | T37 续 | 1 天 | 待做 |
 | T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 任务已写好 |
 | T39 | 训练 v3（Pillar、Voxel），在新验证集上和 nuScenes Pillar 比，定上线模型和上报阈值 | Agent，人定 | T38 | 半天 | 计划 |
@@ -6995,6 +6995,16 @@ NEW=/public/zjst/robot/centerpoint_data/sustech_1104; BK=/public/zjst/robot/cent
 提交：data/reports/T37/stats_before_H6.txt、本文档（不提交 serve.log、tar）。
 报告（写进"T37 续 结果"）：SUSTechPOINTS 地址；第 4 步两行；备份文件的大小。
 ```
+
+### T37 续 结果
+
+- 原 serve：`python tools/dog/sustechpoints_convert.py serve --host 10.36.136.7`（自 10-26 起）；已停掉并用同一命令重新起。
+- 32 个 `1104_*` 软链进 `third_party/SUSTechPOINTS/data/`（0921 的 35 个仍指 `sustech_dual/`，未动）。
+- 备份：`/public/zjst/robot/centerpoint_data/sustech_backup/H6_before.tar`，6.0 MB。
+- 统计（与 T37 `sustech_stats.txt` 一致）：
+  - `total train: 1102 frames, 1275 boxes, 266 marked review`
+  - `total val: 838 frames, 1392 boxes, 156 marked review`
+- 地址：http://10.36.136.7:8081 （日志里已列出全部 1104 场景；浏览器 Ctrl+F5 后开始 H6）。
 
 ---
 

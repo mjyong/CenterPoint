@@ -1,0 +1,5 @@
+1104_cp04_s005 val 61 31 6
+1104_cp04_s006 val 62 125 13
+1104_cp04_s007 val 62 121 2
+total train: 1102 frames, 1275 boxes, 266 marked review
+total val: 838 frames, 1392 boxes, 156 marked review
