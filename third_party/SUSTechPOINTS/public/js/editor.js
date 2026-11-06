@@ -1773,6 +1773,8 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
                         this.imageContextManager.boxes_manager.onBoxUnselected(this.selected_box.obj_local_id, this.selected_box.obj_type);
                         this.selected_box = null;
                         this.boxEditor.detach();
+                        // 2026-11-06: hide side cameras again; keep front only.
+                        this.imageContextManager.syncSideViews(null);
 
                         this.onSelectedBoxChanged(null);
                     }
@@ -1854,6 +1856,8 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
                     this.imageContextManager.setBestCamera(best_camera);
                 }
+                // 2026-11-06: open left/right image panes only when this box is in that camera.
+                this.imageContextManager.syncSideViews(object);
             }
 
             // highlight box
@@ -2446,6 +2450,18 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         this.render();
         this.imageContextManager.attachWorld(world);
         this.imageContextManager.render_2d_image();
+        // Cameras may still be downloading (preload does not wait for them); refresh panes when ready.
+        // 2026-11-06
+        if (world.cameras && world.cameras.content){
+            Object.values(world.cameras.content).forEach(img=>{
+                if (img && !img.complete){
+                    img.addEventListener("load", ()=>{
+                        if (this.data.world === world)
+                            this.imageContextManager.render_2d_image();
+                    }, {once: true});
+                }
+            });
+        }
         this.render2dLabels(world);
         this.update_frame_info(world.frameInfo.scene, world.frameInfo.frame);
 

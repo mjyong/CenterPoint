@@ -122,6 +122,10 @@ def get_one_scene(s):
                     if len(files)>=2:
                         _,camera_ext = os.path.splitext(files[0])
 
+    # 2026-11-06: dog scenes use front/left/right/rear; keep that order for the 2x2 image grid.
+    _cam_order = {"front": 0, "left": 1, "right": 2, "rear": 3}
+    camera.sort(key=lambda c: (_cam_order.get(c, 50), c))
+
     if camera_ext == "":
         camera_ext = ".jpg"
     scene["camera_ext"] = camera_ext

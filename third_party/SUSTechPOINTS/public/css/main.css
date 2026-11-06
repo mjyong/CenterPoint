@@ -343,6 +343,18 @@ dynamic set obj-type css has higher priority than this one.
     margin: 0px;
 }
 
+/* 2026-11-06: 2x2 strip on the right for the dog's four fisheyes during label review. */
+.image-wrapper.image-wrapper-grid {
+	border: 1px solid rgba(255, 80, 80, 0.55);
+	background: rgba(0, 0, 0, 0.35);
+	z-index: 5;
+}
+.image-wrapper.image-wrapper-grid #header {
+	font-size: 12px;
+	background: rgba(0, 0, 0, 0.45);
+	padding: 2px 6px;
+}
+
 
 #resize-handle {
 	position: absolute;

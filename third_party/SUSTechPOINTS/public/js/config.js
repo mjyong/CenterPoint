@@ -12,8 +12,9 @@ class Config{
 
     coordinateSystem = 'utm';
 
-    point_size = 1;
-    point_brightness = 0.6;
+    // 2026-11-06 (dog review): mono + stacked sweeps looked too dark at 0.6; 1.0 keeps headroom for the '+' key.
+    point_size = 1.5;
+    point_brightness = 1.0;
     box_opacity = 1;
     show_background = true;
     color_obj = "category";

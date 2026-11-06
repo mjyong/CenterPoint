@@ -597,7 +597,23 @@ class ImageContext extends MovableView{
         // draw picture
         var img = this.world.cameras.getImageByName(this.name);
 
+        // World preload does not wait for cameras (world.js cameras.loaded is commented out), so the
+        // first render often sees width==0. Hide only on real failure; otherwise redraw when loaded.
+        // 2026-11-06
         if (!img || img.width==0){
+            if (img && !img.complete && !img._dogRedrawBound){
+                img._dogRedrawBound = true;
+                let self = this;
+                let target = img;
+                let redraw = function(){
+                    target._dogRedrawBound = false;
+                    if (self.world && self.world.cameras.getImageByName(self.name) === target)
+                        self.render_2d_image();
+                };
+                img.addEventListener("load", redraw, {once: true});
+                img.addEventListener("error", function(){ target._dogRedrawBound = false; self.hide_canvas(); }, {once: true});
+                return;
+            }
             this.hide_canvas();
             return;
         }
@@ -913,6 +929,10 @@ class ImageContextManager {
     }
 
     updateCameraList(cameras){
+        // Prefer the dog's front/left/right/rear order.
+        const order = {front: 0, left: 1, right: 2, rear: 3};
+        cameras = cameras.slice().sort((a, b) => (order[a] ?? 50) - (order[b] ?? 50) || a.localeCompare(b));
+        this.availableCameras = cameras;
 
         let autoCamera = '<div class="camera-item" id="camera-item-auto">auto</div>';
 
@@ -932,7 +952,87 @@ class ImageContextManager {
         ui.innerHTML = camera_selector_str;
         ui.style.display="none";
 
-        this.setDefaultBestCamera(cameras[0]);
+        this.setDefaultBestCamera(cameras.includes("front") ? "front" : cameras[0]);
+
+        // 2026-11-06: default = front only, tucked top-right so the point cloud stays clear.
+        // left/right open only when a selected box projects into that camera (syncSideViews).
+        if (cameras.length > 0) {
+            this.showDefaultFront(cameras);
+        }
+    }
+
+    showDefaultFront(cameras){
+        this.images.slice().forEach(img => this.removeImage(img));
+        const frontName = cameras.includes("front") ? "front" : cameras[0];
+        const image = this.addImage(frontName, false);
+        this.layoutReviewCamera(image, "front");
+        this.frontCameraName = frontName;
+    }
+
+    layoutReviewCamera(image, slot){
+        // slot: "front" | "left" | "right" — thin strip on the far right, stacked top→down.
+        const ui = image.ui;
+        ui.classList.add("image-wrapper-grid");
+        ui.style.width = "22%";
+        ui.style.height = "18%";
+        ui.style.left = "77%";
+        const top = {front: "2%", left: "21%", right: "40%"};
+        ui.style.top = top[slot] || "2%";
+    }
+
+    boxVisibleInCamera(box, camName){
+        if (!box || !box.world)
+            return false;
+        const meta = box.world.frameInfo.sceneMeta;
+        const calib = meta && meta.calib && meta.calib.camera && meta.calib.camera[camName];
+        if (!calib)
+            return false;
+        const img = box.world.cameras.getImageByName(camName);
+        const w = (img && img.naturalWidth) ? img.naturalWidth : 1920;
+        const h = (img && img.naturalHeight) ? img.naturalHeight : 1536;
+        // Any corner (or the centre) in front of the lens and inside the image → show that view.
+        const corners = psr_to_xyz(box.position, box.scale, box.rotation).slice(0, 8 * 4);
+        const pts = corners.concat([box.position.x, box.position.y, box.position.z, 1]);
+        const imgpos = matmul(calib.extrinsic, pts, 4);
+        for (let i = 0; i < imgpos.length / 4; i++){
+            const x = imgpos[i * 4], y = imgpos[i * 4 + 1], z = imgpos[i * 4 + 2], iw = imgpos[i * 4 + 3];
+            if (z <= 0.05)
+                continue;
+            let uv;
+            if (calib.intrinsic.length > 9)
+                uv = vector3_nomalize(matmul(calib.intrinsic, [x, y, z, iw], 4));
+            else
+                uv = vector3_nomalize(matmul(calib.intrinsic, [x, y, z], 3));
+            if (uv[0] >= -0.05 * w && uv[0] < w * 1.05 && uv[1] >= -0.05 * h && uv[1] < h * 1.05)
+                return true;
+        }
+        return false;
+    }
+
+    syncSideViews(box){
+        // Keep front; show left/right only when the selected object appears in that view.
+        const sides = ["left", "right"].filter(c => (this.availableCameras || []).includes(c));
+        sides.forEach(name => {
+            const existed = this.images.find(i => !i.autoSwitch && i.name === name);
+            const show = !!(box && this.boxVisibleInCamera(box, name));
+            if (show && !existed) {
+                const image = this.addImage(name, false);
+                this.layoutReviewCamera(image, name);
+            } else if (!show && existed) {
+                this.removeImage(existed);
+            } else if (show && existed) {
+                this.layoutReviewCamera(existed, name);
+                existed.render_2d_image();
+            }
+        });
+        // Drop rear (and anything else) that was opened manually and is not front/side.
+        this.images.slice().forEach(img => {
+            if (img.autoSwitch)
+                return;
+            if (img.name === this.frontCameraName || sides.includes(img.name))
+                return;
+            this.removeImage(img);
+        });
     }
 
     setDefaultBestCamera(c){
@@ -983,7 +1083,9 @@ class ImageContextManager {
     removeImage(image){
 
         let selectorName = image.autoSwitch?"auto":image.name;
-        this.selectorUi.querySelector("#camera-item-"+selectorName).className = "camera-item";
+        let sel = this.selectorUi.querySelector("#camera-item-"+selectorName);
+        if (sel)
+            sel.className = "camera-item";
         this.images = this.images.filter(x=>x!=image);
         image.remove();
 

@@ -31,6 +31,22 @@ def test_matches_opencv_fisheye():
     assert np.allclose(cam.project(p)[0], ref[0], atol=1e-6)
 
 
+def test_undistort_keeps_resolution():
+    cv2 = pytest.importorskip("cv2")
+    from dog_perception.cameras import undistort_fisheye, undistort_pinhole_K
+
+    cam = H190XA_G12161021
+    rng = np.random.default_rng(0)
+    img = rng.integers(0, 255, (cam.height, cam.width, 3), np.uint8)
+    out, Knew = undistort_fisheye(img, cam)
+    assert out.shape == img.shape and out.dtype == img.dtype
+    assert Knew.shape == (3, 3) and np.allclose(Knew, undistort_pinhole_K(cam))
+    assert np.isfinite(Knew).all() and Knew[0, 0] > 0 and Knew[1, 1] > 0
+    # remapping moves pixels: centre crop should not be all black for a random frame
+    cy, cx = int(Knew[1, 2]), int(Knew[0, 2])
+    assert out[cy - 20:cy + 20, cx - 20:cx + 20].mean() > 1.0
+
+
 def test_mounting_looks_along_each_axis():
     front, left, right = KYGI_FISHEYES["front"], KYGI_FISHEYES["left"], KYGI_FISHEYES["right"]
     for m, target in ((front, (10.0, 0.0, 0.0424)), (left, (0.0, 10.0, -0.0279)), (right, (0.0, -10.0, -0.0279))):

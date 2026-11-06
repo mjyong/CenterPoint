@@ -93,3 +93,40 @@ T_BASE_BODY = T_BASE_IMU @ make_T(np.eye(3), T_IMU_LIDAR[:3, 3])     # B axes = 
 def T_body_camera(mount):
     """Pose of a camera (optical frame) in the code's body frame B."""
     return np.linalg.inv(T_BASE_BODY) @ mount.T_base_camera()
+
+
+def undistort_pinhole_K(intrinsics, balance=0.0):
+    """Pinhole ``K`` after ``cv2.fisheye`` undistort of a full-resolution frame (same size).
+
+    ``balance`` 0 keeps the useful centre (some edge crop); 1 keeps every source pixel.
+    """
+    import cv2
+
+    K = np.asarray(intrinsics.K, np.float64)
+    D = np.asarray(intrinsics.k, np.float64).reshape(4, 1)
+    size = (intrinsics.width, intrinsics.height)
+    return cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(K, D, size, np.eye(3), balance=balance)
+
+
+def fisheye_undistort_maps(intrinsics, balance=0.0, Knew=None):
+    """``(map1, map2, Knew)`` for ``cv2.remap`` of a full-resolution fisheye frame."""
+    import cv2
+
+    K = np.asarray(intrinsics.K, np.float64)
+    D = np.asarray(intrinsics.k, np.float64).reshape(4, 1)
+    size = (intrinsics.width, intrinsics.height)
+    if Knew is None:
+        Knew = undistort_pinhole_K(intrinsics, balance=balance)
+    map1, map2 = cv2.fisheye.initUndistortRectifyMap(K, D, np.eye(3), Knew, size, cv2.CV_16SC2)
+    return map1, map2, Knew
+
+
+def undistort_fisheye(img, intrinsics, balance=0.0, maps=None):
+    """Undistort a BGR/gray frame with the default fisheye model; returns ``(undistorted, Knew)``."""
+    import cv2
+
+    if maps is None:
+        map1, map2, Knew = fisheye_undistort_maps(intrinsics, balance=balance)
+    else:
+        map1, map2, Knew = maps
+    return cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT), Knew

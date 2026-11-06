@@ -34,6 +34,9 @@ be changed together with the converter (`tools/dog/sustechpoints_convert.py`).
 | 2026-10-24 | `dog_fit.py` (new), `main.py`, `public/js/ml.js`, `public/js/editor.js` | Ctrl + drag asks the new `/dog_fit_box` for the box first: the best-scoring model box from `data/<scene>/dog_dets/<frame>.json` (written by `sustechpoints_convert.py detections`) that holds most of the selected object's points, else the smallest box around them with an L-shape yaw, bottom on the ground where the selection shows it. The object is the group of points nearest the rectangle's middle. SUSTechPOINTS' own fitting only when the answer is empty; Shift + drag unchanged |
 | 2026-10-24 | `public/js/floatlabel.js`, `public/js/header.js` | candidates (`dog_info` with `candidate`, from `sustechpoints_convert.py candidates`) show the models that found them and their scores: `候选 v1_pp 0.62 · nusc_pp 0.41` |
 | 2026-10-25 | `public/js/floatlabel.js`, `public/js/header.js` | a candidate at the place of another frame's label (`dog_info` `labelled_as`) adds `其他帧是 #12` |
+| 2026-11-06 | `public/js/config.js`, `public/js/lidar.js` | default mono brighter (`point_brightness` 1.0, `point_size` 1.5); older sweeps at 65 % instead of 30 % |
+| 2026-11-06 | `public/js/image.js`, `public/css/main.css`, `scene_reader.py`, `public/js/editor.js` | camera strip: default front only (top-right, small); left/right open only when the selected box projects into that camera; folders ordered front/left/right/rear |
+| 2026-11-06 | `public/js/image.js`, `public/js/editor.js` | redraw image panes when camera JPEGs finish loading (preload does not wait for cameras, so the first paint used to hide an empty pane) |
 
 Mark further changes in this table and in the changed file (GPL-3.0 section 5a asks for a notice with
 the date).

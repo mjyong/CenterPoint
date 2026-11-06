@@ -10,7 +10,8 @@ import {settings} from "./settings.js"
 // CenterPoint dog pipeline (2026-10-23): our frames stack 5 sweeps (0.4 s), what the detector sees.
 // Points of the older sweeps (PCD field "t" > 0, see PCDLoader.js) are drawn at this fraction of their
 // color, so a moving vehicle's trail stays visible but the box is fitted to the bright current sweep.
-const OLD_SWEEP_SHADE = 0.3;
+// 2026-11-06: raised 0.3 -> 0.65 so the accumulated cloud is readable under the default mono brightness.
+const OLD_SWEEP_SHADE = 0.65;
 
 function shadeOldSweeps(age, color, indices){
     if (!age || age.length == 0)

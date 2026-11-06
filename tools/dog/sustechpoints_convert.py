@@ -7,6 +7,9 @@ SUSTechPOINTS is vendored in third_party/SUSTechPOINTS (see its VENDORED.md); sc
     python tools/dog/sustechpoints_convert.py export --labels data/labels/rec_001/labels_reviewed.pkl \
         --frames work_dirs/rec_001/frames --scene rec_001 --every 5 --split train
 
+    # 4 fisheye JPEGs + rough calib from the sequence's cameras.mcap (H.264) for the image strip
+    python tools/dog/sustechpoints_convert.py cameras --scenes rec_001 --seq-root data/seq
+
     # label in SUSTechPOINTS: open http://127.0.0.1:8081 (needs cherrypy + jinja2; TensorFlow only for its
     # auto-annotation button). Same as "cd third_party/SUSTechPOINTS && python main.py", with --host / --port.
     python tools/dog/sustechpoints_convert.py serve
@@ -48,8 +51,8 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dog_perception.detection.boxes import CLASSES  # noqa: E402
-from dog_perception.sustechpoints import (add_candidates, carry_review, export_scene, import_scene,  # noqa: E402
-                                          propagate_keyframes, write_detections)
+from dog_perception.sustechpoints import (add_candidates, carry_review, export_cameras, export_scene,  # noqa: E402
+                                          import_scene, propagate_keyframes, write_detections)
 from dog_perception.visibility import annotate_points  # noqa: E402
 
 VENDORED = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "third_party", "SUSTechPOINTS"))
@@ -187,6 +190,15 @@ def main():
     cr.add_argument("--scenes", nargs="+", required=True)
     st = sub.add_parser("stats", help="frames, boxes and boxes still marked review per scene")
     st.add_argument("--root", default=os.path.join(VENDORED, "data"), help="SUSTechPOINTS data/ directory")
+    cam = sub.add_parser("cameras", help="sequence cameras.mcap (H.264) -> scene camera/*.jpg + calib "
+                                         "(4-view strip in the vendored tool)")
+    cam.add_argument("--root", default=os.path.join(VENDORED, "data"), help="SUSTechPOINTS data/ directory")
+    cam.add_argument("--scenes", nargs="+", required=True, help="scene names under --root")
+    cam.add_argument("--seq-root", default="data/seq",
+                     help="sequence root: <seq-root>/<scene>/cameras.mcap (default data/seq)")
+    cam.add_argument("--mcap", default=None,
+                     help="one cameras.mcap for every --scenes entry (default: each scene's own file)")
+    cam.add_argument("--jpeg-quality", type=int, default=85)
     v = sub.add_parser("serve", help="start SUSTechPOINTS (works without TensorFlow)")
     v.add_argument("--app", default=VENDORED, help="SUSTechPOINTS checkout (default: the vendored copy)")
     v.add_argument("--host", default="127.0.0.1")
@@ -195,6 +207,15 @@ def main():
 
     if args.cmd == "serve":
         serve(args.app, args.host, args.port)
+    elif args.cmd == "cameras":
+        for scene in args.scenes:
+            scene_dir = os.path.join(args.root, scene)
+            mcap = args.mcap or os.path.join(args.seq_root, scene, "cameras.mcap")
+            if not os.path.isfile(mcap):
+                print("%s: no cameras.mcap at %s" % (scene, mcap))
+                continue
+            written = export_cameras(scene_dir, mcap, jpeg_quality=args.jpeg_quality)
+            print("%s: %s <- %s" % (scene, ", ".join("%s=%d" % kv for kv in written.items()) or "nothing", mcap))
     elif args.cmd in ("candidates", "detections"):
         candidates(args)
     elif args.cmd == "carry":
