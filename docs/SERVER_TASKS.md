@@ -145,8 +145,8 @@
 | T37 续 | 1104 的 32 个场景接进 SUSTechPOINTS，备份审核前的标注，重新起服务 | Agent | T37 | 10 分钟 | 完成，已复核（2026-11-06）：32 个场景接好，统计和 T37 一致，可以开始 H6 |
 | T37 续 2 | 1104 的 32 个场景导出相机图（068342b 的 cameras 命令，复核修了图早一帧、视野太宽、框偏高），重新起服务 | Agent | T37 续 | 30 分钟 | 完成，已复核（2026-11-06） |
 | H6 | 审 1104 挑出的场景：验证 14 个逐框、训练 18 个看红框（SUSTechPOINTS，只审车；Foxglove 里对照四路相机） | 人 | T37 续 | 1 天 | 完成，已复核（2026-11-06）：红框 422 → 8（二次补清后）；H6 补：`cp01_s003` 删掉的是牵引车拉的一串置物架，可要可不要，T38 恢复成忽略框 |
-| T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 任务已写好（第 0 步含 H6 补：cp01_s003 的三条恢复成忽略框） |
-| T39 | 训练 v3（Pillar、Voxel），在新验证集上和 nuScenes Pillar 比，定上线模型和上报阈值 | Agent，人定 | T38 | 半天 | 计划 |
+| T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 完成，已复核（2026-11-07）：v3 在 `dog_veh_1106_1811`，训练 12,670 帧、验证 1,418 帧；新验证集 30 m 内运动的车 72 条 |
+| T39 | 训练 v3（Pillar、Voxel，配方同 v2）；24 个验证场景上和 nusc_pp、v2_pp 重跑比较（合计、0921、1104 分开），定上线的 Pillar 和上报阈值；v3 Voxel + TTA 对教师 | Agent，人定 | T38 | 半天 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T35（A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频、天线配置；
@@ -7150,7 +7150,7 @@ T37 续之后。在 SUSTechPOINTS 里审 1104 的 32 个场景（先验证集 14
     - 框长 8.5–12 m、高 3–3.6 m；在 26–40 m 时每框当前扫描有 200–340 个点，同一场景里确认过的货车在这个距离是 260–700 个；
     - 最近的别的车框也在 10 m 以外，不是别的车拆出来的半截。
   - 两个教师给的分数都低（0.31–0.37），所以标成了待审。
-  - 另外右边 28–37 m 有两条短的（#8、#9，1–2 s，长 11 m）也一起删了。
+  - 右边 28–37 m 有两条短的（#8、#9，1–2 s，长 11 m）。（T38 复核更正：它们审核时确认成了车，没有删。）
   - 如果是车，删掉等于告诉模型"30 m 处慢慢开的货车是背景"，正好伤到最想要的那类样本（训练集）。如果相机里确认不是车（比如墙或栅栏上滑动的假框），删了是对的。
   - 其他场景删的大多是短轨迹或长货车拆出来的半截。比如 `cp04_s006` #12 离另一辆车的框只有 0.9–3.6 m，`cp02_s000` #14 离另一辆车 6 m，删除合理。
 - **H6 补（人，10 分钟）**：Foxglove 打开服务器上的 `data/labels/1104_cp01_s003/1104_cp01_s003_review.mcap`，看 0–30 s 狗左边约 27 m、右边约 30 m 的那几条轨迹，对照左右相机。
@@ -7158,7 +7158,7 @@ T37 续之后。在 SUSTechPOINTS 里审 1104 的 32 个场景（先验证集 14
   - **H6 补 结论**（人，2026-11-06）：#5/#17/#18 不是货车，是一辆很小的车拉着一串置物架，开得慢，**可要可不要**。
     - 可要可不要，就作忽略框（同叉车）：不要求检出，检出了也不算误检。
     - 删掉不对：删了就是背景，模型检出它反而算误检。T38 第 0 步把这三条从 `H6_before.tar` 恢复成忽略框。
-    - #8/#9 人没提，照审核时的决定，保持删除。
+    - #8/#9 审核时确认成了车，不动（T38 复核更正：之前说它们也被删了，不对）。
     - 以后同类的（牵引车拉的一串料架、物料车）都按这条：右键 → 看不清（作忽略框），写进了 LABELING_TUTORIAL 5.1、DOG_FINETUNE 的叉车那条。
 
 ---
@@ -7198,7 +7198,7 @@ with tarfile.open(os.path.join(BK, "H6_before.tar")) as tar:
             n += len(add)
 print(scene, "restored", n, "boxes as ignore of", sorted(ids, key=int))
 EOF
-   应恢复约 55 框（50–61；这个场景删的 61 框里，#8/#9 约 6 框不恢复）。第 1 步导回后，这些是忽略框，不是车。
+   应恢复 50–61 框。第 1 步导回后，这些是忽略框，不是车。
    没审的 3 个训练场景（T37 复核）改成 drop：
      awk -F, -v OFS=, '$1=="1104_cp03_s003"||$1=="1104_cp03_s006"||$1=="1104_cp03_s007" {$2="drop"; $3="1104 train clip, not reviewed"} 1' \
          $SPLIT > $SPLIT.tmp && mv $SPLIT.tmp $SPLIT
@@ -7295,3 +7295,127 @@ data/reports/T38/、本文档。不提交 tar、data/seq、数据集目录。
   | total | 24 | 22 | 72 | 35 |
 
 - 1104 的 14 个验证场景，审前（`labels.pkl`，`--min-frames 10`）moving_30m **50**；审后（`labels_sustech2.pkl`，同参）moving_30m **31**。
+
+### T38 复核（2026-11-07）
+
+- **结果可用，T39 可以开始。** v3 在 `/public/zjst/robot/centerpoint_data/dog_veh_1106_1811`（61 GB），训练 12,670 帧（0921 7,232 + 1104 5,438）、验证 1,418 帧（580 + 838）。
+- 本地用提交的标签核了一遍：
+  - `cp01_s003` 的 #5/#17/#18 是忽略框：关键帧 25 + 3 + 33 = 61 框，10 Hz 是 121 + 16 + 165 框。
+  - 剩下的 8 个红框导回后是忽略框；moved or new 3 个（验证）。
+  - 传播留下 99.1% 的帧；补空档只有 5 处（1104 几乎没有停着的车，和 T37 复核一致）；叉车尺寸规则没挑到东西；快速测试 183 passed。
+- **更正（H6 复核）**：#8/#9 没有被删，审核时确认成了车（关键帧 4 + 2 框）。
+  - 删掉的 61 框正好是 #5/#17/#18。我当时是按框数推的，推错了。
+  - H6 复核和 H6 补 结论里的说法已改。
+- **"审前 50 → 审后 31"是两边的参数不一样，审核没有删掉运动的车。**
+  - 审后的标签是关键帧，2 Hz。`--min-frames 10` 在关键帧上要连续 5 s 在动，在 10 Hz 的自动标注上只要 1 s。
+  - 两边都按 1 s 算（关键帧用 `--min-frames 2`），本地重算：30 m 内 50 → 51，15 m 内 24 → 27。
+  - 第 6 步"用同一条命令"是我写得不清楚。
+- **验证集的车（car）从 1,100 降到 811，不是退步。**
+  - v2 导出（10-26 下午）之后，0921 的叉车才改成忽略框。现在 0921 验证关键帧里，car 头的正样本 823 个、忽略 501 个（导出再去掉点太少的）。
+  - 1104 的验证集只加了 20 个 car、1,358 个 truck。
+  - 所以 1104 验证基本是一个"货车"验证集，新验证集上 car 的 AP 几乎全来自 0921。T39 按批次分开报。
+- **训练的 truck 翻了一倍**（5,073 → 10,636）：1104 加了约 5,560 个，几乎全是在动的货车；car 只多了 43 个。
+  - 配置里 GT 粘贴是 car 2 个、truck 3 个（注释写"truck 少"），现在已经不少了。
+  - T39 先不改，和 v2 同一个配方，这样差别只来自数据。T39 里货车误检明显变多的话，再调。
+- 新验证集（关键帧、1 s）：24 个场景，有车的 22 个（目标 ≥ 30，还差）；30 m 内运动的车 72 条，15 m 内 35 条。
+- 报告里没写第 4 步（划分写进 meta.json）做没做。T39 不读它，T39 第 0 步顺手查一下。
+
+---
+
+## T39 训练 v3；在新验证集上定上线的 Pillar、教师换不换
+
+- **v3** 用 T38 的数据集（0921 + 1104 的 18 个训练场景），配方和 v2 完全一样：单卡、batch 4、学习率 5e-4、20 个 epoch，配置不改。所以 v3 和 v2 的差别只来自数据。
+- **新验证集**：0921 的 10 个场景 + 1104 的 14 个，每个比较都按三份报：合计、0921、1104。
+  - 0921：狗在走，有轿车也有货车；
+  - 1104：同一个路口、狗不动、几乎全是在动的货车（T38 复核）；它的背景在训练里见过，所以 1104 上的误检偏乐观（T37 复核）。
+- **验证标签偏向 nuScenes 模型**：标签是从两个 nuScenes 教师的框审出来的（T17 复核），所以只看 AP@2.0、AP@4.0，不看 AP@0.5、AP@1.0 和含它们的 mAP。
+- **所有对照模型都用现在的代码在 24 个场景上重跑。** 0921 的旧结果是 T6、T15 时跑的，T22 之后检测的默认参数变了，不要混用。
+- **上线的 Pillar 按人定的规则**（T15 复核）：nusc_pp（现在上线的）、v2_pp、v3_pp 三个里选最好的；都不比 nusc_pp 好就留 nusc_pp。
+
+```text
+任务 T39：用 T38 的 v3 数据集训练 v3 的 Voxel 和 Pillar；在新验证集（0921 + 1104）上和 nusc_pp、v2_pp 比，定上线的 Pillar 和上报阈值；
+v3 Voxel + TTA 和 nuScenes 教师比，定教师换不换。
+先按通用约定做。前置：T38。仓库根目录，export PYTHONPATH=.。SPLIT=data/survey/split_0921_1104/split.csv
+
+0. mkdir -p data/reports/T39
+   readlink -f data/dog_veh                       （应是 /public/zjst/robot/centerpoint_data/dog_veh_1106_1811）
+   python -c "import pickle; print(*(len(pickle.load(open('data/dog_veh/infos_%s.pkl' % s, 'rb'))) for s in ('train', 'val')))"
+                                                  （应是 12670 1418）
+   python -c "import json; print(json.load(open('data/seq/1104_cp02_s000/meta.json'))['segment']['split'])"
+                                                  （应是 val，T38 第 4 步；不是就补做 T38 第 4 步，不用停）
+   VAL=$(awk -F, 'NR>1 && $2=="val" {print $1}' $SPLIT)
+   V0921=$(echo $VAL | tr ' ' '\n' | grep '^0921_'); V1104=$(echo $VAL | tr ' ' '\n' | grep '^1104_')
+   echo $VAL | wc -w; echo $V0921 | wc -w; echo $V1104 | wc -w      （24、10、14）
+   RUNS=$(for r in $VAL; do echo data/runs/$r; done)
+   前两项不对就停下报告。
+1. 训练（照 T6 第 1、2 步放卡和检查），work_dir 是 data/train/dog_voxel_veh_v3、data/train/dog_pp_veh_v3（先 ls 确认两个都不存在）：
+     export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+     CUDA_VISIBLE_DEVICES=<卡1> nohup python tools/train.py configs/dog/dog_centerpoint_voxel_xt32_veh.py \
+         --work_dir data/train/dog_voxel_veh_v3 > data/train/dog_voxel_veh_v3.log 2>&1 &
+     CUDA_VISIBLE_DEVICES=<卡2> nohup python tools/train.py configs/dog/dog_centerpoint_pp_xt32_veh.py \
+         --work_dir data/train/dog_pp_veh_v3 > data/train/dog_pp_veh_v3.log 2>&1 &
+   单卡，不加 --autoscale-lr，配置不改。训练帧数是 v2 的 1.75 倍，每个 epoch 约 3,170 步；
+   各占一张卡时 Voxel 约 2.3 小时、Pillar 约 1.4 小时。
+2. 训练期间，在有空的显存上（训练那张卡也行；Pillar 进程约 3 GB，Voxel + TTA 约 6 GB，通用约定 5）跑对照，一次一条：
+     { python tools/dog/run_sequence.py --replay $RUNS --detectors pillar --ckpt-pillar work_dirs/pretrained/nusc_pp.pth \
+           --no-predict --no-mcap --jobs 2 --device cuda:0 --out "data/runs_v3cmp/nusc_pp/{scene}"
+       python tools/dog/run_sequence.py --replay $RUNS --detectors pillar --ckpt-pillar data/train/dog_pp_veh_v2/epoch_10.pth \
+           --no-predict --no-mcap --jobs 2 --device cuda:0 --out "data/runs_v3cmp/v2_pp/{scene}"
+       python tools/dog/run_sequence.py --replay $RUNS --detectors voxel --tta --ckpt-voxel work_dirs/pretrained/nusc_voxel.pth \
+           --no-predict --no-mcap --jobs 1 --device cuda:0 --out "data/runs_v3cmp/teacher/{scene}"
+     } 2>&1 | tee data/reports/T39/runs_baselines.txt
+3. 选 epoch：照 T7 第 1 步的 ev 函数（权重目录 dog_voxel_veh_v3、dog_pp_veh_v3，报告写到 data/reports/T39/），
+   第 10、15、20 个 epoch。规则同 T6 第 4 步：merged/vehicle 的 AP@2.0 最高；和更晚的差 < 0.005 取更晚的。记为 E_v3_voxel、E_v3_pp。
+4. v3 重放 24 个验证场景：
+     python tools/dog/run_sequence.py --replay $RUNS --detectors pillar,voxel \
+         --ckpt-pillar data/train/dog_pp_veh_v3/epoch_<E_v3_pp>.pth --ckpt-voxel data/train/dog_voxel_veh_v3/epoch_<E_v3_voxel>.pth \
+         --no-predict --no-mcap --jobs 2 --device cuda:0 --out "data/runs_v3cmp/v3/{scene}" 2>&1 | tail -3 | tee data/reports/T39/runs_v3.txt
+     python tools/dog/run_sequence.py --replay $RUNS --detectors voxel --tta \
+         --ckpt-voxel data/train/dog_voxel_veh_v3/epoch_<E_v3_voxel>.pth \
+         --no-predict --no-mcap --jobs 1 --device cuda:0 --out "data/runs_v3cmp/v3_tta/{scene}" 2>&1 | tail -3 | tee -a data/reports/T39/runs_v3.txt
+5. 对比（40 m 内，审过的验证标签），合计、0921、1104 各一次：
+     D=data/runs_v3cmp
+     res() { for r in "$@"; do echo nusc_pp=$D/nusc_pp/$r/pillar/results.pkl v2_pp=$D/v2_pp/$r/pillar/results.pkl \
+         v3_pp=$D/v3/$r/pillar/results.pkl v3_voxel=$D/v3/$r/voxel/results.pkl \
+         teacher=$D/teacher/$r/voxel/results.pkl v3_voxel_tta=$D/v3_tta/$r/voxel/results.pkl; done; }
+     cmp() { n=$1; shift
+       python tools/dog/compare_detectors.py --classes vehicle --max-range 40 --results $(res "$@") \
+           --labels $(for r in "$@"; do echo data/labels/$r/labels_sustech2.pkl; done) \
+           --thresholds 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 --target-recall 0.9 --bootstrap 1000 \
+           | tee data/reports/T39/compare_$n.md; }
+     cmp all $VAL; cmp 0921 $V0921; cmp 1104 $V1104
+6. 运动状态（照 T15 第 5 步），三个 Pillar，24 个场景：
+     motion() {  # motion <名字> <目录>
+       python tools/dog/motion_eval.py $(for r in $VAL; do echo --scene data/labels/$r/labels_sustech2.pkl $D/$2/$r/pillar/results.pkl; done) \
+           --details data/reports/T39/motion_$1_details.csv | tee data/reports/T39/motion_$1.txt
+     }
+     motion nusc_pp nusc_pp; motion v2_pp v2_pp; motion v3_pp v3
+7. 盲区边上的误检（照 T15 第 6 步），三个 Pillar：
+     python tools/dog/sector_check.py --scenes $VAL --labels "data/labels/{scene}/labels_sustech2.pkl" --sector 142 218 \
+         --results nusc_pp=$D/nusc_pp/{scene}/pillar/results.pkl v2_pp=$D/v2_pp/{scene}/pillar/results.pkl \
+         v3_pp=$D/v3/{scene}/pillar/results.pkl --list 10 | tee data/reports/T39/sector_val.md
+8. 两个结论：
+   - **上线的 Pillar**：v3_pp、v2_pp 各和 nusc_pp 比，同时满足下面三条才算比 nusc_pp 好：
+     a. compare_all 的重抽表里"X − nusc_pp"一行：ΔAP@2.0 0-20 m ≥ +0.02，并且 A ahead ≥ 90%；
+     b. compare_0921、compare_1104 的 AP 表：X 的 AP@2.0、AP@4.0 在两份里都不比 nusc_pp 低 0.02 以上
+        （0921 里有轿车，1104 里是在动的货车，哪边都不能明显变差）；
+     c. 运动状态：相关运动段（≥ 1 m/s、30 m 内）的漏报不比 nusc_pp 多。
+     两个都满足就取 ΔAP@2.0 0-20 m 大的；都不满足就留 nusc_pp。
+     写出选中的那个在 compare_all 里的建议上报阈值（--target-recall 0.9，20 m 内），以及那个阈值和 0.30 时 40 m 内的误检数。
+     选中的不是 nusc_pp 的话，到此为止：后处理的阈值、过滤、跟踪是按 nusc_pp 调的（T19–T22），上车要重新导 ONNX、在狗上建引擎，
+     这些另写任务，T39 不做。
+   - **教师**：compare_all 里 v3_voxel_tta 和 teacher 比，同时满足才换（照 T15 第 7 步）：
+     a. AP@2.0 高 ≥ 0.02；b. AP@2.0[20-40m] 不低；c. 速度表 "head > 0.15 m/s" 不低于减 5 个百分点。
+     满足就是下一批数据的 Voxel 教师换成 v3 Voxel + TTA；不满足就不换。Pillar 教师（Pillar + TTA 单进程要约 13 GB）这次不比。
+
+停止条件（停下并报告日志最后 50 行，不要改配置重跑）：任何报错；loss 变成 nan / inf；估算训练总时长超过 5 小时；
+训练进程意外退出（可以用 --resume_from data/train/<名字>/latest.pth 续一次，再退出就停下）。
+提交：data/reports/T39/、两个训练的 .log 和 work_dir 里的 *.log.json（复制到 data/reports/T39/）、本文档。不提交 data/runs_v3cmp、权重。
+报告（写进"T39 结果"）：
+- 训练：卡号、显存、time / data_time、每个 epoch 的步数、总耗时；每 5 个 epoch 的 loss / hm_loss（两个 head 分开），和 v2（T15）并排；
+- 第 3 步每个权重的 merged/vehicle 一行，E_v3_voxel、E_v3_pp；
+- 三份 compare 的 AP 表和速度表；compare_all 重抽表里 v3_pp − nusc_pp、v2_pp − nusc_pp、v3_pp − v2_pp、v3_voxel_tta − teacher 四行
+  （compare_0921、compare_1104 的这四行也抄上）；
+- 三个 Pillar 在 compare_all 里的建议阈值，以及阈值 0.30 时 40 m 内的误检数；
+- 三个 motion_*.txt 的表；sector_val.md 的表；第 8 步的两个结论，每一条写清楚是哪个数满足 / 不满足。
+```
