@@ -136,6 +136,7 @@ python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap> --
 | A\* | `src/algorithm/grid_path_planner/` |
 | 局部轨迹和速度 | `src/algorithm/teb_planner/`，调用在 `src/runnable/mission/tracking/tracking.cc` 的 `spin_s_active` |
 | 发给运控的速度 | `RosBridge::Publish`，发出前会过 `VelocityCalibration` |
+| 路口有车就停、车过去再走（接 3D 检测和预测） | 还没做，设计见仓库根目录 `docs/PLANNING_INTEGRATION.md`；停和走复用任务的 `pause()` / `resume()` |
 
 ## 在这台机器上跑起来
 
