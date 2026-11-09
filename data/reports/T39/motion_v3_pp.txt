@@ -1,0 +1,6 @@
+24 scenes, 7042 frames
+| on speed | on frames | moving recall | false moving | static tracks flagged | false episodes (per h) | moving stretches: missed / all, latency median / p90 s | relevant (>= 1.0 m/s, <= 30 m): missed / all, latency median / p90 s |
+|---|---|---|---|---|---|---|---|
+| 0.70 | 3 | 0.945 (1028) | 0.0272 (1580) | 6 / 44 | 10 (51 / h) | 6 / 71, 0.50 / 0.50 | 1 / 45, 0.50 / 0.50 |
+recording: 0.20 h
+16 missed stretches / false episodes -> data/reports/T39/motion_v3_pp_details.csv

@@ -1,0 +1,4 @@
+check_at 2026-11-09T09:03:23+08:00
+voxel: cuda 7, nvidia 3960 MiB, log memory 3448, steps/epoch 3425, time~0.10 data_time~0.003
+pillar: cuda 5, nvidia 3352 MiB, log memory 2839, steps/epoch 3425, time~0.07 data_time~0.001
+etas: voxel ~2.1h pillar ~1.4h

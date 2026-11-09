@@ -1,0 +1,502 @@
+V3_START 2026-11-09T14:02:02+08:00 E_v3_pp=20 E_v3_voxel=15 gpu=7
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+W1109 14:02:24.115000 1847695 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+W1109 14:02:24.226000 1847698 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+Use HM Bias:  -2.19
+== 0921_164127_s000
+[pillar] 288 frames, network 8.5 ms (median)
+[voxel] 288 frames, network 18.0 ms (median)
+== 0921_164127_s001
+[pillar] 288 frames, network 8.8 ms (median)
+[voxel] 288 frames, network 15.5 ms (median)
+== 0921_164127_s002
+[pillar] 288 frames, network 10.8 ms (median)
+[voxel] 288 frames, network 20.4 ms (median)
+== 0921_164127_s003
+[pillar] 287 frames, network 7.6 ms (median)
+[voxel] 287 frames, network 15.6 ms (median)
+== 0921_164127_s004
+[pillar] 288 frames, network 7.8 ms (median)
+[voxel] 288 frames, network 16.1 ms (median)
+== 0921_164127_s005
+[pillar] 288 frames, network 7.6 ms (median)
+[voxel] 288 frames, network 14.9 ms (median)
+== 0921_165659_s003
+[pillar] 276 frames, network 8.2 ms (median)
+[voxel] 276 frames, network 16.8 ms (median)
+== 0921_165659_s004
+[pillar] 276 frames, network 9.1 ms (median)
+[voxel] 276 frames, network 18.1 ms (median)
+== 0921_165659_s005
+[pillar] 303 frames, network 8.2 ms (median)
+[voxel] 303 frames, network 17.9 ms (median)
+== 0921_165659_s006
+[pillar] 302 frames, network 8.1 ms (median)
+[voxel] 302 frames, network 14.8 ms (median)
+== 1104_cp02_s000
+[pillar] 285 frames, network 12.5 ms (median)
+[voxel] 285 frames, network 22.8 ms (median)
+== 1104_cp02_s001
+[pillar] 285 frames, network 7.5 ms (median)
+[voxel] 285 frames, network 14.7 ms (median)
+== 1104_cp02_s002
+[pillar] 286 frames, network 7.7 ms (median)
+[voxel] 286 frames, network 15.7 ms (median)
+== 1104_cp02_s003
+[pillar] 285 frames, network 9.0 ms (median)
+[voxel] 285 frames, network 17.6 ms (median)
+== 1104_cp02_s004
+[pillar] 285 frames, network 10.3 ms (median)
+[voxel] 285 frames, network 18.2 ms (median)
+== 1104_cp02_s005
+[pillar] 285 frames, network 8.2 ms (median)
+[voxel] 285 frames, network 17.3 ms (median)
+== 1104_cp04_s000
+[pillar] 306 frames, network 9.9 ms (median)
+[voxel] 306 frames, network 18.9 ms (median)
+== 1104_cp04_s001
+[pillar] 306 frames, network 7.1 ms (median)
+[voxel] 306 frames, network 16.1 ms (median)
+== 1104_cp04_s002
+[pillar] 306 frames, network 7.6 ms (median)
+[voxel] 306 frames, network 15.3 ms (median)
+== 1104_cp04_s003
+[pillar] 306 frames, network 8.1 ms (median)
+[voxel] 306 frames, network 17.4 ms (median)
+== 1104_cp04_s004
+[pillar] 306 frames, network 7.8 ms (median)
+[voxel] 306 frames, network 16.0 ms (median)
+== 1104_cp04_s005
+[pillar] 305 frames, network 7.2 ms (median)
+[voxel] 305 frames, network 16.8 ms (median)
+== 1104_cp04_s006
+[pillar] 306 frames, network 9.2 ms (median)
+[voxel] 306 frames, network 17.9 ms (median)
+== 1104_cp04_s007
+[pillar] 306 frames, network 8.0 ms (median)
+[voxel] 306 frames, network 15.6 ms (median)
+v3_done 2026-11-09T14:10:53+08:00
+W1109 14:11:06.048000 1918325 torch/fx/_symbolic_trace.py:56] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/TensorShape.cpp:4215.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/spconv/pytorch/core.py:127: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/python_variable_indexing.cpp:349.)
+  ret[slices] = updates.view(*output_shape)
+iou3d cuda not built. You don't need this if you use circle_nms. Otherwise, refer to the advanced installation part to build this cuda extension
+Deformable Convolution not built!
+iou3d_nms not built, two-stage roi heads disabled!
+Use HM Bias:  -2.19
+== 0921_164127_s000
+frame 20  voxel: 17 dets 25.4 ms
+frame 40  voxel: 18 dets 30.2 ms
+frame 60  voxel: 19 dets 23.5 ms
+frame 80  voxel: 14 dets 23.4 ms
+frame 100  voxel: 18 dets 40.7 ms
+frame 120  voxel: 14 dets 24.1 ms
+frame 140  voxel: 15 dets 23.7 ms
+frame 160  voxel: 19 dets 23.3 ms
+frame 180  voxel: 18 dets 24.6 ms
+frame 200  voxel: 13 dets 42.0 ms
+frame 220  voxel: 13 dets 25.6 ms
+frame 240  voxel: 18 dets 52.1 ms
+frame 260  voxel: 16 dets 37.6 ms
+frame 280  voxel: 17 dets 23.9 ms
+[voxel] 288 frames, network 27.0 ms (median)
+== 0921_164127_s001
+frame 20  voxel: 14 dets 42.7 ms
+frame 40  voxel: 14 dets 24.6 ms
+frame 60  voxel: 14 dets 34.8 ms
+frame 80  voxel: 16 dets 57.6 ms
+frame 100  voxel: 16 dets 28.3 ms
+frame 120  voxel: 16 dets 26.7 ms
+frame 140  voxel: 14 dets 27.3 ms
+frame 160  voxel: 17 dets 46.0 ms
+frame 180  voxel: 17 dets 41.2 ms
+frame 200  voxel: 17 dets 32.2 ms
+frame 220  voxel: 16 dets 45.7 ms
+frame 240  voxel: 12 dets 49.8 ms
+frame 260  voxel: 13 dets 26.3 ms
+frame 280  voxel: 15 dets 26.0 ms
+[voxel] 288 frames, network 28.2 ms (median)
+== 0921_164127_s002
+frame 20  voxel: 11 dets 26.6 ms
+frame 40  voxel: 13 dets 26.9 ms
+frame 60  voxel: 8 dets 30.4 ms
+frame 80  voxel: 11 dets 26.2 ms
+frame 100  voxel: 9 dets 39.6 ms
+frame 120  voxel: 9 dets 37.4 ms
+frame 140  voxel: 11 dets 25.8 ms
+frame 160  voxel: 9 dets 48.6 ms
+frame 180  voxel: 10 dets 26.2 ms
+frame 200  voxel: 6 dets 30.7 ms
+frame 220  voxel: 9 dets 25.6 ms
+frame 240  voxel: 5 dets 26.4 ms
+frame 260  voxel: 3 dets 27.3 ms
+frame 280  voxel: 5 dets 67.5 ms
+[voxel] 288 frames, network 27.0 ms (median)
+== 0921_164127_s003
+frame 20  voxel: 4 dets 26.1 ms
+frame 40  voxel: 3 dets 25.2 ms
+frame 60  voxel: 5 dets 25.1 ms
+frame 80  voxel: 3 dets 28.1 ms
+frame 100  voxel: 4 dets 25.2 ms
+frame 120  voxel: 6 dets 25.3 ms
+frame 140  voxel: 1 dets 25.1 ms
+frame 160  voxel: 2 dets 25.2 ms
+frame 180  voxel: 5 dets 43.9 ms
+frame 200  voxel: 3 dets 27.7 ms
+frame 220  voxel: 6 dets 31.6 ms
+frame 240  voxel: 7 dets 26.4 ms
+frame 260  voxel: 5 dets 37.3 ms
+frame 280  voxel: 8 dets 30.8 ms
+[voxel] 287 frames, network 27.4 ms (median)
+== 0921_164127_s004
+frame 20  voxel: 9 dets 28.4 ms
+frame 40  voxel: 5 dets 25.7 ms
+frame 60  voxel: 5 dets 26.0 ms
+frame 80  voxel: 6 dets 26.3 ms
+frame 100  voxel: 4 dets 34.9 ms
+frame 120  voxel: 4 dets 46.5 ms
+frame 140  voxel: 1 dets 59.7 ms
+frame 160  voxel: 3 dets 35.4 ms
+frame 180  voxel: 5 dets 27.5 ms
+frame 200  voxel: 4 dets 23.1 ms
+frame 220  voxel: 4 dets 21.9 ms
+frame 240  voxel: 2 dets 24.2 ms
+frame 260  voxel: 2 dets 22.0 ms
+frame 280  voxel: 2 dets 22.9 ms
+[voxel] 288 frames, network 26.4 ms (median)
+== 0921_164127_s005
+frame 20  voxel: 1 dets 52.3 ms
+frame 40  voxel: 1 dets 23.5 ms
+frame 60  voxel: 2 dets 22.3 ms
+frame 80  voxel: 2 dets 37.9 ms
+frame 100  voxel: 1 dets 21.9 ms
+frame 120  voxel: 2 dets 22.0 ms
+frame 140  voxel: 2 dets 22.2 ms
+frame 160  voxel: 1 dets 37.7 ms
+frame 180  voxel: 1 dets 26.3 ms
+frame 200  voxel: 3 dets 72.8 ms
+frame 220  voxel: 1 dets 38.7 ms
+frame 240  voxel: 1 dets 22.2 ms
+frame 260  voxel: 2 dets 23.1 ms
+frame 280  voxel: 1 dets 40.6 ms
+[voxel] 288 frames, network 23.8 ms (median)
+== 0921_165659_s003
+frame 20  voxel: 1 dets 28.6 ms
+frame 40  voxel: 1 dets 27.9 ms
+frame 60  voxel: 1 dets 29.1 ms
+frame 80  voxel: 2 dets 27.9 ms
+frame 100  voxel: 2 dets 43.1 ms
+frame 120  voxel: 2 dets 27.9 ms
+frame 140  voxel: 1 dets 29.0 ms
+frame 160  voxel: 1 dets 70.2 ms
+frame 180  voxel: 1 dets 28.4 ms
+frame 200  voxel: 3 dets 27.5 ms
+frame 220  voxel: 1 dets 30.2 ms
+frame 240  voxel: 1 dets 27.3 ms
+frame 260  voxel: 1 dets 26.6 ms
+[voxel] 276 frames, network 28.1 ms (median)
+== 0921_165659_s004
+frame 20  voxel: 1 dets 27.4 ms
+frame 40  voxel: 0 dets 27.1 ms
+frame 60  voxel: 1 dets 32.9 ms
+frame 80  voxel: 0 dets 45.9 ms
+frame 100  voxel: 0 dets 26.7 ms
+frame 120  voxel: 0 dets 28.9 ms
+frame 140  voxel: 0 dets 28.2 ms
+frame 160  voxel: 0 dets 26.7 ms
+frame 180  voxel: 2 dets 27.1 ms
+frame 200  voxel: 1 dets 45.6 ms
+frame 220  voxel: 0 dets 28.7 ms
+frame 240  voxel: 0 dets 27.5 ms
+frame 260  voxel: 0 dets 33.9 ms
+[voxel] 276 frames, network 28.0 ms (median)
+== 0921_165659_s005
+frame 20  voxel: 2 dets 27.4 ms
+frame 40  voxel: 3 dets 27.4 ms
+frame 60  voxel: 2 dets 27.6 ms
+frame 80  voxel: 2 dets 33.8 ms
+frame 100  voxel: 2 dets 26.8 ms
+frame 120  voxel: 1 dets 51.0 ms
+frame 140  voxel: 2 dets 28.3 ms
+frame 160  voxel: 2 dets 28.4 ms
+frame 180  voxel: 2 dets 28.2 ms
+frame 200  voxel: 2 dets 29.5 ms
+frame 220  voxel: 3 dets 29.0 ms
+frame 240  voxel: 3 dets 27.9 ms
+frame 260  voxel: 2 dets 25.6 ms
+frame 280  voxel: 5 dets 24.4 ms
+frame 300  voxel: 3 dets 25.0 ms
+[voxel] 303 frames, network 28.2 ms (median)
+== 0921_165659_s006
+frame 20  voxel: 4 dets 25.6 ms
+frame 40  voxel: 4 dets 47.6 ms
+frame 60  voxel: 4 dets 24.4 ms
+frame 80  voxel: 5 dets 25.7 ms
+frame 100  voxel: 2 dets 25.6 ms
+frame 120  voxel: 3 dets 31.0 ms
+frame 140  voxel: 3 dets 34.5 ms
+frame 160  voxel: 3 dets 27.8 ms
+frame 180  voxel: 3 dets 27.5 ms
+frame 200  voxel: 4 dets 28.6 ms
+frame 220  voxel: 4 dets 29.5 ms
+frame 240  voxel: 4 dets 29.7 ms
+frame 260  voxel: 6 dets 28.7 ms
+frame 280  voxel: 2 dets 41.1 ms
+frame 300  voxel: 4 dets 27.9 ms
+[voxel] 302 frames, network 27.7 ms (median)
+== 1104_cp02_s000
+frame 20  voxel: 1 dets 35.2 ms
+frame 40  voxel: 0 dets 45.2 ms
+frame 60  voxel: 0 dets 36.9 ms
+frame 80  voxel: 0 dets 22.6 ms
+frame 100  voxel: 0 dets 48.2 ms
+frame 120  voxel: 1 dets 55.7 ms
+frame 140  voxel: 1 dets 25.4 ms
+frame 160  voxel: 3 dets 25.4 ms
+frame 180  voxel: 2 dets 26.8 ms
+frame 200  voxel: 2 dets 32.7 ms
+frame 220  voxel: 4 dets 22.8 ms
+frame 240  voxel: 3 dets 59.8 ms
+frame 260  voxel: 6 dets 56.4 ms
+frame 280  voxel: 4 dets 32.8 ms
+[voxel] 285 frames, network 29.2 ms (median)
+== 1104_cp02_s001
+frame 20  voxel: 4 dets 23.2 ms
+frame 40  voxel: 2 dets 25.1 ms
+frame 60  voxel: 2 dets 22.5 ms
+frame 80  voxel: 2 dets 22.9 ms
+frame 100  voxel: 1 dets 78.5 ms
+frame 120  voxel: 1 dets 32.4 ms
+frame 140  voxel: 1 dets 43.1 ms
+frame 160  voxel: 1 dets 29.2 ms
+frame 180  voxel: 1 dets 22.1 ms
+frame 200  voxel: 1 dets 22.9 ms
+frame 220  voxel: 1 dets 25.5 ms
+frame 240  voxel: 1 dets 35.5 ms
+frame 260  voxel: 1 dets 26.5 ms
+frame 280  voxel: 1 dets 22.4 ms
+[voxel] 285 frames, network 23.8 ms (median)
+== 1104_cp02_s002
+frame 20  voxel: 2 dets 22.8 ms
+frame 40  voxel: 2 dets 43.4 ms
+frame 60  voxel: 2 dets 23.1 ms
+frame 80  voxel: 2 dets 24.8 ms
+frame 100  voxel: 2 dets 22.7 ms
+frame 120  voxel: 3 dets 41.9 ms
+frame 140  voxel: 3 dets 23.4 ms
+frame 160  voxel: 3 dets 24.7 ms
+frame 180  voxel: 3 dets 22.8 ms
+frame 200  voxel: 3 dets 31.5 ms
+frame 220  voxel: 2 dets 22.5 ms
+frame 240  voxel: 3 dets 55.4 ms
+frame 260  voxel: 3 dets 35.8 ms
+frame 280  voxel: 5 dets 40.0 ms
+[voxel] 286 frames, network 23.5 ms (median)
+== 1104_cp02_s003
+frame 20  voxel: 3 dets 37.8 ms
+frame 40  voxel: 3 dets 45.5 ms
+frame 60  voxel: 3 dets 35.0 ms
+frame 80  voxel: 3 dets 23.8 ms
+frame 100  voxel: 3 dets 38.1 ms
+frame 120  voxel: 3 dets 44.1 ms
+frame 140  voxel: 2 dets 36.3 ms
+frame 160  voxel: 2 dets 41.0 ms
+frame 180  voxel: 2 dets 22.8 ms
+frame 200  voxel: 3 dets 27.5 ms
+frame 220  voxel: 2 dets 36.1 ms
+frame 240  voxel: 2 dets 39.3 ms
+frame 260  voxel: 2 dets 22.9 ms
+frame 280  voxel: 2 dets 34.6 ms
+[voxel] 285 frames, network 25.0 ms (median)
+== 1104_cp02_s004
+frame 20  voxel: 2 dets 68.6 ms
+frame 40  voxel: 2 dets 42.0 ms
+frame 60  voxel: 1 dets 46.5 ms
+frame 80  voxel: 1 dets 27.4 ms
+frame 100  voxel: 2 dets 23.7 ms
+frame 120  voxel: 2 dets 45.0 ms
+frame 140  voxel: 3 dets 22.6 ms
+frame 160  voxel: 3 dets 23.5 ms
+frame 180  voxel: 3 dets 23.0 ms
+frame 200  voxel: 3 dets 22.9 ms
+frame 220  voxel: 2 dets 23.5 ms
+frame 240  voxel: 3 dets 23.0 ms
+frame 260  voxel: 2 dets 109.6 ms
+frame 280  voxel: 2 dets 29.6 ms
+[voxel] 285 frames, network 23.8 ms (median)
+== 1104_cp02_s005
+frame 20  voxel: 2 dets 37.9 ms
+frame 40  voxel: 2 dets 24.4 ms
+frame 60  voxel: 3 dets 24.3 ms
+frame 80  voxel: 3 dets 23.0 ms
+frame 100  voxel: 4 dets 22.8 ms
+frame 120  voxel: 5 dets 23.1 ms
+frame 140  voxel: 5 dets 23.0 ms
+frame 160  voxel: 4 dets 31.2 ms
+frame 180  voxel: 4 dets 23.0 ms
+frame 200  voxel: 4 dets 37.3 ms
+frame 220  voxel: 2 dets 22.8 ms
+frame 240  voxel: 2 dets 22.7 ms
+frame 260  voxel: 1 dets 22.9 ms
+frame 280  voxel: 1 dets 23.3 ms
+[voxel] 285 frames, network 23.8 ms (median)
+== 1104_cp04_s000
+frame 20  voxel: 0 dets 42.0 ms
+frame 40  voxel: 1 dets 22.9 ms
+frame 60  voxel: 1 dets 62.6 ms
+frame 80  voxel: 1 dets 45.3 ms
+frame 100  voxel: 2 dets 24.5 ms
+frame 120  voxel: 2 dets 23.6 ms
+frame 140  voxel: 2 dets 46.9 ms
+frame 160  voxel: 1 dets 22.9 ms
+frame 180  voxel: 1 dets 35.8 ms
+frame 200  voxel: 2 dets 43.8 ms
+frame 220  voxel: 1 dets 23.7 ms
+frame 240  voxel: 1 dets 24.5 ms
+frame 260  voxel: 1 dets 24.6 ms
+frame 280  voxel: 1 dets 24.4 ms
+frame 300  voxel: 0 dets 23.3 ms
+[voxel] 306 frames, network 25.4 ms (median)
+== 1104_cp04_s001
+frame 20  voxel: 0 dets 25.5 ms
+frame 40  voxel: 0 dets 37.1 ms
+frame 60  voxel: 0 dets 34.0 ms
+frame 80  voxel: 0 dets 24.9 ms
+frame 100  voxel: 0 dets 22.6 ms
+frame 120  voxel: 0 dets 59.3 ms
+frame 140  voxel: 0 dets 30.8 ms
+frame 160  voxel: 0 dets 24.7 ms
+frame 180  voxel: 0 dets 58.5 ms
+frame 200  voxel: 0 dets 40.2 ms
+frame 220  voxel: 0 dets 22.5 ms
+frame 240  voxel: 1 dets 24.7 ms
+frame 260  voxel: 0 dets 23.3 ms
+frame 280  voxel: 0 dets 46.8 ms
+frame 300  voxel: 0 dets 42.7 ms
+[voxel] 306 frames, network 28.7 ms (median)
+== 1104_cp04_s002
+frame 20  voxel: 0 dets 23.2 ms
+frame 40  voxel: 1 dets 40.9 ms
+frame 60  voxel: 1 dets 24.0 ms
+frame 80  voxel: 1 dets 35.5 ms
+frame 100  voxel: 1 dets 26.6 ms
+frame 120  voxel: 2 dets 29.2 ms
+frame 140  voxel: 1 dets 23.5 ms
+frame 160  voxel: 2 dets 23.7 ms
+frame 180  voxel: 2 dets 23.6 ms
+frame 200  voxel: 2 dets 23.2 ms
+frame 220  voxel: 1 dets 23.0 ms
+frame 240  voxel: 1 dets 29.7 ms
+frame 260  voxel: 2 dets 23.4 ms
+frame 280  voxel: 1 dets 61.3 ms
+frame 300  voxel: 1 dets 23.0 ms
+[voxel] 306 frames, network 24.2 ms (median)
+== 1104_cp04_s003
+frame 20  voxel: 1 dets 47.6 ms
+frame 40  voxel: 1 dets 24.4 ms
+frame 60  voxel: 1 dets 33.0 ms
+frame 80  voxel: 2 dets 32.7 ms
+frame 100  voxel: 2 dets 23.5 ms
+frame 120  voxel: 2 dets 34.2 ms
+frame 140  voxel: 2 dets 25.0 ms
+frame 160  voxel: 2 dets 23.9 ms
+frame 180  voxel: 2 dets 37.8 ms
+frame 200  voxel: 2 dets 43.4 ms
+frame 220  voxel: 1 dets 23.7 ms
+frame 240  voxel: 0 dets 36.1 ms
+frame 260  voxel: 1 dets 58.6 ms
+frame 280  voxel: 2 dets 23.2 ms
+frame 300  voxel: 2 dets 29.9 ms
+[voxel] 306 frames, network 25.7 ms (median)
+== 1104_cp04_s004
+frame 20  voxel: 2 dets 23.4 ms
+frame 40  voxel: 2 dets 33.0 ms
+frame 60  voxel: 3 dets 74.5 ms
+frame 80  voxel: 1 dets 32.9 ms
+frame 100  voxel: 1 dets 41.2 ms
+frame 120  voxel: 2 dets 33.8 ms
+frame 140  voxel: 2 dets 36.5 ms
+frame 160  voxel: 2 dets 31.0 ms
+frame 180  voxel: 2 dets 23.4 ms
+frame 200  voxel: 3 dets 23.4 ms
+frame 220  voxel: 2 dets 60.3 ms
+frame 240  voxel: 3 dets 24.5 ms
+frame 260  voxel: 4 dets 39.5 ms
+frame 280  voxel: 4 dets 23.2 ms
+frame 300  voxel: 3 dets 23.5 ms
+[voxel] 306 frames, network 25.2 ms (median)
+== 1104_cp04_s005
+frame 20  voxel: 3 dets 23.1 ms
+frame 40  voxel: 1 dets 30.4 ms
+frame 60  voxel: 0 dets 33.2 ms
+frame 80  voxel: 0 dets 38.2 ms
+frame 100  voxel: 0 dets 28.3 ms
+frame 120  voxel: 0 dets 24.8 ms
+frame 140  voxel: 0 dets 23.7 ms
+frame 160  voxel: 0 dets 23.4 ms
+frame 180  voxel: 0 dets 24.2 ms
+frame 200  voxel: 0 dets 23.0 ms
+frame 220  voxel: 0 dets 23.0 ms
+frame 240  voxel: 1 dets 32.6 ms
+frame 260  voxel: 1 dets 41.4 ms
+frame 280  voxel: 1 dets 32.7 ms
+frame 300  voxel: 1 dets 43.0 ms
+[voxel] 305 frames, network 26.5 ms (median)
+== 1104_cp04_s006
+frame 20  voxel: 1 dets 48.3 ms
+frame 40  voxel: 2 dets 42.6 ms
+frame 60  voxel: 2 dets 24.8 ms
+frame 80  voxel: 2 dets 37.0 ms
+frame 100  voxel: 2 dets 47.0 ms
+frame 120  voxel: 1 dets 39.7 ms
+frame 140  voxel: 1 dets 23.7 ms
+frame 160  voxel: 2 dets 29.6 ms
+frame 180  voxel: 1 dets 23.3 ms
+frame 200  voxel: 3 dets 72.6 ms
+frame 220  voxel: 3 dets 37.5 ms
+frame 240  voxel: 4 dets 24.8 ms
+frame 260  voxel: 3 dets 38.6 ms
+frame 280  voxel: 5 dets 23.6 ms
+frame 300  voxel: 4 dets 23.3 ms
+[voxel] 306 frames, network 25.2 ms (median)
+== 1104_cp04_s007
+frame 20  voxel: 4 dets 22.6 ms
+frame 40  voxel: 4 dets 23.2 ms
+frame 60  voxel: 2 dets 40.5 ms
+frame 80  voxel: 1 dets 31.0 ms
+frame 100  voxel: 2 dets 35.4 ms
+frame 120  voxel: 3 dets 60.4 ms
+frame 140  voxel: 3 dets 25.8 ms
+frame 160  voxel: 3 dets 23.5 ms
+frame 180  voxel: 3 dets 49.8 ms
+frame 200  voxel: 3 dets 23.9 ms
+frame 220  voxel: 3 dets 50.8 ms
+frame 240  voxel: 0 dets 23.2 ms
+frame 260  voxel: 0 dets 23.3 ms
+frame 280  voxel: 0 dets 24.5 ms
+frame 300  voxel: 0 dets 22.9 ms
+[voxel] 306 frames, network 26.4 ms (median)
+v3_tta_done 2026-11-09T14:26:49+08:00
+V3_REPLAY_DONE

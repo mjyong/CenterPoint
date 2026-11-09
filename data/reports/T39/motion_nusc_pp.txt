@@ -1,0 +1,6 @@
+24 scenes, 7042 frames
+| on speed | on frames | moving recall | false moving | static tracks flagged | false episodes (per h) | moving stretches: missed / all, latency median / p90 s | relevant (>= 1.0 m/s, <= 30 m): missed / all, latency median / p90 s |
+|---|---|---|---|---|---|---|---|
+| 0.70 | 3 | 0.926 (983) | 0.0176 (1703) | 6 / 50 | 8 (41 / h) | 3 / 77, 0.50 / 1.00 | 2 / 49, 0.50 / 1.00 |
+recording: 0.20 h
+11 missed stretches / false episodes -> data/reports/T39/motion_nusc_pp_details.csv
