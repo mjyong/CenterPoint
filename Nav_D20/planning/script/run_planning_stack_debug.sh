@@ -50,6 +50,10 @@ export MAMBA_ROOT_PREFIX="${prefix}/root"
 export CONDA_BUILD=0
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export SERES_PERCEPTION_INSTALL_DIR="${install_base}"
+# LOC_MAP_PATH=<定位地图目录>、LOC_INS_ONLY=1：换定位地图 / INS 直出，见 lightning 的 scripts/loc_debug_config.sh
+# shellcheck disable=SC1091
+source "${nav_root}/slam/lightning-lm-master/scripts/loc_debug_config.sh"
+loc_config="$(loc_debug_config "${loc_config}")" || exit 1
 export config_path="${loc_config}"
 export PLANNING_TIMEOUT_WALL_CLOCK=1
 export LD_LIBRARY_PATH="${geo_lib}:${env_prefix}/lib:/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"

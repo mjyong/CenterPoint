@@ -149,8 +149,9 @@
 | T39 | 训练 v3（Pillar、Voxel，配方同 v2）；24 个验证场景上和 nusc_pp、v2_pp 重跑比较（合计、0921、1104 分开），定上线的 Pillar 和上报阈值；v3 Voxel + TTA 对教师 | Agent，人定 | T38 | 半天 | 完成，已复核（2026-11-09）。上线仍用 nuScenes Pillar，上报阈值不改（0.40；T39 建议的 0.35 只看检测，没采用）。v3_pp 近处 ΔAP@2.0 只有 +0.006；v2_pp 在 1104 上 AP@2.0 低 0.049。教师不换 |
 | T40 | 收尾：删 v2 数据集；8 号狗装带开机锁频开关的 deb（默认关）；T35 A、B 两段（B 段用开关锁频）；剩下要人和别的团队定的事列在 T40 节里 | Agent + 人（B 段带狗出门） | T39 | 1 小时 + 出门 | 任务已写好 |
 | T41 | Nav_D20 规划：补提交 .gitignore 漏掉的脚本和配置；重编（/tf 只发一棵树、局部代价地图用里程计的时间戳、标记寿命 0.5 s）；回放 0921 重录；查录包 | Agent | 无 | 1 小时 | 完成，已复核（2026-11-09）：规划的显示问题没了；录包还是不对是定位的问题，IMU 高频预测把 g 当成 m/s²，odom 一秒掉几米、跳几十米，规划因此起点在障碍里 |
-| T42 | Nav_D20 定位：高频预测的加速度按重力归一化以后重编、重跑；查 odom；看 LIO 每秒几帧；找配置的定位地图 | Agent | T41 | 1 小时 | 完成。z 不再掉到 −46 m，odom 仍一下一下跳（p99 55 m/s，最大一跳 12 m）。LIO 约 9.9 Hz。配置的地图没有，用的是仓库里的 0c3f8a2d。规划进了 active，有 CMD，同时大量起点碰撞 |
-| H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T42 | 15 分钟 | 待做（录包在 work_dirs/planning_io_t42/） |
+| T42 | Nav_D20 定位：高频预测的加速度按重力归一化以后重编、重跑；查 odom；看 LIO 每秒几帧；找配置的定位地图 | Agent | T41 | 1 小时 | 完成，已复核（2026-11-09）：高频预测修好（z 不再掉、LIO 9.9 帧/秒、规划进了 active）；还跳是内置定位地图倾斜 51°，配置的现场地图服务器上没有 |
+| T43 | Nav_D20 定位地图：从 8 号狗只读拷现场地图 ad68517c，查平不平；用它回放（A），再用 INS 直出回放（B）；两个录包都查 | Agent | T42 | 1 小时 | 任务已写好 |
+| H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T43 | 15 分钟 | 待做（等 T43 的录包；T42 的录包定位还在跳） |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -7833,7 +7834,7 @@ mkdir -p data/reports/T41
 
 ## H7 在 Foxglove 里看规划的新录包（人做）
 
-T42 之后。用 Foxglove 打开 T42 第 2 步的新录包，导入 `Nav_D20/planning/script/planning_io.json`，从头播放，看几处：
+T43 之后。用 Foxglove 打开 T43 的录包（有现场地图的那一份；没有就用 INS 直出那一份），导入 `Nav_D20/planning/script/planning_io.json`，从头播放，看几处：
 - 狗的位置（`/lightning/odom`）和点云、局部栅格对得上，不来回跳；
 - 局部代价地图跟着狗走；
 - 规划路径不闪，暂停时也在。
@@ -7915,4 +7916,77 @@ LIGHTNING_EXIT:0
 第 5 步。没有。`find /public /home -maxdepth 6 -type d -name "ad68517c*"` 没有输出（`find_map.txt`）。配置路径 `/opt/seres/nav/data/ad68517c-e845-42a4-b5dd-a6b7c6d2af13` 本机不存在，定位日志写了「配置的地图路径无效」，回退到仓库里的 `Nav_D20/slam/lightning-lm-master/map/0c3f8a2d-41eb-416d-8fca-aaad500e2be9`。没有改配置。
 
 录包按 T41 走 Git LFS，`.gitignore` 给 `work_dirs/planning_io_t42/**/metadata.yaml` 加了例外。
+
+### T42 复核（2026-11-09）
+
+- **高频预测的修正起作用了**：
+
+  | | T41 | T42 |
+  |---|---|---|
+  | odom 速度 p99 | 491 m/s | 55 m/s |
+  | odom 高度 | −46.7 .. 3.9 m | −2.9 .. 14.2 m |
+  | 1 m 以上的跳变 | 61 次 | 18 次 |
+  | LIO | 约每秒纠正一次（从跳变推断） | 9.9 帧/秒 |
+  | 规划 | fault | 进了 active，`CMD:` 149 次 |
+
+  录包里没有跳变、在走的 10 段（每段 1 s），odom 的航向和行进方向差中位 −2.7°：`base_link` 朝前，坐标系没问题。
+- **还在跳，是因为定位用的那张内置地图是歪的。** 从 `loc.log` 和地图文件本身看：
+  - 446 / 676 帧报"定位质量下降"，匹配上的点 `effect_num` 中位只有 51（正常应是几千）；每 10 s 攒满 100 帧失败就重初始化一次，共 4 次。
+  - 刚用 RTK 固定解的 INS 位姿重初始化完，第一帧也只匹配上约 55 个点：位姿是对的，地图对不上。
+  - 开头 28.8 s 狗站着不动（0921_164127_s000），INS 一直在 (78.07, 119.18)。LIO 却在 x 76.3–78.6、z −2.0–0.6 m 之间晃，相邻帧跳 0.5 m 以上 44 次。
+  - 内置地图 `0c3f8a2d-...` 是用**这同一个 bag** 的 15 s 建的：8 个关键帧，`pose_lio` 从 (0, 0) 走到 (−0.6, 14.5)，几乎是一条直线。
+  - 它对齐到 INS 以后整张图**倾斜 51.3°**：地面的法向离竖直 51°，z 从 −73.8 到 110.6 m。单个关键帧自己的点云是平的（3.4°）。
+  - 原因：只用一条直线上的 INS 位置去对齐，绕这条线的转动定不住（建图时 kygi665 的横滚、俯仰也设成了 0、不进约束）。优化随便停在了 51°。
+  - 新工具 `Nav_D20/slam/lightning-lm-master/scripts/check_map_tilt.py` 查地图平不平，只要 numpy：这张图报 TILTED 51.3°。测试 `tests/dog/test_loc_map_tilt.py`。
+- **规划的局部代价地图把狗自己圈在障碍里**：
+  - 555 张里 346 张，狗的脚下（1.0 × 0.4 m）有障碍，1 m 内一半以上的格子是障碍；感知的 `/map/occupancy_grid` 319 张里一张都没有。
+  - 所以 TEB 报了 173 次 `Initial pose is in collision`，这些周期速度给 0。
+  - 多半是定位跳的时候，静态全局图按错的位置叠进了局部图（狗"站进了墙里"）。定位对了再看；还有的话查 `CostMapProduction` 往局部图里放了什么。
+  - 查包工具加了这一条（`--footprint`，默认 D20 的 1.0 × 0.4 m）。
+- **配置的地图 `ad68517c-...` 服务器上没有。** 它是机器人团队的现场地图，和规划的 CJGC 是一套（`save_default_map.sh` 里重定位的坐标是几百米量级）。8 号狗跑的就是这套 D20 定位（XT32 + kygi665），多半在狗的 `/opt/seres/nav/data/` 下，只读拷过来就行。
+- 本机回放换地图、换 INS 直出不用改配置：`LOC_MAP_PATH=<地图目录>`、`LOC_INS_ONLY=1`（`scripts/loc_debug_config.sh`）。`run_loc_online_debug.sh`、`run_planning_stack_debug.sh` 都认这两个变量，会写一份临时配置，别的不变。
+  - `ins_only_mode` 是 lightning 自带的：不跑 LIO 和激光定位，直接发 INS 位姿。0921 这包全程 RTK 固定解，INS 直出就能把规划的调试和定位分开。
+
+
+---
+
+## T43 Nav_D20 定位地图：从 8 号狗拷现场地图；用它重跑，同时跑一遍 INS 直出
+
+```text
+任务 T43：从 8 号狗只读拷出配置的定位地图 ad68517c-...，查它平不平、盖不盖得住 0921 这一片；
+有的话用它回放 0921 重录（A）；不管有没有，都用 INS 直出再回放一遍（B）。两个录包都用查包工具查。
+先按通用约定做（第 10 条）。可以改的范围：Nav_D20/。仓库根目录。ROS_DOMAIN_ID 同 T41（42）。
+狗上只读：不停、不改机器人的任何服务和文件，不往域 0 上发东西。
+mkdir -p data/reports/T43；M=/public/zjst/robot/loc_maps；ID=ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+
+0. pytest tests/dog/test_loc_map_tilt.py tests/dog/test_planning_mcap.py -q | tail -1        （8 passed）
+   python3 Nav_D20/slam/lightning-lm-master/scripts/check_map_tilt.py Nav_D20/slam/lightning-lm-master/map/0c3f8a2d-41eb-416d-8fca-aaad500e2be9 \
+       | tee data/reports/T43/tilt_builtin.txt                          （TILTED 51.3）
+   python3 Nav_D20/planning/tools/check_planning_mcap.py work_dirs/planning_io_t42/planning_io_t42_0.mcap | tail -3   （odom、occmap 两条）
+1. 狗上找地图（只读）：
+     ssh dog 'ls -la /opt/seres/nav/data/ 2>&1 | head -20; du -sh /opt/seres/nav/data/'$ID' 2>&1' | tee data/reports/T43/dog_maps.txt
+   - 没有这个目录：在报告里写"狗上没有"，跳过第 2 步和 A，只做 B；
+   - 有的话拷到服务器（读不了就用 sudo -n tar 只读打包；狗上不留任何东西）：
+       mkdir -p $M && rsync -a dog:/opt/seres/nav/data/$ID/ $M/$ID/ \
+         || ssh dog "sudo -n tar -C /opt/seres/nav/data -cf - $ID" | tar -C $M -xf -
+2. 查这张地图：
+     python3 Nav_D20/slam/lightning-lm-master/scripts/check_map_tilt.py $M/$ID | tee data/reports/T43/tilt_site.txt
+   - 要 level；
+   - 打印的 x、y 范围要盖住 0921 的起点 (78, 119)。盖不住、或者 TILTED，就跳过 A，报告里写清。
+3. A：用现场地图回放（同 T42 第 2 步，只多一个变量）：
+     LOC_MAP_PATH=$M/$ID bash Nav_D20/planning/script/run_planning_stack_debug.sh --once
+   - 录到 work_dirs/planning_io_t43_map/，定位日志拷到 data/reports/T43/loc_map.log；
+   - 查包：check_planning_mcap.py ... | tee data/reports/T43/check_map.txt；
+   - 从 loc_map.log 数：定位质量下降的帧数和总帧数，effect_num 中位，定位故障 / 重初始化的次数。
+4. B：INS 直出回放（同上，只换变量）：
+     LOC_INS_ONLY=1 bash Nav_D20/planning/script/run_planning_stack_debug.sh --once
+   - 录到 work_dirs/planning_io_t43_ins/，日志 data/reports/T43/loc_ins.log；check_planning_mcap.py ... | tee data/reports/T43/check_ins.txt；
+   - 定位日志里应有 "INS only mode"。
+5. 两次都抄规划的关键行：mission_state 走到哪、CMD: 的次数和开头两条、Initial pose is in collision 的次数、Start point is in collision 有没有。
+6. 提交：data/reports/T43/、两个录包目录（同 T42，走 LFS）、本文档。不提交拷来的地图。
+
+停止条件：第 1 步要改狗上的东西才能拷；编不过、跑不起来。
+报告（写进"T43 结果"）：狗上有没有这张图、多大；tilt_site.txt；A、B 两次查包的 PROBLEM 行；
+A 的定位质量统计；两次规划的关键行；哪一次 odom 不再报 "not a walking robot"、局部代价地图不再把狗圈住。
+```
 

@@ -19,6 +19,11 @@ if [[ ! -x "${bin}" || ! -f "${setup}" || ! -f "${config_path}" ]]; then
   exit 1
 fi
 
+# LOC_MAP_PATH、LOC_INS_ONLY：见 loc_debug_config.sh
+# shellcheck disable=SC1091
+source "${src_root}/scripts/loc_debug_config.sh"
+config_path="$(loc_debug_config "${config_path}")" || exit 1
+
 export MAMBA_ROOT_PREFIX="${prefix}/root"
 export CONDA_BUILD=0
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"

@@ -35,7 +35,7 @@ def _make(ts, name, **fields):
     return ts.types[name](**values)
 
 
-def _write(path, old, wall_stamps=None, runaway=False):
+def _write(path, old, wall_stamps=None, runaway=False, blocked=False):
     wall_stamps = old if wall_stamps is None else wall_stamps
     from mcap.writer import CompressionType, Writer
     from rosbags.typesys import Stores, get_typestore
@@ -90,9 +90,16 @@ def _write(path, old, wall_stamps=None, runaway=False):
             put("/lightning/odom", "nav_msgs/msg/Odometry",
                 _make(ts, "nav_msgs/msg/Odometry", header=header(bag_t, "map"), child_frame_id="base_link",
                       pose=_make(ts, "geometry_msgs/msg/PoseWithCovariance", pose=pose)), wall_t)
+            cells = np.zeros((20, 20), np.int8)            # 2 x 2 m around base_link at 0.1 m
+            if blocked:
+                cells[9:11, 9:11] = 100                       # obstacles under the robot (T42's local costmap)
+            origin = _make(ts, "geometry_msgs/msg/Pose", position=_make(ts, "geometry_msgs/msg/Point", x=-1.0, y=-1.0,
+                                                                        z=0.0),
+                           orientation=_make(ts, "geometry_msgs/msg/Quaternion", x=0.0, y=0.0, z=0.0, w=1.0))
+            info = _make(ts, "nav_msgs/msg/MapMetaData", resolution=0.1, width=20, height=20, origin=origin)
             put("/planning/debug/cost_map_production/occmap", "nav_msgs/msg/OccupancyGrid",
                 _make(ts, "nav_msgs/msg/OccupancyGrid", header=header(wall_t if wall_stamps else bag_t, "base_link"),
-                      data=np.zeros(4, np.int8)), wall_t)
+                      info=info, data=cells.ravel()), wall_t)
             markers = [] if old else [marker(0.0, "", 3, 0.0)]
             markers += [marker(0.0, "map", 0, 0.05 if old else 0.5) for _ in range(3)]
             put("/planning/debug/path_tracking", "visualization_msgs/msg/MarkerArray",
@@ -142,6 +149,20 @@ def test_check_planning_mcap_finds_odometry_no_robot_can_have(tmp_path, capsys):
     problems = [line for line in capsys.readouterr().out.splitlines() if line.startswith("PROBLEM ")]
     assert len(problems) == 1 and "/lightning/odom: not a walking robot" in problems[0] and "z -4.0 .." \
         in problems[0], problems
+
+
+def test_check_planning_mcap_finds_a_robot_inside_its_costmap(tmp_path, capsys):
+    pytest.importorskip("mcap")
+    pytest.importorskip("rosbags")
+    sys.path.insert(0, TOOL)
+    import check_planning_mcap
+
+    bag = str(tmp_path / "blocked.mcap")
+    _write(bag, old=False, blocked=True)
+    assert check_planning_mcap.main([bag]) == 1
+    problems = [line for line in capsys.readouterr().out.splitlines() if line.startswith("PROBLEM ")]
+    assert problems == ["PROBLEM /planning/debug/cost_map_production/occmap: the robot's footprint is occupied in "
+                        "60 of 60 grids; TEB will not plan from there"], problems
 
 
 def test_check_planning_mcap_finds_a_costmap_on_the_wall_clock(tmp_path, capsys):

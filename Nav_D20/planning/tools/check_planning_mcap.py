@@ -15,7 +15,10 @@
 4. Odometry (nav_msgs/Odometry) a walking robot can have: speed between consecutive messages, height swing,
    jumps. The T41 replay's /lightning/odom ran away between corrections (up to 32 m/s, z down to -46 m) because
    the localization's IMU-rate prediction took the kygi IMU's acceleration in g as m/s^2.
-5. With --layout: the layout's topics that the recording does not have.
+5. Occupancy grids in base_link with the robot's own footprint occupied (--footprint, D20 1.0 x 0.4 m): TEB
+   refuses to plan from there ("Initial pose is in collision"). In T42 planning's local costmap had it in 2 of 3
+   grids while perception's /map/occupancy_grid never did.
+6. With --layout: the layout's topics that the recording does not have.
 
 Prints one line per problem; exit code 1 when there is any. Needs the mcap and rosbags packages.
 """
@@ -36,6 +39,7 @@ DRAWN = ("nav_msgs/msg/OccupancyGrid", "nav_msgs/msg/Odometry", "nav_msgs/msg/Pa
 MAX_SPEED = 4.0       # [m/s] the dogs walk below about 2 m/s
 MAX_Z_SWING = 3.0     # [m] height change over a recording
 MAX_JUMP = 1.0        # [m] between consecutive odometry messages
+FOOTPRINT_SHARE = 0.1  # grids with an occupied footprint cell above this share are reported
 MARKER_TYPES = ("visualization_msgs/msg/Marker", "visualization_msgs/msg/MarkerArray")
 TF_TYPES = ("tf2_msgs/msg/TFMessage",)
 SLACK = 1.0   # [s] a stamp this far outside the TF's time range still counts as covered
@@ -66,7 +70,8 @@ def read(path):
     if not files:
         raise SystemExit("%s: no .mcap" % path)
     ts = get_typestore(Stores.ROS2_HUMBLE)
-    topics = defaultdict(lambda: dict(type=None, stamps=[], frames=set(), log=[], lifetimes=[], xyz=[]))
+    topics = defaultdict(lambda: dict(type=None, stamps=[], frames=set(), log=[], lifetimes=[], xyz=[],
+                                      footprint=[]))
     edges = []
     for f in files:
         with open(f, "rb") as fh:
@@ -88,6 +93,12 @@ def read(path):
                         t["frames"].add(m.header.frame_id)
                         t["stamps"].append(m.header.stamp.sec + m.header.stamp.nanosec * 1e-9)
                         t["lifetimes"].append(m.lifetime.sec + m.lifetime.nanosec * 1e-9)
+                elif t["type"] == "nav_msgs/msg/OccupancyGrid":
+                    msg = ts.deserialize_cdr(message.data, t["type"])
+                    t["stamps"].append(msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9)
+                    t["frames"].add(msg.header.frame_id)
+                    if msg.header.frame_id == "base_link" and FOOT is not None:
+                        t["footprint"].append(_footprint_occupied(msg, *FOOT))
                 elif t["type"] == "nav_msgs/msg/Odometry":
                     msg = ts.deserialize_cdr(message.data, t["type"])
                     p = msg.pose.pose.position
@@ -99,6 +110,32 @@ def read(path):
                     t["stamps"].append(stamp)
                     t["frames"].add(frame)
     return topics, edges
+
+
+FOOT = (1.0, 0.4)      # [m] length (x) and width (y) of the robot, set by --footprint
+
+
+def _footprint_occupied(msg, length, width):
+    """Any cell >= 50 under the robot's rectangle (centred on base_link, x forward)."""
+    i = msg.info
+    if i.width * i.height == 0 or len(msg.data) != i.width * i.height:
+        return False
+    d = np.asarray(msg.data, np.int16).reshape(i.height, i.width)
+    xs = i.origin.position.x + (np.arange(i.width) + 0.5) * i.resolution
+    ys = i.origin.position.y + (np.arange(i.height) + 0.5) * i.resolution
+    cx = np.abs(xs) <= length / 2
+    cy = np.abs(ys) <= width / 2
+    return bool((d[np.ix_(cy, cx)] >= 50).any())
+
+
+def footprint_problems(topics):
+    out = []
+    for name, t in sorted(topics.items()):
+        f = t["footprint"]
+        if f and np.mean(f) > FOOTPRINT_SHARE:
+            out.append("%s: the robot's footprint is occupied in %d of %d grids; TEB will not plan from there" % (
+                name, int(np.sum(f)), len(f)))
+    return out
 
 
 def tf_problems(edges):
@@ -220,14 +257,18 @@ def layout_topics(path):
 
 
 def main(argv=None):
+    global FOOT
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("bag", help="an .mcap file or a ros2 bag directory of them")
     ap.add_argument("--layout", default=None, help="Foxglove layout JSON: report its topics the bag does not have")
     ap.add_argument("--display-frame", default="map")
+    ap.add_argument("--footprint", type=float, nargs=2, default=list(FOOT), metavar=("LENGTH", "WIDTH"),
+                    help="[m] robot rectangle for the occupancy check (robot_param.pb.txt: D20 1.0 x 0.4)")
     args = ap.parse_args(argv)
+    FOOT = tuple(args.footprint)
     topics, edges = read(args.bag)
     problems = (tf_problems(edges) + time_problems(topics, edges, args.display_frame) + marker_problems(topics)
-                + odom_problems(topics))
+                + odom_problems(topics) + footprint_problems(topics))
     if args.layout:
         problems += ["layout: %s is not in the recording" % n for n in sorted(layout_topics(args.layout) - set(topics))]
     print("%s: %d topics, %d transforms" % (args.bag, len(topics), len(edges)))

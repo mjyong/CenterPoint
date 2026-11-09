@@ -206,7 +206,7 @@ bash Nav_D20/planning/script/run_planning_debug.sh
 
 规划不订 `lidar_3d_detection` 的检测框。D20 局部障碍来自 `lidar_seg` 的 `/patchworkpp/ground_seg_intensity`，再由 `grid_map_memory_node` 发成 `/map/occupancy_grid`。定位发 `/lightning/odom`。默认 bag 是 `bags0921/rosbag2_2026_09_21-16_41_27`，大约 173 秒。
 
-定位配置里的 `/opt/seres` 地图这台机器没有，会回退到仓库里的 `0c3f8a2d-...`。那不是这包录制时的那张图，激光定位可能对不上，里程计仍会按 LIO 往外发。规划的全局 A* 用的是磁盘上的 CJGC，不跟这张定位图走。
+定位配置里的 `/opt/seres` 地图这台机器没有，会回退到仓库里的 `0c3f8a2d-...`。**这张内置地图不能用来定位**（2026-11-09，T42 复核）：它是用 0921 这包的 15 s 建的，对齐到 INS 后整张图倾斜约 51°（`slam/lightning-lm-master/scripts/check_map_tilt.py`），定位每帧只匹配上几十个点，每 10 s 重初始化一次、位置来回跳。本机回放用 `LOC_MAP_PATH=<现场地图目录>` 换成真的现场地图，或者 `LOC_INS_ONLY=1` 用 INS 直出（全程 RTK 固定解的包），见 `slam/lightning-lm-master/scripts/loc_debug_config.sh`。那不是这包录制时的那张图，激光定位可能对不上，里程计仍会按 LIO 往外发。规划的全局 A* 用的是磁盘上的 CJGC，不跟这张定位图走。
 
 bag 的时间戳是 9 月，规划超时比较的是本机时钟。一键脚本会设 `PLANNING_TIMEOUT_WALL_CLOCK=1`，按收到消息的时刻判断断流，狗上的正式进程不要设这个变量。
 
