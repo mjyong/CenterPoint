@@ -152,6 +152,7 @@
 | T42 | Nav_D20 定位：高频预测的加速度按重力归一化以后重编、重跑；查 odom；看 LIO 每秒几帧；找配置的定位地图 | Agent | T41 | 1 小时 | 完成，已复核（2026-11-09）：高频预测修好（z 不再掉、LIO 9.9 帧/秒、规划进了 active）；还跳是内置定位地图倾斜 51°，配置的现场地图服务器上没有 |
 | T43 | Nav_D20 定位地图：从 8 号狗只读拷现场地图 ad68517c，查平不平；用它回放（A），再用 INS 直出回放（B）；两个录包都查 | Agent | T42 | 1 小时 | 任务已写好 |
 | H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T43 | 15 分钟 | 待做（等 T43 的录包；T42 的录包定位还在跳） |
+| T44 | 路口让行门控：1104 上离线评测（8 条假想过路线，五组参数：默认、IMM 8 s、狗 2 m/s、σ 放宽、σ 收紧）；只读看 8 号狗的定位外参 | Agent | 无 | 1.5 小时 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -7988,5 +7989,56 @@ mkdir -p data/reports/T43；M=/public/zjst/robot/loc_maps；ID=ad68517c-e845-42a
 停止条件：第 1 步要改狗上的东西才能拷；编不过、跑不起来。
 报告（写进"T43 结果"）：狗上有没有这张图、多大；tilt_site.txt；A、B 两次查包的 PROBLEM 行；
 A 的定位质量统计；两次规划的关键行；哪一次 odom 不再报 "not a walking robot"、局部代价地图不再把狗圈住。
+```
+
+
+---
+
+## T44 路口让行门控：1104 上离线评测
+
+设计见 docs/PLANNING_INTEGRATION.md（第 4、5、7 节）。人定（2026-11-09）：厂区限速 30 km/h；停着的车最多看 3 s；规划里的门控由我们写；先做离线评测。
+门控的 Python 参考实现 `dog_perception/yield_gate.py`，评测 `dog_perception/yield_eval.py` 和 `tools/dog/yield_eval.py`，测试 `tests/dog/test_yield_gate.py`。
+
+```text
+任务 T44：用 1104 审过的标签离线评测让行门控。狗站的地方往 8 个方向各画一条 8 m 的假想过路线，每 1 s "到一次路边"；
+门控用上线模型存下的检测（重跑跟踪和 IMM 预测，和狗上一样）逐帧决定，说走了就按狗的速度一直走过去；
+标签当真值，看放行安不安全、比理想门控多等多久。另外量路口车速、车最早在多远被跟上；只读看 8 号狗的定位外参。
+先按通用约定做。只用 CPU。仓库根目录，export PYTHONPATH=.。mkdir -p data/reports/T44
+S=$(for d in data/labels/1104_*/labels_sustech2.pkl; do basename $(dirname $d); done)
+
+0. pytest tests/dog/test_yield_gate.py -q | tail -1                       （15 passed）
+   echo $S | wc -w                                                        （32）
+   for r in $S; do [ -f data/runs_online/$r/pillar/results.pkl ] || echo "missing $r"; done     （T37 第 2 步的结果，应该都在）
+   8 号狗的定位外参（只读，不停、不改任何东西）：
+     ssh dog 'ps -eo args | grep -iE "lightning|run_loc|loc_launch" | grep -v grep | cut -c1-300;
+              for f in $(find /opt/seres -name default_d20.yaml 2>/dev/null | head -5); do echo "== $f"; grep -n -B1 -A3 "^ *extrinsic_[TR]" $f; done' \
+         2>&1 | tee data/reports/T44/dog_extrinsic.txt
+   对着仓库里的 Nav_D20/slam/lightning-lm-master/config/default_d20.yaml 看狗上生效的是哪一组：
+   "D20 A2"（fasterlio 的 extrinsic_T 是 [-0.0213, 0.18, 0.009]，雷达在 base_link 前 0.32 m）还是 "D20 A1"（[0.4594, 0.0, 0.0516]，前 0.59 m）。
+1. 五次评测，可以同时跑（各占一个 CPU 核；每次约 5–20 分钟）：
+     run() { n=$1; shift; s=$(date +%s); python tools/dog/yield_eval.py --scenes $S --fan 8 --length 8 "$@" \
+         --details data/reports/T44/episodes_$n.csv > data/reports/T44/yield_$n.md 2>&1; echo "$n exit $? $(( $(date +%s) - s )) s"; }
+     { run base & run h8 --pred-horizon 8 & run v2 --dog-speed 2 & run wide --sigma-k 2 --sigma-max 3 & \
+       run tight --sigma-max 0.5 & wait; } 2>&1 | tee data/reports/T44/runs.txt
+   - base：默认（IMM 3 s 以后匀速，狗 1 m/s，τ 2 s，σ 最多 1 m）；h8：IMM 预测 8 s；v2：狗过路口 2 m/s；
+     wide：k = 2、σ 最多 3 m（更保守）；tight：σ 最多 0.5 m。
+   - 退出码 1 表示有不安全的放行，是结果不是出错，照样往下做。别的退出码、或者 md 里有 Traceback 才停。
+2. 看 yield_base.md：
+   - 开头每个场景一行：有没有 "MOVED"（狗在这个场景里挪了 1 m 以上，路线就不是从狗脚下出发了）；
+   - "Per path" 表：oracle waited 大于 0 的路线是真有车横穿的；parked in path 超过 50% 的路线（停着的车挡在路上）单独列出来，不算进结论。
+3. 不安全的放行（五次都看各自的 "Unsafe episodes"）：每一条抄下场景、路线、那辆车当时多远、方位、车速、跟踪器有没有跟上。
+   按原因归类：没跟上（NOT tracked）的，在盲区（方位 142–218°）的几条、30 m 外的几条、别的几条；跟上了还放行的几条。
+   跟上了还放行的，挑最多 3 条：从 episodes_base.csv 找到时间，写出那一刻门控为什么没看出冲突
+   （可以用 dog_perception/yield_eval.track_objects 重跑那个场景，再用 dog_perception/yield_gate.assess 打印那一帧的 conflicts、min_gap）。
+4. 提交：data/reports/T44/（md、csv、runs.txt、dog_extrinsic.txt）、本文档。
+
+停止条件：第 0 步测试不过；缺 results.pkl 的场景超过 3 个；评测报错。
+报告（写进"T44 结果"）：
+- dog_extrinsic.txt 的结论（A1 还是 A2）；
+- 五次的 "all" 一行并成一张表（unsafe、risky、timeouts、wait median / p90、oracle wait median、extra median / p90 / max）；
+- base 的 "Per path" 表，标出真有车横穿的路线和被停着的车挡住的路线；
+- 第 3 步的归类和挑出来的几条；
+- base 的 "Traffic" 两行（30 m 内车的最高车速分布、从 25 m 外开来的车最早在多远被跟上）；
+- 每次的运行时间（runs.txt）。
 ```
 
