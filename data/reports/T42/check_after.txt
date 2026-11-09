@@ -1,0 +1,14 @@
+work_dirs/planning_io_t42/planning_io_t42_0.mcap: 11 topics, 4280 transforms
+  /clock                                           rosgraph_msgs/msg/Clock                1272 msgs  frames -
+  /cmd_vel                                         geometry_msgs/msg/Twist                 516 msgs  frames -
+  /fused_point_cloud                               sensor_msgs/msg/PointCloud2             319 msgs  frames base_link
+  /goal_pose                                       geometry_msgs/msg/PoseStamped             1 msgs  frames map
+  /lightning/odom                                  nav_msgs/msg/Odometry                  2603 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid              319 msgs  frames base_link
+  /mc/motion_control                               mc_interface/msg/Motion                 365 msgs  frames -
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid              555 msgs  frames base_link
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker           517 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray      555 msgs  frames map
+  /tf                                              tf2_msgs/msg/TFMessage                 3162 msgs  frames -
+PROBLEM /lightning/odom: not a walking robot: speed p99 55.2 m/s (max 258.8), z -2.9 .. 14.2 m, 18 jumps > 1 m (largest 12.0 m); path 160 m, net 14 m over 30.2 s
+1 problems

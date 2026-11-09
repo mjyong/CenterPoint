@@ -1,0 +1,4 @@
+  /tf                                              tf2_msgs/msg/TFMessage                 1804 msgs  frames -
+PROBLEM /planning/debug/goal_pose: empty frame_id
+PROBLEM /lightning/odom: not a walking robot: speed p99 491.5 m/s (max 2706.5), z -46.7 .. 3.9 m, 61 jumps > 1 m (largest 43.3 m); path 552 m, net 2 m over 17.5 s
+2 problems

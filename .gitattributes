@@ -5,3 +5,4 @@ data/examples/**/*.mcap filter=lfs diff=lfs merge=lfs -text
 data/examples/**/*.db3 filter=lfs diff=lfs merge=lfs -text
 Nav_D20/planning/robot_factory/data/astar_pgm/CJGC.pgm filter=lfs diff=lfs merge=lfs -text
 work_dirs/planning_io_t41/**/*.mcap filter=lfs diff=lfs merge=lfs -text
+work_dirs/planning_io_t42/**/*.mcap filter=lfs diff=lfs merge=lfs -text

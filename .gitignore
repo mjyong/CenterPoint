@@ -16,6 +16,7 @@ venv/
 !samples/**/metadata.yaml
 !data/examples/**/metadata.yaml
 !work_dirs/planning_io_t41/**/metadata.yaml
+!work_dirs/planning_io_t42/**/metadata.yaml
 *.sh 
 *.pth
 !work_dirs/pretrained/nusc_pp.pth

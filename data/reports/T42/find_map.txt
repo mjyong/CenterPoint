@@ -1,0 +1,3 @@
+find /public /home -maxdepth 6 -type d -name "ad68517c*" 2>/dev/null | head
+(no output)
+FIND_DONE
