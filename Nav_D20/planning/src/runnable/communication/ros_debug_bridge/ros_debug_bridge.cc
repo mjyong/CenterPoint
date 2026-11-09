@@ -192,7 +192,9 @@ bool RosDebugBridge::Publish() {
   tf2_msg.transforms = tf_msg;
   RosbagRecorder::Instance()->add(tf2_msg, "/tf", "tf2_msgs/msg/TFMessage");
   PathTrackingDebug();
-  goal_pose_pub_->publish(goal_pose_marker_);
+  if (!goal_pose_marker_.header.frame_id.empty()) {   // none before the first /goal_pose (an empty frame_id)
+    goal_pose_pub_->publish(goal_pose_marker_);
+  }
   TEBDebug();
 
   auto collision_checker =

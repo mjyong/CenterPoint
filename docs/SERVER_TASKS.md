@@ -148,8 +148,9 @@
 | T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 完成，已复核（2026-11-07）：v3 在 `dog_veh_1106_1811`，训练 12,670 帧、验证 1,418 帧；新验证集 30 m 内运动的车 72 条 |
 | T39 | 训练 v3（Pillar、Voxel，配方同 v2）；24 个验证场景上和 nusc_pp、v2_pp 重跑比较（合计、0921、1104 分开），定上线的 Pillar 和上报阈值；v3 Voxel + TTA 对教师 | Agent，人定 | T38 | 半天 | 完成，已复核（2026-11-09）。上线仍用 nuScenes Pillar，上报阈值不改（0.40；T39 建议的 0.35 只看检测，没采用）。v3_pp 近处 ΔAP@2.0 只有 +0.006；v2_pp 在 1104 上 AP@2.0 低 0.049。教师不换 |
 | T40 | 收尾：删 v2 数据集；8 号狗装带开机锁频开关的 deb（默认关）；T35 A、B 两段（B 段用开关锁频）；剩下要人和别的团队定的事列在 T40 节里 | Agent + 人（B 段带狗出门） | T39 | 1 小时 + 出门 | 任务已写好 |
-| T41 | Nav_D20 规划：补提交 .gitignore 漏掉的脚本和配置；重编（/tf 只发一棵树、局部代价地图用里程计的时间戳、标记寿命 0.5 s）；回放 0921 重录；查录包 | Agent | 无 | 1 小时 | 完成（2026-11-09）。78 个脚本和配置已提交（含人确认可交的 `copy_planning_bag.sh`）。重编通过。改前 11 个问题里，多父 TF、代价地图时间戳、0.05 s 寿命都没了。新录包还剩空 `frame_id`：`/planning/debug/goal_pose`、`/mc/motion_control`。这次起点在障碍上，任务停在 fault，没有 `mission_state: active` 和 `CMD:`。录包 `work_dirs/planning_io_t41/`（不提交） |
-| H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T41 | 15 分钟 | 待做 |
+| T41 | Nav_D20 规划：补提交 .gitignore 漏掉的脚本和配置；重编（/tf 只发一棵树、局部代价地图用里程计的时间戳、标记寿命 0.5 s）；回放 0921 重录；查录包 | Agent | 无 | 1 小时 | 完成，已复核（2026-11-09）：规划的显示问题没了；录包还是不对是定位的问题，IMU 高频预测把 g 当成 m/s²，odom 一秒掉几米、跳几十米，规划因此起点在障碍里 |
+| T42 | Nav_D20 定位：高频预测的加速度按重力归一化以后重编、重跑；查 odom；看 LIO 每秒几帧；找配置的定位地图 | Agent | T41 | 1 小时 | 任务已写好 |
+| H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T42 | 15 分钟 | 待做（等 T42 的新录包） |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -7808,9 +7809,31 @@ mkdir -p data/reports/T41
 
 代码改动：无（只清了指向旧目录的编译缓存）。
 
+### T41 复核（2026-11-09）
+
+- **规划这边的三处显示问题都没有了**：多父 TF、代价地图的时间戳、0.05 s 的寿命。查录包的结果从改前 11 个问题降到 2 个空 `frame_id`。
+  - `/mc/motion_control` 不画，不算问题（查包工具改成只查会画的类型）；
+  - `/planning/debug/goal_pose` 在收到第一个目标之前发空 `frame_id` 的标记，已改成收到目标后才发。
+- **录包还是不对，是定位的问题。** 用提交的录包查了 `/lightning/odom`（17.5 s，84 Hz）：
+  - 录包在 0921_164127 的第 2 个场景里，狗在稳步走：28.8 s 走 46.3 m（1.55 m/s），全程 RTK 固定解。这 17.5 s 应该走约 27 m。
+  - 定位给出的却是：轨迹 552 m、首尾只差 1.8 m；`y` 在 85–211 m 之间来回；`z` 从 3.9 m 掉到 −46.7 m；自报速度到 32 m/s；
+    相邻两条差 0.3 m 以上的 195 次，最大 43 m；航向一下转 38°。同时 1,471 / 1,476 条都报"定位正常"（covariance[1] = 1）。
+  - 规划报 `Start point is in collision!`，是因为每次发目标时，定位的位置都在一秒内跳了 15–30 m，`z` 在 −30 m 上下，起点落在地图里随便哪儿，所以 fault。规划本身没有问题。
+- **原因（找到一处，已改）**：`/lightning/odom` 是 LIO 的 IMU 高频预测（`laser_mapping.cc` 的 `kf_imu_`，`GetIMUState`）。
+  - 速度的变化 = R·(加速度 − 零偏) + 重力，重力状态是 9.81。
+  - kygi665 的 IMU 加速度单位是 g，静止时约 1.0（SENSORS.md 3.3、LOCALIZATION.md）。LIO 主滤波在去畸变时按初始化的重力归一化了（`imu_processing.hpp` 第 201 行），这个高频预测却直接用原始读数。
+  - 于是两次 LIO 更新之间，每秒多出约 8.8 m/s² 的下坠：1 s 掉 4.4 m，速度差 8.8 m/s。
+  - 录包里的样子正是这样：平滑地往下掉、越跑越快，大约每秒被拉回一次（还有一次停了 2.8 s），然后再掉。
+  - 已改：高频预测里的加速度也乘 `G_m_s2 / GetMeanAccNorm()`。输入是 g 还是 m/s² 都对。
+  - 要编出来再跑才能确认（T42）。在狗上实时跑时 LIO 10 Hz 更新，每 0.1 s 只差 4 cm，但速度每 0.1 s 会差到 0.9 m/s，规划用这个速度。
+- **还有两处，可能也在拖后腿**：
+  - 这次回放里 LIO 大约每秒才纠正一次（平时 10 Hz），原因要看定位日志（T42）；
+  - 定位找不到配置的地图 `ad68517c-...`，退回到仓库里的 `0c3f8a2d-...`，ONBOARDING 本来就说那不是这包录制的地方。高频预测改好以后还跳的话，就是地图对不上。
+- 另外，`copy_planning_bag.sh` 里的明文密码已经按人的决定进了 git 历史，删文件也删不掉。这个密码要是还在用，建议换掉。
+
 ## H7 在 Foxglove 里看规划的新录包（人做）
 
-T41 之后。用 Foxglove 打开 T41 第 4 步的新录包，导入 `Nav_D20/planning/script/planning_io.json`，从头播放，看几处：
+T42 之后。用 Foxglove 打开 T42 第 2 步的新录包，导入 `Nav_D20/planning/script/planning_io.json`，从头播放，看几处：
 - 狗的位置（`/lightning/odom`）和点云、局部栅格对得上，不来回跳；
 - 局部代价地图跟着狗走；
 - 规划路径不闪，暂停时也在。
@@ -7820,4 +7843,40 @@ T41 之后。用 Foxglove 打开 T41 第 4 步的新录包，导入 `Nav_D20/pla
 ### H7 结果
 
 （人填）
+
+---
+
+## T42 Nav_D20 定位：高频预测的加速度单位改好以后，重编、重跑、查录包
+
+```text
+任务 T42：重编 lightning（定位：高频预测的加速度按重力归一化）和 planning（目标标记）；照 T41 第 4 步回放 0921 重录；
+查录包里的 /lightning/odom 还跳不跳；看定位日志里 LIO 每秒处理几帧；找配置的定位地图。
+先按通用约定做（第 10 条）。可以改的范围：Nav_D20/。仓库根目录。ROS_DOMAIN_ID 同 T41（42），不在狗的域上起规划。
+mkdir -p data/reports/T42
+
+0. 先查 T41 的录包（新版查包工具，多了 odom 那一条）：
+     python3 Nav_D20/planning/tools/check_planning_mcap.py work_dirs/planning_io_t41/planning_io_t41_0.mcap \
+         --layout Nav_D20/planning/script/planning_io.json 2>&1 | tail -4 | tee data/reports/T42/check_t41.txt
+   应有一行 "/lightning/odom: not a walking robot"。pytest tests/dog/test_planning_mcap.py -q | tail -1（4 passed）。
+1. 重编：planning 同 T41 第 3 步；lightning 用 ONBOARDING 那一套环境，--packages-select lightning
+   （colcon 包名以 lightning-lm-master/package.xml 为准），2>&1 | tail -20 存到 build.txt。编不过就停下报告，不要改别的。
+2. 照 T41 第 4 步重跑、重录，录到 work_dirs/planning_io_t42/（提交，同 T41 的录包）。目标点同 T41。
+   另外把定位的完整日志（/tmp/nav_stack_debug/ 下 loc 那一份）拷到 data/reports/T42/loc.log（太大就只留前 2000 行和后 2000 行）。
+3. 查新录包：
+     python3 Nav_D20/planning/tools/check_planning_mcap.py work_dirs/planning_io_t42/planning_io_t42_0.mcap \
+         --layout Nav_D20/planning/script/planning_io.json 2>&1 | tee data/reports/T42/check_after.txt
+   - 没有 "/lightning/odom: not a walking robot"：定位好了，看规划有没有进 active、有没有 CMD:；
+   - 还有：把那一行抄下来，说明是平滑地往下掉 / 越跑越快，还是一下一下跳（照 T41 复核的看法）。
+4. 定位日志：
+   - LIO 每秒处理几帧（找每帧都打的那一行，按时间数）；
+   - 有没有 "IMU 回调间隔过大"、reinit、fault 一类的行，各多少次。
+5. 配置的定位地图：find /public /home -maxdepth 6 -type d -name "ad68517c*" 2>/dev/null | head。
+   - 找到的话，报路径，不要改配置，等人定；
+   - 找不到，写"没有"。
+6. 提交：data/reports/T42/、work_dirs/planning_io_t42/、本文档。
+
+停止条件：编不过；跑不起来。
+报告（写进"T42 结果"）：第 0、3 步查包的 PROBLEM 行；第 1 步编译的最后几行；规划的关键日志行（mission_state、CMD:、collision）；
+第 4 步 LIO 每秒几帧和那几类日志的次数；第 5 步的结果。
+```
 

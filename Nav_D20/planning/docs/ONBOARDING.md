@@ -105,10 +105,11 @@ D20 默认 `pub_flag: false`，RViz 里看不到规划路径。本机调试把 `
 python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap> --layout Nav_D20/planning/script/planning_io.json
 ```
 
-它查三件事，2026-11-09 之前的规划这三件都有问题：
+它查四件事，2026-11-09 之前前三件都有问题，第四件是定位：
 - `/tf` 是不是一棵树：`TfBuffer` 以前把每个变换连同它的逆一起发（`map -> base_link` 和 `base_link -> map`），云台还多发一条 `map -> ptz_*`，于是 `map`、`base_link`、`ptz_visible` 都有两个父坐标系，Foxglove 在它们之间来回跳；现在 `/tf` 只发 `map -> base_link`、`base_link -> ptz_*`。
 - 时间戳对不对得上：`base_link` 里的局部代价地图以前用本机时钟打戳，回放旧 bag 时比里程计（也就是 `map -> base_link`）晚几周，Foxglove 找不到那个时刻的变换；现在用里程计的时间戳。
 - 标记的寿命：以前 0.05 s，正好一个 20 Hz 周期，回放时一闪一闪、暂停时多半看不到；现在 0.5 s，个数会变的数组开头先发 DELETEALL。
+- `/lightning/odom` 像不像一只在走的狗（速度、高度、跳变）。T41 回放 0921 时，定位的 IMU 高频预测把 kygi665 的加速度（单位 g）当成 m/s²，两次 LIO 更新之间每秒多掉 8.8 m/s²：17.5 s 里 z 掉到 −46 m、速度到 32 m/s、一跳 43 m。规划拿这个位置当起点，报 `Start point is in collision!`。`lightning-lm-master/src/core/lio/laser_mapping.cc` 已改成按重力归一化（同 `imu_processing.hpp`），T42 验证。
 
 日志关键字：
 

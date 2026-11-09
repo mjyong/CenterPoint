@@ -35,7 +35,7 @@ def _make(ts, name, **fields):
     return ts.types[name](**values)
 
 
-def _write(path, old, wall_stamps=None):
+def _write(path, old, wall_stamps=None, runaway=False):
     wall_stamps = old if wall_stamps is None else wall_stamps
     from mcap.writer import CompressionType, Writer
     from rosbags.typesys import Stores, get_typestore
@@ -80,8 +80,16 @@ def _write(path, old, wall_stamps=None):
                           tf(bag_t, "map", "ptz_visible", 78.27 + 0.1 * i),
                           tf(bag_t, "ptz_visible", "map", -78.27 - 0.1 * i)]     # the six edges the old TfBuffer sent
             put("/tf", "tf2_msgs/msg/TFMessage", _make(ts, "tf2_msgs/msg/TFMessage", transforms=edges), wall_t)
+            # a dog walking 1.5 m/s along x; runaway: the T41 localization, falling at 8.8 m/s^2 between corrections
+            # once a second and snapping back
+            k = i % 20
+            pos = _make(ts, "geometry_msgs/msg/Point", x=78.0 + 0.075 * i, y=119.0,
+                        z=-0.5 * 8.8 * (0.05 * k) ** 2 if runaway else 0.0)
+            pose = _make(ts, "geometry_msgs/msg/Pose", position=pos,
+                         orientation=_make(ts, "geometry_msgs/msg/Quaternion", x=0.0, y=0.0, z=0.0, w=1.0))
             put("/lightning/odom", "nav_msgs/msg/Odometry",
-                _make(ts, "nav_msgs/msg/Odometry", header=header(bag_t, "map"), child_frame_id="base_link"), wall_t)
+                _make(ts, "nav_msgs/msg/Odometry", header=header(bag_t, "map"), child_frame_id="base_link",
+                      pose=_make(ts, "geometry_msgs/msg/PoseWithCovariance", pose=pose)), wall_t)
             put("/planning/debug/cost_map_production/occmap", "nav_msgs/msg/OccupancyGrid",
                 _make(ts, "nav_msgs/msg/OccupancyGrid", header=header(wall_t if wall_stamps else bag_t, "base_link"),
                       data=np.zeros(4, np.int8)), wall_t)
@@ -118,6 +126,22 @@ def test_check_planning_mcap_finds_what_foxglove_cannot_draw(tmp_path, capsys, o
         assert any("path_tracking" in p and "lifetime 0.05" in p for p in rest)
     else:
         assert tf == [] and rest == [], out
+
+
+def test_check_planning_mcap_finds_odometry_no_robot_can_have(tmp_path, capsys):
+    """The localization of the T41 replay: between corrections the IMU-rate prediction fell at about 8.8 m/s^2
+    (the kygi IMU's acceleration in g taken as m/s^2)."""
+    pytest.importorskip("mcap")
+    pytest.importorskip("rosbags")
+    sys.path.insert(0, TOOL)
+    import check_planning_mcap
+
+    bag = str(tmp_path / "runaway.mcap")
+    _write(bag, old=False, runaway=True)
+    assert check_planning_mcap.main([bag]) == 1
+    problems = [line for line in capsys.readouterr().out.splitlines() if line.startswith("PROBLEM ")]
+    assert len(problems) == 1 and "/lightning/odom: not a walking robot" in problems[0] and "z -4.0 .." \
+        in problems[0], problems
 
 
 def test_check_planning_mcap_finds_a_costmap_on_the_wall_clock(tmp_path, capsys):

@@ -12,7 +12,10 @@
    clock, weeks after the odometry stamps of a replayed bag (and markers with 0).
 3. Marker lifetime against the publish period: a lifetime of about one period blinks in playback and a paused
    frame often shows nothing (planning used 0.05 s at 20 Hz).
-4. With --layout: the layout's topics that the recording does not have.
+4. Odometry (nav_msgs/Odometry) a walking robot can have: speed between consecutive messages, height swing,
+   jumps. The T41 replay's /lightning/odom ran away between corrections (up to 32 m/s, z down to -46 m) because
+   the localization's IMU-rate prediction took the kygi IMU's acceleration in g as m/s^2.
+5. With --layout: the layout's topics that the recording does not have.
 
 Prints one line per problem; exit code 1 when there is any. Needs the mcap and rosbags packages.
 """
@@ -27,6 +30,12 @@ from collections import defaultdict
 import numpy as np
 
 HEADER_FIRST = ("std_msgs/Header header", "std_msgs/msg/Header header")
+DRAWN = ("nav_msgs/msg/OccupancyGrid", "nav_msgs/msg/Odometry", "nav_msgs/msg/Path", "sensor_msgs/msg/PointCloud2",
+         "sensor_msgs/msg/LaserScan", "geometry_msgs/msg/PoseStamped", "geometry_msgs/msg/PoseArray",
+         "geometry_msgs/msg/PolygonStamped") + ("visualization_msgs/msg/Marker", "visualization_msgs/msg/MarkerArray")
+MAX_SPEED = 4.0       # [m/s] the dogs walk below about 2 m/s
+MAX_Z_SWING = 3.0     # [m] height change over a recording
+MAX_JUMP = 1.0        # [m] between consecutive odometry messages
 MARKER_TYPES = ("visualization_msgs/msg/Marker", "visualization_msgs/msg/MarkerArray")
 TF_TYPES = ("tf2_msgs/msg/TFMessage",)
 SLACK = 1.0   # [s] a stamp this far outside the TF's time range still counts as covered
@@ -57,7 +66,7 @@ def read(path):
     if not files:
         raise SystemExit("%s: no .mcap" % path)
     ts = get_typestore(Stores.ROS2_HUMBLE)
-    topics = defaultdict(lambda: dict(type=None, stamps=[], frames=set(), log=[], lifetimes=[]))
+    topics = defaultdict(lambda: dict(type=None, stamps=[], frames=set(), log=[], lifetimes=[], xyz=[]))
     edges = []
     for f in files:
         with open(f, "rb") as fh:
@@ -79,6 +88,12 @@ def read(path):
                         t["frames"].add(m.header.frame_id)
                         t["stamps"].append(m.header.stamp.sec + m.header.stamp.nanosec * 1e-9)
                         t["lifetimes"].append(m.lifetime.sec + m.lifetime.nanosec * 1e-9)
+                elif t["type"] == "nav_msgs/msg/Odometry":
+                    msg = ts.deserialize_cdr(message.data, t["type"])
+                    p = msg.pose.pose.position
+                    t["stamps"].append(msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9)
+                    t["frames"].add(msg.header.frame_id)
+                    t["xyz"].append((p.x, p.y, p.z))
                 elif schema is not None and _starts_with_header(schema.data):
                     stamp, frame = _stamp_frame(message.data)
                     t["stamps"].append(stamp)
@@ -135,7 +150,7 @@ def time_problems(topics, edges, display):
         s = np.asarray(t["stamps"])
         for frame in sorted(t["frames"]):
             if frame in ("", display):
-                if frame == "":
+                if frame == "" and t["type"] in DRAWN:
                     out.append("%s: empty frame_id" % name)
                 continue
             path = chain(frame, display, parents)
@@ -169,6 +184,32 @@ def marker_problems(topics):
     return out
 
 
+def odom_problems(topics):
+    out = []
+    for name, t in sorted(topics.items()):
+        if t["type"] != "nav_msgs/msg/Odometry" or len(t["xyz"]) < 3:
+            continue
+        xyz, s = np.asarray(t["xyz"]), np.asarray(t["stamps"])
+        order = np.argsort(s, kind="stable")
+        xyz, s = xyz[order], s[order]
+        step = np.linalg.norm(np.diff(xyz[:, :2], axis=0), axis=1)
+        dt = np.diff(s)
+        ok = dt > 1e-3
+        speed = step[ok] / dt[ok]
+        path, net = float(step.sum()), float(np.linalg.norm(xyz[-1, :2] - xyz[0, :2]))
+        what = []
+        if speed.size and np.percentile(speed, 99) > MAX_SPEED:
+            what.append("speed p99 %.1f m/s (max %.1f)" % (np.percentile(speed, 99), speed.max()))
+        if np.ptp(xyz[:, 2]) > MAX_Z_SWING:
+            what.append("z %.1f .. %.1f m" % (xyz[:, 2].min(), xyz[:, 2].max()))
+        if (step > MAX_JUMP).any():
+            what.append("%d jumps > %.0f m (largest %.1f m)" % ((step > MAX_JUMP).sum(), MAX_JUMP, step.max()))
+        if what:
+            out.append("%s: not a walking robot: %s; path %.0f m, net %.0f m over %.1f s" % (
+                name, ", ".join(what), path, net, s[-1] - s[0]))
+    return out
+
+
 def layout_topics(path):
     with open(path) as f:
         cfg = json.load(f)
@@ -185,7 +226,8 @@ def main(argv=None):
     ap.add_argument("--display-frame", default="map")
     args = ap.parse_args(argv)
     topics, edges = read(args.bag)
-    problems = tf_problems(edges) + time_problems(topics, edges, args.display_frame) + marker_problems(topics)
+    problems = (tf_problems(edges) + time_problems(topics, edges, args.display_frame) + marker_problems(topics)
+                + odom_problems(topics))
     if args.layout:
         problems += ["layout: %s is not in the recording" % n for n in sorted(layout_topics(args.layout) - set(topics))]
     print("%s: %d topics, %d transforms" % (args.bag, len(topics), len(edges)))
