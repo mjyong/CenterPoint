@@ -1,0 +1,7 @@
+cluster_wild:
+  lidar_subscribe: /serespilot/lidar_seg # /serespilot/lidar_seg  /desertrescue/perception/serespilot/lidar_seg
+  lidar_cluster_publish: /clusters 
+  leaf_: 24
+  cluster_size_min_: 4
+  cluster_size_max_: 100000
+  

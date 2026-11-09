@@ -1,0 +1,24 @@
+i_vx: [-1.0, 0.0, 1.0]
+o_vx: [-0.5, 0.0, 0.5]
+i_vy: [-1.0, 0.0, 1.0]
+o_vy: [-0.77, 0.0, 0.77]
+i_omega: [-1.0, 0.0, 1.0]
+o_omega: [0.666, 0.0, 0.666]
+
+integral:
+  leak_rate: 0.1
+  vx:
+    enable: false
+    ki: 0.05
+    i_max: 0.03
+    error_deadband: 0.01
+  vy:
+    enable: false
+    ki: 0.05
+    i_max: 0.03
+    error_deadband: 0.01
+  omega:
+    enable: false
+    ki: 0.1
+    i_max: 0.05
+    error_deadband: 0.02

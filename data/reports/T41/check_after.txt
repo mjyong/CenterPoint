@@ -1,0 +1,15 @@
+work_dirs/planning_io_t41: 11 topics, 2462 transforms
+  /clock                                           rosgraph_msgs/msg/Clock                 703 msgs  frames -
+  /cmd_vel                                         geometry_msgs/msg/Twist                  58 msgs  frames -
+  /fused_point_cloud                               sensor_msgs/msg/PointCloud2              83 msgs  frames base_link
+  /goal_pose                                       geometry_msgs/msg/PoseStamped             5 msgs  frames map
+  /lightning/odom                                  nav_msgs/msg/Odometry                  1476 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid               83 msgs  frames base_link
+  /mc/motion_control                               mc_interface/msg/Motion                  58 msgs  frames -
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid              328 msgs  frames base_link
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker           328 msgs  frames ,map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray      328 msgs  frames map
+  /tf                                              tf2_msgs/msg/TFMessage                 1804 msgs  frames -
+PROBLEM /mc/motion_control: empty frame_id
+PROBLEM /planning/debug/goal_pose: empty frame_id
+2 problems

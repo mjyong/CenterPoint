@@ -1,0 +1,139 @@
+patchworkpp_wild:
+  use_multi_lidar : false
+  use_filter : true
+  use_loc_trans : false
+  use_loc_trans_remove: false
+  use_lidar_detect: false
+  ncr_thresh : 0.03
+  detect_num: 200
+  loc_subscribe: /seres/insmodule/devpvt
+  lidar_subscribe: /robot/topic/rdap/top_point_cloud2 # AT128
+  lidar_subscribe_left_front: /LeftBlindSpotLidar # RSE1
+  lidar_subscribe_right_front: /RightBlindSpotLidar # RSE1
+  lidar_subscribe_front: /FrontBlindSpotLidar
+  lidar_subscribe_back: /BackBlindSpotLidar
+  pub_ground: /patchworkpp/ground_seg
+  pub_ground_revert: patchworkpp/ground_revert
+  pub_ground_intensity: patchworkpp/ground_seg_intensity
+  pub_patch: patchworkpp/patch
+  pub_marker: patchworkpp/patch_txt
+  pub_marker_init: patchworkpp/patch_txt_init
+  pub_patch_init: patchworkpp/patch_init
+  pub_lidar_seg_ret: serespilot/lidar_seg
+
+  top_x_offset: 0.5
+  top_y_offset: 0.0
+  top_z_offset: 0.0
+  top_yaw: 1.57
+  top_pitch: 0.0
+  top_roll: 0.0
+
+  front_x_offset: 0.0
+  front_y_offset: 0.0
+  front_z_offset: 0.0
+  front_yaw: 0.0
+  front_pitch: 0.0
+  front_roll: 0.0
+
+  back_x_offset: 0.0
+  back_y_offset: 0.0
+  back_z_offset: 0.0
+  back_yaw: 0.0
+  back_pitch: 0.0
+  back_roll: 0.0
+
+
+  filter_nb_num : 20
+  filter_nb_radius : 0.5
+  filter_front_range : 0.5
+  filter_side_range : 0.5
+  filter_back_range : 0.0
+  convert_front_range : 25.0
+  convert_blind_side_range: 1.5
+  convert_blind_front_range: 4.0 
+  convert_count_thresh : 80
+  min_x_range_ : -0.2
+  max_x_range_: 10
+  min_y_range_: -5.0
+  max_y_range_: 5.0
+  min_z_range_: -4.0
+  max_z_range_: 0.35
+  filter_ground_noise: -0.6
+  car_front: 0.7
+  car_back: -0.7
+  car_left: 0.371
+  car_right: -0.371
+  top_lidar_x_offset: 3.90
+  top_lidar_y_offset: 0.0
+  top_lidar_yaw_offset: 0.5 # 顶雷达，前雷达角度融合阈值
+  top_lidar_dis_thresh: 7.5 # 顶雷达，前雷达距离融合阈值
+  left_lidar_yaw_offset: 0.5 # 左雷达与前雷达角度融合阈值
+  right_lidar_yaw_offset: 0.6 # 右雷达与前雷达角度融合阈值
+  back_lidar_x_offset: -0.878
+  back_lidar_y_offset: 0.047
+  back_lidar_yaw_offset: 0.5 # 左，右雷达与后雷达角度融合阈值
+
+  verbose: false
+  enable_RNR: false
+  enable_RVPF: true
+  enable_TGR: true
+  enable_MRT: true
+
+  num_iter: 3
+  num_lpr: 15
+  num_min_pts: 1
+  num_zones: 4
+  num_rings_of_interest: 4 # 4 
+
+  RNR_ver_angle_thr: -15.0
+  RNR_intensity_thr: 0.2
+
+  sensor_height: 0.95
+  th_seeds: 0.15 #  // 0.3  
+  th_dist: 0.2 #; // 离地点高度判断 非地面 0.25 
+  obstacle_height: 0.15
+  th_seeds_v: 0.4 #; 
+  th_dist_v: 0.4 #;
+  max_range: 20.0 
+  min_range: 0.3
+  uprightness_thr: 0.98 #; // 0.707 极限一点的话 就是0.98 或者 0.99，完全不考虑斜坡的情况
+  adaptive_seed_selection_margin: -1.2
+  intensity_thr: 0
+
+  near_cal_range: 4
+  far_cal_range: 8
+
+  near_revert_thresh: 0.15 # 0.2 
+  middle_revert_thresh: 0.2 # 0.3
+  far_revert_thresh: 0.25 # 0.4
+
+  # vector<int> num_sectors_each_zone  = {32, 32, 64, 32}; 
+  num_sectors_each_zone:
+    - 32
+    - 32
+    - 64
+    - 32
+
+  # vector<int> num_rings_each_zone = {4, 4, 4, 4}; // 不能改
+  num_rings_each_zone:
+    - 4
+    - 4
+    - 4
+    - 4
+  
+  max_flatness_storage: 1000 
+  max_elevation_storage: 1000 
+
+  # vector<double> elevation_thr = {0, 0, 0, 0};
+  elevation_thr:
+    - 2.02
+    - 2.02
+    - 2.02
+    - 2.02
+
+  # vector<double> flatness_thr  = {0, 0, 0, 0}; 
+  flatness_thr:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0

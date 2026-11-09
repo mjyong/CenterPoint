@@ -1,0 +1,105 @@
+patchworkpp_wild:
+  use_multi_lidar : true
+  use_filter : true
+  lidar_subscribe: /lidar_points # AT128
+  lidar_subscribe_left_front: /LeftBlindSpotLidar # RSE1
+  lidar_subscribe_right_front: /RightBlindSpotLidar # RSE1
+  lidar_subscribe_front: /FrontBlindSpotLidar
+  lidar_subscribe_back: /BackBlindSpotLidar
+  pub_ground: /patchworkpp/ground_seg
+  pub_ground_revert: patchworkpp/ground_revert
+  pub_ground_intensity: patchworkpp/ground_seg_intensity
+  pub_patch: patchworkpp/patch
+  pub_marker: patchworkpp/patch_txt
+  pub_marker_init: patchworkpp/patch_txt_init
+  pub_patch_init: patchworkpp/patch_init
+  pub_lidar_seg_ret: serespilot/lidar_seg
+
+  filter_nb_num : 25
+  filter_nb_radius : 0.2
+  filter_front_range : 30 
+  filter_side_range : 5
+  filter_back_range : 0.0
+  min_x_range_ : 0.0
+  max_x_range_: 80.0
+  min_y_range_: -30.0
+  max_y_range_: 30.0
+  min_z_range_: -1.0
+  max_z_range_: 2.0
+  car_front: 3.9058
+  car_back: -0.878
+  car_left: 3.2
+  car_right: -3.2
+  top_lidar_x_offset: 3.90
+  top_lidar_y_offset: 0.0
+  top_lidar_yaw_offset: 0.5 # 顶雷达，前雷达角度融合阈值
+  top_lidar_dis_thresh: 7.5 # 顶雷达，前雷达距离融合阈值
+  left_lidar_yaw_offset: 0.5 # 左雷达与前雷达角度融合阈值
+  right_lidar_yaw_offset: 0.6 # 右雷达与前雷达角度融合阈值
+  back_lidar_x_offset: -0.878
+  back_lidar_y_offset: 0.047
+  back_lidar_yaw_offset: 0.5 # 左，右雷达与后雷达角度融合阈值
+
+  verbose: true
+  enable_RNR: false
+  enable_RVPF: true
+  enable_TGR: true
+  enable_MRT: true
+
+  num_iter: 3
+  num_lpr: 15
+  num_min_pts: 1
+  num_zones: 4
+  num_rings_of_interest: 4 # 4 
+
+  RNR_ver_angle_thr: -15.0
+  RNR_intensity_thr: 0.2
+
+  sensor_height: 2.02
+  th_seeds: 0.15 #  // 0.3  
+  th_dist: 0.55 #; // 离地点高度判断 非地面 0.25 
+  th_seeds_v: 0.4 #; 
+  th_dist_v: 0.4 #;
+  max_range: 100.0 
+  min_range: 0.1   
+  uprightness_thr: 0.8 #; // 0.707 极限一点的话 就是0.98 或者 0.99，完全不考虑斜坡的情况
+  adaptive_seed_selection_margin: -1.2
+  intensity_thr: 0
+
+  near_cal_range: 4
+  far_cal_range: 8
+
+  near_revert_thresh: 0.15 # 0.2 
+  middle_revert_thresh: 0.2 # 0.3
+  far_revert_thresh: 0.25 # 0.4
+
+  # vector<int> num_sectors_each_zone  = {32, 32, 64, 32}; 
+  num_sectors_each_zone:
+    - 32
+    - 32
+    - 64
+    - 32
+
+  # vector<int> num_rings_each_zone = {4, 4, 4, 4}; // 不能改
+  num_rings_each_zone:
+    - 4
+    - 4
+    - 4
+    - 4
+  
+  max_flatness_storage: 1000 
+  max_elevation_storage: 1000 
+
+  # vector<double> elevation_thr = {0, 0, 0, 0};
+  elevation_thr:
+    - 2.02
+    - 2.02
+    - 2.02
+    - 2.02
+
+  # vector<double> flatness_thr  = {0, 0, 0, 0}; 
+  flatness_thr:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0

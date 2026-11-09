@@ -1,0 +1,197 @@
+# =============================================================================
+# GridMapTask 配置 — D20（默认 lidar_only）
+# 加载: $SERES_PERCEPTION_INSTALL_DIR/grid_map_memory_node/cfg/本文件
+#
+# 与 D30 对比（同代码、不同默认）:
+#   D20: mode=lidar_only；点云路径必走；freespace_*_z 放宽以弱化高度分地面
+#   D30: mode=depth_only；主路径 mask 语义；高度阈用于回退/叠雷达时
+# 参数键名与 D30 完全一致；下列【D20】标注与 D30 取值/用法不同处
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# mode: 谁驱动栅格
+#   lidar_only — 【D20 默认】雷达 → body → pointcloud_only 栅格
+#   depth_only — 【D30 默认】深度 + mask
+#   fusion     — 双源时间同步
+# -----------------------------------------------------------------------------
+mode: "lidar_only"
+
+# -----------------------------------------------------------------------------
+# qos: 传感器输入订阅（depth / lidar / camera_info / mask / rgb）
+# 须与发布端一致；板端点云多为 best_effort。传错会收不到消息（RELIABILITY 不兼容）
+# -----------------------------------------------------------------------------
+qos:
+  reliability: "best_effort"   # best_effort | reliable
+  history_depth: 1             # KeepLast 队列深度
+  durability: "volatile"       # volatile | transient_local
+
+# -----------------------------------------------------------------------------
+# topics
+# 【D20】雷达订上游 patchwork 分割强度云；相机序列号与 D30 不同
+# -----------------------------------------------------------------------------
+topics:
+  depth: "/omstuns_99f9_353e_208c_4c44/depth"
+  depth_image_type: "raw"                       # raw | compressed
+  camera_info: "/omstuns_99f9_353e_208c_4c44/depth_info"  # 预留
+  # 【D20】地面分割结果（常已含几何语义）；【D30】多为原始 /livox/lidar
+  lidar: "/patchworkpp/ground_seg_intensity"
+  rgb: "/omstuns_99f9_353e_208c_4c44/rgb_rect_vga"
+  rgb_image_type: "raw"
+  mask: "/segment/mask_raw"                     # lidar_only 下通常不用；切 depth_only 才关键
+  odom: "/Odometry"                             # memory.enable 时必填
+  fused_pointcloud: "/fused_point_cloud"
+  fused_pointcloud_raw: "/fused_point_cloud_raw"
+  occupancy_grid: "/map/occupancy_grid"
+  source_pointcloud: "/grid/source_point_cloud"
+  ground_points: "/grid/source_ground_points"
+  non_ground_points: "/grid/source_non_ground_points"
+  visualization: "/camera/vis_freespace_seg"
+  projected_points_vis: "/grid/projected_points_vis"
+  freespace: "/perception/det_seg_results"
+
+# -----------------------------------------------------------------------------
+# camera
+# 【D20】depth_scale 历史 0.000250；切 depth_only 时务必与相机编码一致
+# -----------------------------------------------------------------------------
+camera:
+  fx: 338.03
+  fy: 338.039
+  cx: 316.538
+  cy: 239.597
+  depth_scale: 0.000250           # DepthToGrid: 原始深度 * scale → 米
+
+# -----------------------------------------------------------------------------
+# extrinsic
+# 【D20】lidar_to_body 常为单位（上游点云已在 body）；【D30】常有 π 与平移
+# -----------------------------------------------------------------------------
+extrinsic:
+  camera_to_lidar:
+    rotation_x: -1.5708
+    rotation_y: 0.0
+    rotation_z: 1.5708
+    translation_x: -0.44
+    translation_y: 0.0
+    translation_z: -0.10
+  lidar_to_body:                  # 【D20】全 0 = 不再二次变换
+    rotation_x: 0.0
+    rotation_y: 0.0
+    rotation_z: 0.0
+    translation_x: 0.0
+    translation_y: 0.0
+    translation_z: 0.0
+  intermediate_frame: "livox_frame"
+  body_frame: "base_link"
+  camera_to_body:                 # 仅 depth 语义路径用；lidar_only 可忽略但建议保留标定
+    yaw: -1.5708
+    pitch: 1.5708
+    roll: -1.5708
+    pitch2: 0.0
+    x: 0.27
+    y: 0.0
+    z: 0.07
+
+# -----------------------------------------------------------------------------
+# pointcloud
+# lidar_only 下 depth_* 采样参数基本闲置；filter 仍可作用于雷达 body 云
+# -----------------------------------------------------------------------------
+pointcloud:
+  depth_sample_step: 6            # 仅 depth/fusion 前端
+  depth_min_m: -0.01
+  depth_max_m: 5.0
+  time_sync_threshold_s: 0.30     # 仅 fusion
+  max_queue_size: 5               # 已加载；订阅 QoS 深度多为代码写死
+  # filter: 非全云统一滤波 — 见 D30 同段注释
+  #   脚下 ground_region 保留 | ROI 内半径离群 | ROI 外原样保留
+  filter:
+    enabled: false                # 【D20】耗时优化时常关；开则只滤 ROI 盒内点
+    roi_x_min: -0.5               # 滤波生效的 body 盒（机前近域）
+    roi_x_max: 2.0
+    roi_y_min: -1.5
+    roi_y_max: 1.5
+    roi_z_min: -1.2
+    roi_z_max: 1.2
+    radius: 0.1
+    min_neighbors: 3
+
+# -----------------------------------------------------------------------------
+# occupancy_grid
+# -----------------------------------------------------------------------------
+occupancy_grid:
+  time_sync_threshold_s: 0.10
+  max_queue_size: 10
+  depth_min_m: 0.00001            # 切 depth_only 时才关键
+  depth_max_m: 5.0
+  skip_pixels: 6
+  range_x_min: -5.0               # 点进入栅格前的 body 裁剪
+  range_x_max: 5.0
+  range_y_min: -5.0
+  range_y_max: 5.0
+  range_z_min: -0.7
+  range_z_max: 5.0
+
+  # --- freespace_*_z：lidar_only 【会生效】---
+  # is_ground = (mini<z<min) OR (z>max) OR (xy∈ground_region)
+  # 【D20 特有取值】把带设到实际达不到的范围 → 高度分带几乎永不命中，
+  #   避免对本已分割的雷达云再按 z「二次切地面」；此时主要靠:
+  #   - 上游 patchwork 给的障碍点本身
+  #   - ground_region 脚下强制可通行
+  # 若改回类似 D30 的 -0.7/-0.1/1.5，则会在本节点内用高度重分地面/障碍
+  freespace_max_z: 10000.0        # 【≠D30 1.5】极大 → (z>max) 近乎永不成立
+  freespace_min_z: -20000.0       # 【≠D30 -0.1】
+  freespace_mini_z: -50000.0      # 【≠D30 -0.7】与 min 组成的薄层近乎空
+
+  freespace_classes: ["freespace", "stair"]  # lidar_only 闲置；depth_only 时用
+  expand_pixels: 5                # 图像外框强制 freespace；lidar_only 闲置
+  boundary_dilate_width: 5
+  expand_classes: ["stair"]
+  ground_region_x_min: -0.4       # 脚下强制地面 + filter 免滤区
+  ground_region_x_max: 0.35
+  ground_region_y_min: -0.2
+  ground_region_y_max: 0.2
+  resolution: 0.05
+  size: 200
+  enable_lidar_grid_fusion: false # depth 路径叠雷达用；lidar_only 无意义
+  publish_debug_vis: true         # 【D20】对齐原行为常开；板端可关
+  publish_split_clouds: true      # 【D20】原始终发拆分点云；octomap_viz 也依赖
+  class_mapping:
+    0: "freespace"
+    1: "stair"
+    2: "shallow grassland"
+    3: "curb"
+    4: "escalator"
+    255: "background"
+
+# -----------------------------------------------------------------------------
+# memory: 与 D30 同一套 voxel hash（mode 无关）
+# 开 enable 后效果仍取决于 non_ground 来源（D20=几何/上游分割，D30=语义）
+# -----------------------------------------------------------------------------
+memory:
+  enable: false
+  voxel_resolution: 0.05
+  body_front_m: 2.0
+  body_rear_m: 2.0
+  body_left_m: 1.5
+  body_right_m: 1.5
+  keep_radius_m: 5.0
+  clear_interval_s: 30.0
+  odom_time_tolerance_s: 0.2
+
+# -----------------------------------------------------------------------------
+# octomap_viz
+# 【D20】默认开 binary/markers；【D30】默认关
+# -----------------------------------------------------------------------------
+octomap_viz:
+  publish_binary: true
+  publish_markers: true
+  enable_profiling: true
+  sync_queue_size: 10
+  max_range_m: 3.0
+  downsample_enabled: false
+  voxel_leaf_size: 0.1
+  compute_free_space: false
+  local_frame: "base_link"
+  global_frame: "map"
+  local_markers_topic: "/octomap/local_markers"
+  local_binary_topic: "/octomap/local_binary"
+  global_markers_topic: "/octomap/global_markers"
+  global_binary_topic: "/octomap/global_binary"

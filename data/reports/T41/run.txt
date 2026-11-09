@@ -1,0 +1,119 @@
+===== lidar_seg 前 20 行 =====
+I20261109 17:51:35.894459 139897529457664 logging.h:37] Lidar Seg Module Logger initialized.
+I20261109 17:51:35.894673 139897529457664 logging.h:38] Log directory: /tmp/lidar_seg_module_logs
+I20261109 17:51:35.894678 139897529457664 logging.h:39] alsologtostderr: 1
+I20261109 17:51:35.894681 139897529457664 logging.h:40] max_log_size: 50 MB
+I20261109 17:51:35.922790 139897529457664 main.cpp:27] parentPath  /home/engineers/junyongmou/robot/ultralytics/d20car_predict/Nav_D20/perception_combo_ros/node_src/lidar_seg_module/src
+I20261109 17:51:35.922814 139897529457664 main.cpp:35]  config_path  /public/zjst/robot/planning_humble_env/colcon/install/lidar_seg/config/lidar_seg.yaml
+ convert_front_range_ 25 convert_blind_side_range_ 1.5 convert_blind_front_range_ 4
+[TopLidar]   calib offset(x,y,z)=(0.5,0,0) rpy(yaw,pitch,roll)=(1.57,0,0)
+[FrontLidar] calib offset(x,y,z)=(0,0,0) rpy(yaw,pitch,roll)=(0,0,0)
+[BackLidar]  calib offset(x,y,z)=(0,0,0) rpy(yaw,pitch,roll)=(0,0,0)
+ P++ params_ min_x_range_  -0.2
+ P++ params_ max_x_range_  10
+ P++ params_ min_y_range_  -5
+ P++ params_ max_y_range_  5
+ P++ params_  use_filter_ 1
+ =-=====> TOP POINT NUM 128000 time: 1789980087.9
+[TopLidar] Transform done: pts_in=128000 pts_out=128000 offset(x,y,z)=(0.5,0,0) rpy(yaw,pitch,roll)=(1.57,0,0) cost=1.859ms
+[Process] lidar stamp lag vs now=4237813753.6 ms
+ ========= CANNOT GET SYNC LOC DATA ===========
+ ===========> USE ONLY TOP  LIDAR DATA 
+===== grid_map 前 20 行 =====
+I20261109 17:51:35.920945 139750850268672 logging.h:36] GridMap Logger initialized.
+I20261109 17:51:35.921170 139750850268672 logging.h:37] Log directory: /tmp/grid_map_logs
+I20261109 17:51:35.921175 139750850268672 logging.h:38] alsologtostderr: 1
+I20261109 17:51:35.921178 139750850268672 logging.h:39] max_log_size: 50 MB
+I20261109 17:51:35.946495 139750850268672 grid_map_memory_node.cpp:2314]  config_path: /public/zjst/robot/planning_humble_env/colcon/install/grid_map_memory_node/cfg/grid_map_memory_node.yaml
+I20261109 17:51:35.948137 139750850268672 grid_map_memory_node.cpp:2368] Class 'stair' will be dilated (label=1)
+I20261109 17:51:35.948165 139750850268672 grid_map_memory_node.cpp:2543] [v2] mode=lidar_only depth=/omstuns_99f9_353e_208c_4c44/depth mask=/segment/mask_raw odom=/Odometry memory=0
+I20261109 17:51:35.948169 139750850268672 grid_map_memory_node.cpp:2325] Parameters loaded successfully (layout=v2)
+I20261109 17:51:35.948173 139750850268672 grid_map_memory_node.cpp:2326] [cfg] mode=lidar_only camera fx/fy/cx/cy=338.03/338.039/316.538/239.597 (grid_338.03/338.039/316.538/239.597)
+I20261109 17:51:35.948192 139750850268672 grid_map_memory_node.cpp:2331] [cfg] memory.enable=0 keep_radius=5 body F/R/L/R=2/2/1.5/1.5
+I20261109 17:51:35.948197 139750850268672 grid_map_memory_node.cpp:2336] [cfg] qos reliability=best_effort history_depth=1 durability=volatile
+I20261109 17:51:35.951517 139750850268672 grid_map_memory_node.cpp:239] [QoS] lidar sub reliability=best_effort KeepLast(1) durability=volatile on /patchworkpp/ground_seg_intensity
+I20261109 17:51:35.951535 139750850268672 grid_map_memory_node.cpp:168] [Fusion Mode] lidar_only
+I20261109 17:51:35.951873 139750850268672 grid_map_memory_node.cpp:1282] Subscribing to raw RGB image on /omstuns_99f9_353e_208c_4c44/rgb_rect_vga
+I20261109 17:51:35.952067 139750850268672 grid_map_memory_node.cpp:1294] Subscribing to mask image on /segment/mask_raw
+I20261109 17:51:35.955431 139750850268672 grid_map_memory_node.cpp:1309] Publishing projected points visualization on /grid/projected_points_vis
+I20261109 17:51:35.958920 139750850268672 grid_map_memory_node.cpp:1957] OctoMap module initialized with resolution: 0.05 m
+I20261109 17:51:35.958941 139750850268672 grid_map_memory_node.cpp:72] Integrated node started successfully.
+I20261109 17:51:41.680831 139750850268672 grid_map_memory_node.cpp:302] [Input] LiDAR pointcloud received, stamp=1789980087.9, system_time=1794217901.681, delay=4237813780.817 ms
+I20261109 17:51:41.680931 139750850268672 grid_map_memory_node.cpp:341] [Output] Fused pointcloud (lidar_only) published, stamp=1.78998e+09, system_time=1.79422e+09, delay=4.23781e+09 ms
+===== loc 前 20 行 =====
+W20261109 17:51:36.234002 140379756272704 loc_system.cc:150] 配置的地图路径无效(无 index.txt): /opt/seres/nav/data/ad68517c-e845-42a4-b5dd-a6b7c6d2af13，回退到内置默认地图: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/map/0c3f8a2d-41eb-416d-8fca-aaad500e2be9
+I20261109 17:51:36.234248 140379756272704 loc_system.cc:176] online mode, creating ros2 node ... 
+I20261109 17:51:36.609782 140379756272704 loc_system.cc:199] 组合导航类型: kygi665
+I20261109 17:51:36.609913 140379756272704 loc_system.cc:232] 使用 MultiThreadedExecutor (3线程)，IMU/LiDAR/INS 回调组并行处理
+I20261109 17:51:36.619672 140379756272704 tiled_map.cc:95] 检测到模板格式地图，map_path 调整为: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/map/0c3f8a2d-41eb-416d-8fca-aaad500e2be9/3d
+I20261109 17:51:36.619691 140379756272704 tiled_map.cc:103] loading maps
+I20261109 17:51:36.624749 140379756272704 tiled_map.cc:183] loaded chunks: 6, fps: 1
+I20261109 17:51:36.624774 140379756272704 localization.cpp:40] TiledMap loaded, map_path=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/map/0c3f8a2d-41eb-416d-8fca-aaad500e2be9
+I20261109 17:51:36.624799 140379756272704 laser_mapping.cc:15] init laser mapping from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/config/default_d20.yaml
+I20261109 17:51:36.625508 140379756272704 laser_mapping.cc:76] NDT init params: min_conf=2, step=36, range=180
+I20261109 17:51:36.625529 140379756272704 laser_mapping.cc:86] lidar_type 4
+I20261109 17:51:36.625531 140379756272704 laser_mapping.cc:98] Using XT32 Lidar
+I20261109 17:51:36.625675 140379756272704 localization.cpp:97] lidar_type 4
+I20261109 17:51:36.625678 140379756272704 localization.cpp:109] Using XT32 Lidar
+I20261109 17:51:36.625773 140379756272704 loc_system.cc:537] 使用 kygi665 组合导航, INS topic: /rte/rdap/rtk/inspvax
+I20261109 17:51:36.647499 140379756272704 loc_system.cc:454] online loc node has been created.
+I20261109 17:51:41.612577 140379756272704 loc_system.cc:296] IMU 回调线程ID: 140379756272704
+I20261109 17:51:41.612727 140379756272704 loc_system.cc:597] Setting init pose from INS (RTK_FIXED, skip NDT).
+I20261109 17:51:41.612734 140379756272704 loc_system.cc:973] set init pose (skip NDT):   78.0723   119.183 -0.290084,         0         0 -0.171374  0.985206
+I20261109 17:51:41.612762 140379756272704 laser_mapping.cc:885] LIO init pose set (skip NDT):   78.0723   119.183 -0.290084, rot:         0         0 -0.171374  0.985206
+===== bag 前 20 行 =====
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1794217900.293204283] [rosbag2_storage]: Opened database '/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/bags0921/rosbag2_2026_09_21-16_41_27/rosbag2_2026_09_21-16_41_27_0.db3' for READ_ONLY.
+[INFO] [1794217900.293301758] [rosbag2_player]: Set rate to 1
+[INFO] [1794217900.303138742] [rosbag2_player]: Adding keyboard callbacks.
+[INFO] [1794217900.303174328] [rosbag2_player]: Press SPACE for Pause/Resume
+[INFO] [1794217900.303184853] [rosbag2_player]: Press CURSOR_RIGHT for Play Next Message
+[INFO] [1794217900.303190401] [rosbag2_player]: Press CURSOR_UP for Increase Rate 10%
+[INFO] [1794217900.303197115] [rosbag2_player]: Press CURSOR_DOWN for Decrease Rate 10%
+[INFO] [1794217900.303340643] [rosbag2_player]: Sleep 1000000000 ns
+[INFO] [1794217901.312144888] [rosbag2_storage]: Opened database '/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/bags0921/rosbag2_2026_09_21-16_41_27/rosbag2_2026_09_21-16_41_27_0.db3' for READ_ONLY.
+[INFO] [1794217982.311203758] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+===== planning 前 20 行 =====
+I20261109 17:51:41.016043 140322024869888 config_helper.cc:25] [PLANNING]Load robot config:/public/zjst/robot/planning_humble_env/colcon/install/planning/share/planning/environment/../../../lib/planning/robot_factory/d20/001
+I20261109 17:51:41.026017 140322024869888 communication_entry.cc:35] [PLANNING]Create communication: RosBridge
+I20261109 17:51:41.103916 140322024869888 communication_entry.cc:35] [PLANNING]Create communication: D20PtzBridge
+I20261109 17:51:41.456737 140322024869888 communication_entry.cc:35] [PLANNING]Create communication: RosDebugBridge
+I20261109 17:51:41.477573 140322024869888 preprocess_entry.cc:32] [PLANNING]Create preprocess: GlobalMapManager
+I20261109 17:51:46.816297 140322024869888 global_map_manager.cc:185] [PLANNING]GlobalMapManager: PGM map loaded. Size: 10293x11412, Resolution: 0.1
+I20261109 17:51:46.824459 140322024869888 cost_map_production.cc:53] [PLANNING]
+Grid_map init, length: 15, width: 10, cells: 300 x 200 
+The center of the map is located at: 2.5, 0
+I20261109 17:51:46.824479 140322024869888 preprocess_entry.cc:32] [PLANNING]Create preprocess: CostMapProduction
+I20261109 17:51:46.914652 140322024869888 cost_map_production_cuda.cu:81] [PLANNING]NPP Library Version: 11.5.1
+I20261109 17:51:46.914689 140322024869888 cost_map_production_cuda.cu:86] [PLANNING]CUDA Driver  Version: 13.0
+I20261109 17:51:46.914692 140322024869888 cost_map_production_cuda.cu:88] [PLANNING]CUDA Runtime Version: 13.0
+I20261109 17:51:47.464482 140322024869888 cost_map_production_cuda.cu:244] [PLANNING]CostMapProductionCuda initialized, map: 300x200, resolution: 0.05, origin: (9.975, 4.975)
+I20261109 17:51:47.464568 140322024869888 mission_entry.cc:31] [PLANNING]Create mission: Tracking
+I20261109 17:51:49.995535 140322024869888 grid_path_planner.cc:72] [PLANNING]SetGridMap: grid_map_ updated from GlobalMapManager, size: 10293x11412
+I20261109 17:51:49.995608 140322024869888 mission_entry.cc:31] [PLANNING]Create mission: Recharging
+I20261109 17:51:50.155672 140322024869888 mission_entry.cc:73] [PLANNING]Current mission type is Idle
+[INFO] [1794217910.182934978] [rosbag2_storage]: Opened database '/tmp/planning_2026-11-9-17-51_50/planning_2026-11-9-17-51_50_0.db3' for READ_WRITE.
+I20261109 17:51:51.166151 140322024869888 mission_entry.cc:73] [PLANNING]Current mission type is Idle
+===== planning 关键字 =====
+1:I20261109 17:51:41.016043 140322024869888 config_helper.cc:25] [PLANNING]Load robot config:/public/zjst/robot/planning_humble_env/colcon/install/planning/share/planning/environment/../../../lib/planning/robot_factory/d20/001
+6:I20261109 17:51:46.816297 140322024869888 global_map_manager.cc:185] [PLANNING]GlobalMapManager: PGM map loaded. Size: 10293x11412, Resolution: 0.1
+71:I20261109 17:52:41.456715 140322024869888 ros_debug_bridge.cc:239] [PLANNING]SetPubFlag: pub_flag enabled
+76:I20261109 17:52:45.624776 140322024869888 ros_bridge.cc:543] [PLANNING]Set mission to Tracking.
+77:I20261109 17:52:45.624803 140322024869888 ros_bridge.cc:545] [PLANNING]Start Tracking mission.
+87:E20261109 17:52:46.808633 140322024869888 astar_search.h:33] [PLANNING]Start point is in collision!
+89:I20261109 17:52:46.808661 140322024869888 tracking.cc:53] [PLANNING]mission_state: standby
+93:I20261109 17:52:46.837862 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+94:I20261109 17:52:46.907065 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+95:I20261109 17:52:46.975100 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+96:I20261109 17:52:47.032921 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+97:I20261109 17:52:47.077438 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+98:I20261109 17:52:47.129270 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+99:I20261109 17:52:47.178619 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+100:I20261109 17:52:47.239413 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+101:I20261109 17:52:47.294799 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+102:I20261109 17:52:47.340996 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+103:I20261109 17:52:47.392558 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+104:I20261109 17:52:47.427277 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+105:I20261109 17:52:47.476855 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+106:I20261109 17:52:47.528011 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+107:I20261109 17:52:47.581965 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault
+108:I20261109 17:52:47.628611 140322024869888 tracking.cc:53] [PLANNING]mission_state: fault

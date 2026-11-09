@@ -1,0 +1,63 @@
+version: 2
+front_end: 1
+back_end: 3
+map_uuid: dynamic_map
+session_count: 1
+last_session_id: 0
+keyframe_count: 8
+last_global_id: 7
+global_map_file: global.pcd
+tile_index_file: index.txt
+map_image_file: map.png
+multi_floor:
+  enabled: true
+  initial_raw_floor_id: 1000
+  normalization_offset: 999
+  floors:
+    - raw_floor_id: 1000
+      floor_id: 1
+      representative_z: 0
+      first_global_id: 0
+      last_global_id: 7
+      map_image_file: 2d/1789980090/map.png
+      map_yaml_file: 2d/1789980090/map.yaml
+keyframe_ids:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+sessions:
+  - session_id: 0
+    start_time: 1789980090.1891811
+    end_time: 1789980143.388402
+    start_pose:
+      - 78.166480796983123
+      - 119.40287525730379
+      - -0.14179788526157283
+      - -0.052337874836147776
+      - -0.42926304204409599
+      - -0.15600536110634206
+      - 0.88806323811920307
+    end_pose:
+      - 82.397887932507956
+      - 133.24407972144243
+      - 0.049184144199077837
+      - -0.059517344613825351
+      - -0.42767538163584762
+      - -0.11908611523203423
+      - 0.89407491341145129
+    anchor_pose:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 1
+    anchor_source: localization
+    first_global_id: 0
+    last_global_id: 7

@@ -1,0 +1,12 @@
+image: map.png
+mode: trinary
+width: 552
+height: 904
+resolution: 0.200000003
+origin:
+  - 0
+  - 0
+  - 0
+negate: 0
+occupied_thresh: 0.65000000000000002
+free_thresh: 0.25
