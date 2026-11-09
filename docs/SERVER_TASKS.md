@@ -148,7 +148,7 @@
 | T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 完成，已复核（2026-11-07）：v3 在 `dog_veh_1106_1811`，训练 12,670 帧、验证 1,418 帧；新验证集 30 m 内运动的车 72 条 |
 | T39 | 训练 v3（Pillar、Voxel，配方同 v2）；24 个验证场景上和 nusc_pp、v2_pp 重跑比较（合计、0921、1104 分开），定上线的 Pillar 和上报阈值；v3 Voxel + TTA 对教师 | Agent，人定 | T38 | 半天 | 完成，已复核（2026-11-09）。上线仍用 nuScenes Pillar，上报阈值不改（0.40；T39 建议的 0.35 只看检测，没采用）。v3_pp 近处 ΔAP@2.0 只有 +0.006；v2_pp 在 1104 上 AP@2.0 低 0.049。教师不换 |
 | T40 | 收尾：删 v2 数据集；8 号狗装带开机锁频开关的 deb（默认关）；T35 A、B 两段（B 段用开关锁频）；剩下要人和别的团队定的事列在 T40 节里 | Agent + 人（B 段带狗出门） | T39 | 1 小时 + 出门 | 任务已写好 |
-| T41 | Nav_D20 规划：补提交 .gitignore 漏掉的脚本和配置；重编（/tf 只发一棵树、局部代价地图用里程计的时间戳、标记寿命 0.5 s）；回放 0921 重录；查录包 | Agent | 无 | 1 小时 | 任务已写好 |
+| T41 | Nav_D20 规划：补提交 .gitignore 漏掉的脚本和配置；重编（/tf 只发一棵树、局部代价地图用里程计的时间戳、标记寿命 0.5 s）；回放 0921 重录；查录包 | Agent | 无 | 1 小时 | 停在第 1 步（2026-11-09）。`copy_planning_bag.sh` 里有硬编码的远程密码，78 个新文件都没提交。改前录包查过：11 个问题。重编和重录没做 |
 | H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T41 | 15 分钟 | 待做 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -7786,6 +7786,29 @@ mkdir -p data/reports/T41
 - check_before.txt、check_after.txt 的 PROBLEM 行和最后一行；
 - 人在 Foxglove 里打开新录包（planning_io.json）看到的：路径、局部代价地图、点云跟不跟着狗、闪不闪（H7）。
 ```
+
+### T41 结果
+
+停在第 1 步（2026-11-09）。`git pull` 到 `78567f5`。第 0 步做完，第 1 步的密码检查有输出，按停止条件没有 `git add`，第 2–5 步没做。
+
+第 0 步。改前录包是 `work_dirs/planning_io/`（`planning_io_0.mcap`，未提交）。本机 `python3` 没有 `mcap`，用的是仓库外的 `.venv/bin/python`（`PATH` 里放在前面，命令仍是任务里那条）。`check_before.txt` 最后一行是 `11 problems`，PROBLEM 行：
+
+- TF：`base_link` 有 3 个父（map、ptz_infrared、ptz_visible）；`map` 有 3 个父（base_link、ptz_infrared、ptz_visible）；`ptz_infrared`、`ptz_visible` 各有 2 个父（base_link、map）
+- `/fused_point_cloud`、`/map/occupancy_grid`、`/planning/debug/cost_map_production/occmap`：没有从 `base_link` 到 `map` 的唯一 TF
+- `/mc/motion_control`、`/planning/debug/goal_pose`：空的 `frame_id`
+- `/planning/debug/goal_pose`、`/planning/debug/path_tracking`：寿命 0.05 s，和发布间隔一样
+
+`pytest tests/dog/test_planning_mcap.py -q`：`3 passed`。
+
+第 1 步。`Nav_D20` 下未跟踪文件 78 个（`data/reports/T41/new_files.txt`），含 `run_planning_stack_debug.sh`、`run_planning_debug.sh`、`CJGC.yaml`、`default_d20.yaml`。没有超过 5 MB 的。还被忽略的 15 条在 `still_ignored.txt`（`build/`、`*.so`、`gflags_build.py.in`、`__pycache__/`），不提交。
+
+密码检查只有这一条：
+
+- `Nav_D20/planning/script/copy_planning_bag.sh`：`REMOTE_PASSWORD` 写死在脚本里，用 `sshpass` 连 `nvidia@192.168.122.100`。
+
+78 个新文件都没有提交。请人决定这个脚本怎么处理（删掉密码再提交，或者不要这个文件），然后从第 1 步继续。
+
+代码改动：无。
 
 ## H7 在 Foxglove 里看规划的新录包（人做）
 

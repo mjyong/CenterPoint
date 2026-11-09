@@ -1,0 +1,24 @@
+work_dirs/planning_io: 11 topics, 18458 transforms
+  /clock                                           rosgraph_msgs/msg/Clock                2555 msgs  frames -
+  /cmd_vel                                         geometry_msgs/msg/Twist                  42 msgs  frames -
+  /fused_point_cloud                               sensor_msgs/msg/PointCloud2             640 msgs  frames base_link
+  /goal_pose                                       geometry_msgs/msg/PoseStamped             5 msgs  frames map
+  /lightning/odom                                  nav_msgs/msg/Odometry                  6398 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid              640 msgs  frames base_link
+  /mc/motion_control                               mc_interface/msg/Motion                  42 msgs  frames -
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid             1203 msgs  frames base_link
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker          1204 msgs  frames ,map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     1204 msgs  frames map
+  /tf                                              tf2_msgs/msg/TFMessage                 7604 msgs  frames -
+PROBLEM TF: base_link has 3 parents (map, ptz_infrared, ptz_visible); Foxglove and RViz switch between them
+PROBLEM TF: map has 3 parents (base_link, ptz_infrared, ptz_visible); Foxglove and RViz switch between them
+PROBLEM TF: ptz_infrared has 2 parents (base_link, map); Foxglove and RViz switch between them
+PROBLEM TF: ptz_visible has 2 parents (base_link, map); Foxglove and RViz switch between them
+PROBLEM /fused_point_cloud: no single TF path from base_link to map
+PROBLEM /map/occupancy_grid: no single TF path from base_link to map
+PROBLEM /mc/motion_control: empty frame_id
+PROBLEM /planning/debug/cost_map_production/occmap: no single TF path from base_link to map
+PROBLEM /planning/debug/goal_pose: empty frame_id
+PROBLEM /planning/debug/goal_pose: marker lifetime 0.05 s against one message every 0.05 s: they blink in playback and a paused frame often has none
+PROBLEM /planning/debug/path_tracking: marker lifetime 0.05 s against one message every 0.05 s: they blink in playback and a paused frame often has none
+11 problems

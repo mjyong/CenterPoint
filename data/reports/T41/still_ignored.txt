@@ -1,0 +1,15 @@
+!! Nav_D20/perception_combo_ros/build/
+!! Nav_D20/perception_combo_ros/common_interface/build/
+!! Nav_D20/perception_combo_ros/node_src/build/
+!! Nav_D20/perception_combo_ros/third_party/gflags/build/
+!! Nav_D20/perception_combo_ros/third_party/gflags/test/gflags_build.py.in
+!! Nav_D20/perception_combo_ros/third_party/glog-0.6.0/build/
+!! Nav_D20/planning/third_party/osqp/lib_arm/libosqp.so
+!! Nav_D20/planning/third_party/osqp/lib_arm/libqdldl.so
+!! Nav_D20/planning/third_party/osqp/lib_arm/libqpOASES_e.so
+!! Nav_D20/planning/tools/__pycache__/
+!! Nav_D20/slam/lightning-lm-master/bin/
+!! Nav_D20/slam/lightning-lm-master/thirdparty/geographiclib/ARM/include/AzimuthalEquidistant.hpp
+!! Nav_D20/slam/lightning-lm-master/thirdparty/geographiclib/ARM/lib/libGeographicLib.so
+!! Nav_D20/slam/lightning-lm-master/thirdparty/geographiclib/X86/include/AzimuthalEquidistant.hpp
+!! Nav_D20/slam/lightning-lm-master/thirdparty/geographiclib/X86/lib/libGeographicLib.so
