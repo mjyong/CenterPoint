@@ -1,0 +1,8 @@
+---
+# 时间校准最高优先级(枚举型)
+uint8 TIME_ADJUST_MAX_PRIORITY_NONE=0           # 校准类型未知
+uint8 TIME_ADJUST_MAX_PRIORITY_RTC=1            # 校准类型为RTC
+uint8 TIME_ADJUST_MAX_PRIORITY_NTP=2            # 校准类型为NTP
+uint8 TIME_ADJUST_MAX_PRIORITY_GNSS=3           # 校准类型为GNSS
+
+uint8 max_priority                              # 时间校准最高优先级[必须使用 TIME_ADJUST_MAX_PRIORITY_* 常量]

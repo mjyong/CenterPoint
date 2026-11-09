@@ -1,0 +1,5 @@
+# 开启或关闭 Wifi
+bool enable  # true: 开启 Wifi, false: 关闭 Wifi
+---
+bool success    # 请求成功/错误
+string message  # 请求成功/错误描述

@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>voice_interface</name>
+  <version>0.1.0</version>
+  <description>
+    Voice interface package for ROS2.
+    Provides custom message and service definitions for voice-based applications.
+    Supports speech recognition, speech synthesis, and voice command processing.
+  </description>
+  <maintainer email="voice.agent@seres.cn">Seres Voice Agent</maintainer>
+  <license>Apache License 2.0</license>
+
+  <!-- 构建工具依赖 -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <!-- 构建依赖 -->
+  <build_depend>builtin_interfaces</build_depend>
+  <build_depend>rosidl_typesupport_c</build_depend>
+  <build_depend>rosidl_typesupport_cpp</build_depend>
+
+  <!-- 运行时依赖 -->
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>action_msgs</depend>
+  
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <!-- 声明这是一个ROS接口包 -->
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <!-- 测试依赖 -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

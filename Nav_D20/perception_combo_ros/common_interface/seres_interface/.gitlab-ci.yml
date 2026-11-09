@@ -1,0 +1,45 @@
+# 定义全局变量,使用jetpack-crosscompile环境进行编译.
+variables:
+  DOCKER_NAME: "jetpack6.1-crosscompile-aarch64-x86:latest"
+  SYSROOT_DIR: "/l4t/jetson_arm64_sysroot"
+  TOOLCHAIN_CMAKE: "toolchain_aarch64.cmake"
+  X86_BUILD_JOB: "false"
+
+stages:
+  - build
+workflow:
+  rules:
+    # Trigger the pipeline when a merge request is created
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "D10_1230_base"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    # Trigger the pipeline when manually triggered from the GitLab UI
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - when: never
+
+.compile-job:
+  variables:
+    GIT_STRATEGY: "clone"
+    WS_DIR_IN_DOCKER: "/workspace"
+  stage: build
+  tags:
+    - "runner_resource_other_project1"
+
+  script:  # 将代码所在目录挂载到docker中编译
+    - echo "[Info] Start $CI_PROJECT_NAME $CI_JOB_NAME ..."
+    - docker_ws_dir="${WS_DIR_IN_DOCKER}/$(basename ${CI_PROJECT_DIR})"
+    - echo "[Info] docker workspace dir = $docker_ws_dir"
+    - |
+      HOST_GID=$(id -g)
+      HOST_UID=$(id -u)
+      HOST_USR=$(id -un)
+    - cmd_str="groupadd -g ${HOST_GID} ${HOST_USR} && useradd -u ${HOST_UID} -g ${HOST_GID} -m ${HOST_USR} && su ${HOST_USR} -c \"bash ./.build_interface.sh \""
+    - echo "[Info] Start execute = ${cmd_str}"
+    - echo "[Info] Docker run command = docker run --rm -i -v $(pwd):$docker_ws_dir -w $docker_ws_dir $DOCKER_NAME bash -c \"${cmd_str}\""
+    - docker run --rm -i -v $(pwd):$docker_ws_dir -w $docker_ws_dir $DOCKER_NAME bash -c "${cmd_str}"
+    - if [ $? -ne 0 ];then echo "[Error] Build result is failed!!!"; exit 1; fi
+    - echo "[Info] $CI_JOB_NAME done!"
+
+local_compile-job:
+  extends: .compile-job
+
+

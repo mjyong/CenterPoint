@@ -1,0 +1,16 @@
+# C++ development image of the server (docs/DEPLOY_ORIN.md section 3): TensorRT 10.3.0 and CUDA 12.6 like the
+# Orin, plus what lidar_3d_detection builds and tests with (without ROS). The repository is mounted, not copied;
+# from the CenterPoint repository's root, L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection:
+#   docker build -t dogperc-dev -f $L/docker/Dockerfile.dev $L/docker
+#   docker run --rm --gpus '"device=5"' -u $(id -u):$(id -g) -v $PWD:/repo -w /repo dogperc-dev \
+#       bash -c "cmake -S $L -B build/lidar3d_cuda -G Ninja -DLIDAR3D_ROS=OFF -DLIDAR3D_TESTS=ON -DLIDAR3D_WITH_CUDA=ON && \
+#                cmake --build build/lidar3d_cuda -j && ctest --test-dir build/lidar3d_cuda --output-on-failure"
+#   (LIDAR3D_MODEL_DIR=<exported model with this machine's engines> in the container adds the GPU detector tests)
+FROM nvcr.io/nvidia/tensorrt:24.08-py3
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cmake ninja-build libeigen3-dev libyaml-cpp-dev libgtest-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+# the golden data of the parity tests (tools/deploy/dump_golden.py): NumPy 1.x like the project environment;
+# rosbags for its online part (the sample bag through the node's message handling)
+RUN python3 -m pip install --no-cache-dir "numpy==1.26.4" "scipy>=1.8" "rosbags>=0.9"
+ENV HOME=/tmp

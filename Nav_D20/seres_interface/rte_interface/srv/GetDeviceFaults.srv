@@ -1,0 +1,5 @@
+
+
+---
+uint32[] fault_codes   # 故障代码列表
+string[] fault_descriptions  # 故障描述列表

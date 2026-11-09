@@ -1,0 +1,42 @@
+/*
+ * @Descripttion: 
+ * @version: 
+ * @Author: ZhaoTian
+ * @Date: 2023-05-26 16:38:07
+ * @LastEditors: ZhaoTian
+ * @LastEditTime: 2023-05-26 17:02:57
+ */
+#pragma once
+
+#include "src/common/easysocket/DllHelper.h"
+
+#include "src/common/easysocket/tcpsocket.h"
+#include <functional>
+#include <string>
+#include <thread>
+namespace common {
+namespace device {
+class EASYSOCKET_API TCPServer : public BaseSocket {
+public:
+  // Event Listeners:
+  std::function<void(TCPSocket *)> onNewConnection = [](TCPSocket *sock) {
+    FDR_UNUSED(sock)
+  };
+
+  explicit TCPServer(FDR_ON_ERROR);
+
+  // Binding the server.
+  void Bind(int port, FDR_ON_ERROR);
+  void Bind(const char *address, uint16_t port, FDR_ON_ERROR);
+
+  // Start listening the server.
+  void Listen(FDR_ON_ERROR);
+
+  // Overriding Close to add shutdown():
+  void Close() override;
+
+private:
+  static void Accept(TCPServer *server, FDR_ON_ERROR);
+};
+} // namespace socket
+} // namespace common_base

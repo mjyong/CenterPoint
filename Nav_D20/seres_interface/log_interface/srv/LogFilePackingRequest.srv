@@ -1,0 +1,11 @@
+# request
+# topic name:"/log_service/log_file_packing_request"
+
+string cmd_seq         # 命令序列号
+uint64 start_utc_time  # 开始时间戳(秒)
+uint64 end_utc_time    # 结束时间戳(秒)
+
+---
+
+# response
+string  result         #SUCCESS, FAIL

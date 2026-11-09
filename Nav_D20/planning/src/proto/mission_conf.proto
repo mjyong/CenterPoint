@@ -1,0 +1,72 @@
+syntax = "proto2";
+
+package planning.config;
+import "grid_path_planner_conf.proto";
+import "teb_planner_conf.proto";
+
+message MissionConf {
+  enum Type {
+    Idle = 0;
+    Tracking = 1;
+    Following = 2;
+    Recharging = 3;
+  }
+  repeated Type types = 1;
+  repeated Conf confs = 2;
+  required double reset_idle_time = 3 [default = 2.0];
+  message Conf {
+    optional Type type = 1;
+    oneof config {
+      TrackingConf tracking_conf = 2;
+      FollowingConf following_conf = 3;
+      RechargingConf recharging_conf = 4;
+    }
+  }
+  message TrackingConf {
+    optional bool use_3d_global_planner = 1 [ default = false ];
+    optional GridPathPlannerConf grid_path_planner_conf = 2;
+    optional TebPlannerConf teb_planner_conf = 3;
+    optional double off_distance_threshold = 4 [ default = 0.05 ];
+    optional double off_yaw_threshold = 5 [ default = 0.05 ];
+    optional double off_velocity_threshold = 6 [ default = 0.1 ];
+    optional double off_angular_velocity_threshold = 7 [ default = 0.05 ];
+    optional double off_duration_threshold = 8 [ default = 1.0 ];
+  }
+  message FollowingConf {
+    enum Type {
+      PathFollow = 0;
+      TargetFollow = 1;
+    }
+    optional Type follow_type = 1;
+    optional string default_path_file = 2;
+  }
+
+  message RechargingConf {
+    required double vx_min = 1 [ default = -0.3 ];
+    required double vx_max = 2 [ default = 0.3 ];
+    required double vy_max = 3 [ default = 0.3 ];
+    required double yaw_rate_max = 4 [ default = 0.3 ];
+    required double vx_gain = 5 [ default = 1.0 ];
+    required double vy_gain = 6 [ default = 3.0 ];
+    required double yaw_rate_gain = 7 [ default = 1.0 ];
+    optional double vx_ki = 20 [ default = 0.0 ];
+    optional double vx_kd = 21 [ default = 0.0 ];
+    optional double vy_ki = 22 [ default = 0.0 ];
+    optional double vy_kd = 23 [ default = 0.0 ];
+    optional double yaw_rate_ki = 24 [ default = 0.0 ];
+    optional double yaw_rate_kd = 25 [ default = 0.0 ];
+    optional double detect_spin_rate = 8 [ default = 0.5 ];
+    optional double ready_distance = 9 [ default = 2.0 ];
+
+    optional double period = 11 [ default = 0.05 ];
+    optional double time_out_threshold = 12 [ default = 60.0 ];
+    optional double standby_pos_tolerance = 13 [ default = 0.1 ];
+    optional double standby_euler_tolerance = 14 [ default = 0.1 ];
+    optional double standby_stable_time = 15 [ default = 2.0 ];
+    optional double standstill_pos_x_tolerance = 16 [ default = 0.05 ];
+    optional double standstill_pos_y_tolerance = 17 [ default = 0.02 ];
+    optional double standstill_euler_tolerance = 18 [ default = 0.1 ];
+    optional double standstill_stable_time = 19 [ default = 2.0 ];
+    optional double charging_station_offset_x = 29 [ default = 0.0 ];
+  }
+}

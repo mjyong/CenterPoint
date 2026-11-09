@@ -1,0 +1,42 @@
+# 请求部分：
+# 日志配置（查询）数据
+uint8 ecu_type            # 日志源: 1：CCU_SOC，2：CCU-MCU, 3：PMU, 4：TMU-SOC， 5：TMU-MCU
+# 日志配置类型
+uint8 log_config_type           
+# 日志配置类型枚举
+uint8 LOG_CFG_ENABLE         = 0   # 日志开关
+uint8 LOG_CFG_LEVEL          = 1   # 日志等级
+uint8 LOG_CFG_OUTPUT_ENABLE  = 2   # 日志开启输出方式
+uint8 LOG_CFG_OUTPUT_DISABLE = 3   # 日志关闭输出方式
+uint8 LOG_CFG_MODULE_ENABLE  = 4   # 日志开启指定模块
+uint8 LOG_CFG_MODULE_DISABLE = 5   # 日志关闭指定模块
+uint8 LOG_CFG_COLLECT_METHOD = 6   # 日志采集方式
+uint8 LOG_CFG_CYCLE_TIME     = 7   # 日志周期触发时间（单位：秒）
+
+# 日志配置参数
+uint8 log_config_value 
+# 日志参数根据配置类型决定
+# 日志开关 （开启）
+uint8 LOG_DISABLE = 0          # 关闭
+uint8 LOG_ENABLE = 1           # 开启
+# 日志等级 （LOG_LEVEL_WARN）
+uint8 LOG_LEVEL_DEBUG = 0
+uint8 LOG_LEVEL_INFO = 1
+uint8 LOG_LEVEL_WARN = 2
+uint8 LOG_LEVEL_ERROR = 3
+uint8 LOG_LEVEL_FATAL = 4
+# 日志输出方式 （发送到SOC）
+uint8 LOG_OUTPUT_FLASH = 0      # 写入Flash
+uint8 LOG_OUTPUT_UART  = 1      # 实时输出到串口
+uint8 LOG_OUTPUT_SOC   = 2      # 发送到SOC
+# 日志模块 （默认全部模块）
+# 详见对应ecu log source的module_id.csv文件
+# 日志采集方式 （默认周期上报）
+uint8 LOG_COLLECT_PERIOD = 1    # 周期上报（即周期性同步日志数据）
+uint8 LOG_COLLECT_QUERY  = 2    # 查询日志（立即查询当前日志）
+uint8 LOG_COLLECT_EVENT  = 3    # 事件触发（产生相关日志主动上报）
+
+# 周期触发时间（单位：秒）
+---
+# 响应部分：
+uint8 result                # 响应码：0：成功，1：失败

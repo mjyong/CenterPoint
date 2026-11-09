@@ -1,0 +1,14 @@
+uint8 EXPLORE_MODE_MAPPING  = 0    # 建图模式
+uint8 EXPLORE_MODE_WANDER   = 1    # 漫游
+
+uint8 explore_mode          # 详见EXPLORE_MODE_*定义
+string object_name          # 在探索中寻物目标，非空有效；目标名称详见感知目标类型定义，须匹配 
+uint32 distance             # 探索半径，单位cm，非0有效
+
+---
+# Result
+string message              # 结果描述
+
+---
+# Feedback
+uint32 state                # 详见 nav2_interface/msg/NavState.msg

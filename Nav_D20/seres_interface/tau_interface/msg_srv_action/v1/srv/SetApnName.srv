@@ -1,0 +1,10 @@
+# APN类型(枚举型)
+uint8 APN_ID_PRIVATE=0x00                                   # APN1，厂家流量
+uint8 APN_ID_PUBLIC=0x01                                    # APN2，用户流量
+
+uint8 apn_id                                                # APN类型[必须使用 APN_ID_* 常量]
+string apn_name                                             # APN名称
+string username                                             # 用户名
+string password                                             # 密码
+---
+int32 return_code                                           # 返回码，0-成功，1-失败

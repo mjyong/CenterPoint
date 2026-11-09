@@ -1,0 +1,4 @@
+# 获取机器人信息
+
+---
+woosh_robot_msgs/RobotInfo info

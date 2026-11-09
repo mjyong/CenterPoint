@@ -1,0 +1,5 @@
+# 根据网络 ID 删除已保存的网络
+int32 network_id
+---
+bool success
+string message

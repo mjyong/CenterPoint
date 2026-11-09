@@ -1,0 +1,23 @@
+
+uint8 COMMAND_START = 1               # 请求开始标定
+uint8 COMMAND_STOP = 2                # 主动取消标定
+
+# Request
+string sn                     # 机器人的sn码
+string robot_type             # 机器人类型
+string uuid                   # 请求操作的id, 当请求成功，异步返回执行结果时会携带这个id返回来;
+uint8 command                 # 请求的命令,如上定义 COMMAND_*
+Device[] dev                  # 待标定设备，多个非同类型时为联合标定
+string content                # 请求参数（按需， 默认空）, json格式
+
+---
+# Response
+uint8 ERRCODE_SUCCESS = 0
+uint8 ERRCODE_FAILURE = 1
+uint8 ERRCODE_BUSY = 2
+uint8 ERRCODE_COMMAND_UNSUPPORT = 3         # 不支持的命令
+uint8 ERRCODE_INVALID_PARAM = 4             # 请求的参数无效
+uint8 ERRCODE_UUID_NO_MATCH = 5             # 任务id不匹配
+
+uint8 errcode               # 错误码
+string message              # 结果描述, 查询时返回查询结果

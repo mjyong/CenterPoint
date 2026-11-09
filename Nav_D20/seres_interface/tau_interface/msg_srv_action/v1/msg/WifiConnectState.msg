@@ -1,0 +1,17 @@
+# 工作模式(枚举型)
+uint8 WIFI_WORK_MODE_STA=0x00           # STA工作模式
+uint8 WIFI_WORK_MODE_AP=0x01            # AP工作模式
+
+# 连接状态(枚举型)
+uint8 WIFI_STATUS_DISCONNECT=0x00       # 断开
+uint8 WIFI_STATUS_CONNECT=0x01          # 连接
+
+uint8 wifi_work_mode                    # 工作模式[必须使用 WIFI_WORK_MODE_* 常量]
+uint8 status                            # 连接状态[必须使用 WIFI_STATUS_* 常量]
+string interface                        # 网卡名称
+string ip                               # IP地址
+string ip_mask                          # IP地址子网掩码
+string gateway                          # 网关地址
+string gateway_mask                     # 网关地址子网掩码
+string primary_dns                      # 主DNS
+string secondary_dns                    # 备DNS

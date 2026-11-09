@@ -1,0 +1,19 @@
+syntax = "proto2";
+
+package planning.config;
+
+message RobotParam {
+  message RobotID {
+    optional string vin = 1;
+    optional string plate = 2;
+    optional string other_unique_id = 3;
+    optional string appellation = 4;
+  }
+  optional RobotID robot_id = 2;
+
+  optional double length = 3 [ default = nan ];
+  optional double width = 4 [ default = nan ];
+  optional double height = 5 [ default = nan ];
+}
+
+message RobotConfig { optional RobotParam robot_param = 1; }

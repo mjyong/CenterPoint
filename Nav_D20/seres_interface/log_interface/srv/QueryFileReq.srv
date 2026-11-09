@@ -1,0 +1,15 @@
+# request
+# 服务名称:"/log_service/query_file_req"
+
+string TAU_SYS = "TAU_SYS"
+string TAU_MATION = "TAU_MATION"
+
+string log_dir         # CCU log请求请传具体路径e.g. /data/log/main, TAU log请求传TAU_SYS，TAU_MATION
+uint64 start_utc       # 开始时间戳(秒)
+uint64 end_utc         # 结束时间戳(秒)
+
+---
+
+# response
+
+string result_log_path    # 打包后的log path

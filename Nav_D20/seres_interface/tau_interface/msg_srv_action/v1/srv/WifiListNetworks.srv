@@ -1,0 +1,5 @@
+# 获取所有已保存的网络配置列表
+---
+WifiConfiguration[] networks
+bool success
+string message

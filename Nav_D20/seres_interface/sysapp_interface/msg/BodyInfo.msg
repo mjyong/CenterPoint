@@ -1,0 +1,9 @@
+string robot_name                    #机器人名称
+string robot_sn                      #sn号
+string ccu_debug_ip                  #ip地址
+string ccu_software_version          #软件版本
+string robot_type              #设备型号,如D10,R11,W11
+string robot_height                  #身高
+string robot_weight                  #体重
+string robot_product_date            #生产日期
+string robot_product_factory         #生产厂商

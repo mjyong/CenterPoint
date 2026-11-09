@@ -1,0 +1,5 @@
+# WiFi-AP开关(枚举型)
+uint8 WIFI_AP_CLOSE=0x00                # 关闭
+uint8 WIFI_AP_OPEN=0x01                 # 打开
+
+uint8 wifi_ap_switch                    # WiFi-AP开关[必须使用 WIFI_AP_* 常量]

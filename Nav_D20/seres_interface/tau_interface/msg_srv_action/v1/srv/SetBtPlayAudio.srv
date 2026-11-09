@@ -1,0 +1,9 @@
+uint8 BT_A2DP_STREM_STOP=0      # 蓝牙音响暂停控制
+uint8 BT_A2DP_STREM_START=1     # 蓝牙音响播放控制
+
+
+string addr                     # 蓝牙设备地址
+string name                     # 蓝牙设备名称
+uint8 cmd                       # 蓝牙操作指令[必须使用BT_DEVICE_*常量]
+---
+int32 return_code               # 返回码，0-成功，1-失败

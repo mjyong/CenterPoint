@@ -1,0 +1,15 @@
+# 接口描述：事件查询
+# 客户端：本地web
+# 服务端：rhr模块
+# service:/rhr/service/event_request
+
+# request
+# 事件类型枚举定义
+uint8 EVENT_CURRENT=1 # 当前事件
+uint8 EVENT_HISTORY=2 # 历史事件
+
+uint8 event_type    # 事件类型，参考事件类型枚举定义
+---
+
+# response
+EventInfo[] event_array

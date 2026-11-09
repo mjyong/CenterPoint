@@ -1,0 +1,30 @@
+# Action name:"agv/move_follow_path"
+# Action Server：agv_controller
+# Action Client：
+# 需提前创建好地图才可使用
+
+# Goal
+int32 mode          # (0:底盘前后直线运动  1：底盘旋转  2：底盘左右直线运动  3：移动到绝对坐标点（goal_x,goal_y,goal_yaw）)
+int32 value         # (底盘直线运动距离：单位 mm。mode=0：正值前进，负值后退；mode=2：正值左平移，负值右平移；)
+                    # (底盘旋转rad值: 单位 (1/1000)rad。正值逆时针，负值顺时针)
+int32 speed         # (底盘运动线速度级别(速度最大值百分比)，值范围 1~100（默认100） [例：web端设置最大线速度1000 mm/s,此处设置为50，则线速度为500mm/s])
+                    # (底盘运动角速度不支持设置)
+uint32 timeout_sec  # 单位s (可选项，默认不使用超时判断)
+int32 goal_x        # 单位 mm（mode=3时使用）
+int32 goal_y        # 单位 mm（mode=3时使用）
+int32 goal_yaw      # 单位 (1/1000)rad（mode=3时使用）
+---
+# Result
+bool success
+string message
+uint32 task_id
+
+---
+# Feedback
+float32 progress
+string state
+int32 current_x
+int32 current_y
+int32 current_yaw
+bool obstacle_detected
+bool emergency_stopped

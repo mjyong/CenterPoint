@@ -1,0 +1,5 @@
+# 充电控制
+
+woosh_ros_msgs/ChargeControlExecuteMode execute_mode
+woosh_ros_msgs/ChargeControlMode mode
+woosh_ros_msgs/ControlAction action

@@ -1,0 +1,33 @@
+[Unit]
+Description=Seres Nav Perception Service (lidar_seg / visual_perception / pedestrian / grid_map / ptz_detection)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# 感知节点安装根目录
+Environment="PERCEPTION_INSTALL_DIR=/opt/seres/nav_perception"
+
+# 启动：执行后台多进程启动脚本，脚本末尾 wait 使 service 主进程保持存活
+ExecStart=/opt/seres/nav_perception/start/start_nav_perception_bg.sh
+
+# 停止时杀掉整个 cgroup（包括所有子进程）
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# 不自动重启（节点崩溃需人工介入）
+Restart=no
+
+TimeoutStartSec=60
+
+# 日志输出到 journald，查看: journalctl -u nav_perception.service -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nav_perception
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,44 @@
+service                                                 srv_file
+----------------------------------------------------------------------------------------------------
+/nad/service/v1/GetTauVersionInfo                       GetTauVersionInfo.srv
+/nad/service/v1/SetApnSwitchState                       SetApnSwitchState.srv
+/nad/service/v1/GetApnSwitchState                       GetApnSwitchState.srv
+/nad/service/v1/SetApnConnectState                      SetApnConnectState.srv
+/nad/service/v1/GetApnConnectState                      GetApnConnectState.srv
+/nad/service/v1/SetApnName                              SetApnName.srv
+/nad/service/v1/GetApnName                              GetApnName.srv
+/nad/service/v1/GetWifiConnectState                     GetWifiConnectState.srv
+/nad/service/v1/SetWifiStaSwitchStatus                  SetWifiStaSwitchStatus.srv
+/nad/service/v1/GetWifiStaSwitchStatus                  GetWifiStaSwitchStatus.srv
+/nad/service/v1/SetWifiStaLoginInfo                     SetWifiStaLoginInfo.srv
+/nad/service/v1/GetWifiStaLoginInfo                     GetWifiStaLoginInfo.srv
+/nad/service/v1/SetWifiStaLogoutInfo                    SetWifiStaLogoutInfo.srv
+/nad/service/v1/SetWifiApSwitchStatus                   SetWifiApSwitchStatus.srv
+/nad/service/v1/GetWifiApSwitchStatus                   GetWifiApSwitchStatus.srv
+/nad/service/v1/SetWifiApLoginInfo                      SetWifiApLoginInfo.srv
+/nad/service/v1/GetWifiApLoginInfo                      GetWifiApLoginInfo.srv
+/nad/service/v1/GetWifiApConnectDeviceList              WifiApConnectDeviceInfo.msg
+                                                        GetWifiApConnectDeviceList.srv
+/nad/service/v1/WifiAdbGetEnabled                       WifiAdbGetEnabled.srv          [QCOM_6490 only]
+/nad/service/v1/WifiAdbSetEnabled                       WifiAdbSetEnabled.srv          [QCOM_6490 only]
+/nad/service/v1/SetBtSwitchStatus                       SetBtSwitchStatus.srv
+/nad/service/v1/GetBtSwitchStatus                       GetBtSwitchStatus.srv
+/nad/service/v1/BtDeviceHandle                          BtDeviceHandle.srv
+/nad/service/v1/GetBtPlayState                          GetBtPlayState.srv
+/nad/service/v1/SetBtPlayAudio                          SetBtPlayAudio.srv
+/nad/service/v1/GetBtScanSwState                        GetBtScanSwState.srv
+/nad/service/v1/SetBtScanSw                             SetBtScanSw.srv
+/nad/service/v1/SetBtHidMouse                           SetBtHidMouse.srv
+/nad/service/v1/GetBtMusicSwitch                        GetBtMusicSwitch.srv
+/nad/service/v1/GetBtName                               GetBtName.srv
+/nad/service/v1/GetBtPairMode                           GetBtPairMode.srv
+/nad/service/v1/SetBtPairMode                           SetBtPairMode.srv
+/nad/service/v1/SetBtAvrcpCtrl                          SetBtAvrcpCtrl.srv
+/nad/service/v1/SetGnssSwitch                           SetGnssSwitchState.srv
+/nad/service/v1/GetGnssSwitch                           GetGnssSwitchState.srv
+/nad/service/v1/GetGnssInfo                             GetGnssInfo.srv
+/nad/service/v1/GetTimeAdjustInfo                       GetTimeAdjustInfo.srv
+/nad/service/v1/SetTimeAdjustNtpAddress                 SetTimeAdjustNtpAddress.srv
+/nad/service/v1/GetTimeAdjustNtpAddress                 GetTimeAdjustNtpAddress.srv
+/nad/service/v1/SetTimeAdjustMaxPriority                SetTimeAdjustMaxPriority.srv
+/nad/service/v1/GetTimeAdjustMaxPriority                GetTimeAdjustMaxPriority.srv

@@ -1,0 +1,8 @@
+# 模式切换服务
+# 服务名: /mode_switch
+# 用于在建图模式和定位模式之间切换
+
+string mode   # "mapping" 或 "localization"
+---
+bool success
+string message

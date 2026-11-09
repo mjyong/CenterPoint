@@ -1,0 +1,15 @@
+int32 OP_ACQUIRE = 0   # 申请焦点
+int32 OP_RELEASE = 1   # 释放焦点
+int32 OP_QUERY = 2     # 查询焦点
+
+# Goal
+std_msgs/Header header # header
+int32 op               # 请求/释放/查询焦点
+int32 focus            # 请求或释放的焦点; op为查询时不用传
+string token           # 通信的token, 必传
+---
+# Result
+int32 ret              # 请求是否成功, SkillRet::RET_OK表示成功, 其他表示失败
+int32 target_focus     # 请求获取或释放的焦点, 与Goal中的focus一致
+int32 cur_focus        # 经过请求后当前生效的焦点;
+int32 reserved_focus   # 保留的焦点（先申请成功，但被高优模块抢占了, 后续会归还回来的）

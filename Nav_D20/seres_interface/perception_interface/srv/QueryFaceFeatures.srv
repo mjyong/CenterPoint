@@ -1,0 +1,11 @@
+
+#查询所有已添加的特征用户
+#Request
+# 无参数
+
+---
+#Responso
+
+uint32[] user_id           # 用户列表
+bool success               # 是否成功
+string message             # 错误信息

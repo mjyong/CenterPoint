@@ -1,0 +1,11 @@
+# 蓝牙操作指令(枚举型)
+uint8 BT_HID_MOUSE_RIGHT_SHIFT=0    # 右移
+uint8 BT_HID_MOUSE_LEFT_SHIFT=1     # 左移
+uint8 BT_HID_MOUSE_MOVE_UP=2        # 上移
+uint8 BT_HID_MOUSE_MOVE_DOWN=3      # 下移
+uint8 BT_HID_MOUSE_CONFIRM_BUTTON=4 # 确定按键
+uint8 BT_HID_MOUSE_CANCEL_BUTTON=5  # 取消按键
+
+uint8 cmd                       # 蓝牙操作指令[BT_HID_MOUSE_*常量]
+---
+int32 return_code               # 返回码，0-成功，1-失败

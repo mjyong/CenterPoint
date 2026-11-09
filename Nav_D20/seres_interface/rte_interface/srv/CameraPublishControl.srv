@@ -1,0 +1,17 @@
+# 相机帧发布控制服务
+# camera_id: 0 代表D30腹部相机
+uint8 camera_id
+
+# ---- 功能使能位 ----
+bool enable_raw           # 原图BGR发布
+bool enable_rect          # 去畸变+裁剪BGR发布
+bool enable_encode        # h264编码发布
+# 后续新增功能在此追加使能位，如：
+# bool enable_roi
+
+# start=true启动发布, start=false停止发布
+bool start
+---
+# 响应
+bool success
+string message

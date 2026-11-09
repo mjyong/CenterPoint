@@ -1,0 +1,7 @@
+# 升降机构控制3
+
+woosh_ros_msgs/LiftControl3 arg
+---
+woosh_ros_msgs/Feedback ret
+---
+woosh_ros_msgs/Feedback fb

@@ -1,0 +1,7 @@
+# request
+string node_name  #节点名称
+
+---
+# response
+bool result      # true: success; false: failure
+string jsonstr   # 返回该节点下所有参数

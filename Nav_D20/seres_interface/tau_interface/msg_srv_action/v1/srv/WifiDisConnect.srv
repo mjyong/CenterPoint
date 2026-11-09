@@ -1,0 +1,4 @@
+# 断开当前STA连接（不删除网络配置）
+---
+bool success
+string message

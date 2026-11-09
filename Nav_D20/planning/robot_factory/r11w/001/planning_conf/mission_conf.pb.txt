@@ -1,0 +1,82 @@
+reset_idle_time: 2.0
+types: Tracking
+confs{
+    type: Tracking
+    tracking_conf{
+        off_distance_threshold: 0.2
+        off_yaw_threshold: 0.2
+        off_velocity_threshold: 0.2
+        off_angular_velocity_threshold: 0.2
+        off_duration_threshold: 1.0
+        grid_path_planner_conf{
+            planner_type: A_STAR
+            input_type: PGM_MAP
+            input_dir: "/../../data/astar_pgm/"
+            input_name: "map"
+            safe_margin: 0.4
+            inflation_margin: 0.05
+            max_obstacle_dist: 2.0
+            heuristic: EUCLIDEAN
+            unknown_as_free: false
+            use_smoother: true
+            smoother_safety_margin: 0.4
+            smoother_safety_factor: 0.5
+            smoother_far_away_obstacle_dist: 1.0
+            smoother_weight_fem_pos_deviation: 10.0
+            smoother_weight_path_length: 1e6
+            smoother_weight_ref_deviation: 1.0
+        }
+        teb_planner_conf{
+            coarse_search_conf{
+                xy_resolution: 0.1
+                theta_resolution: 0.3
+                min_x: -5.0
+                max_x: 10.0
+                min_y: -5.0
+                max_y: 5.0
+                max_search_nodes_no_theta: 5000
+                max_search_nodes_with_theta: 10000
+                weight_reference_path: 1.0
+                ref_grid_resolution: 0.5
+            }
+            optimizer_conf{
+                max_num_iterations: 30
+                function_tolerance: 1e-6
+                gradient_tolerance: 1e-10
+                parameter_tolerance: 1e-8
+                num_threads: 4
+            }
+            time_conf{
+                time_delta_lower_bound: 0.1
+                time_delta_upper_bound: 0.5
+                time_delta_init: 0.1
+            }
+            dynamic_constraints{
+                max_vx: 0.5
+                max_vy: 0.5
+                max_omega: 1.0
+                max_accel_vx: 2.0
+                max_accel_vy: 2.0
+                max_accel_omega: 3.14
+                reference_velocity: 0.5
+            }
+            weight_conf{
+                weight_path_following: 3.0
+                weight_initial_velocity: 10.0
+                weight_final_velocity: 3.0
+                weight_accel_smooth: 20.0
+                weight_accel_limit: 20.0
+                weight_velocity_limit: 20.0
+                weight_obstacle_warning: 10.0
+                weight_obstacle_danger: 1000.0
+                obstacle_warning_distance: 1.0
+                obstacle_danger_distance: 0.4
+                weight_time_optimal: 3.0
+                weight_path_smoothness: 100.0
+                weight_lateral_velocity: 5.0
+                weight_reference_velocity: 3.0
+            }
+            velocity_cmd_time: 0.5
+        }
+    }
+}

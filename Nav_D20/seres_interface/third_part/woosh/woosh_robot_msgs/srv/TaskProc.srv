@@ -1,0 +1,5 @@
+# 获取任务进度信息
+
+woosh_robot_msgs/TaskProc arg
+---
+woosh_robot_msgs/TaskProc info

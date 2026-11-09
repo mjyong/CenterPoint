@@ -1,0 +1,12 @@
+# Goal 启动自检
+
+---
+# Result
+bool success    # 整体是否成功
+string message  # 检测结果附加消息 
+
+---
+# Feedback
+string item     # 每个检测项目描述
+bool result     # 每个检测项目结果
+

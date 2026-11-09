@@ -1,0 +1,10 @@
+# 设置连接服务器地址
+
+woosh_robot_msgs/Server arg
+---
+# 连接服务器地址
+woosh_robot_msgs/Server ret
+# 请求成功与否
+bool ok 
+# 请求状态消息
+string msg

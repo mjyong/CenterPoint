@@ -1,0 +1,42 @@
+//
+// Created by xiang on 25-3-18.
+//
+
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+
+#include "core/system/loc_system.h"
+
+#include "wrapper/ros_utils.h"
+
+DEFINE_string(config, "./config/default.yaml", "配置文件");
+
+/// 运行定位的测试
+int main(int argc, char** argv) {
+    google::InitGoogleLogging(argv[0]);
+    FLAGS_colorlogtostderr = true;
+    FLAGS_stderrthreshold = google::INFO;
+
+    // google::ParseCommandLineFlags(&argc, &argv, true);
+    std::string config_path = std::getenv("config_path");
+    using namespace lightning;
+
+    rclcpp::init(argc, argv);
+
+    LocSystem::Options opt;
+    LocSystem loc(opt);
+
+    if (!loc.Init(config_path)) {
+        LOG(ERROR) << "failed to init loc";
+    }
+
+    /// 默认起点开始定位
+    // 使用坐标和欧拉角设置初始位姿
+    //PoseRPYD init_pose(10.0, 10.0, 0.0, 0.0, 0.0, 0.0);
+    //loc.SetInitPose(math::XYZRPYToSE3(init_pose));
+    loc.Spin();
+
+    rclcpp::shutdown();
+
+    return 0;
+}

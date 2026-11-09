@@ -1,0 +1,10 @@
+#请求:
+std_msgs/Header header
+#网络开关
+uint8 network_switch
+uint8 CELLULAR_NETWORK_CLOSE  = 0     # 关闭
+uint8 CELLULAR_NETWORK_OPEN   = 1     # 打开
+---
+#响应:
+#设置结果 0-成功，1-失败
+uint8 result

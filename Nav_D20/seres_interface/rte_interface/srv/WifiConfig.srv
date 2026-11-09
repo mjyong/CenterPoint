@@ -1,0 +1,43 @@
+#请求:
+std_msgs/Header header
+#WIFI设置类型
+uint8 type
+uint8 WIFI_SET_UNKNOWN = 0 #WIFI设置类型未知
+uint8 WIFI_STA_SWITCH = 1  #设置STA开关
+uint8 WIFI_STA_CONNECT_SSID = 2 #设置STA连接热点
+uint8 WIFI_STA_DISCONNECT_SSID = 3 #设置STA断开热点
+uint8 WIFI_AP_SWITCH = 4 #设置AP开关
+uint8 WIFI_AP_LOGIN_CONFIG = 5 #设置AP登录信息
+uint8 WIFI_SET_MODE = 6 #设置WIFI模式
+uint8 WIFI_SET_FREQUENCY = 7 #设置WIFI频段
+
+#wifi名称
+string ssid
+#wifi密码
+string password
+#加密方式
+uint8 encryption
+uint8 WIFI_STA_ENCRYPTION_NONE=0x01         # 未加密
+uint8 WIFI_STA_ENCRYPTION_WPA2=0x02         # WPA2
+uint8 WIFI_STA_ENCRYPTION_WPA=0x03          # WPA
+uint8 WIFI_STA_ENCRYPTION_WEP=0x04          # WEP
+uint8 WIFI_STA_ENCRYPTION_WAPI_PSK=0x05     # WAPI PSK
+uint8 WIFI_STA_ENCRYPTION_WAPI_CERT=0x06    # WAPI CERT
+
+#WIFI 开关
+uint8 wifi_switch
+uint8 WIFI_CLOSE=0x00               # 关闭
+uint8 WIFI_OPEN=0x01                # 打开
+
+#WIFI频段
+uint8 frequency
+uint8 WIFI_FREQUENCY_2G=0x00            # 2.4G
+uint8 WIFI_FREQUENCY_5G=0x01            # 5G
+uint8 WIFI_FREQUENCY_2G_5G=0x02         # 2.4G+5G
+
+---
+#响应:
+#WIFI设置类型
+uint8 type
+#WIFI设置结果 0-成功，1-失败
+uint8 result

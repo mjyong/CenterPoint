@@ -1,0 +1,62 @@
+main_type: RosBridge
+debug_type: RosDebugBridge
+
+types: RosBridge
+confs{
+    type: RosBridge
+    ros_bridge_conf{
+        sync_odom_occ: false
+        enable_global_map_reload: false
+        sub_odom                    { name: "/lightning/odom"      queue_size: 3  timeout: 0.2 }
+        sub_occupancy_grid          { name: "/map/occupancy_grid"  queue_size: 3  timeout: 0.5 }
+        sub_global_occupancy_grid   { name: "/map" }
+        sub_map_switch              { name: "/map/switch" }
+        sub_init_pose               { name: "/initialpose"         queue_size: 10 }
+        sub_goal_pose               { name: "/goal_pose"           queue_size: 10 }
+        pub_cmd_vel                 { name: "/cmd_vel"             queue_size: 10 }
+        pub_motion                  { name: "/mc/motion_control"   queue_size: 10 }
+        action_navigation           { name: "/nav/navigation" }
+        sub_charging_goal           { name: "/reflector_position"  queue_size: 10  timeout: 0.5 }
+        sub_battery_states          { name: "/robot/topic/rdap/battery_states"  queue_size: 10  timeout: 1.0 }
+        sub_motion_state            { name: "/mc/state"            queue_size: 10  timeout: 1.0 }
+        action_backcharge           { name: "/nav/back_charge" }
+        enable_timeout_check: true
+        timeout_pause_duration: 1.0
+        timeout_resume_duration: 3.0
+    }
+}
+
+types: D20PtzBridge
+confs{
+    type: D20PtzBridge
+    assist: true
+    d20_ptz_bridge_conf{
+        sub_ptz_state       { name: "/robot/topic/ptz/current_state"  queue_size: 10  timeout: 0.5 }
+        pub_ptz_cmd         { name: "/robot/topic/ptz/target_ctrl"    queue_size: 10}
+        pub_focus_point     { name: "/planning/debug/focus_point"     queue_size: 10}
+        action_ptz_camera   { name: "/nav/ptz_camera" }
+        pan_delta_th: 0.05
+        tilt_delta_th: 0.05
+        zoom_delta_th: 0.2
+        target_hold_time: 3.0
+        time_to_idle: 2.0
+        max_pan: 170.0
+        min_pan: -170.0
+        max_tilt: 90.0
+        min_tilt: -90.0
+        max_focal_length: 153.0
+        min_focal_length: 4.8
+        cmos_size: 5.7
+        cmos_scale_h: 0.6
+    }
+}
+
+types: RosDebugBridge
+confs{
+    type: RosDebugBridge
+    ros_debug_bridge_conf{
+        enable_global_map_pub: false
+        pub_flag: false
+        record_flag: false
+    }
+}

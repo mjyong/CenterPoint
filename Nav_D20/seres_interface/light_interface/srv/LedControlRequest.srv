@@ -1,0 +1,46 @@
+# 控制参数
+# target = 0(氛围灯) mode 说明 
+int16 MODE_STATE_IGNORE                         = -1    #忽略 
+int16 MODE_STATE_EMERGENCY_STOP                 = 0     #急停激活
+int16 MODE_STATE_FAULT_SEVERE                   = 2     #严重故障
+int16 MODE_STATE_SHUTTING_DOWN                  = 5     #关机中
+int16 MODE_STATE_FAULT_MODERATE                 = 34    #一般故障
+int16 MODE_STATE_TASK_PAUSED                    = 36    #任务暂停
+int16 MODE_STATE_BOOTING                        = 50    #开机中
+int16 MODE_STATE_VOICE_WAKEUP                   = 61    #唤醒
+int16 MODE_STATE_TASK_GUARDING                  = 41    #守卫中
+int16 MODE_STATE_GUARD_EVENT                    = 42    #守卫事件
+int16 MODE_STATE_VOICE_LISTENING                = 62    #语音聆听
+int16 MODE_STATE_VOICE_PLAYBACK                 = 63    #语音播报
+int16 MODE_STATE_NORMAL                         = 250   #待机（空闲）
+int16 MODE_POWER_STATE_CHARGING                 = 252   #充电中
+int16 MODE_POWER_STATE_CRITICAL                 = 255   #低电量
+
+# target = 1(照明灯) mode 说明
+int16 MODE_LAMP_CLOSE           = 0 #关闭
+int16 MODE_LAMP_TAKE_PIC        = 1 #拍照补光，释放即可
+int16 MODE_LAMP_ILLUMINATE      = 2 #暗部照明，释放即可
+int16 MODE_LAMP_AUTO            = 3 #自动模式
+
+# target = 2(暖光照明灯) mode 说明
+int16 MODE_WARM_LIGHT_CLOSE     = 0 #关闭
+int16 MODE_WARM_LIGHT_OPEN      = 1 #暖光照明，释放即可
+
+# 目标参数
+int8 TARGET_AMB_LIGHT     = 0  #氛围灯
+int8 TARGET_LIGHTING_LAMP = 1  #照明灯
+int8 TARGET_WARM_LIGHT    = 2  #暖光照明灯
+          
+common_interface/ResourcePriority priority
+int8   ratio      #亮度0-100, -1表示使用当前亮度
+int8   color      #暂时无用
+int16  mode       #操作类型,不同target下对应不同
+int8   target     #操作目标,默认0表示氛围灯，1表示照明灯，2表示暖光灯   
+string name       #请求者名字，用于debug
+string request_id #请求id,如果有就用这个，没有会自己生成，如果请求时带有request_id则会覆盖之前请求的效果，可以用来修改当前状态
+
+---
+bool   success
+string request_id
+string msg
+int8   code     #请求返回码，0代表请求成功，1代表请求成功但有高优先级的占用

@@ -1,0 +1,7 @@
+# 基础导航
+
+woosh_ros_msgs/MoveBase arg
+---
+woosh_ros_msgs/Feedback ret
+---
+woosh_ros_msgs/Feedback fb

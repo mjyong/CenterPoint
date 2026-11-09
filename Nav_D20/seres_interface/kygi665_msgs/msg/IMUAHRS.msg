@@ -1,0 +1,14 @@
+std_msgs/Header                   header
+Kygi665Header                    kygi_header
+uint8                            frame
+float32                          gyr_x
+float32                          gyr_y
+float32                          gyr_z
+float32                          acc_x
+float32                          acc_y
+float32                          acc_z
+float32[4]                       quaternion
+float32[3]                       attitude
+uint8                            imu_status
+float32                          temp
+uint8[4]                         reserve

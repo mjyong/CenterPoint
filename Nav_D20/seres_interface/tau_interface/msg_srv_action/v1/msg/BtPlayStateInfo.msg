@@ -1,0 +1,6 @@
+# 播放状态
+uint8 BT_PLAY_STOP=0    # 播放暂停
+uint8 BT_PLAY_START=1   # 开始播放
+
+uint8 play_state    # 播放状态[必须使用 BT_PLAY_* 常量]
+string addr         # 蓝牙设备地址

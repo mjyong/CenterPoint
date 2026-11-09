@@ -1,0 +1,9 @@
+# Request
+# WiFi-STA开关(枚举型)
+uint8 WIFI_STA_CLOSE=0x00               # 关闭
+uint8 WIFI_STA_OPEN=0x01                # 打开
+
+uint8 wifi_sta_switch                 # 操作类型：# WiFi-STA开关[必须使用 WIFI_STA_* 常量]
+---
+# Response
+int32 return_code                       # 返回码，0-成功，1-失败

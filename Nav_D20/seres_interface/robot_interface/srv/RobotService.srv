@@ -1,0 +1,9 @@
+# Goal
+std_msgs/Header header  # header
+string content          # pb请求体
+string token            # 请求的token, 用来校验权限;
+---
+# Result
+int32 ret               # 执行返回状态
+# string message          # 执行返回状态描述
+string result           # pb结果

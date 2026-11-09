@@ -1,0 +1,7 @@
+# 蓝牙配对模式开关(枚举型)
+uint8 BT_PAIR_MODE_OFF=0      # 关闭配对模式(不可被发现)
+uint8 BT_PAIR_MODE_ON=1       # 开启配对模式(可被发现)
+
+uint8 pair_mode                # 配对模式开关[必须使用 BT_PAIR_MODE_* 常量]
+---
+int32 return_code              # 返回码，0-成功，1-失败

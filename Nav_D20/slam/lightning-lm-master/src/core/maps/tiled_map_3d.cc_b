@@ -1,0 +1,692 @@
+//
+// Created by xiang on 23-2-7.
+//
+
+#include "core/maps/tiled_map.h"
+#include "io/file_io.h"
+#include "common/math_utils.h"
+
+#include <pcl/io/pcd_io.h>
+#include <pcl/filters/voxel_grid.h>
+#include <opencv2/opencv.hpp>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
+#include <cmath>
+
+namespace lightning {
+
+// ==================== 辅助函数实现 ====================
+
+int TiledMap::FallsInDynamicArea(const Vec3f& pt) {
+    if (!options_.enable_dynamic_polygon_) {
+        return -1;
+    }
+
+    cv::Point2f p(pt[0], pt[1]);
+    for (const auto& poly : dynamic_polygon_) {
+        if (cv::pointPolygonTest(poly.second.polygon_, p, false) >= 0) {
+            return poly.first;
+        }
+    }
+    return -1;
+}
+
+// ==================== 核心功能实现 ====================
+
+bool TiledMap::ConvertFromFullPCD(CloudPtr map, const SE3& start_pose, const std::string& map_path) {
+    if (!map || map->empty()) {
+        LOG_ERROR("Input map is empty or null");
+        return false;
+    }
+
+    origin_.setZero();
+    options_.map_path_ = map_path;
+    func_points_.emplace_back(FunctionalPoint("start", start_pose));
+    
+    // 创建地图目录
+    if (!FileExists(options_.map_path_)) {
+        CreateDirectory(options_.map_path_);
+    }
+
+    chunk_id_3d_ = 0;
+    static_chunks_3d_.clear();
+    id_to_grid_3d_.clear();
+
+    // 遍历点云，分配到3D分块
+    for (const auto& pt : map->points) {
+        // 跳过无效点
+        if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z)) {
+            continue;
+        }
+        
+        ChunkKey3D grid = Pos3D2Grid(math::ToEigen<float, 3, PointType>(pt));
+        auto iter = static_chunks_3d_.find(grid);
+        
+        if (iter != static_chunks_3d_.end()) {
+            iter->second->AddPoint(pt);
+        } else {
+            // 创建新分块
+            int id = chunk_id_3d_;
+            std::string filename = options_.map_path_ + "/" + std::to_string(id) + ".pcd";
+            auto new_chunk = std::make_shared<MapChunk>(id, grid, filename);
+            new_chunk->AddPoint(pt);
+            static_chunks_3d_.emplace(grid, new_chunk);
+            id_to_grid_3d_.emplace(id, grid);
+            chunk_id_3d_++;
+        }
+    }
+
+    // 保存地图索引文件
+    SaveToBin(false);
+    LOG_INFO("Converted {} points into {} chunks", map->size(), static_chunks_3d_.size());
+    return true;
+}
+
+bool TiledMap::LoadMapIndex() {
+    std::string index_file = options_.map_path_ + "/map_index.txt";
+    if (!FileExists(index_file)) {
+        LOG_WARN("Map index file not found: {}", index_file);
+        return false;
+    }
+
+    std::ifstream ifs(index_file);
+    if (!ifs.is_open()) {
+        LOG_ERROR("Failed to open map index file: {}", index_file);
+        return false;
+    }
+
+    static_chunks_3d_.clear();
+    id_to_grid_3d_.clear();
+    chunk_id_3d_ = 0;
+    std::string line;
+    int loaded_count = 0;
+
+    while (std::getline(ifs, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        
+        std::istringstream iss(line);
+        int id, gx, gy, gz;
+        std::string filename;
+        
+        if (!(iss >> id >> gx >> gy >> gz >> filename)) {
+            LOG_WARN("Invalid line in index file: {}", line);
+            continue;
+        }
+        
+        ChunkKey3D grid(gx, gy, gz);
+        auto new_chunk = std::make_shared<MapChunk>(id, grid, options_.map_path_ + "/" + filename);
+        static_chunks_3d_.emplace(grid, new_chunk);
+        id_to_grid_3d_.emplace(id, grid);
+        chunk_id_3d_ = std::max(chunk_id_3d_, id + 1);
+        loaded_count++;
+    }
+    
+    ifs.close();
+    LOG_INFO("Loaded {} static chunks from index file", loaded_count);
+    
+    // 加载动态区域多边形（如果启用）
+    if (options_.enable_dynamic_polygon_) {
+        std::string poly_file = options_.map_path_ + "/dynamic_polygons.txt";
+        if (FileExists(poly_file)) {
+            LoadDynamicPolygons(poly_file);
+        }
+    }
+    
+    return loaded_count > 0;
+}
+
+void TiledMap::LoadOnPose(const SE3& pose) {
+    ChunkKey3D current_grid = Pos3D2Grid(pose.translation());
+    
+    // 检查是否需要更新
+    if (last_load_grid_set_3d_ && last_load_grid_3d_ == current_grid) {
+        map_updated_ = false;
+        return;
+    }
+
+    {
+        std::unique_lock<std::mutex> lock_static(static_data_mutex_);
+        std::unique_lock<std::mutex> lock_dynamic(dynamic_data_mutex_);
+
+        // 1. 加载新区域
+        for (const auto& cp : static_chunks_3d_) {
+            ChunkKey3D d = cp.first - current_grid;
+            int dist_xy = std::abs(d[0]) + std::abs(d[1]);
+            int dist_z = std::abs(d[2]);
+            
+            // 检查是否在加载范围内
+            if (dist_xy <= options_.load_map_size_ && dist_z <= options_.load_map_size_z_) {
+                if (loaded_chunks_3d_.find(cp.first) == loaded_chunks_3d_.end()) {
+                    // 加载静态地图块
+                    if (!cp.second->loaded_ && cp.second->cloud_ == nullptr) {
+                        cp.second->LoadCloud();
+                        if (cp.second->cloud_ && !cp.second->cloud_->empty()) {
+                            LOG_DEBUG("Loaded static chunk [{},{},{}] with {} points", 
+                                cp.first[0], cp.first[1], cp.first[2], cp.second->cloud_->size());
+                        }
+                    }
+                    loaded_chunks_3d_.insert(cp.first);
+                    map_updated_ = true;
+                }
+
+                // 确保动态块存在
+                auto dyn_iter = dynamic_chunks_3d_.find(cp.first);
+                if (dyn_iter == dynamic_chunks_3d_.end()) {
+                    std::string dyn_filename = options_.map_path_ + "/" + 
+                        std::to_string(cp.second->id_) + "_dyn.pcd";
+                    auto new_dyn_chunk = std::make_shared<MapChunk>(
+                        cp.second->id_, cp.first, dyn_filename);
+                    dynamic_chunks_3d_.emplace(cp.first, new_dyn_chunk);
+                    dynamic_map_updated_ = true;
+                } else if (!dyn_iter->second->loaded_ && options_.load_dyn_cloud_) {
+                    // 加载已存在的动态块
+                    dyn_iter->second->LoadCloud();
+                    if (dyn_iter->second->cloud_ && !dyn_iter->second->cloud_->empty()) {
+                        LOG_DEBUG("Loaded dynamic chunk [{},{},{}] with {} points", 
+                            cp.first[0], cp.first[1], cp.first[2], dyn_iter->second->cloud_->size());
+                    }
+                }
+            }
+        }
+
+        // 2. 卸载远距离区域
+        auto iter = loaded_chunks_3d_.begin();
+        while (iter != loaded_chunks_3d_.end()) {
+            ChunkKey3D grid = *iter;
+            ChunkKey3D d = grid - current_grid;
+            int dist_xy = std::abs(d[0]) + std::abs(d[1]);
+            int dist_z = std::abs(d[2]);
+            
+            if (dist_xy > options_.unload_map_size_ || dist_z > options_.unload_map_size_z_) {
+                // 卸载静态块（仅释放内存，不删除数据结构）
+                auto static_iter = static_chunks_3d_.find(grid);
+                if (static_iter != static_chunks_3d_.end() && static_iter->second->loaded_) {
+                    static_iter->second->Unload();
+                }
+                
+                // 处理动态块
+                auto dyn_iter = dynamic_chunks_3d_.find(grid);
+                if (dyn_iter != dynamic_chunks_3d_.end()) {
+                    if (options_.policy_ == DynamicCloudPolicy::SHORT) {
+                        // 短期策略：直接清空
+                        dyn_iter->second->cloud_.reset();
+                        dyn_iter->second->loaded_ = false;
+                        dynamic_map_updated_ = true;
+                    } else if (options_.policy_ == DynamicCloudPolicy::PERSISTENT && 
+                               options_.save_dyn_when_unload_ && 
+                               dyn_iter->second->loaded_ && 
+                               dyn_iter->second->cloud_ && 
+                               !dyn_iter->second->cloud_->empty()) {
+                        // 持久化策略：保存到磁盘
+                        pcl::io::savePCDFileBinaryCompressed(
+                            dyn_iter->second->filename_, *dyn_iter->second->cloud_);
+                        LOG_DEBUG("Saved dynamic chunk [{},{},{}] to disk", 
+                            grid[0], grid[1], grid[2]);
+                        
+                        if (options_.delete_when_unload_) {
+                            dyn_iter->second->Unload();
+                        }
+                    }
+                }
+                
+                iter = loaded_chunks_3d_.erase(iter);
+                map_updated_ = true;
+            } else {
+                ++iter;
+            }
+        }
+    }
+
+    last_load_grid_3d_ = current_grid;
+    last_load_grid_set_3d_ = true;
+    LOG_DEBUG("Loaded {} chunks around pose ({:.2f}, {:.2f}, {:.2f})", 
+        loaded_chunks_3d_.size(), pose.translation()[0], pose.translation()[1], pose.translation()[2]);
+}
+
+CloudPtr TiledMap::GetAllMap() {
+    CloudPtr cloud(new PointCloudType);
+    size_t total_points = 0;
+
+    {
+        std::unique_lock<std::mutex> lock(static_data_mutex_);
+        for (const auto& idx : loaded_chunks_3d_) {
+            auto iter = static_chunks_3d_.find(idx);
+            if (iter != static_chunks_3d_.end() && iter->second->cloud_ && !iter->second->cloud_->empty()) {
+                *cloud += *iter->second->cloud_;
+                total_points += iter->second->cloud_->size();
+            }
+        }
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(dynamic_data_mutex_);
+        for (const auto& idx : loaded_chunks_3d_) {
+            auto iter = dynamic_chunks_3d_.find(idx);
+            if (iter != dynamic_chunks_3d_.end() && iter->second->cloud_ && !iter->second->cloud_->empty()) {
+                *cloud += *iter->second->cloud_;
+                total_points += iter->second->cloud_->size();
+            }
+        }
+    }
+
+    cloud->width = cloud->size();
+    cloud->height = 1;
+    LOG_DEBUG("Combined map has {} points from {} chunks", total_points, loaded_chunks_3d_.size());
+    return cloud;
+}
+
+std::map<int, CloudPtr> TiledMap::GetStaticCloud() {
+    std::map<int, CloudPtr> result;
+    std::unique_lock<std::mutex> lock(static_data_mutex_);
+    
+    for (const auto& idx : loaded_chunks_3d_) {
+        auto iter = static_chunks_3d_.find(idx);
+        if (iter != static_chunks_3d_.end() && iter->second->cloud_ && !iter->second->cloud_->empty()) {
+            CloudPtr c(new PointCloudType);
+            *c = *iter->second->cloud_; // 深拷贝
+            result.emplace(iter->second->id_, c);
+        }
+    }
+    return result;
+}
+
+std::map<int, CloudPtr> TiledMap::GetDynamicCloud() {
+    std::map<int, CloudPtr> result;
+    std::unique_lock<std::mutex> lock(dynamic_data_mutex_);
+    
+    for (const auto& idx : loaded_chunks_3d_) {
+        auto iter = dynamic_chunks_3d_.find(idx);
+        if (iter != dynamic_chunks_3d_.end() && iter->second->cloud_ && !iter->second->cloud_->empty()) {
+            CloudPtr c(new PointCloudType);
+            *c = *iter->second->cloud_; // 深拷贝
+            result.emplace(iter->second->id_, c);
+        }
+    }
+    return result;
+}
+
+void TiledMap::UpdateDynamicCloud(CloudPtr cloud_world, bool remove_old_pts) {
+    if (!cloud_world || cloud_world->empty()) {
+        return;
+    }
+
+    std::set<ChunkKey3D, math::less_vec<3>> updated_grids;
+    std::unique_lock<std::mutex> lock(dynamic_data_mutex_);
+    
+    for (const auto& pt : cloud_world->points) {
+        // 跳过无效点
+        if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z)) {
+            continue;
+        }
+        
+        // 检查是否在动态区域内（如果启用）
+        if (options_.enable_dynamic_polygon_ && FallsInDynamicArea(pt.getVector3fMap()) < 0) {
+            continue;
+        }
+
+        ChunkKey3D grid = Pos3D2Grid(math::ToEigen<float, 3, PointType>(pt));
+        auto dyn_iter = dynamic_chunks_3d_.find(grid);
+        auto static_iter = static_chunks_3d_.find(grid);
+
+        // 确保动态块存在
+        if (dyn_iter == dynamic_chunks_3d_.end()) {
+            if (static_iter != static_chunks_3d_.end()) {
+                // 创建与静态块对应的动态块
+                std::string dyn_filename = options_.map_path_ + "/" + 
+                    std::to_string(static_iter->second->id_) + "_dyn.pcd";
+                auto new_chunk = std::make_shared<MapChunk>(
+                    static_iter->second->id_, grid, dyn_filename);
+                dyn_iter = dynamic_chunks_3d_.emplace(grid, new_chunk).first;
+                dynamic_map_updated_ = true;
+            } else {
+                // 静态块不存在，跳过（或可选择创建独立动态块）
+                continue;
+            }
+        }
+
+        // 确保块已加载
+        if (!dyn_iter->second->loaded_) {
+            dyn_iter->second->LoadCloud();
+        }
+
+        // 检查点数限制
+        if (!remove_old_pts && dyn_iter->second->cloud_ && 
+            dyn_iter->second->cloud_->size() >= options_.max_pts_in_dyn_chunk_) {
+            continue;
+        }
+
+        // 添加点
+        dyn_iter->second->AddPoint(pt);
+        updated_grids.insert(grid);
+        dynamic_map_updated_ = true;
+    }
+
+    // 后处理：体素滤波和点数控制
+    for (const auto& grid : updated_grids) {
+        auto iter = dynamic_chunks_3d_.find(grid);
+        if (iter == dynamic_chunks_3d_.end() || !iter->second->cloud_ || iter->second->cloud_->empty()) {
+            continue;
+        }
+
+        // 体素滤波（如果点数过多）
+        if (iter->second->cloud_->size() > static_cast<size_t>(1.5 * options_.max_pts_in_dyn_chunk_)) {
+            pcl::VoxelGrid<PointType> voxel_filter;
+            voxel_filter.setInputCloud(iter->second->cloud_);
+            voxel_filter.setLeafSize(0.3f, 0.3f, 0.3f); // 30cm分辨率
+            CloudPtr filtered(new PointCloudType);
+            voxel_filter.filter(*filtered);
+            iter->second->cloud_ = filtered;
+            LOG_DEBUG("Voxel filtered dynamic chunk [{},{},{}]: {} -> {} points", 
+                grid[0], grid[1], grid[2], iter->second->cloud_->size(), filtered->size());
+        }
+
+        // 移除旧点（如果启用）
+        if (remove_old_pts && iter->second->cloud_->size() > options_.max_pts_in_dyn_chunk_) {
+            size_t remove_count = iter->second->cloud_->size() - options_.max_pts_in_dyn_chunk_;
+            iter->second->cloud_->points.erase(
+                iter->second->cloud_->points.begin(),
+                iter->second->cloud_->points.begin() + remove_count);
+            iter->second->cloud_->width = iter->second->cloud_->size();
+            iter->second->cloud_->height = 1;
+            iter->second->cloud_->points.shrink_to_fit();
+            LOG_DEBUG("Trimmed dynamic chunk [{},{},{}] to {} points", 
+                grid[0], grid[1], grid[2], iter->second->cloud_->size());
+        }
+    }
+}
+
+void TiledMap::ResetDynamicCloud() {
+    std::unique_lock<std::mutex> lock(dynamic_data_mutex_);
+    
+    for (auto& chunk : dynamic_chunks_3d_) {
+        chunk.second->cloud_.reset(new PointCloudType);
+        chunk.second->loaded_ = false;
+    }
+    
+    dynamic_map_updated_ = true;
+    LOG_INFO("Reset all dynamic clouds");
+}
+
+void TiledMap::AddStaticCloud(CloudPtr cloud) {
+    if (!cloud || cloud->empty()) return;
+    
+    std::unique_lock<std::mutex> lock(static_data_mutex_);
+    
+    for (const auto& pt : cloud->points) {
+        if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z)) continue;
+        
+        ChunkKey3D grid = Pos3D2Grid(math::ToEigen<float, 3, PointType>(pt));
+        auto iter = static_chunks_3d_.find(grid);
+        
+        if (iter != static_chunks_3d_.end()) {
+            iter->second->AddPoint(pt);
+        } else {
+            int id = chunk_id_3d_++;
+            std::string filename = options_.map_path_ + "/" + std::to_string(id) + ".pcd";
+            auto new_chunk = std::make_shared<MapChunk>(id, grid, filename);
+            new_chunk->AddPoint(pt);
+            static_chunks_3d_.emplace(grid, new_chunk);
+            id_to_grid_3d_.emplace(id, grid);
+            map_updated_ = true;
+        }
+    }
+}
+
+void TiledMap::AddDynamicCloud(CloudPtr cloud) {
+    UpdateDynamicCloud(cloud, false); // 不移除旧点
+}
+
+void TiledMap::UpdateVoxel(VoxelData& v, bool flag_first_scan) {
+    if (v.pts_.empty()) return;
+    
+    // 计算均值
+    Vec3f sum = Vec3f::Zero();
+    for (const auto& pt : v.pts_) {
+        sum += pt;
+    }
+    v.mu_ = sum / static_cast<float>(v.pts_.size());
+    
+    // 计算协方差
+    Mat3f cov = Mat3f::Zero();
+    for (const auto& pt : v.pts_) {
+        Vec3f diff = pt - v.mu_;
+        cov += diff * diff.transpose();
+    }
+    cov /= static_cast<float>(v.pts_.size() - 1);
+    
+    // 添加小噪声避免奇异矩阵
+    cov += Mat3f::Identity() * 1e-4f;
+    
+    v.sigma_ = cov;
+    v.info_ = cov.inverse();
+    v.ndt_estimated_ = true;
+    v.num_pts_ = static_cast<int>(v.pts_.size());
+    
+    // 清理原始点（节省内存）
+    if (!flag_first_scan) {
+        v.pts_.clear();
+        v.pts_.shrink_to_fit();
+    }
+}
+
+GridHashMap TiledMap::GetStaticGridMap() {
+    GridHashMap result;
+    std::unique_lock<std::mutex> lock(static_data_mutex_);
+    
+    // 遍历所有已加载的静态块
+    for (const auto& idx : loaded_chunks_3d_) {
+        auto iter = static_chunks_3d_.find(idx);
+        if (iter == static_chunks_3d_.end() || !iter->second->cloud_ || iter->second->cloud_->empty()) {
+            continue;
+        }
+        
+        // 体素化处理
+        for (const auto& pt : iter->second->cloud_->points) {
+            if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z)) continue;
+            
+            KeyType key = math::FloorVec(
+                math::ToEigen<float, 3, PointType>(pt) * ndt_map_options_.inv_voxel_size_);
+            
+            auto v_iter = result.find(key);
+            if (v_iter != result.end()) {
+                v_iter->second.AddPoint(math::ToEigen<float, 3, PointType>(pt));
+            } else {
+                result.emplace(key, VoxelData(math::ToEigen<float, 3, PointType>(pt)));
+            }
+        }
+    }
+    
+    // 更新NDT参数
+    for (auto& item : result) {
+        if (item.second.pts_.size() >= static_cast<size_t>(ndt_map_options_.min_pts_in_voxel_)) {
+            UpdateVoxel(item.second, flag_first_static_scan_);
+        }
+    }
+    
+    flag_first_static_scan_ = false;
+    return result;
+}
+
+GridHashMap TiledMap::GetDynamicGridMap() {
+    GridHashMap result;
+    std::unique_lock<std::mutex> lock(dynamic_data_mutex_);
+    
+    // 遍历所有已加载的动态块
+    for (const auto& idx : loaded_chunks_3d_) {
+        auto iter = dynamic_chunks_3d_.find(idx);
+        if (iter == dynamic_chunks_3d_.end() || !iter->second->cloud_ || iter->second->cloud_->empty()) {
+            continue;
+        }
+        
+        // 体素化处理
+        for (const auto& pt : iter->second->cloud_->points) {
+            if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z)) continue;
+            
+            KeyType key = math::FloorVec(
+                math::ToEigen<float, 3, PointType>(pt) * ndt_map_options_.inv_voxel_size_);
+            
+            auto v_iter = result.find(key);
+            if (v_iter != result.end()) {
+                v_iter->second.AddPoint(math::ToEigen<float, 3, PointType>(pt));
+            } else {
+                result.emplace(key, VoxelData(math::ToEigen<float, 3, PointType>(pt)));
+            }
+        }
+    }
+    
+    // 更新NDT参数
+    for (auto& item : result) {
+        if (item.second.pts_.size() >= static_cast<size_t>(ndt_map_options_.min_pts_in_voxel_)) {
+            UpdateVoxel(item.second, flag_first_dynamic_scan_);
+        }
+    }
+    
+    flag_first_dynamic_scan_ = false;
+    return result;
+}
+
+void TiledMap::SaveToBin(bool only_dynamic) {
+    // 保存地图索引文件
+    if (!only_dynamic) {
+        std::string index_file = options_.map_path_ + "/map_index.txt";
+        std::ofstream ofs(index_file);
+        if (!ofs.is_open()) {
+            LOG_ERROR("Failed to open index file for writing: {}", index_file);
+            return;
+        }
+        
+        ofs << "# Map Index File (3D Chunks)\n";
+        ofs << "# Format: ID GX GY GZ FILENAME\n";
+        
+        for (const auto& chunk : static_chunks_3d_) {
+            ofs << chunk.second->id_ << " "
+                << chunk.first[0] << " " << chunk.first[1] << " " << chunk.first[2] << " "
+                << std::filesystem::path(chunk.second->filename_).filename().string() << "\n";
+        }
+        ofs.close();
+        LOG_INFO("Saved map index with {} static chunks", static_chunks_3d_.size());
+    }
+    
+    // 保存静态块点云
+    if (!only_dynamic) {
+        std::unique_lock<std::mutex> lock(static_data_mutex_);
+        int saved_count = 0;
+        for (auto& chunk : static_chunks_3d_) {
+            if (chunk.second->cloud_ && !chunk.second->cloud_->empty()) {
+                chunk.second->cloud_->width = chunk.second->cloud_->size();
+                chunk.second->cloud_->height = 1;
+                pcl::io::savePCDFileBinaryCompressed(chunk.second->filename_, *chunk.second->cloud_);
+                saved_count++;
+            }
+        }
+        LOG_INFO("Saved {} static chunks to disk", saved_count);
+    }
+    
+    // 保存动态块点云（根据策略）
+    if (options_.save_dynamic_layer_ || options_.policy_ == DynamicCloudPolicy::PERSISTENT) {
+        std::unique_lock<std::mutex> lock(dynamic_data_mutex_);
+        int saved_count = 0;
+        for (auto& chunk : dynamic_chunks_3d_) {
+            if (chunk.second->cloud_ && !chunk.second->cloud_->empty()) {
+                chunk.second->cloud_->width = chunk.second->cloud_->size();
+                chunk.second->cloud_->height = 1;
+                pcl::io::savePCDFileBinaryCompressed(chunk.second->filename_, *chunk.second->cloud_);
+                saved_count++;
+            }
+        }
+        LOG_INFO("Saved {} dynamic chunks to disk", saved_count);
+    }
+    
+    // 保存功能点
+    if (!only_dynamic && !func_points_.empty()) {
+        std::string fp_file = options_.map_path_ + "/functional_points.txt";
+        std::ofstream ofs(fp_file);
+        if (ofs.is_open()) {
+            for (const auto& fp : func_points_) {
+                ofs << fp.name_ << " " 
+                    << fp.pose_.translation()[0] << " " << fp.pose_.translation()[1] << " " << fp.pose_.translation()[2] << " "
+                    << fp.pose_.so3().matrix()(0,0) << " " << fp.pose_.so3().matrix()(0,1) << " " << fp.pose_.so3().matrix()(0,2) << " "
+                    << fp.pose_.so3().matrix()(1,0) << " " << fp.pose_.so3().matrix()(1,1) << " " << fp.pose_.so3().matrix()(1,2) << " "
+                    << fp.pose_.so3().matrix()(2,0) << " " << fp.pose_.so3().matrix()(2,1) << " " << fp.pose_.so3().matrix()(2,2) << "\n";
+            }
+            ofs.close();
+            LOG_INFO("Saved {} functional points", func_points_.size());
+        }
+    }
+}
+
+void TiledMap::ClearMap() {
+    {
+        std::unique_lock<std::mutex> lock(static_data_mutex_);
+        static_chunks_3d_.clear();
+        loaded_chunks_3d_.clear();
+        id_to_grid_3d_.clear();
+        static_grids_.clear();
+        origin_.setZero();
+    }
+    
+    {
+        std::unique_lock<std::mutex> lock(dynamic_data_mutex_);
+        dynamic_chunks_3d_.clear();
+        dynamic_grids_.clear();
+    }
+    
+    func_points_.clear();
+    chunk_id_3d_ = 0;
+    last_load_grid_set_3d_ = false;
+    map_updated_ = false;
+    dynamic_map_updated_ = false;
+    flag_first_static_scan_ = true;
+    flag_first_dynamic_scan_ = true;
+    
+    LOG_INFO("Cleared all map data");
+}
+
+// ==================== 辅助功能实现 ====================
+
+void TiledMap::LoadDynamicPolygons(const std::string& filename) {
+    dynamic_polygon_.clear();
+    std::ifstream ifs(filename);
+    if (!ifs.is_open()) {
+        LOG_WARN("Failed to open dynamic polygons file: {}", filename);
+        return;
+    }
+    
+    std::string line;
+    int poly_id = 0;
+    DynamicPolygon current_poly;
+    bool in_polygon = false;
+    
+    while (std::getline(ifs, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        
+        if (line.find("POLYGON") != std::string::npos) {
+            if (in_polygon && !current_poly.polygon_.empty()) {
+                dynamic_polygon_.emplace(poly_id++, current_poly);
+            }
+            current_poly = DynamicPolygon();
+            in_polygon = true;
+            continue;
+        }
+        
+        if (in_polygon) {
+            std::istringstream iss(line);
+            float x, y;
+            if (iss >> x >> y) {
+                current_poly.polygon_.emplace_back(cv::Point2f(x, y));
+            }
+        }
+    }
+    
+    // 添加最后一个多边形
+    if (in_polygon && !current_poly.polygon_.empty()) {
+        dynamic_polygon_.emplace(poly_id, current_poly);
+    }
+    
+    ifs.close();
+    LOG_INFO("Loaded {} dynamic polygons", dynamic_polygon_.size());
+}
+
+}  // namespace lightning

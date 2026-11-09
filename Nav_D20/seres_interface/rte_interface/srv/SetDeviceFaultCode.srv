@@ -1,0 +1,5 @@
+uint32 fault_code   # 故障码
+uint8 status # 0:告警产生,1:告警消除        
+---
+bool success        # 操作是否成功
+

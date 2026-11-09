@@ -1,0 +1,6 @@
+# 添加或更新一个网络配置到保存列表（不自动连接）
+WifiConfiguration config
+---
+int32 network_id   # 返回网络 ID（wpa_supplicant内部标识），失败时为 -1
+bool success
+string message

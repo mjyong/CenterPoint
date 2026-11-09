@@ -1,0 +1,11 @@
+# 查询点位所属区域/站点名称
+
+# Request
+string map_uuid                       # 地图uuid, 为空时查询当前地图
+geometry_msgs/Point point              # 查询点位坐标 (m)
+
+---
+# Response
+bool success                          # 查询是否成功
+string message                        # 结果描述
+string name                           # 区域名或站点名

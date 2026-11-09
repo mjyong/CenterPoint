@@ -1,0 +1,8 @@
+# Request
+
+uint8 mode            # 使用Mode.msg定义 MODE_*
+
+---
+# Response
+
+uint32[] motion       # 详见MotionSkill.msg定义 MOTION_*

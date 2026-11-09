@@ -1,0 +1,11 @@
+# RFID配置接口，仅标定状态有效
+
+# Request
+
+RfidConfig[] configs
+
+---
+
+# Response
+
+uint8[] feedback_codes # 0-> 第一个RFID 1->第二个RFID 反馈码：1-成功 2-请求参数异常 3-硬件设备未初始化 4-写参数失败

@@ -1,0 +1,10 @@
+# 切换控制模式
+
+woosh_robot_msgs/SwitchControlMode arg
+---
+# 机器人模式
+woosh_robot_msgs/Mode ret
+# 请求成功与否
+bool ok 
+# 请求状态消息
+string msg

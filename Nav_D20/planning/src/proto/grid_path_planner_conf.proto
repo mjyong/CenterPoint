@@ -1,0 +1,40 @@
+syntax = "proto2";
+
+package planning.config;
+message GridPathPlannerConf {
+  enum PlannerType {
+    A_STAR = 0;
+    THETA_A_STAR = 1;
+    JPS = 2;
+    VORONOI_ASTAR = 3;
+  }
+  enum InputType {
+    PGM_MAP = 0;
+    IMG = 1;
+  }
+  optional PlannerType planner_type = 1 [ default = JPS ];
+  optional InputType input_type = 2 [ default = PGM_MAP ];
+  optional string input_dir = 3
+      [ default = "/home/zt/works/D10/planning/robot_factory/data/astar_pgm/" ];
+  optional string input_name = 4 [ default = "rtabmap" ];
+  optional double safe_margin = 5 [ default = 0.3 ];
+  optional double inflation_margin = 6 [ default = 0.05 ];
+  optional double max_obstacle_dist = 7 [ default = 2.0 ];
+  enum Heuristic {
+    EUCLIDEAN = 0;
+    MANHATTAN = 1;
+    DIAGONAL = 2;
+    DIJKSTRA = 3;
+  }
+  optional Heuristic heuristic = 8 [ default = EUCLIDEAN ];
+  optional bool unknown_as_free = 9 [ default = true ];
+  optional bool use_smoother = 10 [ default = true ];
+  optional double smoother_safety_margin = 11 [default = 0.3];
+  optional double smoother_safety_factor = 12 [default = 0.5];
+  optional double smoother_far_away_obstacle_dist = 13 [default = 1.0];
+  optional double smoother_weight_fem_pos_deviation = 14 [default = 1.0e3];
+  optional double smoother_weight_path_length = 15 [default = 100.0];
+  optional double smoother_weight_ref_deviation = 16 [default = 10.0];
+  optional bool allow_collision_goal = 17 [default = false];
+  optional double collision_goal_search_radius = 18 [default = 1.0];
+}

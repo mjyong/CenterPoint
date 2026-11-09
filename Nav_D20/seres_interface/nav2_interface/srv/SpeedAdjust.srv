@@ -1,0 +1,9 @@
+# Request
+
+float32 max_speed                   # 指定最大速度 m/s
+
+---
+# Response
+
+uint32 state                        # 详见 nav2_interface/msg/NavState.msg
+string message                      # 结果描述

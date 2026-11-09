@@ -1,0 +1,31 @@
+
+# RobotEnterSafePose.action
+# 电源模块、升级作为client, robot_service作为server, 服务名称："/robot_service/enterSafePose"
+
+uint8 ACTION_SLEEP = 1                      # 休眠
+uint8 ACTION_SHUTDOWN = 2                   # 关机
+uint8 ACTION_OTA = 3                        # OTA升级
+uint8 ACTION_CALIB_ENTER = 4                # 进入标定模式
+uint8 ACTION_CALIB_EXIT = 5                 # 退出标定模式
+
+uint8 RET_SUCCESS = 0                       # 执行成功
+uint8 RET_TIMEOUT = 1                       # 执行超时
+uint8 RET_ERROR   = 2                       # 执行错误
+uint8 RET_ERROR_BUSY = 3                    # 设备繁忙中（在执行任务）
+uint8 RET_ERROR_ON_OTHER_ACTION = 4         # 在其他的安全姿态下
+uint8 RET_ERROR_STATUS = 5                  # 当前模式不支持进入安全姿态
+uint8 RET_ERROR_ENTER_FAILED = 6            # 自动切姿态失败
+
+
+# Request
+uint8 action                                # ACTION_SLEEP/ACTION_SHUTDOWN/ACTION_OTA
+uint8 timeout                               # 超时时间(秒)
+
+---
+# Result
+uint8 ret                                   # 执行的状态码
+string message                              # 错误信息
+
+---
+# Feedback
+string feedback_msg                         # 当前执行的进展

@@ -1,0 +1,15 @@
+int32 OP_START = 0     # 请求执行技能
+int32 OP_PAUSE = 1     # 暂停任务
+int32 OP_RESUME = 2    # 恢复任务
+int32 OP_CANCEL = 3    # 取消任务
+int32 OP_STOP = 4      # 停止任务
+
+# Goal
+std_msgs/Header header # header
+int32 op               # 操作
+string token           # token, 必传
+string content         # pb请求体
+---
+# Result
+int32 ret              # 请求是否成功
+string result          # pb结果

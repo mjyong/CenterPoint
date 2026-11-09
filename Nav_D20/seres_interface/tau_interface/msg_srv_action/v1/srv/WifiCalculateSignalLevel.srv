@@ -1,0 +1,5 @@
+# 根据 rssi 计算信号强度等级
+int32 rssi
+---
+int32 signal_level
+int32 max_signal_level

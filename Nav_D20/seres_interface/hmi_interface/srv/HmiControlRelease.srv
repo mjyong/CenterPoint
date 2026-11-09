@@ -1,0 +1,8 @@
+# 控制参数
+string request_id    # 待释放的请求ID（来自 HmiControlRequest 的 Result.request_id）
+string request_name  # 请求者名称（用于日志/审计）
+---
+# Result
+bool  success
+string request_id    # 回传被释放的请求ID（与 Request 中一致）
+string result_message # 成功或失败原因

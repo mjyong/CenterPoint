@@ -1,0 +1,2 @@
+---
+uint8 wifi_ap_state  # 使用 WIFI_AP_STATE_*

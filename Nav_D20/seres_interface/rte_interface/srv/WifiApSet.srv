@@ -1,0 +1,9 @@
+# 请求部分：
+string ssid
+string password
+bool action
+string freq_band
+
+---
+# 响应部分：
+bool result

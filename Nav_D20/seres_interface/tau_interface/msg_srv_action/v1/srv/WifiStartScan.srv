@@ -1,0 +1,4 @@
+# 触发主动扫描（扫描结果通过 WifiScanResults topic 发布）
+---
+bool success
+string message

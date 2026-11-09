@@ -1,0 +1,9 @@
+# Request
+# 蓝牙操作指令(枚举型)
+uint8 BT_SCAN_STOP=0  # 关闭扫描
+uint8 BT_SCAN_START=1 # 开启扫描
+
+uint8 scan_sw   # 扫描开关 
+---
+# Response
+int32 return_code  # 返回码，0-成功，1-失败

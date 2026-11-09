@@ -1,0 +1,10 @@
+# Goal definition
+int32 target
+
+---
+# Result definition
+int32 final_count
+
+---
+# Feedback definition
+int32 current_count

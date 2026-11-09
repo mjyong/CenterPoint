@@ -1,0 +1,5 @@
+#请求参数
+uint8[64] rbt_software_version
+---
+#响应部分
+int32 return_code

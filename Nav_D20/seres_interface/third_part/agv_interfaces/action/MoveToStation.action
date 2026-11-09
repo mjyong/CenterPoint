@@ -1,0 +1,25 @@
+# Action name:"agv/move_to_station"
+# Action Server：agv_controller
+# Action Client：
+# 需提前在地图中提前设置好站点才可使用
+
+# Goal
+uint16 station_id   # 站点ID，需提前在地图中设置站点
+int32 speed         # (底盘运动线速度级别(速度最大值百分比)，值范围 1~100（默认100） [例：web端设置最大线速度1000 mm/s,此处设置为50，则线速度为500mm/s])
+uint32 timeout_sec  # 单位s (可选项，默认不使用超时判断)
+
+---
+# Result
+bool success
+string message
+uint32 task_id
+
+---
+# Feedback
+float32 progress
+string state
+int32 current_x
+int32 current_y
+int32 current_yaw
+bool obstacle_detected
+bool emergency_stopped

@@ -1,0 +1,6 @@
+int32 remote_command # 1 向下翻页
+                     # 2 向上翻页
+                     # 0 home首页
+                     # 0x7F0000xx, xx表示指定页码（0~x)
+---
+int32 result_code    # 0请求成功

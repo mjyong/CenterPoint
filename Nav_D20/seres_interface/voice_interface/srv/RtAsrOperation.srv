@@ -1,0 +1,8 @@
+string session_id    # 会话 ID
+string intent        # 操作意图
+string params        # 操作可能携带的参数(json字符串)
+---
+int32  code          # RtAsrRet::Ok / ServiceUnavailable
+string session_id    # 会话 ID
+string intent        # 回复给对应的操作意图
+string message       # 回复给对应操作可能的结果(json字符串)

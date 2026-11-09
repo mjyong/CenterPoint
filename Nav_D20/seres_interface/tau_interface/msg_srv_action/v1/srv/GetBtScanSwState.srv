@@ -1,0 +1,6 @@
+---
+# 蓝牙操作指令(枚举型)
+uint8 BT_SCAN_STOP=0            # 扫描关闭
+uint8 BT_SCAN_START=1           # 扫描开启
+
+uint8 state                     # 扫描状态

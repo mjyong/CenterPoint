@@ -1,0 +1,13 @@
+# service:"agv/map_management"
+# 服务端：agv_controller
+# 客户端：
+# AGV地图设置
+
+uint8 command        # (0:获取地图列表  1：设置当前地图  2：获取当前地图  3：开始建图  4：完成建图  5：取消建图)
+string map_name
+---
+bool success
+string[] map_list
+string current_map
+string message
+int32 progress

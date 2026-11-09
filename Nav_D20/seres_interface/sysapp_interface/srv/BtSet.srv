@@ -1,0 +1,19 @@
+# Request
+# 蓝牙操作指令cmd (枚举型)
+uint8 BT_DEVICE_DISCONNECT=0      # 断开
+uint8 BT_DEVICE_CONNECT=1         # 连接
+uint8 BT_DEVICE_ENABLE_PAIR=2     # 使能配对
+uint8 BT_DEVICE_DISABLE_PAIR=3    # 取消配对
+# 设备类型枚举
+uint8 BT_CTRL_DEVICES_A2DP=0    # a2dp设备
+uint8 BT_CTRL_DEVICES_HID=1     # hid host设备
+uint8 BT_CTRL_DEVICES_GATTC=2   # GATTC设备
+uint8 BT_CTRL_DEVICES_GATTS=3   # GATTS设备
+
+string addr                     # 蓝牙设备地址
+string name                     # 蓝牙设备名称
+uint8 cmd                       # 蓝牙操作指令[必须使用BT_DEVICE_*常量]
+uint8 device                    # 蓝牙设备类型[必须使用BT_CTRL_DEVICES_*常量]
+---
+# Response
+int32 return_code         # 操作是否成功，0-成功，1-失败

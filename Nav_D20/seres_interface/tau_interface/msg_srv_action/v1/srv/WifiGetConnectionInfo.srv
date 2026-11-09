@@ -1,0 +1,5 @@
+# 获取 Wifi 网络连接状态信息
+---
+WifiConnectionInfo connection_info
+bool success
+string message

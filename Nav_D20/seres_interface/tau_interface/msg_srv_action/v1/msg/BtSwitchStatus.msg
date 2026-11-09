@@ -1,0 +1,5 @@
+# 蓝牙开关状态(枚举型)
+uint8 BT_SWITCH_CLOSE=0     # 关闭蓝牙
+uint8 BT_SWITCH_OPEN=1      # 打开蓝牙
+
+uint8 bt_switch             # 蓝牙开关状态[必须使用BT_SWITCH_*常量]

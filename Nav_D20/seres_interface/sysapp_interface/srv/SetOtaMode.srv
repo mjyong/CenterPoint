@@ -1,0 +1,5 @@
+#请求参数 1-设置ota模式 0-取消ota模式
+int8 ota_mode
+---
+#响应部分
+int32 return_code

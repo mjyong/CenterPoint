@@ -1,0 +1,5 @@
+#请求,json结构数据
+string req
+---
+#响应，,json结构数据
+string res

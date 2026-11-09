@@ -1,0 +1,13 @@
+# Goal
+string skill         # 技能名称，如pick,point等，详见《具身操作技能定义》
+string target        # 目标对象描述，null：操作仅依赖skill；非空：表示skill要操作的目标对象说明信息
+
+---
+# Result
+uint32 state        # 结束状态，取值见 MANIP_STA_*
+string message      # 结果描述
+
+---
+# Feedback
+uint32 state        # 基础操作任务执行状态，取值见 MANIP_STA_*，如执行中 / 成功 / 失败 / 目标不可达
+string desc         # 可选，状态描述

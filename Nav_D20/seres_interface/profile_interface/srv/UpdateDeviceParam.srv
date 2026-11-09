@@ -1,0 +1,8 @@
+# request
+string param_name   #参数名称
+string check_sum    #校验值
+string param_value  #参数值
+---
+# response
+bool result      # true: success; false: failure
+string message   # extra message

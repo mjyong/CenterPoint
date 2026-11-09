@@ -1,0 +1,18 @@
+# Request
+uint8 dev_type
+uint8 module
+---
+
+# Response
+uint32[] sc
+#------------------------------
+# dev_type
+#DEV_RESOURCE_ALL = 0, // UNKOWN
+#DEV_RESOURCE_CCU_SOC = 1, // CCU-SOC
+#DEV_RESOURCE_CCU_MCU = 2, // CCU-MCU
+#DEV_RESOUCE_TMU_MCU = 3, // TMU-MCU
+#DEV_RESOURCE_TMU_SOC = 4, // TMU-SOC
+#DEV_RESOURCE_PMU = 5, // PMU
+# module
+#DEV_MODULE_ALL = 0, // UNKOWN
+#DEV_MODULE_

@@ -1,0 +1,12 @@
+# Goal
+
+---
+# Result
+uint32 state        # 结束状态，取值见 MANIP_STA_*
+string message      # 结果描述
+string[] result
+
+---
+# Feedback
+uint32 state        # 基础操作任务执行状态，取值见 MANIP_STA_*，如执行中 / 成功 / 失败 / 目标不可达
+string desc         # 可选，状态描述

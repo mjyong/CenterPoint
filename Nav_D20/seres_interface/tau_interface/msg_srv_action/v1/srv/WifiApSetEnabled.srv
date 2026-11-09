@@ -1,0 +1,5 @@
+# 开启或关闭 AP 热点
+bool enable  # true: 开启热点, false: 关闭热点
+---
+bool success    # 请求成功/错误
+string message  # 请求成功/错误描述

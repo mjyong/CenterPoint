@@ -1,0 +1,4 @@
+#接收音视频控制信息
+StreamStatus[] streams   # 请求：流状态数组
+---
+uint8 status_code         # 响应：状态码（0 成功，非0表示错误）

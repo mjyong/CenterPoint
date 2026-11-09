@@ -1,0 +1,8 @@
+# 连接指定网络
+# 服务端会优先使用 config，如果 config 无效（ssid 为空），再连接 network_id 对应网络（network_id >=0）
+int32 network_id          # 已保存的网络ID（-1 表示不使用）
+WifiConfiguration config  # 新网络配置（若提供且有效，则忽略 network_id）
+---
+bool success
+string message
+int32 used_network_id  # 实际使用的网络ID（成功时返回）

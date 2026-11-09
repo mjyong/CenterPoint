@@ -1,0 +1,9 @@
+# Request
+# 蜂窝网络开关状态(枚举型)
+uint8 CELLULAR_NETWORK_SWITCH_CLOSE=0       # 关闭
+uint8 CELLULAR_NETWORK_SWITCH_OPEN=1        # 打开
+
+uint8 nw_switch                             # 蜂窝网络开关状态[必须使用 CELLULAR_NETWORK_SWITCH_* 常量]
+---
+# Response
+int32 return_code                           # 返回码，0-成功，1-失败

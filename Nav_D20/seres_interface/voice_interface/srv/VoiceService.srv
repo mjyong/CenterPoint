@@ -1,0 +1,45 @@
+# 请求部分
+string ssid
+string action
+string method
+string package
+voice_interface/VoiceContent content
+---
+# 响应部分
+string ssid
+string code
+string package
+string message
+voice_interface/VoiceContent content
+
+# 请求字段说明:
+# ssid: 会话标识
+#   UUID格式，用于标识一次完整的语音交互流程，由调用方生成
+# action: 操作类型
+#   TTS_SERVICE - 语音播报服务
+#   SETTINGS    - 设置管理
+# method: 具体方法
+#   speak   - 发起播报（需通过content传递播报参数）
+#   pause   - 暂停播报（只能暂停自己发起的播报）
+#   resume  - 恢复播报（只能恢复自己发起的播报）
+#   stop    - 停止播报（只能停止自己发起的播报）
+#   query   - 状态查询（查询播报服务的全局状态）
+#   wakeword - 唤醒词管理
+# package: 应用标识
+#   用于标识请求来源，如"com.example.app"
+# content: 请求内容
+#   当method=speak时，通过Intent类型传递播报参数
+#   其他方法时可为空
+
+# 响应字段说明:
+# ssid: 会话标识
+#   与请求中的ssid保持一致，用于关联请求和响应
+# code: 响应码
+#   0      - 成功
+#   其他值 - 错误码，具体含义参见错误码定义文档
+# package: 响应包标识
+#   与请求中的package保持一致
+# message: 响应消息描述
+#   对响应码的文本描述，用于调试和日志
+# content: 响应内容
+#   当需要返回额外数据时使用，如状态查询结果等

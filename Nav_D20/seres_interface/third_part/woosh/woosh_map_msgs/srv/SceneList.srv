@@ -1,0 +1,10 @@
+# 场景列表请求
+
+woosh_map_msgs/SceneList arg
+---
+# 场景列表
+woosh_map_msgs/SceneList ret
+# 请求成功与否
+bool ok
+# 请求状态消息
+string msg

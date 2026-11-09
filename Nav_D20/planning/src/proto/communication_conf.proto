@@ -1,0 +1,112 @@
+syntax = "proto2";
+
+package planning.config;
+
+message CommunicationConf {
+  enum Type {
+    RosBridge = 1;
+    RosDebugBridge = 2;
+    D20PtzBridge = 3;
+    R11HeadBridge = 4;
+  }
+  repeated Type types = 1;
+  repeated Conf confs = 2;
+  required Type main_type = 3;
+  required Type debug_type = 4;
+  message Conf {
+    optional Type type = 1;
+    optional bool assist = 2 [ default = false ];
+    oneof config {
+      RosBridgeConf ros_bridge_conf = 3;
+      RosDebugBridgeConf ros_debug_bridge_conf = 4;
+      D20PtzBridgeConf d20_ptz_bridge_conf = 5;
+      R11HeadBridgeConf r11_head_bridge_conf = 6;
+    }
+  }
+  message RosPipeConf {
+    optional string name = 1;
+    optional int32 queue_size = 2 [ default = 10 ];
+    optional double timeout = 3;
+  }
+  message RosBridgeConf {
+    // -- Subscribers --
+    optional RosPipeConf sub_odom = 1;
+    optional RosPipeConf sub_occupancy_grid = 2;
+    optional RosPipeConf sub_joint_state = 3;
+    optional RosPipeConf sub_octomap = 4;
+    optional RosPipeConf sub_global_occupancy_grid = 5;
+    optional RosPipeConf sub_charging_goal = 6;
+    optional RosPipeConf sub_init_pose = 7;
+    optional RosPipeConf sub_goal_pose = 8;
+    optional RosPipeConf sub_objects = 9;
+    optional RosPipeConf sub_battery_states = 16;
+    optional RosPipeConf sub_motion_state = 17;
+    optional RosPipeConf sub_map_switch = 18;
+
+    // -- Publishers --
+    optional RosPipeConf pub_cmd_vel = 10;
+    optional RosPipeConf pub_motion = 11;
+
+    // -- Action Servers --
+    optional RosPipeConf action_navigation = 12;
+    optional RosPipeConf action_backcharge = 13;
+    optional RosPipeConf action_following = 14;
+
+    // -- Service Clients --
+    optional RosPipeConf client_woosh_twist = 15;
+
+    // -- 全局配置 --
+    optional bool sync_odom_occ = 26 [ default = false ];
+    optional double timeout_pause_duration = 27 [ default = 1.0 ];
+    optional double timeout_resume_duration = 28 [ default = 3.0 ];
+    optional bool enable_global_map_reload = 29 [ default = false ];
+    optional double image_width = 30 [ default = 640 ];
+    optional double image_height = 31 [ default = 480 ];
+    optional bool enable_timeout_check = 32 [ default = true ];
+  }
+
+  message RosDebugBridgeConf {
+    required bool pub_flag = 1 [ default = true ];
+    required bool record_flag = 2 [ default = false ];
+    required bool enable_global_map_pub = 3 [ default = true ];
+  }
+
+  message D20PtzBridgeConf {
+    optional RosPipeConf sub_ptz_state = 1;
+    optional RosPipeConf pub_ptz_cmd = 2;
+    optional RosPipeConf pub_focus_point = 3;
+    optional RosPipeConf action_ptz_camera = 4;
+    optional double pan_delta_th = 5;                        //rad
+    optional double tilt_delta_th = 6;                       //rad
+    optional double zoom_delta_th = 7;                       //magnification
+    optional double target_hold_time = 8;
+    optional double time_to_idle = 9;
+
+    optional double max_pan = 11 [ default = 170 ];          // deg
+    optional double min_pan = 12 [ default = -170 ];         // deg
+    optional double max_tilt = 13 [ default = 90 ];          // deg
+    optional double min_tilt = 14 [ default = -90 ];         // deg
+    optional double max_focal_length = 15 [ default = 153 ]; // mm
+    optional double min_focal_length = 16 [ default = 4.8 ]; // mm
+    optional double cmos_size = 17 [ default = 5.7 ];        // mm  
+    optional double cmos_scale_h = 18 [ default = 0.6 ];     // 4:3
+  }
+
+  message R11HeadBridgeConf {
+    optional RosPipeConf sub_head_state = 1;
+    optional RosPipeConf pub_head_cmd = 2;
+    message MotorConf{
+      optional double max_position = 1;
+      optional double min_position = 2;
+      optional double kp = 3;
+      optional double kd = 4;
+    }
+    optional MotorConf motor_roll = 3;
+    optional MotorConf motor_pitch = 4;
+    optional MotorConf motor_yaw = 5;
+    optional double tracking_gain = 6 [default = 0.05];
+    optional double tracking_dead_zone = 7 [default = 0.01];
+    optional double tracking_lowpass_alpha = 8 [default = 0.3];
+    optional double tracking_timeout = 9 [default = 0.5];
+  }
+}

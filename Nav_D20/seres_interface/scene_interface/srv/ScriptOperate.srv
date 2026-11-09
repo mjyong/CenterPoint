@@ -1,0 +1,26 @@
+#操作选项
+uint8 IMMEDIATELY = 0
+uint8 EQUENE = 1
+
+#剧本格式
+uint8 SCRIPT = 0
+uint8 BEHAVIOR_TREE = 1
+
+#焦点丢失策略
+string FOCUS_LOSS_STRATEGY_CANCEL = CANCEL
+string FOCUS_LOSS_STRATEGY_PAUSE = PAUSE
+
+# 任务操作
+string id  #任务id，为空则自动生成
+uint8 option  #操作选项
+string script #剧本内容 二选一
+string path #剧本路径 二选一
+uint32 priority 0  #优先级,默认为0
+uint8 format 0 #剧本格式
+string replace_data  #替换script中的"{xxx}"
+string blackboard_data  #黑板变量，设置xxx但不进行替换，保留黑板属性
+string focus_loss_strategy #焦点丢失任务处理策略
+---
+string id
+bool result
+string message

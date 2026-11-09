@@ -1,0 +1,32 @@
+# 域类型
+
+# 未定义的
+int32 K_FIELD_TYPE_UNDEFINED=0
+# 双行道
+int32 K_BIDIRECTION_WAY=1
+# 单行道
+int32 K_SINGLE_WAY=2
+# 单向道
+int32 K_ONE_WAY=3
+# 路口
+int32 K_CROSSING=4
+# 狭窄通道
+int32 K_NARROW_PASSAGE=5
+# 定位域
+int32 K_LOCATE=6
+# 斜坡域
+int32 K_RAMP=7
+# Odom域
+int32 K_ODOM=8
+# 自动门域
+int32 K_AUTO_DOOR=9
+# 限速域
+int32 K_SPEED_LIMIT=10
+# 消防域
+int32 K_FIRE_FIELD=11
+# 警示域
+int32 K_WARN_FIELD=12
+# 引导域
+int32 K_GUIDE_FIELD=13
+
+int32 value

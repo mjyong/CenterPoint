@@ -1,0 +1,20 @@
+# 储位集合
+
+# 最基础的储位
+woosh_map_msgs/StoragesBase[] bases
+# 货架
+woosh_map_msgs/StoragesBase[] racks
+# 停车位
+woosh_map_msgs/StoragesBase[] parkspots
+# 充电桩
+woosh_map_msgs/StoragesBase[] chargers
+# 栈板平台
+woosh_map_msgs/StoragesBase[] pallet_platforms
+# 举升料车
+woosh_map_msgs/StoragesBase[] lift_trolleys
+# 牵引挂车
+woosh_map_msgs/StoragesBase[] tractor_trailers
+# 辊筒桩
+woosh_map_msgs/StoragesBase[] roller_stations
+# 机械臂作业台
+woosh_map_msgs/StoragesBase[] arm_worktops

@@ -1,0 +1,22 @@
+# Request
+# WiFi-AP加密方式(枚举型)
+uint8 WIFI_AP_ENCRYPTION_NONE=0x01          #未加密
+uint8 WIFI_AP_ENCRYPTION_WPA2=0x02          # WPA2
+uint8 WIFI_AP_ENCRYPTION_WPA=0x03           # WPA
+uint8 WIFI_AP_ENCRYPTION_WEP=0x04           # WEP
+uint8 WIFI_AP_ENCRYPTION_WAPI_PSK=0x05      # WAPI PSK
+uint8 WIFI_AP_ENCRYPTION_WAPI_CERT=0x06     # WAPI CERT
+
+# WIFI-AP频段(枚举型)
+uint8 WIFI_AP_FREQUENCY_2G=0x00             # 2.4G
+uint8 WIFI_AP_FREQUENCY_5G=0x01             # 5G
+uint8 WIFI_AP_FREQUENCY_2G_5G=0x02          # 2.4G+5G
+
+string name                                 # WiFi-AP热点名称
+string password                             # WiFi-AP热点密码
+uint8 encryption                            # WiFi-AP加密方式[必须使用 WIFI_AP_ENCRYPTION_* 常量]
+uint8 frequency                             # WIFI频段[必须使用 WIFI_FREQUENCY_* 常量]
+int32 capacity                              # 容量(允许连接的最大设备数量)
+---
+# Response
+int32 return_code                           # 返回码，0-成功，1-失败

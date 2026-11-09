@@ -1,0 +1,9 @@
+robot_param {
+  robot_id {
+      appellation: "D20"
+      vin: "001"
+  }
+  length: 1.0
+  width: 0.4
+  height: 1.0
+}

@@ -1,0 +1,11 @@
+# Request
+#priority类型，同系统ResourcePriority.msg定义一致
+
+common_interface/ResourcePriority priority
+int32 skill_type        # 技能类型，例如 空闲，聆听，工作等，对应HmiSkillType.msg
+uint8 skill_state       # 技能状态，1表示开始/0表示停止
+string request_name     # 调用方名称
+---
+# Result
+bool success            # 是否成功
+string result_message    # 成功或失败原因

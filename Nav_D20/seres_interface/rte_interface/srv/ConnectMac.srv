@@ -1,0 +1,7 @@
+# 请求部分：
+string mac_address  # 要连接或断开的 MAC 地址
+bool connect        # true: 连接，false: 断开
+
+---
+# 响应部分：
+bool status       # "true(success)" 或 "false(failure)"

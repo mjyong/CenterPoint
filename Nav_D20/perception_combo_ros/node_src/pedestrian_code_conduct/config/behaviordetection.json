@@ -1,0 +1,23 @@
+{
+    "img_topic": "/perception/ptz_ori_image",
+    "vis_flag" : true,
+    "det_seg_ret_topic": "/perception/seg_det_result",
+    "seg_src_h": 1080, 
+    "seg_src_w": 1920, 
+    "det_src_h": 1080, 
+    "det_src_w": 1920,
+    "det_width_min": 80,
+    "det_width_max": 500,
+    "det_height_min":180,
+    "wh_ratio": 0.2,
+    "det_height_max": 800,
+    "min_zebra_area": 6000,
+    "min_walkable_area": 500,
+    "use_offline_mode": false,
+    "offline_mode_save_path": "/home/huanghanlin/hhl_work/seres_work/dog_follow/D20/0404_demonstration/data/bad_behavior_results",
+    "offline_img_dir": "/home/huanghanlin/hhl_work/seres_work/dog_follow/D20/0404_demonstration/data/bad_behavior_data",
+    "report_internal": 40,
+    "save_img":true,
+    "save_task_img_path" : "/home/nvidia/20251029_test/ptz_data_save",
+    "perception_detect_action" : "/perception/perception_detect_cycle"
+}

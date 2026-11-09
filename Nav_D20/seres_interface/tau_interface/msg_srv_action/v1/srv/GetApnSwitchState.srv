@@ -1,0 +1,11 @@
+# APN类型(枚举型)
+uint8 APN_ID_PRIVATE=0x00                                   # APN1，厂家流量
+uint8 APN_ID_PUBLIC=0x01                                    # APN2，用户流量
+
+uint8 apn_id                                                # APN类型[必须使用 APN_ID_* 常量]
+---
+# APN开关状态(枚举型)
+uint8 APN_SWITCH_STATUS_CLOSE=0x00                          # 关闭
+uint8 APN_SWITCH_STATUS_OPEN=0x01                           # 打开
+
+uint8 switch_status                                         # APN开关状态[必须使用 APN_SWITCH_STATUS_* 常量]

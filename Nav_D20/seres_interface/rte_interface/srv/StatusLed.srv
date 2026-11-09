@@ -1,0 +1,5 @@
+# 请求部分：
+LedCtrl[] led_ctrl   # 灯光控制列表，当led_index为0时，表示所有灯，否则表示相关状态灯序号
+---
+# 响应部分：
+bool success        # "true(success)" 或 "false(failure)"

@@ -1,0 +1,10 @@
+# 设置自动驻车请求
+
+woosh_robot_msgs/AutoHold arg
+---
+# 自动驻车
+woosh_robot_msgs/AutoHold ret 
+# 请求成功与否
+bool ok 
+# 请求状态消息
+string msg

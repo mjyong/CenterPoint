@@ -1,0 +1,62 @@
+#Request
+#操作类型
+uint8 OP_GET=0
+uint8 OP_SET=1
+uint8 operation
+
+# 逻辑网口
+uint8 port_id # 0为调试口，其余预留
+
+#网络模式枚举
+uint8 NETWORKTYPE_STATIC=0   #静态
+uint8 NETWORKTYPE_DHCP=1     #dhcp模式
+uint8 network_mode #网络模式
+
+string ip_addr  #ip地址
+string netmask  #子网掩码
+---
+# Response：
+uint8 network_mode #网络模式
+string ip_addr   #ip地址
+string netmask  #子网掩码
+int32 return_code   #返回码，0-成功，1-失败
+
+
+# =========================
+# 接口使用说明
+# =========================
+# 1. 查询网络配置 (OP_GET)
+# Request：
+#   operation = OP_GET
+#   port_id   = 查询的逻辑网口
+#   network_mode / ip_addr / netmask 参数忽略
+# Response：
+#   network_mode  当前网络模式 (STATIC / DHCP)
+#   ip_addr       当前IP地址
+#   netmask       当前子网掩码
+#   return_code   0成功，1失败
+
+# 2. 设置网络配置 (OP_SET)
+# 2.1 设置为静态IP
+# Request：
+#   operation     = OP_SET
+#   port_id       = 设置的逻辑网口
+#   network_mode  = NETWORKTYPE_STATIC
+#   ip_addr       = 目标IP地址
+#   netmask       = 子网掩码
+# Response：
+#   network_mode  当前网络模式 (STATIC)
+#   ip_addr       当前IP地址
+#   netmask       当前子网掩码
+#   return_code   0成功，1失败
+# 2.2 设置为DHCP模式
+# Request：
+#   operation     = OP_SET
+#   port_id       = 设置的逻辑网口
+#   network_mode  = NETWORKTYPE_DHCP
+#   ip_addr / netmask 参数忽略
+# Response：
+#   network_mode  当前网络模式 (DHCP)
+#   ip_addr       当前IP地址
+#   netmask       当前子网掩码
+#   return_code   0成功，1失败

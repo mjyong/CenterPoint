@@ -1,0 +1,9 @@
+# 关机请求
+
+woosh_robot_msgs/PowerOff arg
+---
+woosh_robot_msgs/PowerOff ret
+# 请求成功与否
+bool ok 
+# 请求状态消息
+string msg

@@ -1,0 +1,66 @@
+main_type: RosBridge
+debug_type: RosDebugBridge
+
+types: RosBridge
+confs{
+    type: RosBridge
+    ros_bridge_conf{
+        sync_odom_occ: false
+        enable_global_map_reload: false
+        sub_odom                   { name: "/robot/topic/mapm/odometry"           queue_size: 10  timeout: 0.5 }
+        sub_occupancy_grid         { name: "/robot/topic/dp/traversability_grid"  queue_size: 10  timeout: 0.5 }
+        sub_global_occupancy_grid  { name: "/map" }
+        sub_objects                { name: "/objects"            queue_size: 10 }
+        sub_init_pose              { name: "/initialpose"        queue_size: 10 }
+        sub_goal_pose              { name: "/goal_pose"          queue_size: 10 }
+        pub_cmd_vel                { name: "/cmd_vel"            queue_size: 10 }
+        pub_motion                 { name: "/mc/motion_control"  queue_size: 10 }
+        action_navigation          { name: "/nav/navigation" }
+        action_backcharge          { name: "/backcharge" }
+        action_following           { name: "/following" }
+        timeout_pause_duration: 1.0
+        timeout_resume_duration: 3.0
+    }
+}
+
+types: RosDebugBridge
+confs{
+    type: RosDebugBridge
+    ros_debug_bridge_conf{
+        enable_global_map_pub: false
+        pub_flag: true
+        record_flag: false
+    }
+}
+
+types: R11HeadBridge
+confs{
+    type: R11HeadBridge
+    assist: true
+    r11_head_bridge_conf{
+        sub_head_state: { name: "/mc/joints/state" }
+        pub_head_cmd: { name: "/mc/joints/control" }
+        motor_roll{
+            max_position: 0.2
+            min_position: -0.2
+            kp: 100.0
+            kd: 4.0
+        }
+        motor_pitch{
+            max_position: 0.5
+            min_position: -0.1
+            kp: 100.0
+            kd: 4.0
+        }
+        motor_yaw{
+            max_position: 1.0
+            min_position: -1.0
+            kp: 100.0
+            kd: 4.0
+        }
+        tracking_gain: 0.05
+        tracking_dead_zone: 0.1
+        tracking_lowpass_alpha: 0.3
+        tracking_timeout: 0.5
+    }
+}

@@ -1,0 +1,13 @@
+# service:"/robot/service/v1/agv/agv_power_req"
+# 服务端：agv_controller
+# 客户端：
+# AGV电源管理
+
+uint8 request       # 0：能否下电状态请求
+                    # 6：开始充电
+                    # 7：结束充电
+                    # 8：AGV关机下电
+uint16 delay_time   # 关机延时设置，范围[0~60]s
+---
+bool success
+string message

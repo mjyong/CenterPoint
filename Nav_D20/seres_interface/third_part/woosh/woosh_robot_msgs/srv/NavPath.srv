@@ -1,0 +1,4 @@
+# 请求导航路径
+
+---
+woosh_robot_msgs/NavPath nav_path

@@ -1,0 +1,23 @@
+# Installed by the lidar-3d-detection .deb (scripts/build_deb.sh fills in @PREFIX@ and @USER@).
+#   sudo systemctl start lidar-3d-detection       now
+#   sudo systemctl enable lidar-3d-detection      at every boot
+#   journalctl -u lidar-3d-detection -f           its output (also the glog files in LIDAR3D_LOG_DIR)
+[Unit]
+Description=lidar_3d_detection: lidar 3D detection, tracking and prediction (ROS 2)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# the user of the robot's other ROS 2 nodes (DDS shared memory between processes needs the same user)
+User=@USER@
+EnvironmentFile=-/etc/default/lidar-3d-detection
+ExecStart=@PREFIX@/lidar_3d_detection/bin/start_lidar_3d_detection.sh
+# SIGINT: rclcpp shuts down cleanly, glog flushes
+KillSignal=SIGINT
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

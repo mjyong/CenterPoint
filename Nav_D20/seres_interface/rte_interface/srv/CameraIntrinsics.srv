@@ -1,0 +1,6 @@
+##请求部分
+
+---
+#响应部分
+sensor_msgs/CameraInfo intrinsics
+bool status        # "true(success)" 或 "false(failure)"

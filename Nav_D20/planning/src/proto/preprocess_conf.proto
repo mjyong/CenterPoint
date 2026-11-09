@@ -1,0 +1,44 @@
+syntax = "proto2";
+
+package planning.config;
+
+message PreprocessConf {
+  enum Type {
+    CostMapProduction = 1;
+    CollisionChecker = 2;
+    GlobalMapManager = 3;
+  }
+  repeated Type types = 1;
+  repeated Conf confs = 2;
+  message Conf {
+    optional Type type = 1;
+    oneof config {
+      CostMapProductionConf cost_map_production_conf = 2;
+      CollisionCheckerConf collision_checker_conf = 3;
+      GlobalMapManagerConf global_map_manager_conf = 4;
+    }
+  }
+  message CollisionCheckerConf {
+    required string urdf_dir = 1;
+    required string urdf_name = 2;
+  }
+  message CostMapProductionConf {
+    required double front_to_base_length = 1;
+    required double back_to_base_length = 2;
+    required double left_to_base_width = 3;
+    required double right_to_base_width = 4;
+    required double resolution = 5;
+    required double safe_margin = 6;
+    required double inflation_margin = 7;
+    required double max_obstacle_dist = 8;
+    optional double max_reference_offset = 9 [default = 1.0];
+    optional bool enable_cuda = 10 [default = false];
+    optional double reference_path_length = 11 [default = 10.0];
+  }
+  message GlobalMapManagerConf {
+    required string input_dir = 1;
+    required string input_name = 2;
+    required bool enable_overlay = 3;
+    required double cell_timeout_seconds = 4;
+  }
+}

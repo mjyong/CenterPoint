@@ -1,0 +1,5 @@
+# 请求部分：
+float32[] base_value   # 左腿标定数据: 0, 右腿标定数据:1
+---
+# 响应部分：
+bool status        # "true(success)" 或 "false(failure)"

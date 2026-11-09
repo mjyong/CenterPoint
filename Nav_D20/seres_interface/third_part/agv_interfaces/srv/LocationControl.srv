@@ -1,0 +1,13 @@
+# service:"agv/location_control"
+# 服务端：agv_controller
+# 客户端：
+# AGV地图中定位，需要先确认地图设置正确
+
+uint8 command         # (0：坐标定位  1：站点定位  2：停止定位  3：设置初始位姿)
+int32 pose_x
+int32 pose_y
+int32 pose_yaw
+uint16 station_id     # (command = 1时使用)
+---
+bool success
+string message

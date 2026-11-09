@@ -1,0 +1,31 @@
+main_type: RosBridge
+debug_type: RosDebugBridge
+
+types: RosBridge
+confs{
+    type: RosBridge
+    ros_bridge_conf{
+        sync_odom_occ: false
+        sub_odom             { name: "/odom"                          queue_size: 10 }
+        sub_occupancy_grid   { name: "/rolling_bonxai/local_map_2d"   queue_size: 10 }
+        sub_joint_state      { name: "/joint_states"                  queue_size: 10 }
+        sub_octomap          { name: "/octomap_binary"                queue_size: 10 }
+        sub_init_pose        { name: "/initialpose"                   queue_size: 10 }
+        sub_goal_pose        { name: "/goal_pose"                     queue_size: 10 }
+        pub_cmd_vel          { name: "/cmd_vel"                       queue_size: 10 }
+        pub_motion           { name: "/mc/motion_control"             queue_size: 10 }
+        action_navigation    { name: "/nav/navigation" }
+        timeout_pause_duration: 1.0
+        timeout_resume_duration: 3.0
+    }
+}
+
+types: RosDebugBridge
+confs{
+    type: RosDebugBridge
+    ros_debug_bridge_conf{
+        enable_global_map_pub: true
+        pub_flag: true
+        record_flag: false
+    }
+}

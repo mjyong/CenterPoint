@@ -1,0 +1,7 @@
+# 自动对接
+
+woosh_ros_msgs/AutoDock arg
+---
+woosh_ros_msgs/Feedback ret
+---
+woosh_ros_msgs/Feedback fb

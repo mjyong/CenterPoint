@@ -1,0 +1,5 @@
+# 蓝牙配对模式状态(枚举型)
+uint8 BT_PAIR_MODE_OFF=0      # 配对模式关闭(不可被发现)
+uint8 BT_PAIR_MODE_ON=1       # 配对模式开启(可被发现)
+
+uint8 pair_mode               # 配对模式状态[必须使用 BT_PAIR_MODE_* 常量]

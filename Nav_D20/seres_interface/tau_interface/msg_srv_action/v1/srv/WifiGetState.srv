@@ -1,0 +1,2 @@
+---
+uint8 wifi_state  # 使用 WIFI_STA_* 常量

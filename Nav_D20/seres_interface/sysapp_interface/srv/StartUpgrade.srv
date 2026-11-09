@@ -1,0 +1,9 @@
+string source_module
+string local_path
+string sha256
+KeyValue[] extra
+---
+bool accepted
+string upgrade_id
+uint32 error_code
+string message

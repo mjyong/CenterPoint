@@ -1,0 +1,40 @@
+#咖啡品种
+#"Espresso":意式浓缩,
+#"Americano":美式咖啡,
+#"Cappuccino":卡布奇诺,
+#"CaffeLatte":拿铁咖啡,
+#"WarmMilk":热⽜奶,
+#"FlatWhite":澳⽩咖啡,
+#"Macchiato":玛琪雅朵,
+#"LatteMacchiato":拿铁玛琪雅朵,
+#"AmericanoIced":冰美式,
+#"Ristretto":芮斯崔朵，
+#"AmericanoMilk":美式奶咖
+#"EspressoMilk":意式奶咖,
+#"CaffeLatteIced":冰拿铁
+string food_id
+
+#咖啡风味
+#"none"不加冰,"little"加少量冰,"standard"加标准冰
+string makeice
+
+#糖类品种
+#"none"不加糖,"1"加1号糖,"2"加2号糖,"3"加3号糖
+string sugar
+
+#甜度等级
+#"little"少量糖,"standard"标准量糖,"much"多糖
+string sugarweight
+
+uint32 count #数量
+---
+# 0正常接单
+# 2002 机械⼿臂设备状态不对，⽆法接受订单
+# 2011 咖啡机设备状态不对，⽆法接受订单
+# 2008 不能满⾜订单要求(点的咖啡，因咖啡机缺奶或者制冰机缺冰不能制作)
+# 2009 歇业维护，不能接单2006订单号重复
+# 2010 订单数据信息不完整，缺少字段
+# 2020 该品类咖啡没有
+# 2021 上⼀个失败订单，设备异常，需要⼈⼯介⼊处理，恢复接单
+int32 result_code 
+int32 order_id #咖啡机统⾥的订单号

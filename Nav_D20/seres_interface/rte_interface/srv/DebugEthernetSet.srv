@@ -1,0 +1,14 @@
+#Request
+#网络模式枚举
+uint8 NETWORKTYPE_STATIC=0   #静态
+uint8 NETWORKTYPE_DHCP=1     #dhcp模式
+
+uint8  network_mode #网络模式
+string ip_addr  #ip地址
+string netmask  #子网掩码
+---
+# Responde：
+string ip_addr   #ip地址,dhcp模式时有效
+string netmask  #子网掩码,dhcp模式时有效
+int32 return_code   #返回码，0-成功，1-失败
+

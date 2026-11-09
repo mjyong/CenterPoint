@@ -1,0 +1,32 @@
+# Goal
+uint8 FOLLOW_MODE_AUTO  = 0     # 跟踪当前正对目标
+uint8 FOLLOW_MODE_UWB   = 1     # UWB目标信标跟随
+uint8 FOLLOW_MODE_PIC   = 2     # 目标图像跟随
+uint8 FOLLOW_MODE_BOX   = 3     # 目标框对象跟随
+
+uint8 FOLLOW_PERIOD_CONTINUE = 0    # 持续跟随
+uint8 FOLLOW_PERIOD_ONCE     = 1    # 单次跟随，到达目标跟随范围后即完成
+
+uint8 PLAN_MODE_AUTO        = 0     # 自动规划路径
+uint8 PLAN_MODE_PATH        = 1     # 按指定路径跟随
+uint8 PLAN_MODE_SURROUND    = 2     # 环绕跟随
+uint8 PLAN_MODE_LINE        = 3     # 直线跟随，跟随目标直进直退
+
+uint8 follow_mode               # 跟随目标来源，详见本协议FOLLOW_MODE_*定义 
+uint8 follow_period             # 跟随周期，详见本协议FOLLOW_PERIOD_*定义  
+uint8 plan_mode                 # 跟随路径规划方式，详见本协议PLAN_MODE_*定义              
+float32 speed                   # 跟随速度，有效值：大于0
+
+sensor_msgs/CompressedImage[] object    # 目标对象，mode为FOLLOW_MODE_PIC时有效
+common_interface/BoundingBox2D box      # 目标框对象，mode为FOLLOW_MODE_BOX时，有效 
+
+uint32 distance                 # 距离，单位cm。PLAN_MODE_SURROUND时为环绕半径
+geometry_msgs/Point[] point     # 跟随路径，PLAN_MODE_PATH时有效
+
+---
+# Result
+string message                  # 结果描述
+
+---
+# Feedback
+uint32 state                    # 详见 nav2_interface/msg/NavState.msg

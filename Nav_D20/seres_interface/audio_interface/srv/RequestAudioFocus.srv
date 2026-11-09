@@ -1,0 +1,20 @@
+# request
+# 服务名称:"/audio_service/request_audio_focus"
+
+#申请焦点的音频source类型，同系统ResourcePriority.msg定义一致
+
+common_interface/ResourcePriority source
+
+# 焦点变化回调通知建议定义成 xxx_node_focus_listener_xxxSource, 
+# 一个node不同source焦点的listener可以 "xxx_node_focus_listener_alarm"，"xxx_node_focus_listener_voice"
+# 一个node有2个同类型source焦点可以 "xxx_node_focus_listener_voice1"，　 "xxx_node_focus_listener_voice2"
+
+string focus_change_listener
+
+---
+
+# response
+
+int32 AUDIOFOCUS_REQUEST_GRANTED = 1   # 焦点申请成功
+int32 AUDIOFOCUS_REQUEST_FAILED = 0    # 焦点申请失败
+int32 result

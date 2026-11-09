@@ -1,0 +1,14 @@
+# request
+# 服务名称:"/audio_service/abandon_audio_focus"
+
+
+string focus_change_listener         # 申请焦点时使用的的listener
+
+---
+
+# response
+
+int32 AUDIOFOCUS_ABANDON_OK = 1      # 释放焦点成功返回
+int32 AUDIOFOCUS_ABANDON_FAILED = 0  # 释放焦点失败返回, 可能listener不存在，或者已经释放过了
+
+int32 result

@@ -1,0 +1,71 @@
+syntax = "proto2";
+
+package planning.config;
+
+message TebPlannerConf {
+  message CoarseSearchConf {
+    optional double xy_resolution = 1 [ default = 0.1 ];
+    optional double theta_resolution = 2 [ default = 0.314159265 ];
+    optional double min_x = 3 [ default = -5.0 ];
+    optional double max_x = 4 [ default = 5.0 ];
+    optional double min_y = 5 [ default = -5.0 ];
+    optional double max_y = 6 [ default = 5.0 ];
+    optional int32 max_search_nodes_no_theta = 7 [ default = 1000 ];
+    optional int32 max_search_nodes_with_theta = 8 [ default = 50000 ];
+    optional double weight_reference_path = 9 [ default = 1.0 ];
+    optional double ref_grid_resolution = 10 [ default = 0.5 ];
+    optional double weight_last_path_consistency = 11 [ default = 0.0 ];
+  }
+
+  message OptimizerConf {
+    optional int32 max_num_iterations = 1 [ default = 100 ];
+    optional double function_tolerance = 2 [ default = 1e-6 ];
+    optional double gradient_tolerance = 3 [ default = 1e-10 ];
+    optional double parameter_tolerance = 4 [ default = 1e-8 ];
+    optional int32 num_threads = 5 [ default = 16 ];
+  }
+
+  message TimeConf {
+    optional double time_delta_lower_bound = 1 [ default = 0.25 ];
+    optional double time_delta_upper_bound = 2 [ default = 0.5 ];
+    optional double time_delta_init = 3 [ default = 0.1 ];
+  }
+
+  message DynamicConstraints {
+    optional double max_vx = 1 [ default = 5.0 ];
+    optional double max_vy = 2 [ default = 3.0 ];
+    optional double max_omega = 3 [ default = 2.0 ];
+    optional double max_accel_vx = 4 [ default = 1.0 ];
+    optional double max_accel_vy = 5 [ default = 1.0 ];
+    optional double max_accel_omega = 6 [ default = 2.0 ];
+    optional double reference_velocity = 7 [ default = 0.0 ];
+  }
+
+  message WeightConf {
+    optional double weight_path_following = 1 [ default = 1.5 ];
+    optional double weight_initial_velocity = 2 [ default = 10.0 ];
+    optional double weight_final_velocity = 3 [ default = 3.0 ];
+    optional double weight_accel_smooth = 4 [ default = 2.0 ];
+    optional double weight_accel_limit = 5 [ default = 2.0 ];
+    optional double weight_velocity_limit = 6 [ default = 1.0 ];
+    optional double weight_obstacle_warning = 7 [ default = 10.0 ];
+    optional double weight_obstacle_danger = 8 [ default = 1000.0 ];
+    optional double obstacle_warning_distance = 15 [ default = 1.0 ];
+    optional double obstacle_danger_distance = 16 [ default = 0.4 ];
+    optional double weight_time_optimal = 9 [ default = 3.0 ];
+    optional double weight_path_smoothness = 10 [ default = 10.0 ];
+    optional double weight_lateral_velocity = 11 [ default = 2.0 ];
+    optional double weight_reference_velocity = 14 [ default = 1.0 ];
+    optional double weight_non_holonomic = 17 [ default = 5.0 ];
+    optional double non_holonomic_min_speed = 18 [ default = 0.3 ];
+    optional double weight_prefer_forward = 19 [ default = 5.0 ];
+  }
+
+  optional CoarseSearchConf coarse_search_conf = 1;
+  optional OptimizerConf optimizer_conf = 2;
+  optional TimeConf time_conf = 3;
+  optional DynamicConstraints dynamic_constraints = 4;
+  optional WeightConf weight_conf = 5;
+
+  optional double velocity_cmd_time = 6 [ default = 0.65 ];
+}

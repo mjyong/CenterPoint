@@ -1,0 +1,4 @@
+#!/bin/sh
+work_dir="$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+export PLANNING_ROOT_DIR="$work_dir/../../../lib/@PROJECT_NAME@"
+export LD_LIBRARY_PATH="$PLANNING_ROOT_DIR/lib:/opt/seres/middleware/nav:/opt/seres/middleware/robot_common/lib:/opt/seres/middleware/robot_common/lib3:$LD_LIBRARY_PATH"

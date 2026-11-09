@@ -1,0 +1,38 @@
+types: GlobalMapManager
+confs{
+    type: GlobalMapManager
+    global_map_manager_conf{
+        input_dir: "/../../data/astar_pgm/"
+        input_name: "wuyun"
+        enable_overlay: true
+        cell_timeout_seconds: 1.0
+    }
+}
+types: CostMapProduction
+confs{
+    type: CostMapProduction
+    cost_map_production_conf{
+        enable_cuda: false
+        front_to_base_length: 10.0
+        back_to_base_length: 5.0
+        left_to_base_width: 5.0
+        right_to_base_width: 5.0
+        resolution: 0.05
+        max_obstacle_dist: 1.5
+        safe_margin: 0.3
+        inflation_margin: 0.0
+
+        max_reference_offset: 3.0
+        reference_path_length: 10.0
+    }
+}
+
+types: CollisionChecker
+confs{
+    type: CollisionChecker
+    collision_checker_conf{
+        urdf_dir: "/../../data/urdf/r1pro_description"
+        urdf_name: "r1pro.urdf"
+    }
+}
+

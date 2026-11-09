@@ -1,0 +1,22 @@
+#Goal
+uint32 user_id            # 调用方传入uint型业务用户ID（确保唯一性）
+
+---
+#Result
+string feature_id         # SDK生成的唯一特征ID（UUID，供调用方保存）
+float32[] feature         # 人脸特征向量（浮点数数组，供调用方保存）
+
+bool success              # 注册是否成功
+string message            # 错误信息（失败时填充）
+
+---
+#Feedback: 算法持续反馈进度状态
+
+int32 STATE_CODE_DETECTING   = 0  # 正在检测人脸（刚开始，还未抓到人脸）
+int32 STATE_CODE_NO_FACE     = 1  # 未检测到人脸
+int32 STATE_CODE_MULTI_FACE  = 2  # 检测到多张人脸
+int32 STATE_CODE_LOW_QUALITY = 3  # 人脸质量不达标
+int32 STATE_CODE_IN_PROGRESS = 4  # 抓拍进行中（已抓到人脸，正在多帧选优）
+
+int32 state_code          # 进度，详见STATE_CODE_*定义
+float32 current_quality   # 当前最佳质量评分

@@ -1,0 +1,8 @@
+# 执行预定义任务
+
+woosh_robot_msgs/ExecPreTask arg
+---
+# 请求成功与否
+bool ok 
+# 请求状态消息
+string msg

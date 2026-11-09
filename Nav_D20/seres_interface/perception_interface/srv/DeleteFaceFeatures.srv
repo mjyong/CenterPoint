@@ -1,0 +1,8 @@
+#Request
+string[] feature_id     # 待删除的特征ID。 非空：删除具体特征项； null：删除全部特征项
+
+---
+#Response
+
+bool success            # 删除是否成功
+string message          # 错误信息

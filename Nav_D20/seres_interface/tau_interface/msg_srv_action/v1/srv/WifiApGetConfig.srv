@@ -1,0 +1,5 @@
+# 获取当前保存的AP配置
+---
+WifiApConfig config
+bool success
+string message

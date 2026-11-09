@@ -1,0 +1,6 @@
+# 根据网络 ssid 获取网络配置
+string ssid
+---
+WifiConfiguration config
+bool success
+string message

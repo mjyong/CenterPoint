@@ -1,0 +1,5 @@
+# 设置AP热点配置（保存配置，自动重启热点）
+WifiApConfig config
+---
+bool success
+string message

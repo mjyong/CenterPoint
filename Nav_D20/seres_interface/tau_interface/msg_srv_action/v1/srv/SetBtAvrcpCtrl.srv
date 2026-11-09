@@ -1,0 +1,11 @@
+# === AVRCP 控制命令常量 ===
+uint8 AVRCP_PLAY=0           # 播放
+uint8 AVRCP_PAUSE=1          # 暂停
+uint8 AVRCP_NEXT=2           # 下一首
+uint8 AVRCP_PREVIOUS=3       # 上一首
+
+# === 参数 ===
+string addr                  # 蓝牙设备地址(可空，空则控制当前活跃设备)
+uint8 cmd                    # 控制指令[必须使用 AVRCP_* 常量]
+---
+int32 return_code            # 返回码，0-成功，1-失败

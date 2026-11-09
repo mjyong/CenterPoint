@@ -1,0 +1,12 @@
+# 请求
+uint8 target        # 控制对象，对应0x00~0x0F
+uint8 command
+# 0：下电（停止）模式
+# 1：上电（激活）模式
+# 2：休眠模式
+# 3：急停模式（表示外设停止工作（device_type = 0Xff，且power_state=3表示触发急停动作）
+# 4：表示UNKNOWN
+
+---
+# 响应
+bool success

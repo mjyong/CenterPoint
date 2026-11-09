@@ -1,0 +1,5 @@
+#iot控制号
+int32 cmd_id
+string param
+---
+int32 result_code  # 0请求成功,-1失败

@@ -1,0 +1,12 @@
+#操作选项
+uint8 IMMEDIATE = 0
+uint8 PAUSE = 1
+uint8 RECOVER = 2
+uint8 CANCEL = 3
+
+# 任务操作
+string id     #任务ID
+uint8 option  #操作选项
+---
+bool result
+string message

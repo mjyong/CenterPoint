@@ -1,0 +1,7 @@
+#请求参数为空
+---
+#响应部分
+uint8[64] ecu_hsn
+uint8[64] supplier_code
+uint8[64] ecu_s_ver
+uint8[64] ecu_h_ver

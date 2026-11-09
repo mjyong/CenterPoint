@@ -1,0 +1,5 @@
+#请求参数为空
+---
+#响应部分
+int32 return_code
+uint8[64] vin

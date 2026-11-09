@@ -1,0 +1,109 @@
+{
+  "configById": {
+    "3D!lidar3d": {
+      "layers": {
+        "grid": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "grid",
+          "layerId": "foxglove.Grid",
+          "size": 100,
+          "divisions": 20,
+          "lineWidth": 1,
+          "color": "#3c3c3c",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": true,
+        "distance": 55,
+        "phi": 55,
+        "thetaOffset": 20,
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          -20,
+          10,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "camera_init",
+      "scene": {
+        "transforms": {
+          "showLabel": true,
+          "editable": true
+        },
+        "enableStats": false,
+        "ignoreColladaUpAxis": false,
+        "meshUpAxis": "z_up"
+      },
+      "transforms": {},
+      "topics": {
+        "/perception/lidar_3d/cloud": {
+          "visible": true,
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo",
+          "pointSize": 2
+        },
+        "/perception/lidar_3d/tracks": {
+          "visible": true,
+          "showOutlines": true
+        },
+        "/perception/lidar_3d/predictions": {
+          "visible": true
+        }
+      },
+      "publish": {
+        "type": "point",
+        "poseTopic": "/move_base_simple/goal",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {}
+    },
+    "RawMessages!objects": {
+      "topicPath": "/perception/lidar_3d/objects",
+      "diffEnabled": false,
+      "showFullMessageForDiff": false
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "first": "3D!lidar3d",
+    "second": "RawMessages!objects",
+    "direction": "row",
+    "splitPercentage": 72
+  }
+}

@@ -1,0 +1,9 @@
+robot_param {
+  robot_id {
+      appellation: "R1 Pro"
+      vin: "001"
+  }
+  length: 0.6
+  width: 0.7
+  height: 1.75
+}

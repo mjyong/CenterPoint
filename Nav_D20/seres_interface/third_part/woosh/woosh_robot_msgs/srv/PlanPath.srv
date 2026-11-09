@@ -1,0 +1,4 @@
+# 请求全局规划路径
+
+---
+woosh_robot_msgs/PlanPath plan_path

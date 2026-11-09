@@ -1,0 +1,8 @@
+# 设置屏蔽呼叫
+
+woosh_robot_msgs/SetMuteCall arg
+---
+# 请求成功与否
+bool ok 
+# 请求状态消息
+string msg

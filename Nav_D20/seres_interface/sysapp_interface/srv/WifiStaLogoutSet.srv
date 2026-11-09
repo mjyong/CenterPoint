@@ -1,0 +1,5 @@
+# Request
+string name                                 # WiFi-STA热点名称
+---
+# Response
+int32 return_code                           # 返回码，0-成功，1-失败
