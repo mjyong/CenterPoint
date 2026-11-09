@@ -89,6 +89,11 @@ sudo systemctl stop lidar-3d-detection
 - 配置和 `/etc/default` 那个文件是 conffile：升级时保留你改过的；`dpkg -r` 卸载时也留着，`dpkg -P` 才删掉；
 - 起来以后日志里有一行 "lidar_3d_detection up: ..."，之后每秒一行：框数、轨迹数、各段耗时（ms），最后是这一秒里最长的回调（`callback_max_ms`，含发布）和 `clouds N frames N skipped N`（收到几帧点云、发出几帧结果、按点云时间戳算中间缺了几帧）；
 - 延迟要在锁频后看：`sudo jetson_clocks`，重启就没了。`scripts/orin_clocks.sh` 查锁没锁。没锁时节点慢 2–3 倍（T32：每帧 55 ms，锁频时 15–21 ms）；
+- 开机锁频：`/etc/default/lidar-3d-detection` 里 `LIDAR3D_LOCK_CLOCKS=1`，服务每次启动前先跑 `jetson_clocks`（`packaging/lock_clocks.sh`，unit 的 `ExecStartPre=+`，以 root 跑）。默认 0，什么都不改。
+  - 它把整台机器的 CPU、GPU、内存频率拉到最高，风扇也开到最大，功耗和发热跟着涨，影响机器人上所有进程，开不开由机器人团队定；
+  - 找不到或跑失败只打一行日志，节点照常起来；
+  - 改回 0 要等下次重启才恢复（脚本不解锁）；
+  - 改过 `/etc/default` 以后升级 deb，dpkg 会问保留哪份配置（`--force-confold` 保留自己的）；
 - 不经过 deb，直接用 colcon 的安装目录也行：`source install/setup.bash && ros2 launch lidar_3d_detection lidar_3d_detection.launch.py`。
 
 ## 用 Foxglove 看（板上循环播 bag）

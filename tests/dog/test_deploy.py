@@ -510,6 +510,46 @@ def test_orin_clocks_tells_whether_jetson_clocks_ran(tmp_path, cpu, gpu, code, w
         assert "%d / %d" % cpu in r.stdout and "%d / %d" % gpu in r.stdout
 
 
+@pytest.mark.parametrize("switch, fake, code_word", [
+    (None, "ok", None), ("0", "ok", None), ("1", "ok", "clocks locked"), ("yes", "ok", "clocks locked"),
+    ("1", "fails", "failed (exit 3)"), ("1", "missing", "not found")])
+def test_lock_clocks_runs_jetson_clocks_only_when_switched_on(tmp_path, switch, fake, code_word):
+    """deploy_deb's packaging/lock_clocks.sh (the service's ExecStartPre): jetson_clocks only with
+    LIDAR3D_LOCK_CLOCKS=1 in /etc/default/lidar-3d-detection (default 0), and it never stops the node from starting."""
+    script = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection", "packaging",
+                          "lock_clocks.sh")
+    if not os.path.exists(script):
+        pytest.skip("no deploy_deb")
+    marker = tmp_path / "ran"
+    jc = tmp_path / "jetson_clocks"
+    if fake != "missing":
+        jc.write_text("#!/bin/sh\ntouch %s\n%s\n" % (marker, "exit 3" if fake == "fails" else "exit 0"))
+        jc.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k != "LIDAR3D_LOCK_CLOCKS"}
+    env["JETSON_CLOCKS"] = str(jc)
+    if switch is not None:
+        env["LIDAR3D_LOCK_CLOCKS"] = switch
+    r = subprocess.run(["bash", script], env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert marker.exists() == (code_word is not None and fake != "missing")
+    if code_word:
+        assert code_word in r.stdout + r.stderr
+    else:
+        assert r.stdout + r.stderr == ""
+
+
+def test_lock_clocks_is_wired_into_the_service_and_off_by_default():
+    node = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection")
+    if not os.path.isdir(node):
+        pytest.skip("no deploy_deb")
+    unit = open(os.path.join(node, "packaging", "lidar-3d-detection.service")).read()
+    default = open(os.path.join(node, "packaging", "lidar-3d-detection.default")).read()
+    cmake = open(os.path.join(node, "CMakeLists.txt")).read()
+    assert "ExecStartPre=+@PREFIX@/lidar_3d_detection/bin/lock_clocks.sh" in unit
+    assert "\nLIDAR3D_LOCK_CLOCKS=0\n" in default
+    assert "packaging/lock_clocks.sh DESTINATION bin" in cmake
+
+
 def test_objects_bag_reads_the_vehicle_messages(tmp_path):
     """objects_bag.py also reads deploy_deb's perception_interface/LidarObjectArray (the same fields)."""
     pytest.importorskip("rosbags")

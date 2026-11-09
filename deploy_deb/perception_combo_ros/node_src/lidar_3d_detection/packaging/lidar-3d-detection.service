@@ -12,6 +12,8 @@ Type=simple
 # the user of the robot's other ROS 2 nodes (DDS shared memory between processes needs the same user)
 User=@USER@
 EnvironmentFile=-/etc/default/lidar-3d-detection
+# LIDAR3D_LOCK_CLOCKS=1 in /etc/default: jetson_clocks first ("+": as root whatever User= is); never fails the start
+ExecStartPre=+@PREFIX@/lidar_3d_detection/bin/lock_clocks.sh
 ExecStart=@PREFIX@/lidar_3d_detection/bin/start_lidar_3d_detection.sh
 # SIGINT: rclcpp shuts down cleanly, glog flushes
 KillSignal=SIGINT

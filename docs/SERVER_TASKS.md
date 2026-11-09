@@ -107,9 +107,9 @@
 | T6 | 训练 v1（单卡，和 v0 同配方）；同时跑基线：nuScenes 原始模型、v0 | Agent | T5 | 约 1.2 小时（两个训练挤一张卡时约 2 小时） | 完成 |
 | T7 | 比较 7 个模型，选部署 Voxel 还是 Pillar、上报阈值 | Agent | T6 | 1 小时 | 完成 |
 | T8 | 部署：导出上线 Pillar 的 ONNX（2026-10-26 起是 nuScenes Pillar，见 T15 复核）；选了 Voxel 时再打包 Voxel，人在 Orin 上测（H2） | Agent | T7 | 10 分钟 | 并入 T26（2026-10-28） |
-| H2 | （T7 选了 Voxel 时）在 Orin 上测 Voxel v1 的延迟，放得下就部署 Voxel，否则部署 Pillar | 人 | T8 | 半天 | 待做 |
-| T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 待做 |
-| T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 待做 |
+| H2 | （T7 选了 Voxel 时）在 Orin 上测 Voxel v1 的延迟，放得下就部署 Voxel，否则部署 Pillar | 人 | T8 | 半天 | 不做（2026-11-09，T40：上线的是 Pillar） |
+| T9 | （可选）用 v1 Voxel 当教师重新自动标注，准备第二轮 | Agent | T7 | 1 小时 | 不做（2026-11-09，T40：教师已定，T15、T39 都是不换） |
+| T10 | （可选）比较 0921 的两个 INS 杠杆臂 | Agent | T0 | 1 小时 | 不做（2026-11-09，T40：可选项，收尾时不做） |
 | T11 | 验证集加多模型候选框（红框"候选"）；35 个场景写上模型框，供 Ctrl + 拖框用 | Agent | T7 | 20 分钟 | 完成（物体最高分门槛 0.5，306 个候选物体） |
 | T11b | 重做候选：只要车辆，只用 v1 Voxel、v1 Pillar 两个模型（T11 混进了行人、骑行者） | Agent | T11 | 15 分钟 | 完成（物体最高分门槛 0.3，54 个候选物体） |
 | T16 | 双教师的自动标注导成新的 SUSTechPOINTS 场景（35 个），沿用 H1 的审核结论；训练和验证一样，只留两个教师的框 | Agent | T14 | 20 分钟 | 完成（2026-10-26，验证集的 v1 候选已去掉） |
@@ -125,7 +125,7 @@
 | T20 | 跟踪扫参（关联、coast、确认、观测噪声、运动状态） | Agent | T19 | 1 小时 | 完成。coast 1.5 s，确认 3 帧；关联半径、观测噪声、速度头、匹配、运动状态留默认 |
 | T21 | 预测：IMM 对 CV、IMM 参数；oracle 和端到端 | Agent | T20 | 30 分钟 | 完成。运动模型、合并距离留默认（cv:1.5+ct:1.5:0.25，merge_dist 0.25）；训练 oracle 上 CV 比 IMM 差 |
 | T22 | 定版：参数改成默认值（我改代码），从原始扫描完整跑验证场景，和旧默认值比，出最终报告和 MCAP | Agent | T21 | 30 分钟 | 完成。从原始扫描完整跑，IDF1 0.786，和 T20 final_A 相同；新默认值相对旧默认值 IDF1 +0.060。MCAP 在 data/tune/T22_mcap（872 MB） |
-| H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做 |
+| H5 | 看最终效果，定上线参数 | 人 | T22 | 1 小时 | 待做（列在 T40 的收尾表里，等 T35 B 段） |
 | T23 | 第二档预测（学习模型）第一版：35 个场景的跟踪日志（附带两项检查：预测误差拆成纵向 / 横向，训练目标对标签的误差）、选训练目标、训练 GRU 和 Transformer、在验证集上和 IMM 配对比 | Agent | T22 | 1 小时 | 完成，已复核。线上继续用 IMM：GRU、Transformer 概率最高的路线偏慢，3 s FDE 都更高（MR 低得多）。predict_ms 2746 / 4322 ms 是并行进程抢 CPU 测出来的，单线程约 16–40 ms，仍超 10 ms。伪真值用 measured，离标签 0.2 m，改为默认。误差主要在纵向，地图暂不做 |
 | T24 | 第二档第二版，跟踪的部分合并：重新生成跟踪日志（加运动状态列），训练两个带状态输出的 GRU（一个加原始检测输入），评估"用它的速度匀速外推""用它的在动判断替换跟踪器的规则"及两者合用 | Agent | T23 | 1 小时 | 完成，已复核。保持现状。在动判断漏报增加、领先不到 90%；速度外推的 FDE 没同时过端到端和标签当检测。复核发现网络估的速度系统性偏慢，原始检测输入有用；人定不在 0921 上继续调，厂区数据来了先修速度目标 |
 | T25 | Orin 部署 P0：经反向隧道连通板子，记录服务器和板子的环境，装好缺的包（docs/DEPLOY_ORIN.md） | Agent + 人 | — | 半天 | 完成，已复核。通道通；板上补了 trtexec（libnvinfer-bin 10.3.0.30）。服务器项目环境 TensorRT 10.3.0。小引擎测试失败是建引擎工具没按模型目录找外部权重，已修 |
@@ -139,7 +139,7 @@
 | T32 | 删掉 `deploy/` 以后：服务器容器里不带 ROS 编 deploy_deb、跑 CTest（含 GPU），样例 bag 上 Python 对 C++；板上清掉旧的 `deploy/`，装 foxglove_bridge、patchelf，升级前留参考、重打 deb、升级安装，升级前后逐位比、ROS 读 bag 对读消息日志逐位比；查 TF 和 bridge（`foxglove_probe.py`）；留一段 60 s 的 bag 给人看 | Agent，最后一步人看 | T31 | 1.5 小时 | 完成，已复核。删掉 deploy/ 以后服务器 CTest 27 项全过，升级前后、两条回放路径都逐位相同，TF、bridge 过。复核：板子重启后没锁频，节点慢 2–3 倍（每帧 55 ms，T31 是 15–21 ms），Foxglove 那次只有 5 Hz 的原因没分清（没锁频、DDS 缓冲、调试点云）；节点每秒那一行加了收到 / 发出 / 缺的帧数和最长回调，加了 orin_clocks.sh；板上服务的配置不是包里的 |
 | T33 | 板上实时性：锁频与否 × DDS 缓冲 × 发不发调试点云，60 s bag 1× 播六遍，分清丢帧来自哪；重打 deb（新的统计行），服务改回包里的配置 | Agent | T32 复核 | 1.5 小时 | 完成，已复核。不锁频、默认 UDP：341 条 objects、skipped 247。只加大到 8 MB 缓冲：592 条、skipped 0。只锁频：598 条、total_ms 17.7。锁频后再发调试点云并开 bridge，默认缓冲掉到 452（callback 只有 44 ms），8 MB 缓冲回到 597。建议开机锁频；Fast DDS 的机器带上这份 profile。deb `0.1.0+312.gb7dc5c6`，服务改回包里的配置。复核："真狗是 CycloneDDS"没有依据，T34 核实；deb 带上 8 MB 的 Fast DDS profile，orin_foxglove.sh 默认用它；/etc/default 列了 DDS 选项 |
 | T34 | 8 号狗上车前的检查（室内，不用人）：证据、话题和坐标系撞车、用现在的代码重建引擎并打包（带车上的 DDS 设置）、CycloneDDS 下收真雷达点云、回放和编译机比、锁频前后的延迟、照 SENSORS 7.2 录 60 s、foxglove_bridge | Agent | 80a9546 复核 | 2 小时 | 完成，已复核。CycloneDDS 域 0、只绑 eth1、共享内存、socket 10 MB，节点 root。我们的话题各 1 个发布者、0 个订阅，TF 里没有 camera_init。deb `0.1.0+316.gdbde7ed`。室内 clouds 598 / skipped 0 / frames 0。和编译机比过门槛（匹配 0.998）。不锁频 total 中位 58.6 ms，锁频 37.1 ms（服务也在占 GPU），测完恢复未锁。录 64 s 点云 640 条，丢包计数没涨。nvidia 的 bridge 10 秒只收到 10 帧点云。复核：慢的原因是机器人自己的负载（load 32），不是我们的服务；不锁频 p99 99 ms 贴着帧间隔；nvidia 用户拿到的数据不全（root 的共享内存），撞车检查和 bridge 要用 root 再看；SENSORS 7.2 的雷达检查改成录 12 秒数条数 |
-| T35 | 8 号狗出门实跑：A 段室内（root 视角撞车、root 起 bridge、负载和 GPU）；B 段室外有固定解（在线每秒的帧数和延迟、天线接法、录包和离线回放对比、Foxglove） | Agent + 人（带狗出门） | T34 复核 | 1.5 小时 | 待做 |
+| T35 | 8 号狗出门实跑：A 段室内（root 视角撞车、root 起 bridge、负载和 GPU）；B 段室外有固定解（在线每秒的帧数和延迟、天线接法、录包和离线回放对比、Foxglove） | Agent + 人（带狗出门） | T34 复核 | 1.5 小时 | 并入 T40（2026-11-09；A、B 两段照 T35 的步骤，B1 改用开机锁频的开关） |
 | T36 | 1104（第二批，4 份 bag、17.6 分钟、四路相机）：体检、切场景、转换、预览、时间差、位姿融合、再预览；看 RTK 固定解、天线接法、时钟 | Agent | 无 | 1 小时 | 完成，已复核（2026-11-05；续：偏置 0 重转，31 场景两遍预览全 OK、位姿基本不用修，时间差跳过。人补了现场：三叉路口，车很多、基本在动） |
 | T37 | 1104：转出 4 个缓冲场景；双教师推理和自动标注、上线模型对教师、每个场景的统计；按 bag 划分（两份验证、两份训练，人定）；挑场景、带四路相机的审核材料 | Agent | T36 续 | 3 小时 | 完成，已复核（2026-11-06）：30 m 内运动的车 103 条（0921 是 29）；验证 cp02 + cp04；待审 32 个场景、1,940 个关键帧；没接进 SUSTechPOINTS，补在 T37 续 |
 | T37 续 | 1104 的 32 个场景接进 SUSTechPOINTS，备份审核前的标注，重新起服务 | Agent | T37 | 10 分钟 | 完成，已复核（2026-11-06）：32 个场景接好，统计和 T37 一致，可以开始 H6 |
@@ -147,9 +147,10 @@
 | H6 | 审 1104 挑出的场景：验证 14 个逐框、训练 18 个看红框（SUSTechPOINTS，只审车；Foxglove 里对照四路相机） | 人 | T37 续 | 1 天 | 完成，已复核（2026-11-06）：红框 422 → 8（二次补清后）；H6 补：`cp01_s003` 删掉的是牵引车拉的一串置物架，可要可不要，T38 恢复成忽略框 |
 | T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 完成，已复核（2026-11-07）：v3 在 `dog_veh_1106_1811`，训练 12,670 帧、验证 1,418 帧；新验证集 30 m 内运动的车 72 条 |
 | T39 | 训练 v3（Pillar、Voxel，配方同 v2）；24 个验证场景上和 nusc_pp、v2_pp 重跑比较（合计、0921、1104 分开），定上线的 Pillar 和上报阈值；v3 Voxel + TTA 对教师 | Agent，人定 | T38 | 半天 | 完成，已复核（2026-11-09）。上线仍用 nuScenes Pillar，上报阈值不改（0.40；T39 建议的 0.35 只看检测，没采用）。v3_pp 近处 ΔAP@2.0 只有 +0.006；v2_pp 在 1104 上 AP@2.0 低 0.049。教师不换 |
+| T40 | 收尾：删 v2 数据集；8 号狗装带开机锁频开关的 deb（默认关）；T35 A、B 两段（B 段用开关锁频）；剩下要人和别的团队定的事列在 T40 节里 | Agent + 人（B 段带狗出门） | T39 | 1 小时 + 出门 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
-  - 部署：T35（A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频、天线配置；
+  - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
   - 数据：T36 → T36 续 → T37 → T37 续 → H6（人审）→ T38 → T39，都已完成（2026-11-09）。上线模型不换；模型这条线等下一批数据（另一天、另一片区域、狗在走），先留测试集，再看 v3；
   - 1104 只有一个晚上，测试集等下一批（另一天、另一片区域，DATA_COLLECTION_PLAN 3.5）。
 - T1R 之后，T1S 和 T3 可以同时进行；T1S 之后人开始审核（H1），v0 同时在训练。
@@ -7627,3 +7628,94 @@ v3 的优势在 1104（在动的货车，背景训练里见过）：AP@2.0 0.929
   - 数据：下一批要另一天、另一片区域、狗在走（最好白天），先留出测试集，再看 v3 是不是真的好（DATA_COLLECTION_PLAN 3.1、3.5）。
   - 部署：T35（A 段室内随时可以做；B 段要人带狗出门）。
   - v3 的权重留着（`data/train/dog_*_veh_v3`）。v2 的数据集目录 `dog_veh_1026_1410`（37 GB）T39 已经用不到，删不删人定。
+
+---
+
+## T40 收尾：剩下的都在这里（2026-11-09）
+
+这一轮模型和数据做完了（T39：上线仍用 nuScenes Pillar，阈值 0.40）。剩下的收尾放在一起，按谁做分开。
+T35 并入这里：步骤照 T35 原来写的，这里只写改了的地方。
+
+| # | 事 | 谁 | 前置 |
+|---|---|---|---|
+| 1 | 删 v2 数据集 `dog_veh_1026_1410`（人定，2026-11-09） | Agent，服务器 | 无 |
+| 2 | 8 号狗装新 deb：开机锁频的开关 `LIDAR3D_LOCK_CLOCKS`（默认 0，什么都不改）；7432c90 的预测线也在里面 | Agent，ssh dog | 无 |
+| 3 | T35 A 段（室内）：root 视角的撞车检查、root 起 bridge、负载和 GPU | Agent | 2 |
+| 4 | T35 B 段（室外、固定解）：在线出框、天线接法、在线对离线、Foxglove；锁频改用开关，顺便在真狗上验开关 | 人带狗出门，Agent | 3 |
+| 5 | 8 号狗开不开开机锁频：`/etc/default/lidar-3d-detection` 里 `LIDAR3D_LOCK_CLOCKS=1`，然后 `systemctl restart lidar-3d-detection` | 机器人团队 | 4（看锁频前后的延迟和负载） |
+| 6 | 规划确认 `ObjectArray` 的坐标系和字段 | 人、规划 | 无 |
+| 7 | H5：看最终效果，定上线参数 | 人 | 4 |
+| 8 | 下一批数据：另一天、另一片区域、狗在走（最好白天）。先留测试集，再看 v3（DATA_COLLECTION_PLAN 3.5） | 人录，Agent 照 T36–T39 做 | 无 |
+
+不做了：
+- H2：只在选了 Voxel 时才要，上线的是 Pillar；
+- T9：用 v1 Voxel 当教师，教师已经定了（T15、T39：不换）；
+- T10：两个杠杆臂，可选项，到收尾也没用上；
+- H4：等下一批数据，模型变了再看。
+
+```text
+任务 T40：收尾。1. 删 v2 数据集；2. 8 号狗装带开机锁频开关的 deb（默认关）；3. T35 A 段；4. T35 B 段（人带狗出门时）。
+先按通用约定做（第 9 条：可以改 deploy_deb/、tools/deploy/；第 10 条）。仓库根目录，export PYTHONPATH=.。
+规矩同 T34、T35：域 0 上除了我们的服务不发任何东西；不停、不改机器人别的服务；狗上不 apt install，deb 用 dpkg -i，
+依赖不满足就停，不要 --force-depends。
+mkdir -p data/reports/T40；L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection
+pytest tests/dog/test_deploy.py -q -k "lock_clocks or orin_clocks" | tail -1      （新的开关测试，7 + 3 个）
+
+1. 删 v2 数据集：
+     readlink -f data/dog_veh                       （应是 /public/zjst/robot/centerpoint_data/dog_veh_1106_1811，v3；不是就停）
+     ps aux | grep -E "train.py|dist_test|compare_detectors|run_sequence|export_dataset" | grep -v grep   （应没有输出；有就等它结束）
+     D=/public/zjst/robot/centerpoint_data/dog_veh_1026_1410
+     du -sh $D | tee data/reports/T40/delete_v2.txt && rm -rf $D && ls -d $D 2>&1 | tee -a data/reports/T40/delete_v2.txt
+   v2 的权重（data/train/dog_*_veh_v2）留着。v1 的目录（dog_veh_1023_1529）还在的话，只报大小，不删（人没说）。
+2. 8 号狗装新 deb（开机锁频开关，默认关）：
+   a. 装之前的状态，备份 /etc/default：
+     ssh dog 'dpkg -s lidar-3d-detection | grep Version; systemctl is-enabled lidar-3d-detection; systemctl is-active lidar-3d-detection; \
+         ~/dogperc/repo/'$L'/scripts/orin_clocks.sh; sudo -n cp /etc/default/lidar-3d-detection /etc/default/lidar-3d-detection.T40-before' \
+         2>&1 | tee data/reports/T40/before.txt
+   b. 同步、打包（同 T34 第 3 步。引擎不用重建：模型和狗上的 TensorRT 都没变）：
+     ORIN_HOST=dog tools/deploy/sync_to_orin.sh --model data/deploy/nusc_pp_dyn
+     ssh dog 'mkdir -p ~/dogperc/deb/old && mv ~/dogperc/deb/lidar-3d-detection_0.1.0+* ~/dogperc/deb/old/ 2>/dev/null; \
+         cd ~/dogperc/repo/deploy_deb/perception_combo_ros && node_src/lidar_3d_detection/scripts/build_deb.sh \
+         --model ~/dogperc/models/nusc_pp_dyn --service-user root --no-enable-service \
+         --ros-domain-id 0 --rmw rmw_cyclonedds_cpp --cyclonedds-uri file:///opt/ros/cyclonedds.xml --out ~/dogperc/deb' \
+         2>&1 | tail -40 | tee data/reports/T40/build_deb.txt
+   - settings 一行应是 T34 的四项再加 LIDAR3D_LOCK_CLOCKS=0。
+   c. 装：
+     ssh dog 'sudo -n dpkg -i --force-confnew ~/dogperc/deb/lidar-3d-detection_0.1.0+*_arm64.deb 2>&1 | tail -4; \
+         diff /etc/default/lidar-3d-detection.T40-before /etc/default/lidar-3d-detection; \
+         systemctl show lidar-3d-detection -p ExecStartPre | cut -c1-200; \
+         dpkg -s lidar-3d-detection | grep Version; systemctl is-enabled lidar-3d-detection; systemctl is-active lidar-3d-detection' \
+         2>&1 | tee data/reports/T40/install.txt
+   - diff 只能多出 LIDAR3D_LOCK_CLOCKS=0 和它上面三行注释，DDS 的三项和 LIDAR3D_THREADS 不变。
+     有别的不一样就停下：sudo -n cp /etc/default/lidar-3d-detection.T40-before /etc/default/lidar-3d-detection，报告；
+   - ExecStartPre 里有 lock_clocks.sh；
+   - a 里是 active 的，现在也要是 active（postinst 只在 enabled 时重启服务；不是就 sudo -n systemctl start lidar-3d-detection）。
+   d. 开关关着时什么都不改：
+     ssh dog 'sudo -n systemctl restart lidar-3d-detection; sleep 15; \
+         journalctl -u lidar-3d-detection --since "-1min" --no-pager | grep -c lock_clocks; \
+         ~/dogperc/repo/'$L'/scripts/orin_clocks.sh; systemctl is-active lidar-3d-detection' 2>&1 | tee data/reports/T40/switch_off.txt
+   - lock_clocks 的行数是 0；orin_clocks.sh 那一行和 a 里一样；服务 active。
+3. T35 A 段：照 T35 的第 0 步（不用再打包，第 2 步做过了）和 A1–A3，报告写到 data/reports/T40/（文件名照 T35）。
+   A1 有同名坐标系就停下问人。
+4. T35 B 段（人在聊天里说"狗在室外、可以开始"再做）：照 T35 的 B0–B8，改三处：
+   - bag 的名字用当天的日期，例如 1110_t40，B5、B6 里的 1105_t35 都换成它；
+   - B1 用开关锁频（顺便在真狗上验开关）：
+     ssh dog 'C=$(~/dogperc/repo/'$L'/scripts/orin_clocks.sh); echo "$C"; \
+         case "$C" in "clocks locked"*) ;; *) sudo -n jetson_clocks --store /tmp/clocks_default ;; esac; \
+         sudo -n sed -i "s/^LIDAR3D_LOCK_CLOCKS=0$/LIDAR3D_LOCK_CLOCKS=1/" /etc/default/lidar-3d-detection; \
+         sudo -n systemctl restart lidar-3d-detection; sleep 15; \
+         journalctl -u lidar-3d-detection --since "-1min" --no-pager | grep lock_clocks; \
+         ~/dogperc/repo/'$L'/scripts/orin_clocks.sh; systemctl is-active lidar-3d-detection' 2>&1 | tee data/reports/T40/switch_on.txt
+     journal 里要有 "lock_clocks.sh: clocks locked"，orin_clocks.sh 打印 clocks locked。不是就照 T35 原来的 B1 手动锁，报告里写明。
+   - B4 恢复：开关改回 0（同一条 sed，0 和 1 对调）。开始时没锁的话，sudo -n jetson_clocks --restore /tmp/clocks_default；
+     orin_clocks.sh 一行进报告。服务不用再重启（开关只在服务启动时起作用）。改回 0 以后，/etc/default 和包里的一样，下次升级不会问配置。
+
+停止条件：同 T35；第 1 步 data/dog_veh 不是 v3；第 2 步 diff 里有别的设置、依赖不满足、服务起不来。
+提交：data/reports/T40/、本文档，以及按约定 9 改的代码。不提交 bag、data/deploy/。
+报告（写进"T40 结果"）：
+- 1：删掉了多大；v1 的目录在不在、多大；
+- 2：装之前 / 之后的版本，settings 一行，diff，ExecStartPre，开关关着时 orin_clocks.sh 前后两行；
+- 3、4：照 T35 的报告要求；B1 打开开关后 journal 里那一行和 orin_clocks.sh 的结果，B4 恢复后的结果；
+- 结论：8 号狗能不能交给规划用；开机锁频建议开不开（锁 / 不锁时的延迟和负载，T34 是 37 / 59 ms，p99 68 / 99 ms）。
+```
+
