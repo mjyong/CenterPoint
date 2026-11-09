@@ -1,0 +1,90 @@
+{
+  "configById": {
+    "3D!planning_io": {
+      "layers": {
+        "grid": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "grid",
+          "layerId": "foxglove.Grid",
+          "size": 40,
+          "divisions": 8,
+          "lineWidth": 1,
+          "color": "#3c3c3c",
+          "position": [78, 123, 0],
+          "rotation": [0, 0, 0],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": false,
+        "distance": 30,
+        "phi": 0,
+        "thetaOffset": 0,
+        "targetOffset": [0, 0, 0],
+        "target": [78, 123, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-none",
+      "followTf": "map",
+      "scene": {
+        "transforms": {
+          "visible": false,
+          "showLabel": false,
+          "editable": false
+        },
+        "enableStats": false,
+        "ignoreColladaUpAxis": false,
+        "meshUpAxis": "z_up"
+      },
+      "transforms": {},
+      "topics": {
+        "/fused_point_cloud": {
+          "visible": true,
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo",
+          "pointSize": 3
+        },
+        "/map/occupancy_grid": {
+          "visible": true
+        },
+        "/planning/debug/cost_map_production/occmap": {
+          "visible": true
+        },
+        "/lightning/odom": {
+          "visible": true
+        },
+        "/planning/debug/path_tracking": {
+          "visible": true
+        },
+        "/planning/debug/goal_pose": {
+          "visible": true
+        },
+        "/goal_pose": {
+          "visible": true
+        }
+      },
+      "publish": {
+        "type": "pose",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {}
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": "3D!planning_io"
+}
