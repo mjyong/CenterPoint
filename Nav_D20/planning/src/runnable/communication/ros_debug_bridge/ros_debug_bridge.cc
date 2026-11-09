@@ -80,6 +80,19 @@ bool RosDebugBridge::Init(PlanningEntry *planning_entry) {
 
 bool RosDebugBridge::Proc() { return true; }
 
+builtin_interfaces::msg::Time RosDebugBridge::DebugStamp() const {
+  const auto *odometry =
+      planning_entry_->communication_entry_ptr()->MainBridge()->odometry();
+  if (odometry == nullptr || odometry->timestamp <= 0.0) {
+    return node_->now();
+  }
+  const int64_t ns = static_cast<int64_t>(odometry->timestamp * 1e9);
+  builtin_interfaces::msg::Time stamp;
+  stamp.sec = static_cast<int32_t>(ns / 1000000000);
+  stamp.nanosec = static_cast<uint32_t>(ns % 1000000000);
+  return stamp;
+}
+
 bool RosDebugBridge::Publish() {
   rclcpp::spin_some(node_);
   std_msgs::msg::String debug_string;
@@ -116,6 +129,9 @@ bool RosDebugBridge::Publish() {
            ->cost_map_production()
            ->GridMap(),
       "obstacle", 0.0, 1.0, occmap_msg);
+  // the grid map is stamped with the wall clock; its base_link pose on /tf has the odometry's stamp
+  const auto debug_stamp = DebugStamp();
+  occmap_msg.header.stamp = debug_stamp;
   RosbagRecorder::Instance()->add(occmap_msg,
                                   "/planning/debug/cost_map_production/occmap",
                                   "nav_msgs/msg/OccupancyGrid");
@@ -128,6 +144,7 @@ bool RosDebugBridge::Publish() {
   // RosbagRecorder::Instance()->add(grid_map_msg,
   //                                 "/planning/debug/cost_map_production/grid_map",
   //                                 "grid_map_msgs/msg/GridMap");
+  grid_map_msg->header.stamp = debug_stamp;
   local_grid_map_pub_->publish(*grid_map_msg);
   // pub obstacle gradient vector
   {
@@ -136,7 +153,7 @@ bool RosDebugBridge::Publish() {
                          ->GridMap();
     visualization_msgs::msg::Marker gradient_vec_marker;
     gradient_vec_marker.header.frame_id = "base_link";
-    gradient_vec_marker.header.stamp = node_->now();
+    gradient_vec_marker.header.stamp = debug_stamp;
     gradient_vec_marker.type = visualization_msgs::msg::Marker::LINE_LIST;
     gradient_vec_marker.action = visualization_msgs::msg::Marker::ADD;
     gradient_vec_marker.ns = "composite_gradient";
@@ -182,6 +199,7 @@ bool RosDebugBridge::Publish() {
       planning_entry_->preprocess_entry_ptr()->collision_checker();
   if (collision_checker) {
     visualization_msgs::msg::MarkerArray marker_array;
+    VisualizationUtil::appendDeleteAll(&marker_array);
     for (size_t i = 0; i < collision_checker->contacts().size(); i++) {
       geometry_msgs::msg::Pose pose;
       pose.position.x = collision_checker->contacts()[i].x();
@@ -228,6 +246,8 @@ void RosDebugBridge::PathTrackingDebug() {
   auto mission_tracking =
       dynamic_cast<planning::mission::Tracking *>(mission_base_tracking);
   visualization_msgs::msg::MarkerArray marker_array;
+  // the footprints vary in number: clear the previous ones instead of waiting for their lifetime
+  VisualizationUtil::appendDeleteAll(&marker_array);
   int32_t marker_id = 1;
   auto global_path_2d = mission_tracking->global_path_2d();
   auto global_path_marker = VisualizationUtil::createLineStripMarker(
@@ -337,6 +357,7 @@ void RosDebugBridge::TEBDebug() {
 
   auto teb_planner = mission_tracking->teb_planner();
   visualization_msgs::msg::MarkerArray marker_array;
+  VisualizationUtil::appendDeleteAll(&marker_array);
   int32_t marker_id = 1;
 
   auto odometry =

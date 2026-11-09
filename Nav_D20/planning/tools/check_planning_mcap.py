@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""Why a planning recording (ros2 bag, mcap) looks wrong in Foxglove: checks of what the 3D panel needs.
+
+    python3 Nav_D20/planning/tools/check_planning_mcap.py <bag.mcap | bag dir> \
+        [--layout Nav_D20/planning/script/planning_io.json] [--display-frame map]
+
+1. TF tree (/tf, /tf_static): every child frame has one parent and there is no cycle. planning's TfBuffer used to
+   publish each transform and its inverse (map -> base_link and base_link -> map) plus map -> ptz_* next to
+   base_link -> ptz_*; a frame with several parents jumps between them and a cycle has no root.
+2. Time base: Foxglove places a message with the transform at its header stamp. A topic whose frame is not the
+   display frame needs the TF chain to cover its stamps; planning stamped its base_link costmap with the wall
+   clock, weeks after the odometry stamps of a replayed bag (and markers with 0).
+3. Marker lifetime against the publish period: a lifetime of about one period blinks in playback and a paused
+   frame often shows nothing (planning used 0.05 s at 20 Hz).
+4. With --layout: the layout's topics that the recording does not have.
+
+Prints one line per problem; exit code 1 when there is any. Needs the mcap and rosbags packages.
+"""
+import argparse
+import glob
+import json
+import os
+import struct
+import sys
+from collections import defaultdict
+
+import numpy as np
+
+HEADER_FIRST = ("std_msgs/Header header", "std_msgs/msg/Header header")
+MARKER_TYPES = ("visualization_msgs/msg/Marker", "visualization_msgs/msg/MarkerArray")
+TF_TYPES = ("tf2_msgs/msg/TFMessage",)
+SLACK = 1.0   # [s] a stamp this far outside the TF's time range still counts as covered
+
+
+def _stamp_frame(data):
+    """(stamp [s], frame_id) of a CDR message whose first field is a std_msgs/Header."""
+    endian = "<" if data[1] == 1 else ">"
+    sec, nsec, n = struct.unpack_from(endian + "iII", data, 4)
+    return sec + nsec * 1e-9, data[16:16 + max(n - 1, 0)].decode("utf-8", "replace")
+
+
+def _starts_with_header(schema):
+    for line in schema.decode("utf-8", "replace").splitlines():
+        line = line.split("#")[0].strip()
+        if line:
+            return line in HEADER_FIRST
+    return False
+
+
+def read(path):
+    """{topic: dict(type, stamps [s], frames set, log [s], lifetimes [s])} and the TF edges
+    [(parent, child, stamp, static)]."""
+    from mcap.reader import make_reader
+    from rosbags.typesys import Stores, get_typestore
+
+    files = sorted(glob.glob(os.path.join(path, "*.mcap"))) if os.path.isdir(path) else [path]
+    if not files:
+        raise SystemExit("%s: no .mcap" % path)
+    ts = get_typestore(Stores.ROS2_HUMBLE)
+    topics = defaultdict(lambda: dict(type=None, stamps=[], frames=set(), log=[], lifetimes=[]))
+    edges = []
+    for f in files:
+        with open(f, "rb") as fh:
+            for schema, channel, message in make_reader(fh).iter_messages():
+                t = topics[channel.topic]
+                t["type"] = schema.name if schema else None
+                t["log"].append(message.log_time * 1e-9)
+                if t["type"] in TF_TYPES:
+                    msg = ts.deserialize_cdr(message.data, t["type"])
+                    for tr in msg.transforms:
+                        edges.append((tr.header.frame_id, tr.child_frame_id,
+                                      tr.header.stamp.sec + tr.header.stamp.nanosec * 1e-9,
+                                      channel.topic == "/tf_static"))
+                elif t["type"] in MARKER_TYPES:
+                    msg = ts.deserialize_cdr(message.data, t["type"])
+                    for m in getattr(msg, "markers", [msg]):
+                        if m.action == 3:          # DELETEALL carries no frame
+                            continue
+                        t["frames"].add(m.header.frame_id)
+                        t["stamps"].append(m.header.stamp.sec + m.header.stamp.nanosec * 1e-9)
+                        t["lifetimes"].append(m.lifetime.sec + m.lifetime.nanosec * 1e-9)
+                elif schema is not None and _starts_with_header(schema.data):
+                    stamp, frame = _stamp_frame(message.data)
+                    t["stamps"].append(stamp)
+                    t["frames"].add(frame)
+    return topics, edges
+
+
+def tf_problems(edges):
+    parents = defaultdict(set)
+    for p, c, _, _ in edges:
+        parents[c].add(p)
+    out = ["TF: %s has %d parents (%s); Foxglove and RViz switch between them" % (c, len(ps), ", ".join(sorted(ps)))
+           for c, ps in sorted(parents.items()) if len(ps) > 1]
+    for start in sorted(parents):
+        seen, f = [start], start
+        while f in parents and len(parents[f]) == 1:
+            f = next(iter(parents[f]))
+            if f == start:
+                out.append("TF: cycle %s" % " -> ".join(seen + [f]))
+                break
+            if f in seen:
+                break
+            seen.append(f)
+    return sorted(set(out))
+
+
+def chain(frame, display, parents):
+    """Frames from frame up to display (one parent each), or None when there is no such path."""
+    path, f = [frame], frame
+    while f != display:
+        ps = parents.get(f)
+        if not ps or len(ps) != 1:
+            return None
+        f = next(iter(ps))
+        if f in path:
+            return None
+        path.append(f)
+    return path
+
+
+def time_problems(topics, edges, display):
+    parents, stamps, static = defaultdict(set), defaultdict(list), set()
+    for p, c, s, st in edges:
+        parents[c].add(p)
+        stamps[c].append(s)
+        if st:
+            static.add(c)
+    if display not in parents and not any(display in ps for ps in parents.values()):
+        return ["TF: the display frame %s is in no transform" % display] if edges else []
+    out = []
+    for name, t in sorted(topics.items()):
+        if not t["stamps"]:
+            continue
+        s = np.asarray(t["stamps"])
+        for frame in sorted(t["frames"]):
+            if frame in ("", display):
+                if frame == "":
+                    out.append("%s: empty frame_id" % name)
+                continue
+            path = chain(frame, display, parents)
+            if path is None:
+                out.append("%s: no single TF path from %s to %s" % (name, frame, display))
+                continue
+            for child in path[:-1]:
+                if child in static:
+                    continue
+                lo, hi = min(stamps[child]), max(stamps[child])
+                outside = np.mean((s < lo - SLACK) | (s > hi + SLACK))
+                if outside > 0.05:
+                    out.append("%s (%s): %.0f%% of the header stamps are outside the %s TF stamps (%.1f .. %.1f); "
+                               "stamps %.1f .. %.1f, %s" % (
+                                   name, frame, 100 * outside, child, lo, hi, s.min(), s.max(),
+                                   "stamp 0" if s.min() == 0 else "%.0f s apart" % abs(np.median(s) - (lo + hi) / 2)))
+                    break
+    return out
+
+
+def marker_problems(topics):
+    out = []
+    for name, t in sorted(topics.items()):
+        if t["type"] not in MARKER_TYPES or len(t["log"]) < 3 or not t["lifetimes"]:
+            continue
+        period = float(np.median(np.diff(np.sort(t["log"]))))
+        life = [x for x in t["lifetimes"] if x > 0]
+        if life and min(life) < 1.5 * period:
+            out.append("%s: marker lifetime %.2f s against one message every %.2f s: they blink in playback and a "
+                       "paused frame often has none" % (name, min(life), period))
+    return out
+
+
+def layout_topics(path):
+    with open(path) as f:
+        cfg = json.load(f)
+    names = set()
+    for panel in cfg.get("configById", {}).values():
+        names.update((panel.get("topics") or {}).keys())
+    return names
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("bag", help="an .mcap file or a ros2 bag directory of them")
+    ap.add_argument("--layout", default=None, help="Foxglove layout JSON: report its topics the bag does not have")
+    ap.add_argument("--display-frame", default="map")
+    args = ap.parse_args(argv)
+    topics, edges = read(args.bag)
+    problems = tf_problems(edges) + time_problems(topics, edges, args.display_frame) + marker_problems(topics)
+    if args.layout:
+        problems += ["layout: %s is not in the recording" % n for n in sorted(layout_topics(args.layout) - set(topics))]
+    print("%s: %d topics, %d transforms" % (args.bag, len(topics), len(edges)))
+    for name, t in sorted(topics.items()):
+        frames = ",".join(sorted(t["frames"])) or "-"
+        print("  %-48s %-36s %6d msgs  frames %s" % (name, t["type"], len(t["log"]), frames))
+    for p in problems:
+        print("PROBLEM " + p)
+    print("no problems found" if not problems else "%d problems" % len(problems))
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

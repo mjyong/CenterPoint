@@ -6,6 +6,7 @@
  */
 #pragma once
 #include "rclcpp/rclcpp.hpp"
+#include <builtin_interfaces/msg/time.hpp>
 #include "src/runnable/communication/communication_base.h"
 #include "src/runnable/communication/ros_debug_bridge/visualization_util.h"
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
@@ -43,6 +44,9 @@ private:
   Eigen::Vector3d transformToGlobal(const Eigen::Vector3d &local_point,
                                     const Eigen::Vector3d &robot_pos,
                                     double robot_yaw);
+  // Stamp of the debug messages drawn in base_link: the odometry's, as the map -> base_link transform on /tf
+  // (node time until the first odometry). The wall clock went wrong in bag replays, weeks after the TF.
+  builtin_interfaces::msg::Time DebugStamp() const;
 
 private:
   PlanningEntry *planning_entry_{nullptr};

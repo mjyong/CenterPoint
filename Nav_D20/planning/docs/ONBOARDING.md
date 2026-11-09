@@ -99,6 +99,17 @@ D20 默认 `pub_flag: false`，RViz 里看不到规划路径。本机调试把 `
 | `/planning/debug/plotjuggler/string` | 一帧调试字符串，含 `mission_type`、`cmd_vx` |
 | `/planning/debug/diagnostic` | 诊断 |
 
+录下来放到 Foxglove 里看（`script/planning_io.json` 布局，显示坐标系 `map`），先查一遍录包：
+
+```bash
+python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap> --layout Nav_D20/planning/script/planning_io.json
+```
+
+它查三件事，2026-11-09 之前的规划这三件都有问题：
+- `/tf` 是不是一棵树：`TfBuffer` 以前把每个变换连同它的逆一起发（`map -> base_link` 和 `base_link -> map`），云台还多发一条 `map -> ptz_*`，于是 `map`、`base_link`、`ptz_visible` 都有两个父坐标系，Foxglove 在它们之间来回跳；现在 `/tf` 只发 `map -> base_link`、`base_link -> ptz_*`。
+- 时间戳对不对得上：`base_link` 里的局部代价地图以前用本机时钟打戳，回放旧 bag 时比里程计（也就是 `map -> base_link`）晚几周，Foxglove 找不到那个时刻的变换；现在用里程计的时间戳。
+- 标记的寿命：以前 0.05 s，正好一个 20 Hz 周期，回放时一闪一闪、暂停时多半看不到；现在 0.5 s，个数会变的数组开头先发 DELETEALL。
+
 日志关键字：
 
 - `Load robot config:` 确认读的是 `d20/001`
@@ -126,6 +137,9 @@ D20 默认 `pub_flag: false`，RViz 里看不到规划路径。本机调试把 `
 | 发给运控的速度 | `RosBridge::Publish`，发出前会过 `VelocityCalibration` |
 
 ## 在这台机器上跑起来
+
+下面的命令都在 CenterPoint 仓库根目录执行（`Nav_D20/` 在仓库里；以前在 `d20car_predict/` 下）。
+2026-11-09 之前仓库的 `.gitignore` 把 `Nav_D20` 里所有 `*.sh`、`*.yaml` 都漏掉了（启动脚本、A* 地图的 `CJGC.yaml`、定位和感知的配置），那之前的克隆缺这些文件，跑不起来。
 
 规划是 ROS 2 Humble 的 C++ 节点，链接 acados、Ceres、g2o、OSQP、OsqpEigen、grid_map、OctoMap、PCL、CUDA。狗上的 aarch64 包仍走官方镜像 `10.42.11.106:5000/jetpack6.1-crosscompile-aarch64-x86:v2.2.1` 和 `bash build.sh -arm`。这台机器访问该仓库会超时，主机也没有 `/opt/ros`，所以本机调试不用镜像，编译环境单独放在 `/public/zjst/robot/planning_humble_env`。
 
@@ -156,7 +170,7 @@ micromamba activate "$ENV"
 set -u
 export PATH="/usr/local/cuda/bin:$PATH" CUDA_HOME=/usr/local/cuda
 export LIBRARY_PATH="$ENV/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
-cd d20car_predict/Nav_D20/planning
+cd Nav_D20/planning
 set +u
 source /public/zjst/robot/planning_humble_env/colcon/install/setup.bash
 set -u
@@ -178,7 +192,7 @@ colcon build \
 
 ```bash
 # run_planning_debug.sh：只启动 planning。前面的感知和定位要自己先起来。
-bash d20car_predict/Nav_D20/planning/script/run_planning_debug.sh
+bash Nav_D20/planning/script/run_planning_debug.sh
 ```
 
 `lidar_3d_detection` 用的 2026-09-21 bag 里只有三路，和这条链路用的是同一份：
@@ -189,7 +203,7 @@ bash d20car_predict/Nav_D20/planning/script/run_planning_debug.sh
 | `/rte/rdap/rtk/imus/data_raw` | 定位 |
 | `/rte/rdap/rtk/inspvax` | 定位 |
 
-规划不订 `lidar_3d_detection` 的检测框。D20 局部障碍来自 `lidar_seg` 的 `/patchworkpp/ground_seg_intensity`，再由 `grid_map_memory_node` 发成 `/map/occupancy_grid`。定位发 `/lightning/odom`。默认 bag 是 `d20car_predict/bags0921/rosbag2_2026_09_21-16_41_27`，大约 173 秒。
+规划不订 `lidar_3d_detection` 的检测框。D20 局部障碍来自 `lidar_seg` 的 `/patchworkpp/ground_seg_intensity`，再由 `grid_map_memory_node` 发成 `/map/occupancy_grid`。定位发 `/lightning/odom`。默认 bag 是 `bags0921/rosbag2_2026_09_21-16_41_27`，大约 173 秒。
 
 定位配置里的 `/opt/seres` 地图这台机器没有，会回退到仓库里的 `0c3f8a2d-...`。那不是这包录制时的那张图，激光定位可能对不上，里程计仍会按 LIO 往外发。规划的全局 A* 用的是磁盘上的 CJGC，不跟这张定位图走。
 
@@ -197,22 +211,22 @@ bag 的时间戳是 9 月，规划超时比较的是本机时钟。一键脚本�
 
 ```bash
 # run_planning_stack_debug.sh：播这份 bag，并启动 lidar_seg、grid_map、定位和 planning。
-bash d20car_predict/Nav_D20/planning/script/run_planning_stack_debug.sh
+bash Nav_D20/planning/script/run_planning_stack_debug.sh
 ```
 
-只要前置节点、不启规划：`bash d20car_predict/Nav_D20/planning/script/run_planning_stack_debug.sh --no-planning`。换 bag：`--bag <目录>`。只播一遍：`--once`。日志在 `/tmp/nav_stack_debug/`。
+只要前置节点、不启规划：`bash Nav_D20/planning/script/run_planning_stack_debug.sh --no-planning`。换 bag：`--bag <目录>`。只播一遍：`--once`。日志在 `/tmp/nav_stack_debug/`。
 
 感知和定位用同一套前缀，各开一个终端。脚本在 `ROS_DOMAIN_ID` 没设置时用 `42`，三个进程要设成同一个值，并且不要跟正在跑的狗撞车。
 
 ```bash
 # run_lidar_seg_debug.sh：启动地面分割，发布 /patchworkpp/ground_seg_intensity。
-bash d20car_predict/Nav_D20/perception_combo_ros/script/run_lidar_seg_debug.sh
+bash Nav_D20/perception_combo_ros/script/run_lidar_seg_debug.sh
 
 # run_grid_map_debug.sh：用上面的点云做局部栅格，发布 /map/occupancy_grid。
-bash d20car_predict/Nav_D20/perception_combo_ros/script/run_grid_map_debug.sh
+bash Nav_D20/perception_combo_ros/script/run_grid_map_debug.sh
 
 # run_loc_online_debug.sh：按 default_d20.yaml 启动定位，发布 /lightning/odom 和 /map。
-bash d20car_predict/Nav_D20/slam/lightning-lm-master/scripts/run_loc_online_debug.sh
+bash Nav_D20/slam/lightning-lm-master/scripts/run_loc_online_debug.sh
 ```
 
 定位配置里的地图路径是 `/opt/seres/nav/data/...`。这台机器没有这个目录时，节点会回退到仓库里的 `lightning-lm-master/map/0c3f8a2d-41eb-416d-8fca-aaad500e2be9`。没有顶激光和 IMU 时，定位进程能起来，但不会持续发布里程计。`lidar_seg` 同样在等点云。

@@ -45,3 +45,8 @@ deploy_deb/**/log/
 *.deb
 *.onnx
 *.engine
+# Nav_D20 (the D20 planning stack, 2026-11-09): its launch scripts and configs are sources. The *.sh, *.yaml and
+# **build** rules above, from upstream CenterPoint, had dropped every run script and config (the A* map's
+# CJGC.yaml, the localization and perception settings, build.sh). Its colcon build directories stay out.
+!Nav_D20/**/*.sh
+!Nav_D20/**/*.yaml

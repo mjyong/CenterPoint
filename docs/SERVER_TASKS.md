@@ -148,6 +148,8 @@
 | T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 完成，已复核（2026-11-07）：v3 在 `dog_veh_1106_1811`，训练 12,670 帧、验证 1,418 帧；新验证集 30 m 内运动的车 72 条 |
 | T39 | 训练 v3（Pillar、Voxel，配方同 v2）；24 个验证场景上和 nusc_pp、v2_pp 重跑比较（合计、0921、1104 分开），定上线的 Pillar 和上报阈值；v3 Voxel + TTA 对教师 | Agent，人定 | T38 | 半天 | 完成，已复核（2026-11-09）。上线仍用 nuScenes Pillar，上报阈值不改（0.40；T39 建议的 0.35 只看检测，没采用）。v3_pp 近处 ΔAP@2.0 只有 +0.006；v2_pp 在 1104 上 AP@2.0 低 0.049。教师不换 |
 | T40 | 收尾：删 v2 数据集；8 号狗装带开机锁频开关的 deb（默认关）；T35 A、B 两段（B 段用开关锁频）；剩下要人和别的团队定的事列在 T40 节里 | Agent + 人（B 段带狗出门） | T39 | 1 小时 + 出门 | 任务已写好 |
+| T41 | Nav_D20 规划：补提交 .gitignore 漏掉的脚本和配置；重编（/tf 只发一棵树、局部代价地图用里程计的时间戳、标记寿命 0.5 s）；回放 0921 重录；查录包 | Agent | 无 | 1 小时 | 任务已写好 |
+| H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T41 | 15 分钟 | 待做 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -7718,4 +7720,83 @@ pytest tests/dog/test_deploy.py -q -k "lock_clocks or orin_clocks" | tail -1    
 - 3、4：照 T35 的报告要求；B1 打开开关后 journal 里那一行和 orin_clocks.sh 的结果，B4 恢复后的结果；
 - 结论：8 号狗能不能交给规划用；开机锁频建议开不开（锁 / 不锁时的延迟和负载，T34 是 37 / 59 ms，p99 68 / 99 ms）。
 ```
+
+---
+
+## T41 Nav_D20 规划：补上漏提交的脚本和配置，重编，重录，查录包
+
+aff7108 把 `Nav_D20` 放进了仓库，但仓库根目录 `.gitignore` 里从上游 CenterPoint 带来的 `*.sh`、`*.yaml` 两条，把所有启动脚本和配置都漏掉了：
+- `run_planning_stack_debug.sh` 等启动脚本；
+- A* 地图的 `CJGC.yaml`：没有它规划起不来，日志报 `Failed to load PGM`；
+- 定位的 `default_d20.yaml` 和感知的配置。
+
+所以别处克隆下来跑不起来。服务器上的工作目录里这些文件都在，只是没提交。`.gitignore` 已经补了 `!Nav_D20/**/*.sh`、`!Nav_D20/**/*.yaml`（2026-11-09）。
+
+Foxglove 里规划录包显示不对，从代码里找到三处，都已改好（`Nav_D20/planning/docs/ONBOARDING.md`"调试时看什么"）：
+1. `/tf` 不是一棵树。`TfBuffer` 把每个变换连同它的逆一起发，云台还多发一条 `map -> ptz_*`，结果 `map`、`base_link`、`ptz_visible` 各有两个父坐标系，还成了环。
+   - 本机把 `tf_buffer.cc` 单独编出来比过：改前发 6 条、有环；改后只发 `map -> base_link`、`base_link -> ptz_visible` 两条，规划内部的查询照旧能查到逆变换和捷径。
+2. `base_link` 里的局部代价地图（`/planning/debug/cost_map_production/occmap`）用本机时钟打戳。
+   - 回放 0921 的 bag 时，它比里程计（也就是 `map -> base_link`）晚几周，Foxglove 找不到那一刻的变换。
+   - 现在和梯度标记一起，改用里程计的时间戳。
+3. 标记的寿命是 0.05 s，正好一个 20 Hz 周期，回放时一闪一闪。
+   - 现在是 0.5 s；路径、TEB、碰撞点这几组个数会变的数组，开头先发一个 DELETEALL。
+
+新工具 `Nav_D20/planning/tools/check_planning_mcap.py` 查录包里这三件事，外加布局里的话题录了没有（测试 `tests/dog/test_planning_mcap.py`）。
+
+```text
+任务 T41：Nav_D20 规划：补提交漏掉的脚本和配置；用改过的代码重编 planning；回放 0921、重录 planning_io 的录包；
+用 check_planning_mcap.py 比改前、改后的录包。
+先按通用约定做（第 10 条）。可以改的范围：Nav_D20/。仓库根目录（服务器上原来的工作目录，漏提交的文件在这里）。
+不要在狗用的域上起规划（它会发 /cmd_vel、/mc/motion_control）：ROS_DOMAIN_ID 用脚本默认的 42，或别的没人用的号。
+mkdir -p data/reports/T41
+
+0. 改前的录包先查一遍（之前在 Foxglove 里显示不对的那一份）：
+     python3 Nav_D20/planning/tools/check_planning_mcap.py <那份录包> --layout Nav_D20/planning/script/planning_io.json \
+         2>&1 | tee data/reports/T41/check_before.txt
+   pytest tests/dog/test_planning_mcap.py -q | tail -1                       （3 passed）
+1. 补提交（拉到本次提交以后，.gitignore 已经不忽略 Nav_D20 里的 .sh、.yaml）：
+     git status --short -uall Nav_D20 | tee data/reports/T41/new_files.txt    （应多出启动脚本和 yaml，包括 CJGC.yaml）
+     NEW=$(git status --short -uall Nav_D20 | awk '$1=="??" {print $2}')
+     grep -liE "password|passwd|token|secret|api_key" $NEW
+     du -k $NEW | awk '$1 > 5120'
+   - grep 有输出就先停下，把文件名报给人，不要提交；
+   - du 列出的（超过 5 MB），先问人；
+   - 其余的 git add Nav_D20，和第 6 步一起提交。
+   还被忽略的（*.so、*.bin、*.pkl、*.zip、build 目录等）只列出来，不提交：
+     git status --ignored --short Nav_D20 | grep '^!!' | tee data/reports/T41/still_ignored.txt
+2. 第 6 步提交以后，确认启动要的东西进了仓库（别处克隆下来就有）：
+     git ls-files Nav_D20 | grep -E "run_planning_stack_debug.sh|run_planning_debug.sh|astar_pgm/CJGC.yaml|default_d20.yaml" \
+         | tee data/reports/T41/tracked.txt                                    （四个都要有）
+3. 重编 planning：照 ONBOARDING"在这台机器上跑起来"的增量重编命令（colcon --packages-select planning），2>&1 | tail -20 存到 build.txt。
+4. 跑起来、重录：用之前录 planning_io 录包的同一条命令（run_planning_stack_debug.sh 播 0921 的 bag，pub_flag 打开）。
+   - 先确认 planning 的日志里有这几行：Load robot config: d20/001、GlobalMapManager: PGM map loaded；
+   - 发一个之前用过的目标点，等日志里出现 mission_state: active 和 CMD:；
+   - 录到 data/reports/T41/ 以外的地方（录包不提交），录的话题和之前一样。
+   照抄每个进程起来时的前 20 行日志和 planning 的关键字行，存到 run.txt。
+5. 查新录包：
+     python3 Nav_D20/planning/tools/check_planning_mcap.py <新录包> --layout Nav_D20/planning/script/planning_io.json \
+         2>&1 | tee data/reports/T41/check_after.txt
+   - 应是 no problems found。只剩"layout: ... is not in the recording"的，写清是哪个话题、为什么没录；
+   - 还有 TF、时间戳或寿命的问题，把那几行和 planning 的日志一起报告，不要自己改别的。
+6. 提交：第 1 步的文件、data/reports/T41/、本文档。不提交录包、build 目录。
+
+停止条件：第 1 步 grep 有输出、有超过 5 MB 的文件；第 3 步编不过；第 4 步 planning 起不来、收不到 odom 或局部栅格。
+报告（写进"T41 结果"）：
+- 新加的文件数，和还被忽略的清单；第 2 步的四个文件；第 3 步编译的最后几行；第 4 步的关键日志行；
+- check_before.txt、check_after.txt 的 PROBLEM 行和最后一行；
+- 人在 Foxglove 里打开新录包（planning_io.json）看到的：路径、局部代价地图、点云跟不跟着狗、闪不闪（H7）。
+```
+
+## H7 在 Foxglove 里看规划的新录包（人做）
+
+T41 之后。用 Foxglove 打开 T41 第 4 步的新录包，导入 `Nav_D20/planning/script/planning_io.json`，从头播放，看几处：
+- 狗的位置（`/lightning/odom`）和点云、局部栅格对得上，不来回跳；
+- 局部代价地图跟着狗走；
+- 规划路径不闪，暂停时也在。
+
+再打开改前那份录包对照。哪里还不对，截一张图，说一句是哪个话题。结果写到下面。
+
+### H7 结果
+
+（人填）
 
