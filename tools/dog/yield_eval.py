@@ -20,8 +20,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from dog_perception.yield_eval import (EvalConfig, det_to_world, evaluate_path, fan_paths, first_seen,  # noqa: E402
-                                       gt_tracks, summarize, track_objects, traffic_stats)
+from dog_perception.yield_eval import (CAUSES, EvalConfig, det_to_world, evaluate_path, fan_paths,  # noqa: E402
+                                       first_seen, gt_tracks, summarize, track_objects, traffic_stats)
 from dog_perception.yield_gate import YieldConfig, required_sight_range  # noqa: E402
 
 KMH = 3.6
@@ -102,12 +102,15 @@ def main(argv=None):
             eps_all += eps
             parked.setdefault(name, []).append(info["parked_frac"])
             for e in eps:
+                w = e.why or {}
                 rows.append(dict(scene=scene, path=name, arrive=e.arrive - frames[0][0],
                                  go=None if e.go is None else e.go - e.arrive,
                                  oracle=None if e.oracle is None else e.oracle - e.arrive,
                                  known=int(e.known), unsafe=int(e.unsafe), risky=int(not e.oracle_ok_at_go),
                                  gap_true=e.gap_true, gap_track=e.gap_track, reason=e.reason,
-                                 waited_for=" ".join(map(str, e.waited_for))))
+                                 waited_for=" ".join(map(str, e.waited_for)), cause=w.get("cause", ""),
+                                 first_dt=w.get("first_dt"), first_range=w.get("first_range"),
+                                 first_bearing=w.get("first_bearing")))
 
     print("\n## Per path\n")
     print("crossing %.1f s (%.1f m + robot %.1f m at %.1f m/s); unsafe: labelled PET < %.1f s; risky: went where the "
@@ -128,14 +131,28 @@ def main(argv=None):
             waited, _fmt(m["extra_med"]), _fmt(m["extra_p90"]), _fmt(m["extra_max"]), 100 * pk))
 
     bad = [e for e in eps_all if e.unsafe]
+    print("\n## Why unsafe\n")
+    print("blind / far / near: the vehicle was first labelled less than %.1f s before the robot went, or after: "
+          "out of the rear blind sector (%.0f-%.0f deg +- %.0f), from %.0f m or more, or closer (round a corner); "
+          "occluded: labelled before but not when it went; detection: labelled, not tracked; prediction: tracked, "
+          "no conflict seen\n" % (ev.recent, ev.blind_sector[0], ev.blind_sector[1], ev.blind_margin, ev.far))
+    print("| path | unsafe | " + " | ".join(CAUSES) + " |")
+    print("|---|---|" + "---|" * len(CAUSES))
+    for name in list(paths) + ["all"]:
+        m = summarize([e for e in eps_all if name == "all" or e.path == name])
+        print("| %s | %d | %s |" % (name, m["unsafe"], " | ".join(str(m["causes"][c]) for c in CAUSES)))
     print("\n## Unsafe episodes (%d)\n" % len(bad))
     for e in bad[:50]:
         w = e.why or {}
-        where = ("; when it went the vehicle was %.0f m away at %.0f deg (blind sector 142-218), %.0f km/h, %s"
-                 % (w["range"], w["bearing"], w["speed_kmh"], "tracked" if w["tracked"] else "NOT tracked")
-                 if w.get("labelled") else "; the vehicle was not labelled yet when it went")
-        print("- %s %s: arrived %.1f s, went after %.1f s, labelled track %d came %.2f s after the robot left%s"
-              % (e.scene, e.path, e.arrive - e.t0, e.go - e.arrive, e.gap_track, e.gap_true, where))
+        at_go = ("then %.0f m away at %.0f deg, %.0f km/h, %s" % (w["range"], w["bearing"], w["speed_kmh"],
+                                                                 "tracked" if w["tracked"] else "NOT tracked")
+                 if w.get("labelled") else "not labelled then")
+        first = ("first labelled %+.1f s from the go at %.0f m, %.0f deg" % (w["first_dt"], w["first_range"],
+                                                                           w["first_bearing"])
+                 if "first_dt" in w else "")
+        print("- %s %s: arrived %.1f s, went after %.1f s; labelled track %d came %.2f s after the robot left; "
+              "%s; %s [%s]" % (e.scene, e.path, e.arrive - e.t0, e.go - e.arrive, e.gap_track, e.gap_true, at_go,
+                               first, w.get("cause", "?")))
 
     print("\n## Traffic\n")
     sp = np.array(speeds_all)
@@ -160,7 +177,7 @@ def main(argv=None):
 
     if args.details:
         cols = ["scene", "path", "arrive", "go", "oracle", "known", "unsafe", "risky", "gap_true", "gap_track",
-                "reason", "waited_for"]
+                "reason", "waited_for", "cause", "first_dt", "first_range", "first_bearing"]
         with open(args.details, "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=cols)
             w.writeheader()

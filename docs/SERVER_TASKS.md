@@ -152,7 +152,8 @@
 | T42 | Nav_D20 定位：高频预测的加速度按重力归一化以后重编、重跑；查 odom；看 LIO 每秒几帧；找配置的定位地图 | Agent | T41 | 1 小时 | 完成，已复核（2026-11-09）：高频预测修好（z 不再掉、LIO 9.9 帧/秒、规划进了 active）；还跳是内置定位地图倾斜 51°，配置的现场地图服务器上没有 |
 | T43 | Nav_D20 定位地图：从 8 号狗只读拷现场地图 ad68517c，查平不平；用它回放（A），再用 INS 直出回放（B）；两个录包都查 | Agent | T42 | 1 小时 | 任务已写好 |
 | H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T43 | 15 分钟 | 待做（等 T43 的录包；T42 的录包定位还在跳） |
-| T44 | 路口让行门控：1104 上离线评测（8 条假想过路线，五组参数：默认、IMM 8 s、狗 2 m/s、σ 放宽、σ 收紧）；只读看 8 号狗的定位外参 | Agent | 无 | 1.5 小时 | 完成。32 个场景，狗都没挪。默认 230 次不安全放行，多半是车还没标上就走；狗 2 m/s 降到 160，放宽 σ 降到 206。8 号狗外参没读到（5038 拒绝连接） |
+| T44 | 路口让行门控：1104 上离线评测（8 条假想过路线，五组参数：默认、IMM 8 s、狗 2 m/s、σ 放宽、σ 收紧）；只读看 8 号狗的定位外参 | Agent | 无 | 1.5 小时 | 完成，已复核（2026-11-10）：默认 230 次不安全放行，216 次是车还在后方盲区或刚出来；调参数解决不了。门控加了刚出现的车、近处车拐弯两条，评测加了原因分类；外参没读到（狗不在线） |
+| T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8095,4 +8096,78 @@ Traffic（五次相同，只看标签和跟踪，不看门控参数）：
 - 从 25 m 外开来的 51 辆；没跟上的 0；最早跟上的距离中位 44.7 m，p10 27.3 m，最近 21.6 m。
 
 运行时间（`runs.txt`）：v2 78 s，tight 85 s，base 86 s，wide 86 s，h8 97 s。
+
+### T44 复核（2026-11-10）
+
+- **数是对的，但"盲区五次都是 0"不对。** "还没标上"那 203 次，车在狗走的时候还在后方盲区里，所以没有标签（标签也是从雷达点云来的）。复核用标签重算了每一辆车第一次标上的时间和位置：
+  - 默认那组 230 次里，**216 次的车在狗走的时候还在盲区里，或者刚出来不到 1.5 s**：第一次标上的方位都在 128°–141°，正好是盲区（142°–218°）边上；距离分两拨，9–17 m（cp03、cp04）和 38–51 m（cp01、cp02）。
+  - 放行时已经标着 1.5 s 以上的 12 次；35 m 外才出现的 2 次。没有标签换号（ID 跳变）。
+  - 狗 2 m/s 那组 160 次里 128 次、σ 放宽那组 206 次里 194 次也是这样。
+- **1104 里来车都是从狗的左后方出来的。** 远的一拨（cp01、cp02）基本直行，从狗左边开过去；近的一拨（cp03、cp04）贴着狗 8 s 内拐了约 90°。正前方那条路线（狗真过马路时朝着走的方向）35 次里 29 次也是这样。
+- **放行时已经标着的那十几次**：按标签在放行那一刻的真实速度匀速推，大多是会碰到路线的。门控没看出来，是因为航迹刚建（车刚从盲区出来，速度还没稳），或者车正在拐弯（T44 挑的三条，`assess` 都是 conflicts 空、min_gap inf）。速度在世界系里是转过的，坐标系没问题。
+- **改了什么**：
+  - 门控加两条：航迹不到 1 s、离路线 30 m 内的车先按冲突等（`young`）；在动、离路线 25 m 内的车，除了预测的走法再加左转、右转两条（半径 10 m，转到 90° 再直行，`turn`）。可以分别用 `--young-range 0`、`--turn-range 0` 关掉。
+  - 评测给出每次不安全的原因：blind（从后方盲区出来）、far（35 m 外出现）、near（更近处出现）、occluded（标过、那一刻被挡）、detection（没跟上）、prediction（跟上了、门控没看出冲突）。md 里多一张 "Why unsafe" 表，CSV 多 cause、first_dt、first_range、first_bearing 四列。
+  - 测试 18 个（加了刚出现的车、拐弯、从身后来的车三条）。
+- **IMM 8 s、σ 放宽和收紧都差不多**：节点的预测留 3 s；σ 的默认值不动。
+- **1104 的车速**：30 m 内在动的车最高车速中位 22 km/h、p90 27 km/h，过路口并不怎么减速。按这个速度，狗 1 m/s 过 8 m 要看 79 m。
+- **后方盲区要人定怎么补**（docs/PLANNING_INTEGRATION.md 末尾）：8 号狗上广播着 `/BackBlindSpotLidar`、`/FrontBlindSpotLidar`（T34 抓到的），1104 的包里没录；1104 一直录着后视相机。T45 先只读看补盲雷达在不在发。
+- 8 号狗 T44 时连不上（5038 拒绝），外参放到 T45 再试。
+- Foxglove 视图（`work_dirs/yield_t44/`）没问题：det 系、三路 SceneUpdate，按场景首尾相接。
+
+
+---
+
+## T45 让行门控第二版：1104 上重跑；8 号狗的外参和补盲雷达（只读）
+
+```text
+任务 T45：门控加了"刚出现的车"和"近处的车可能拐弯"两条，评测加了不安全的原因（T44 复核）。1104 上重跑四组，
+看除了"从后方盲区来的"（blind），别的原因能不能到 0，新规则多等多久。狗在线的话，只读看 8 号狗的定位外参和补盲雷达。
+先按通用约定做。只用 CPU。仓库根目录，export PYTHONPATH=.。mkdir -p data/reports/T45
+S=$(for d in data/labels/1104_*/labels_sustech2.pkl; do basename $(dirname $d); done)
+
+0. pytest tests/dog/test_yield_gate.py -q | tail -1                       （18 passed）
+1. 8 号狗（只读：不停、不改任何东西，狗上不留文件，不往域 0 上发东西）。ssh dog 连不上就在报告里写"狗不在线"，跳过这一步。
+   - 外参：同 T44 第 0 步，输出 data/reports/T45/dog_extrinsic.txt。
+   - 补盲雷达：话题在不在发、多快、坐标系、TF：
+       R='source /opt/ros/humble/setup.bash && source /opt/seres/perception/local_setup.bash && \
+          export ROS_DOMAIN_ID=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml'
+       ssh dog "$R && for t in /BackBlindSpotLidar /FrontBlindSpotLidar; do echo == \$t; ros2 topic info --no-daemon \$t; \
+           timeout 6 ros2 topic hz \$t 2>&1 | tail -2; timeout 5 ros2 topic echo --once --field header \$t; done; \
+           timeout 5 ros2 topic echo --once /tf_static 2>&1 | grep -iE 'frame_id|child' | sort | uniq -c" \
+           2>&1 | tee data/reports/T45/blindspot.txt
+   - 在发的话，各取一帧算点数、距离和方位范围（只订阅、只打印；节点不发 rosout、不开参数服务）：
+       for t in /BackBlindSpotLidar /FrontBlindSpotLidar; do ssh dog "$R && T=$t timeout 20 python3 -" <<'EOF'; done 2>&1 | tee -a data/reports/T45/blindspot.txt
+import os, numpy as np, rclpy
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import PointCloud2
+from sensor_msgs_py import point_cloud2 as pc2
+rclpy.init(); n = rclpy.create_node("t45_probe", enable_rosout=False, start_parameter_services=False); got = []
+n.create_subscription(PointCloud2, os.environ["T"], got.append, qos_profile_sensor_data)
+while not got: rclpy.spin_once(n, timeout_sec=1.0)
+m = got[0]; p = np.array([[q[0], q[1], q[2]] for q in pc2.read_points(m, ("x", "y", "z"), skip_nans=True)])
+r = np.hypot(p[:, 0], p[:, 1]); a = np.degrees(np.arctan2(p[:, 1], p[:, 0]))
+print(os.environ["T"], m.header.frame_id, "points", len(p), "range p50 / p95 / max %.1f / %.1f / %.1f m" % tuple(np.percentile(r, [50, 95, 100])),
+      "azimuth (own frame, from +x) p1 / p99 %.0f / %.0f deg" % tuple(np.percentile(a, [1, 99])))
+EOF
+2. 四次评测，同时跑（同 T44 第 1 步的 run()，输出到 data/reports/T45/）：
+     run() { n=$1; shift; s=$(date +%s); python tools/dog/yield_eval.py --scenes $S --fan 8 --length 8 "$@" \
+         --details data/reports/T45/episodes_$n.csv > data/reports/T45/yield_$n.md 2>&1; echo "$n exit $? $(( $(date +%s) - s )) s"; }
+     { run base & run t44 --young-range 0 --turn-range 0 & run v2 --dog-speed 2 & run v2pet1 --dog-speed 2 --pet 1 & wait; } \
+         2>&1 | tee data/reports/T45/runs.txt
+   - base：新默认；t44：两条新规则关掉，应和 T44 的 base 一样（all 一行 unsafe 230、risky 350）；v2：狗 2 m/s；v2pet1：狗 2 m/s、τ 1 s。
+   - 退出码 1 是有不安全的放行，照样往下做。
+3. 看四份 md 的 "Why unsafe" 表：
+   - base 里 blind 以外的几列（far、near、occluded、detection、prediction）还有多少；还有的话，从 "Unsafe episodes" 一节抄下这些条（最多 10 条）；
+   - 代价：base 对 t44，all 一行和 fan000 一行的 wait median / p90、extra median / p90 / max、timeouts。
+4. 提交：data/reports/T45/、本文档。
+
+停止条件：第 0 步测试不过；t44 和 T44 的 base 对不上（unsafe 不是 230 或 risky 不是 350）：停下报告，说明哪里不一样。
+报告（写进"T45 结果"）：
+- 狗在不在线；外参 A1 还是 A2；两路补盲雷达：在不在发、频率、frame_id、TF 里有没有、点数、距离 p50 / p95 / 最远、方位范围；
+- 四次的 "all" 一行并成一张表，加上各自 "Why unsafe" 的 all 一行；
+- base 里 blind 以外还剩的不安全，逐条；
+- 新规则的代价（base 对 t44）；
+- 运行时间。
+```
 

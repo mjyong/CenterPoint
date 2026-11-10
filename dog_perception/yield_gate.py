@@ -45,13 +45,21 @@ class YieldConfig:
     stopped_wait: float = 3.0       # [s] a standing vehicle near the path must be seen standing this long
     start_zone: float = 10.0        # [m] a standing vehicle this close to the path, nose or tail towards it
     stale_after: float = 0.3        # [s] perception older than this: wait
+    # T44 (1104): vehicles out of the rear blind sector or round the corner were tracked only moments before the
+    # robot went, or turned into its path
+    young_age: float = 1.0          # [s] a vehicle track younger than this (velocity not settled) ...
+    young_range: float = 30.0       # [m] ... this close to the path: wait (0: off)
+    turn_range: float = 25.0        # [m] a moving vehicle this close to the path may also turn left / right (0: off)
+    turn_radius: float = 10.0       # [m] of those turns, at the vehicle's speed ...
+    turn_max_deg: float = 90.0      # ... up to this much, then straight on
 
 
 @dataclass
 class Assessment:
     now: float
     stale: bool
-    conflicts: list = field(default_factory=list)   # dicts: id, gap [s], s [m] along the path
+    conflicts: list = field(default_factory=list)   # dicts: id, gap [s] (nan: young), s [m], kind
+                                                    # (predicted / turn / young)
     standing: list = field(default_factory=list)    # dicts: id, standing_for [s] or None
     approaching: set = field(default_factory=set)   # ids of moving vehicles heading towards the path
     present: set = field(default_factory=set)       # ids of every vehicle looked at
@@ -62,7 +70,7 @@ class Assessment:
 @dataclass
 class Decision:
     go: bool
-    reason: str                     # clear / committed / vehicle / standing / clearing / not_passed / stale
+    reason: str                     # clear / committed / vehicle / young / standing / clearing / not_passed / stale
     ids: list = field(default_factory=list)
     gap: float = float("inf")
 
@@ -165,6 +173,28 @@ def rollout(obj, now, stamp, cfg, horizon=None):
     return out, tau
 
 
+def turn_modes(obj, now, stamp, cfg, horizon, sigma):
+    """Left and right turns of radius ``turn_radius`` from the object's position and velocity, up to
+    ``turn_max_deg`` then straight on: two (centers, headings, sigma) like ``rollout``'s."""
+    tau = np.arange(0.0, horizon + 1e-9, cfg.dt)
+    q = tau + max(0.0, now - stamp)
+    p0 = np.asarray(obj["position"], dtype=float)[:2]
+    v0 = np.asarray(obj["velocity"], dtype=float)[:2]
+    speed = float(np.hypot(*v0))
+    th0 = float(np.arctan2(v0[1], v0[0]))
+    out = []
+    for sign in (1.0, -1.0):
+        w = sign * speed / cfg.turn_radius
+        t_turn = np.radians(cfg.turn_max_deg) / abs(w)
+        qt = np.minimum(q, t_turn)
+        th = th0 + w * qt
+        x = p0[0] + speed / w * (np.sin(th) - np.sin(th0))
+        y = p0[1] - speed / w * (np.cos(th) - np.cos(th0))
+        rest = np.maximum(q - t_turn, 0.0)
+        out.append((np.column_stack([x + speed * rest * np.cos(th), y + speed * rest * np.sin(th)]), th, sigma))
+    return out
+
+
 def _is_moving(obj, cfg):
     return obj.get("motion") == "moving" or float(np.hypot(*obj["velocity"][:2])) >= cfg.stopped_speed
 
@@ -187,30 +217,36 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
         a.present.add(oid)
         size = np.asarray(obj["size"], dtype=float)
         hl0, hw0 = 0.5 * size[0], 0.5 * size[1]
+        p = np.asarray(obj["position"], dtype=float)[:2]
+        dist = np.linalg.norm(pts - p, axis=1)
+        conflicted = False
         if _is_moving(obj, cfg):
             modes, tau = rollout(obj, now, stamp, cfg, horizon)
-            worst = (np.inf, None)
-            for centers, head, sigma in modes:
+            kinds = ["predicted"] * len(modes)
+            if cfg.turn_range > 0 and dist.min() <= cfg.turn_range:
+                modes += turn_modes(obj, now, stamp, cfg, horizon, modes[0][2])
+                kinds += ["turn", "turn"]
+            worst = (np.inf, None, None)
+            for (centers, head, sigma), kind in zip(modes, kinds):
                 grow = cfg.vehicle_margin + cfg.sigma_k * sigma + corridor
                 first, last = occupancy(pts, centers, head, hl0 + grow, hw0 + grow, tau)
                 g = gaps(first, last, d_in, d_out)
                 j = int(np.argmin(g))
                 if g[j] < worst[0]:
-                    worst = (float(g[j]), float(s[j]))
-                if not a.in_lane:
+                    worst = (float(g[j]), float(s[j]), kind)
+                if not a.in_lane and kind == "predicted":
                     raw_first, _ = occupancy(pts[here], centers, head, np.full(len(tau), hl0),
                                              np.full(len(tau), hw0 + 0.5 * cfg.dog_width), tau)
                     a.in_lane = bool(np.any(~np.isnan(raw_first)))
             a.min_gap = min(a.min_gap, worst[0])
             if worst[0] < cfg.pet:
-                a.conflicts.append(dict(id=oid, gap=worst[0], s=worst[1]))
-            p = np.asarray(obj["position"], dtype=float)[:2]
-            r = pts[int(np.argmin(np.linalg.norm(pts - p, axis=1)))] - p
+                a.conflicts.append(dict(id=oid, gap=worst[0], s=worst[1], kind=worst[2]))
+                conflicted = True
+            r = pts[int(np.argmin(dist))] - p
             if float(np.dot(np.asarray(obj["velocity"], dtype=float)[:2], r)) > 0:
                 a.approaching.add(oid)
         else:
             # standing: in the corridor, or nose / tail towards it within start_zone
-            p = np.asarray(obj["position"], dtype=float)[:2]
             yaw = float(obj.get("yaw", 0.0))
             d = pts - p
             along = d[:, 0] * np.cos(yaw) + d[:, 1] * np.sin(yaw)
@@ -221,6 +257,10 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
                 if standing_for is None and obj.get("motion") == "static":
                     standing_for = obj.get("age")
                 a.standing.append(dict(id=oid, standing_for=standing_for))
+        # a new track: its velocity (and so its prediction) is not to be trusted yet
+        if (not conflicted and cfg.young_range > 0 and obj.get("age") is not None and obj["age"] < cfg.young_age
+                and dist.min() <= cfg.young_range):
+            a.conflicts.append(dict(id=oid, gap=float("nan"), s=float(s[int(np.argmin(dist))]), kind="young"))
     return a
 
 
@@ -255,14 +295,16 @@ class YieldGate:
             if now - t0 < cfg.stopped_wait:
                 waiting_for.append(st["id"])
         conflict_ids = [c["id"] for c in a.conflicts]
-        gap = min([c["gap"] for c in a.conflicts], default=a.min_gap)
+        gap = min([c["gap"] for c in a.conflicts if c["gap"] == c["gap"]], default=a.min_gap)
         if dog_moving and not self.paused and a.in_lane:
             return Decision(True, "committed", conflict_ids, gap)     # never stop in front of a vehicle
         if conflict_ids or waiting_for:
             self.paused = True
             self.last_conflict = now
             self.yielded.update(conflict_ids + waiting_for)
-            return Decision(False, "vehicle" if conflict_ids else "standing", conflict_ids + waiting_for, gap)
+            reason = ("young" if all(c["kind"] == "young" for c in a.conflicts) else "vehicle") if conflict_ids \
+                else "standing"
+            return Decision(False, reason, conflict_ids + waiting_for, gap)
         if self.paused:
             if now - self.last_conflict < cfg.clear_time:
                 return Decision(False, "clearing", sorted(self.yielded), gap)

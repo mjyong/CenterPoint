@@ -37,8 +37,13 @@ class EvalConfig:
     max_gap: float = 1.1            # [s] longest keyframe gap of a track that is interpolated
     grid_dt: float = 0.1            # [s] time grid of the labels
     classes: tuple = ("vehicle", "cyclist")
+    blind_sector: tuple = (142.0, 218.0)   # [deg] counter-clockwise from forward: no points (T13, SENSORS.md)
+    blind_margin: float = 15.0      # [deg] a vehicle first labelled this close to it came out of it
+    recent: float = 1.5             # [s] first labelled less than this before the go: it "just appeared"
+    far: float = 35.0               # [m] just appeared at least this far: beyond the sensor's reach before
 
 
+CAUSES = ("blind", "far", "near", "occluded", "detection", "prediction")
 # ------------------------------------------------------------------ perception, as on the robot
 def track_objects(results, pred_horizon=3.0, tracker_cfg=None):
     """Re-run the tracker and the IMM predictor on saved detections (run_sequence.py results.pkl rows).
@@ -215,18 +220,48 @@ class Episode:
     t0: float = 0.0                 # first frame of the scene
 
 
+def _range_bearing(xy, T):
+    d = T[:2, :2].T @ (np.asarray(xy) - T[:2, 3])
+    return float(np.hypot(*d)), float(np.degrees(np.arctan2(-d[0], d[1])) % 360)
+
+
+def in_sector(bearing, sector, margin=0.0):
+    lo, hi = sector[0] - margin, sector[1] + margin
+    return lo <= bearing % 360 <= hi
+
+
 def explain(track, objs, stamp, T_world_det, ev=EvalConfig(), match=2.5):
-    """Where the labelled vehicle was at ``stamp`` (robot's det frame): range [m], bearing [deg, counter-
-    clockwise from forward, 0-360], speed [km/h], and whether the tracker reported a vehicle within ``match``."""
-    xy, _, speed, valid = gt_sample(track, [stamp], ev.max_gap)
-    if not valid[0]:
-        return dict(labelled=False)
+    """Why the robot went in front of a labelled vehicle at ``stamp``. Where the vehicle was then (robot's
+    det frame: range [m], bearing [deg, counter-clockwise from forward, 0-360], speed [km/h]), whether the
+    tracker reported a vehicle within ``match``, where and when (``first_dt`` [s] after the go) it was first
+    labelled, and the cause:
+
+    - blind / far / near: first labelled less than ``recent`` before the go, or after it: out of the rear
+      blind sector (first labelled within ``blind_margin`` of it, or in it 1 s before at its first velocity),
+      from beyond ``far``, or closer (round a corner, from behind something);
+    - occluded: labelled before, but not at the go;
+    - detection: labelled at the go, not tracked; prediction: tracked, and the gate saw no conflict."""
     T = np.asarray(T_world_det)
-    d = T[:2, :2].T @ (xy[0] - T[:2, 3])
-    tracked = any(o["label"] == "vehicle" and np.linalg.norm(np.asarray(o["position"][:2]) - xy[0]) <= match
-                  for o in objs)
-    return dict(labelled=True, range=float(np.hypot(*d)), bearing=float(np.degrees(np.arctan2(-d[0], d[1])) % 360),
-                speed_kmh=float(speed[0] * 3.6), tracked=bool(tracked))
+    xy, _, speed, valid = gt_sample(track, [stamp], ev.max_gap)
+    first_range, first_bearing = _range_bearing(track["xy"][0], T)
+    out = dict(labelled=bool(valid[0]), first_dt=float(track["t"][0] - stamp), first_range=first_range,
+               first_bearing=first_bearing)
+    if valid[0]:
+        out["range"], out["bearing"] = _range_bearing(xy[0], T)
+        out["speed_kmh"] = float(speed[0] * 3.6)
+        out["tracked"] = any(o["label"] == "vehicle" and np.linalg.norm(np.asarray(o["position"][:2]) - xy[0])
+                             <= match for o in objs)
+    if out["first_dt"] > -ev.recent:
+        blind = in_sector(first_bearing, ev.blind_sector, ev.blind_margin)
+        if not blind and len(track["t"]) > 1:
+            v = (track["xy"][1] - track["xy"][0]) / max(track["t"][1] - track["t"][0], 1e-6)
+            blind = in_sector(_range_bearing(track["xy"][0] - v, T)[1], ev.blind_sector)
+        out["cause"] = "blind" if blind else "far" if first_range >= ev.far else "near"
+    elif not valid[0]:
+        out["cause"] = "occluded"
+    else:
+        out["cause"] = "prediction" if out["tracked"] else "detection"
+    return out
 
 
 def evaluate_path(scene, name, path_world, frames, tracks, gt_end, cfg=YieldConfig(), ev=EvalConfig(),
@@ -287,6 +322,7 @@ def evaluate_path(scene, name, path_world, frames, tracks, gt_end, cfg=YieldConf
 def summarize(eps):
     known = [e for e in eps if e.known]
     went = [e for e in known if e.go is not None]
+    causes = {c: sum(1 for e in went if e.unsafe and (e.why or {}).get("cause") == c) for c in CAUSES}
     waits = np.array([e.go - e.arrive for e in went])
     extra = np.array([e.go - e.oracle for e in went if e.oracle is not None])
     owait = np.array([e.oracle - e.arrive for e in known if e.oracle is not None])
@@ -300,7 +336,7 @@ def summarize(eps):
                 wait_med=q(waits, 50), wait_p90=q(waits, 90), wait_max=q(waits, 100),
                 oracle_wait_med=q(owait, 50), oracle_wait_p90=q(owait, 90),
                 extra_med=q(extra, 50), extra_p90=q(extra, 90), extra_max=q(extra, 100),
-                immediate=int(np.sum(waits < 1e-6)) if len(waits) else 0)
+                immediate=int(np.sum(waits < 1e-6)) if len(waits) else 0, causes=causes)
 
 
 def traffic_stats(tracks, dog_xy, grid, ev=EvalConfig(), radius=30.0):

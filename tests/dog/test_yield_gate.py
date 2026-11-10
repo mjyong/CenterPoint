@@ -207,3 +207,56 @@ def test_the_command_line_tool(tmp_path, capsys):
     assert tool.main(argv + ["blind", "missing"]) == 1      # walks in front of the car; a missing scene is skipped
     out = capsys.readouterr().out
     assert "missing: SKIPPED" in out and "fan000: arrived" in out and "NOT tracked" in out
+
+
+def test_a_new_track_near_the_path_makes_the_robot_wait_until_it_settles():
+    # 20 m to the side, going away: no conflict by its prediction, but its velocity is 0.3 s old
+    young = car(-20.0, 4.0, -5.0, age=0.3)
+    a = assess(PATH, [young], 0.0, 0.0)
+    assert [c["kind"] for c in a.conflicts] == ["young"]
+    assert YieldGate().update(a, 0.0).reason == "young"
+    assert assess(PATH, [dict(young, age=1.5)], 0.0, 0.0).conflicts == []
+    assert assess(PATH, [car(-40.0, 4.0, -5.0, age=0.3)], 0.0, 0.0).conflicts == []      # beyond 30 m
+    assert assess(PATH, [young], 0.0, 0.0, YieldConfig(young_range=0.0)).conflicts == []
+
+
+def test_a_vehicle_passing_the_end_of_the_path_may_turn_into_it():
+    # passing 4 m beyond the far end, straight on it never comes near; turning right (10 m) it drives down the path
+    passing = car(-10.0, 12.0, 5.0)
+    a = assess(PATH, [passing], 0.0, 0.0)
+    assert [c["kind"] for c in a.conflicts] == ["turn"]
+    assert assess(PATH, [passing], 0.0, 0.0, YieldConfig(turn_range=0.0)).conflicts == []
+    assert assess(PATH, [car(-10.0, 40.0, 5.0)], 0.0, 0.0).conflicts == []              # 32 m away: no turns
+
+
+def _behind_scene(seconds=30.0, speed=6.0):
+    """A car on x = -4 m (4 m to the robot's left) coming from 60 m behind; the lidar sees nothing in the rear
+    142-218 deg, so it is detected and labelled only from about 5 m behind the robot."""
+    labels, results = [], []
+    for k in range(int(seconds * 10)):
+        t = 100.0 + 0.1 * k
+        y = -60.0 + speed * 0.1 * k
+        box = np.array([-4.0, y, 0.8, 4.5, 1.9, 1.6, np.pi / 2])
+        bearing = np.degrees(np.arctan2(4.0, y)) % 360
+        seen = not (142.0 <= bearing <= 218.0) and abs(y) < 60.0
+        dets = Detections(boxes=box[None] if seen else np.zeros((0, 7)),
+                          velocities=np.array([[0.0, speed]]) if seen else np.zeros((0, 2)),
+                          scores=np.array([0.8]) if seen else np.zeros(0),
+                          labels=np.array([CLASSES.index("vehicle")]) if seen else np.zeros(0, dtype=np.int64),
+                          stamp=t)
+        results.append(dict(stamp=t, T_world_det=np.eye(4), detections=dets))
+        if k % 5 == 0:
+            labels.append(dict(stamp=t, T_world_det=np.eye(4), objects=[
+                dict(track_id=5, label="vehicle", box=box, velocity=np.array([0.0, speed]))] if seen else []))
+    return dict(frames=labels), results
+
+
+def test_unsafe_episodes_are_explained_by_where_the_vehicle_came_from():
+    labels, results = _behind_scene()
+    left = np.array([[0.0, 0.0], [-8.0, 0.0]])            # across the car's lane
+    eps, _ = evaluate_path("s", "left", left, track_objects(results), gt_tracks(labels),
+                           labels["frames"][-1]["stamp"])
+    m = summarize(eps)
+    assert m["unsafe"] > 0 and m["causes"]["blind"] == m["unsafe"], m
+    why = next(e.why for e in eps if e.unsafe)
+    assert why["first_dt"] > -1.5 and 125.0 < why["first_bearing"] < 145.0 and why["first_range"] < 8.0
