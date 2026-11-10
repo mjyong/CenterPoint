@@ -1,0 +1,52 @@
+{
+  "configById": {
+    "3D!yield_base": {
+      "layers": {
+        "grid": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "grid",
+          "layerId": "foxglove.Grid",
+          "size": 40,
+          "divisions": 8,
+          "lineWidth": 1,
+          "color": "#3c3c3c",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": false,
+        "distance": 40,
+        "phi": 0,
+        "thetaOffset": 0,
+        "targetOffset": [0, 0, 0],
+        "target": [0, 4, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-none",
+      "followTf": "det",
+      "scene": {
+        "transforms": {"visible": false, "showLabel": false, "editable": false},
+        "enableStats": false
+      },
+      "transforms": {},
+      "topics": {
+        "/yield/paths": {"visible": true},
+        "/yield/labels": {"visible": true},
+        "/yield/tracks": {"visible": true}
+      },
+      "publish": {"type": "none"},
+      "imageMode": {}
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {"speed": 1},
+  "layout": "3D!yield_base"
+}
