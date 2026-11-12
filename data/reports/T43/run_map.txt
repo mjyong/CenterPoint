@@ -1,0 +1,13 @@
+定位临时配置 /tmp/loc_debug_1BKrcc.yaml： map_path: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13  ins_only_mode: false  
+ROS_DOMAIN_ID=42
+bag=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/bags0921/rosbag2_2026_09_21-16_41_27
+日志 /tmp/nav_stack_debug
+链路: bag 的顶激光/IMU/INSPVAX -> lidar_seg -> /map/occupancy_grid，定位 -> /lightning/odom -> planning
+已启动 pid: 1171314 1171315 1171316 1171739 1172022
+Ctrl-C 会停掉 bag、感知、定位和规划。
+Nav_D20/planning/script/run_planning_stack_debug.sh: line 108: 1172022 Aborted                 (core dumped) "${plan_bin}" > "${log_dir}/planning.log" 2>&1
+ss=True, message='pub_flag enabled')
+
+publisher: beginning loop
+publishing #1: geometry_msgs.msg.PoseStamped(header=std_msgs.msg.Header(stamp=builtin_interfaces.msg.Time(sec=0, nanosec=0), frame_id='map'), pose=geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=80.0, y=126.9, z=0.0), orientation=geometry_msgs.msg.Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)))
+

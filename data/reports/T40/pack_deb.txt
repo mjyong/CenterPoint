@@ -1,0 +1,9 @@
+pytest tests/dog/test_deploy.py -q -k "lock_clocks or orin_clocks"
+11 passed, 19 deselected
+
+ORIN_HOST=dog tools/deploy/sync_to_orin.sh --model data/deploy/nusc_pp_dyn
+deb on dog: /home/nvidia/dogperc/deb/lidar-3d-detection_0.1.0+360.g3d6b0d5_arm64.deb
+settings: ROS_DOMAIN_ID=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml LIDAR3D_THREADS=4 LIDAR3D_LOCK_CLOCKS=1
+
+dpkg -i 没有执行。编完以后 ssh dog 变为 banner exchange 超时，随后 127.0.0.1:5038 Connection refused。
+装之前的版本、备份和锁频状态见 before.txt。

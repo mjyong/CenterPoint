@@ -7724,6 +7724,16 @@ pytest tests/dog/test_deploy.py -q -k "lock_clocks or orin_clocks" | tail -1    
 - 2：装之前 / 之后的版本，settings 一行，diff，ExecStartPre，开关关着时 orin_clocks.sh 前后两行；
 - 3、4：照 T35 的报告要求；B1 打开开关后 journal 里那一行和 orin_clocks.sh 的结果，B4 恢复后的结果；
 - 结论：8 号狗能不能交给规划用；开机锁频建议开不开（锁 / 不锁时的延迟和负载，T34 是 37 / 59 ms，p99 68 / 99 ms）。
+
+### T40 结果
+
+2026-11-12，做到第 2 步打包。安装和 T35 A 停在隧道断开。
+
+- 1：`dog_veh_1026_1410` 37G。`/public` 只读，`rm` 失败，目录还在。v1 `dog_veh_1023_1529` 也是 37G，留着。`data/dog_veh` 指向 v3 `dog_veh_1106_1811`。明细 `data/reports/T40/delete_v2.txt`。
+- 2：`pytest tests/dog/test_deploy.py -q -k "lock_clocks or orin_clocks"` 为 11 passed，19 deselected。装之前版本 `0.1.0+316.gdbde7ed`，enabled，active，clocks NOT locked，`/etc/default/lidar-3d-detection.T40-before` 备份成功（`before.txt`）。狗上已编出 `/home/nvidia/dogperc/deb/lidar-3d-detection_0.1.0+360.g3d6b0d5_arm64.deb`，settings 一行含 `LIDAR3D_LOCK_CLOCKS=1`（`pack_deb.txt`）。`dpkg -i` 没跑成：编完后 `ssh dog` 先是 banner exchange 超时，随后 `127.0.0.1:5038` Connection refused。diff、ExecStartPre、开关打开后的 journal 都还没有。
+- 3：T35 A 未做。
+- 4：室外段未做。隧道恢复后先装这个 deb，再做室内 A。室外段等人说狗在室外。
+- 结论：锁频后的 8 号狗这次还没交到规划。开机锁频开不开，要等开关打开、A 段负载出来再写。
 ```
 
 ---
@@ -7992,6 +8002,27 @@ mkdir -p data/reports/T43；M=/public/zjst/robot/loc_maps；ID=ad68517c-e845-42a
 报告（写进"T43 结果"）：狗上有没有这张图、多大；tilt_site.txt；A、B 两次查包的 PROBLEM 行；
 A 的定位质量统计；两次规划的关键行；哪一次 odom 不再报 "not a walking robot"、局部代价地图不再把狗圈住。
 ```
+
+### T43 结果
+
+2026-11-12。`/public` 只读，地图放在 `data/loc_maps/`（不提交）。回放用 `Nav_D20/map` 里的 zip，没有覆盖狗上的文件。
+
+- 狗上：隧道还通时 `/opt/seres/nav/data/ad68517c-e845-42a4-b5dd-a6b7c6d2af13` 为 317M，旁边 `a70c6db6-de74-4337-ad1c-8bc491d9621a` 为 168M。见 `data/reports/T43/dog_maps.txt`。
+- `tilt_site.txt`：level，倾角 0.1°，x −771.0..343.1，y −399.0..834.3，盖住 0921 起点 (78, 119)。定位加载 59 块。`tilt_builtin.txt` 仍是 TILTED 51.3°。
+- A 定位（`loc_map.log`）：`laser_mapping.cc:501` 1477 行。质量下降 2 帧（effect_num 95、99，residual 约 0.03），下一帧恢复（effect_num 112）。定位故障 0，重初始化 0。effect_num 只打在这三行上，日志里没有逐帧值。
+- A 查包（`check_map.txt`）。录包在 bag 结束后多录了一段，mcap 862 MB，max 速度来自这段：
+  - `PROBLEM /lightning/odom: not a walking robot: speed p99 7.5 m/s (max 14627.7), 30 jumps > 1 m (largest 142.8 m); path 367 m, net 240 m over 170.5 s`
+  - `PROBLEM /planning/debug/cost_map_production/occmap: the robot's footprint is occupied in 1992 of 12276 grids; TEB will not plan from there`
+  - `PROBLEM layout: /fused_point_cloud is not in the recording`
+- A 规划：`Set mission to Tracking`、`Start Tracking mission`。mission_state：passive 1，standby 1，fault 12217，没有 active。`CMD:` 0 次。`Initial pose is in collision` 0 次。`Start point is in collision` 1 次。
+- B：`loc_ins.log` 有 `INS only mode`。没设 `LOC_MAP_PATH` 时临时配置把 `map_path` 写成仓库里的 `0c3f8a2d`；INS 直出不跑 LIO。`ros2 topic pub --once` 在录包订阅匹配上就返回，规划没接到目标；16:58:05 补发 3 次后才进入 Tracking。
+- B 查包（`check_ins.txt`）：
+  - `PROBLEM /lightning/odom: not a walking robot: speed p99 5.2 m/s (max 34.6); path 167 m, net 108 m over 172.8 s`
+  - `PROBLEM /planning/debug/cost_map_production/occmap: the robot's footprint is occupied in 1485 of 2774 grids; TEB will not plan from there`
+  - `PROBLEM layout: /fused_point_cloud is not in the recording`
+- B 规划：`Set mission to Tracking`、`Start Tracking mission`。mission_state：passive 1，standby 1，off 42，fault 6，没有 active。`CMD:` 0 次。`Initial pose is in collision` 0 次。`Start point is in collision` 1 次。
+- 两次 odom 都还报 `not a walking robot`。两次局部代价地图都还有足迹被占。规划两次都停在起点碰撞，没有速度指令。
+
 
 
 ---
@@ -8264,4 +8295,17 @@ EOF
 - 第 4 步：三次的 all 一行和 "Why unsafe" 的 all 一行；cp04_s007 的 6 次；新增的超时；
 - 做到哪了、哪一步在等人。
 ```
+
+### T46 结果
+
+2026-11-12。第 1、2、4 步做完。第 3 步停在装 deb。第 5 步未开始。
+
+- 第 1 步：外参是 D20 A2。fasterlio `extrinsic_T [-0.0213, 0.18, 0.009]`，imu2body `[0.13898, 0.02129, 0.134]`。定位进程是 `mode_switch_node`。`data/reports/T46/dog_extrinsic.txt`。
+- 第 4 步：`pytest tests/dog/test_yield_gate.py` 21 passed。三次退出码都是 1（有不安全放行）。`runs.txt`：v2 104 s，base 117 s，blocked3 118 s。
+  - blocked3 all：episodes 3966，unknown 3106，unsafe 207，risky 319，timeouts 0，wait 0.0 / 3.2 / 15.1，oracle wait 0.0 / 0.0，extra 0.0 / 2.9 / 15.1。Why unsafe all：207 = blind 195，far 1，near 0，occluded 0，detection 5，prediction 6。与 T45 base 的 unsafe 207、risky 319 一致。
+  - base（blocked_wait 15 s）all：episodes 3966，unknown 3106，unsafe 204，risky 314，timeouts 0，wait 0.0 / 3.2 / 15.1，extra 0.0 / 2.9 / 15.1。Why unsafe all：204 = blind 195，far 1，near 0，occluded 0，detection 5，prediction 3。
+  - v2（狗 2 m/s）all：episodes 5025，unknown 2047，unsafe 128，risky 209，timeouts 0，wait 0.0 / 3.3 / 13.8，extra 0.0 / 2.9 / 13.8。Why unsafe all：128 = blind 103，far 0，near 0，occluded 0，detection 21，prediction 4。
+  - `1104_cp04_s007` 原来 6 次不安全，base 里还剩 3 次，都是 go=0：fan000 arrive 3.05，cause detection（first_dt −2.90，range 5.07，bearing 63.28）；fan000 arrive 9.05，cause prediction（first_dt −8.90）；fan045 arrive 3.05，cause detection（first_dt −2.90）。另外 3 次没了。timeouts 为 0，没有 go>25。
+- 做到哪了：第 3 步的 deb 已经在狗上（`0.1.0+360.g3d6b0d5`，`LIDAR3D_LOCK_CLOCKS=1`），`dpkg -i` 没跑成，因为 `ssh dog` 断了（5038 Connection refused）。室内 A 和室外 B 都还没做。室外段要等聊天里说狗在室外；锁频开关还没打开，室外段排在安装和室内 A 之后。
+
 

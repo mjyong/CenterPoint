@@ -17,7 +17,8 @@ venv/
 !data/examples/**/metadata.yaml
 !work_dirs/planning_io_t41/**/metadata.yaml
 !work_dirs/planning_io_t42/**/metadata.yaml
-*.sh 
+*.sh
+!data/reports/**/*.sh
 *.pth
 !work_dirs/pretrained/nusc_pp.pth
 !work_dirs/pretrained/nusc_voxel.pth

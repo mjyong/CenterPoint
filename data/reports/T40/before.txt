@@ -1,0 +1,5 @@
+Version: 0.1.0+316.gdbde7ed
+enabled
+active
+clocks NOT locked (sudo jetson_clocks; latencies 2-3x higher): cpu0 729600 / 2201600 / 2201600 kHz, gpu 306000000 / 1300500000 / 816000000 Hz (min / max / current), power mode MAXN
+BACKUP_OK

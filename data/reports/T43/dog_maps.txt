@@ -1,0 +1,9 @@
+回放用的是 Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip，解开在 data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13。
+/public/zjst/robot 是只读挂载，没有写到 /public/zjst/robot/loc_maps。狗上的目录没有覆盖。
+
+隧道还通的时候，狗上 /opt/seres/nav/data 里两张都在：
+  ad68517c-e845-42a4-b5dd-a6b7c6d2af13  317M
+  a70c6db6-de74-4337-ad1c-8bc491d9621a  168M
+第二张也解开在 data/loc_maps/，tilt 见 tilt_a70.txt，0921 回放没有用它。
+
+后来 ssh dog 先是 banner exchange 超时，再后来 127.0.0.1:5038 Connection refused。

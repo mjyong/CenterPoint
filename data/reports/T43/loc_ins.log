@@ -1,0 +1,17 @@
+I20261112 16:55:44.400658 140307459415104 loc_system.cc:176] online mode, creating ros2 node ... 
+I20261112 16:55:44.424350 140307459415104 loc_system.cc:199] 组合导航类型: kygi665
+I20261112 16:55:44.424466 140307459415104 loc_system.cc:232] 使用 MultiThreadedExecutor (3线程)，IMU/LiDAR/INS 回调组并行处理
+I20261112 16:55:44.424470 140307459415104 loc_system.cc:236] INS only mode: skip LIO and lidar localization, publish odom from INS directly.
+I20261112 16:55:44.455768 140307459415104 tiled_map.cc:95] 检测到模板格式地图，map_path 调整为: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/map/0c3f8a2d-41eb-416d-8fca-aaad500e2be9/3d
+I20261112 16:55:44.455788 140307459415104 tiled_map.cc:103] loading maps
+I20261112 16:55:44.460431 140307459415104 tiled_map.cc:183] loaded chunks: 6, fps: 1
+I20261112 16:55:44.460448 140307459415104 localization.cpp:40] TiledMap loaded, map_path=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/map/0c3f8a2d-41eb-416d-8fca-aaad500e2be9
+I20261112 16:55:44.460469 140307459415104 laser_mapping.cc:15] init laser mapping from /tmp/loc_debug_qhz351.yaml
+I20261112 16:55:44.461164 140307459415104 laser_mapping.cc:76] NDT init params: min_conf=2, step=36, range=180
+I20261112 16:55:44.461199 140307459415104 laser_mapping.cc:86] lidar_type 4
+I20261112 16:55:44.461201 140307459415104 laser_mapping.cc:98] Using XT32 Lidar
+I20261112 16:55:44.461348 140307459415104 localization.cpp:97] lidar_type 4
+I20261112 16:55:44.461351 140307459415104 localization.cpp:109] Using XT32 Lidar
+I20261112 16:55:44.461749 140307459415104 loc_system.cc:756] [INS only] 使用 kygi665 组合导航, INS topic: /rte/rdap/rtk/inspvax
+[INFO] [1794473924.864436799] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+I20261112 16:58:44.870335 140307459415104 laser_mapping.h:57] laser mapping deconstruct

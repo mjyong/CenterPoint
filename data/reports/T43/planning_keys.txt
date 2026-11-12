@@ -1,0 +1,14 @@
+A map  /tmp/planning.gpu1.junyongmou.log.INFO.20261112-162921.1172022
+Set mission to Tracking / Start Tracking mission
+CMD: 0
+Initial pose is in collision: 0
+Start point is in collision: 1
+mission_state: passive 1, standby 1, fault 12217
+
+B ins  /tmp/planning.gpu1.junyongmou.log.INFO.20261112-165547.1375086
+第一次 ros2 topic pub --once 在规划订阅匹配上之前就返回了。16:58:05 补发 3 次之后：
+Set mission to Tracking / Start Tracking mission
+CMD: 0
+Initial pose is in collision: 0
+Start point is in collision: 1
+mission_state: passive 1, standby 1, off 42, fault 6

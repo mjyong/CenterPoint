@@ -1,0 +1,5 @@
+37G	/public/zjst/robot/centerpoint_data/dog_veh_1026_1410
+rm: Read-only file system (/public is mounted ro). Directory still present.
+v1 dog_veh_1023_1529 also 37G, not deleted.
+data/dog_veh -> /public/zjst/robot/centerpoint_data/dog_veh_1106_1811 (v3).
+The only train.py on this machine is another user's hugsim job, not this dataset.

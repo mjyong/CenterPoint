@@ -1,0 +1,15 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1794472157.578825704] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1794472157.662952056] [rosbag2_recorder]: Listening for topics...
+[INFO] [1794472157.662972331] [rosbag2_recorder]: Event publisher thread: Starting
+[INFO] [1794472158.033540538] [rosbag2_recorder]: Subscribed to topic '/map/occupancy_grid'
+[INFO] [1794472158.033653275] [rosbag2_recorder]: Recording...
+[INFO] [1794472159.868546517] [rosbag2_recorder]: Subscribed to topic '/lightning/odom'
+[INFO] [1794472159.876877887] [rosbag2_recorder]: Subscribed to topic '/tf'
+[INFO] [1794472161.501090677] [rosbag2_recorder]: Subscribed to topic '/cmd_vel'
+[INFO] [1794472161.704545599] [rosbag2_recorder]: Subscribed to topic '/planning/debug/cost_map_production/occmap'
+[INFO] [1794472161.719667662] [rosbag2_recorder]: Subscribed to topic '/planning/debug/goal_pose'
+[INFO] [1794472161.721563920] [rosbag2_recorder]: Subscribed to topic '/planning/debug/path_tracking'
+[INFO] [1794472173.042927483] [rosbag2_recorder]: Subscribed to topic '/goal_pose'
+[INFO] [1794472789.529364003] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[INFO] [1794472789.531785564] [rosbag2_recorder]: Event publisher thread: Exiting
+[INFO] [1794472789.531911077] [rosbag2_recorder]: Recording stopped

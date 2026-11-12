@@ -1,0 +1,13 @@
+work_dirs/planning_io_t43_ins/planning_io_t43_ins_0.mcap: 8 topics, 25594 transforms
+  /cmd_vel                                         geometry_msgs/msg/Twist                  49 msgs  frames -
+  /goal_pose                                       geometry_msgs/msg/PoseStamped             4 msgs  frames map
+  /lightning/odom                                  nav_msgs/msg/Odometry                 17272 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid             1451 msgs  frames base_link
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid             2774 msgs  frames base_link
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker           746 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     2774 msgs  frames map
+  /tf                                              tf2_msgs/msg/TFMessage                20046 msgs  frames -
+PROBLEM /lightning/odom: not a walking robot: speed p99 5.2 m/s (max 34.6); path 167 m, net 108 m over 172.8 s
+PROBLEM /planning/debug/cost_map_production/occmap: the robot's footprint is occupied in 1485 of 2774 grids; TEB will not plan from there
+PROBLEM layout: /fused_point_cloud is not in the recording
+3 problems

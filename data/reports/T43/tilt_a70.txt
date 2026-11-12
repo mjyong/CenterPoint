@@ -1,0 +1,3 @@
+data/loc_maps/a70c6db6-de74-4337-ad1c-8bc491d9621a: 4981524 points from 1 file(s); x -433.3 .. 29.0, y 117.5 .. 557.1, z -14.0 .. 39.5 m
+ground plane (lowest point of 120377 cells of 0.5 m): normal [-0.0, 0.011, 1.0], tilt 0.6 deg
+level

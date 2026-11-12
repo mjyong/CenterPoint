@@ -1,0 +1,35 @@
+tegra-ubuntu
+/usr/bin/python3 /opt/ros/humble/bin/ros2 launch lightning model_switch_launch.py
+/opt/seres/nav/slam/lightning/lib/lightning/mode_switch_node --ros-args --params-file /tmp/launch_params_8syxhc_9
+----
+== /opt/seres/nav/slam/lightning/lib/lightning/config/default_d20.yaml
+48-  # D20 A2
+49:  extrinsic_T: [ -0.0213, 0.18, 0.009] 
+50:  extrinsic_R: [ -1., 0., 0., 
+51-                0., -1., 0., 
+52-                0., 0., 1.]
+53-
+--
+99-  # D20 A2
+100:  extrinsic_T: [ 0.13898, 0.02129, 0.134]   ## imu2body
+101:  extrinsic_R: [ 0., 1., 0., 
+102-                -1., 0., 0., 
+103-                0., 0., 1.]
+104-
+== /opt/seres/nav/slam/lightning/share/lightning/config/default_d20.yaml
+29-  extrinsic_est_en: false
+30:  extrinsic_T: [-0.0213, 0.18, 0.009]
+31:  extrinsic_R: [-1., 0., 0., 0., -1., 0., 0., 0., 1.]
+32-  keep_first_imu_estimation: false
+33-g2p5:
+34-  esti_floor: false
+--
+60-  ins_height: 217.1952074889191
+61:  extrinsic_T: [0.13898, 0.02129, 0.134]
+62:  extrinsic_R: [0., 1., 0., -1., 0., 0., 0., 0., 1.]
+63-  init_t: [68.47, 229.41, 0.0775522]
+64-  init_r: [1., 0., 0., 0., 1., 0., 0., 0., 1.]
+65-loop_closing:
+
+结论：车上生效的是 D20 A2（fasterlio extrinsic_T [-0.0213, 0.18, 0.009]，imu2body [0.13898, 0.02129, 0.134]）。
+lib 和 share 两份 default_d20.yaml 这两组数一样。定位进程是 mode_switch_node，不是 run_loc_online。
