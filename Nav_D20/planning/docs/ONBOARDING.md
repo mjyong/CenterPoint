@@ -80,6 +80,9 @@ Tracking 状态机：`off -> passive -> standby -> active -> standstill -> off`�
 全局图和局部图是分开的：
 
 - 全局图：`GlobalMapManager` 读 `robot_factory/data/astar_pgm/CJGC.pgm` + `CJGC.yaml`（分辨率 0.1 m，原点约 `[-716, -321]`）。`enable_overlay: false`，感知障碍 **不会** 画进这张图，A\* 只看见静态图。
+  - **CJGC 是一张路网图**（2026-11-12，T46 复核）：像素 255 是能走的路，只占 0.26%，是一条条约 1.7 m 宽的线；其余都是障碍。`LoadPGMMap` 把 255 读成 `obstacle` 层的 255，`cv::distanceTransform` 把 0 当障碍，所以只有路上能走。
+  - A\* 要起点离路边至少 `safe_margin`（0.3 m），也就是只有路中间约 1.1 m 宽的一条。定位偏几分米就报 `Start point is in collision!`：0921 的起点按 INS 离路边只有 0.41 m，T43 两次回放都卡在这里。
+  - 现在 D20 开了 `allow_collision_start`：起点不合格时，在 1 m 内挪到最近的空地（和终点的 `allow_collision_goal` 一样）。局部代价地图也把路外当障碍，狗偏出路面时 TEB 会报起点在障碍里。
 - 局部图：`CostMapProduction`，车体前 10 m、后 5 m、左右各 5 m，分辨率 0.05 m，`enable_cuda: true`。TEB 避障看这张图，所以没有 `/map/occupancy_grid` 时全局路径还能搜，局部速度会不对。
 
 `/map` 是定位发出来的另一张全局栅格。`enable_global_map_reload: false` 时，规划启动用的仍是磁盘上的 CJGC，不是定位刚发出的 `/map`。切图要走 `/map/switch`。
@@ -216,7 +219,15 @@ bag 的时间戳是 9 月，规划超时比较的是本机时钟。一键脚本�
 bash Nav_D20/planning/script/run_planning_stack_debug.sh
 ```
 
-只要前置节点、不启规划：`bash Nav_D20/planning/script/run_planning_stack_debug.sh --no-planning`。换 bag：`--bag <目录>`。只播一遍：`--once`。日志在 `/tmp/nav_stack_debug/`。
+只要前置节点、不启规划：`bash Nav_D20/planning/script/run_planning_stack_debug.sh --no-planning`。换 bag：`--bag <目录>`。只播一遍：`--once`（bag 放完就收，2026-11-12 起；以前会一直等）。日志在 `/tmp/nav_stack_debug/`。
+
+回放一遍、录包、发目标、查包，一条命令（2026-11-12）：
+
+```bash
+LOC_MAP_PATH=<现场地图目录> bash Nav_D20/planning/script/replay_planning_check.sh <名字> <目标 x> <目标 y>
+```
+
+输出在 `work_dirs/planning_io_<名字>/`：录包、`logs/`（各进程日志和规划的 glog）、`report.txt`（查包结果，mission_state 各状态出现的次数，`CMD:` 的次数，起点、终点挪了没有，起点在不在障碍里）。目标点会等录包和规划两个订阅者都连上再发。
 
 感知和定位用同一套前缀，各开一个终端。脚本在 `ROS_DOMAIN_ID` 没设置时用 `42`，三个进程要设成同一个值，并且不要跟正在跑的狗撞车。
 

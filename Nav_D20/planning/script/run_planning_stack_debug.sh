@@ -95,7 +95,8 @@ if [[ "${loop}" -eq 1 ]]; then
   play_args+=(--loop)
 fi
 ros2 bag play "${play_args[@]}" "${bag}" >"${log_dir}/bag.log" 2>&1 &
-pids+=($!)
+bag_pid=$!
+pids+=("${bag_pid}")
 
 if [[ "${with_planning}" -eq 1 ]]; then
   sleep 2
@@ -105,4 +106,11 @@ fi
 
 echo "已启动 pid: ${pids[*]}"
 echo "Ctrl-C 会停掉 bag、感知、定位和规划。"
+if [[ "${loop}" -eq 0 ]]; then
+  # --once：bag 放完就收（定位、分割、规划不会自己退；以前在这里一直等，录包会多录一段没有输入的，T43）
+  wait "${bag_pid}" || true
+  sleep 3
+  echo "bag 放完了，停掉其余进程"
+  exit 0
+fi
 wait

@@ -39,6 +39,8 @@ DRAWN = ("nav_msgs/msg/OccupancyGrid", "nav_msgs/msg/Odometry", "nav_msgs/msg/Pa
 MAX_SPEED = 4.0       # [m/s] the dogs walk below about 2 m/s
 MAX_Z_SWING = 3.0     # [m] height change over a recording
 MAX_JUMP = 1.0        # [m] between consecutive odometry messages
+SPEED_WINDOW = 0.2    # [s] speed over at least this: 100 Hz INS odometry 1-2 ms apart reads metres per second from
+                      # centimetre jitter (T43 B)
 FOOTPRINT_SHARE = 0.1  # grids with an occupied footprint cell above this share are reported
 MARKER_TYPES = ("visualization_msgs/msg/Marker", "visualization_msgs/msg/MarkerArray")
 TF_TYPES = ("tf2_msgs/msg/TFMessage",)
@@ -230,17 +232,22 @@ def odom_problems(topics):
         order = np.argsort(s, kind="stable")
         xyz, s = xyz[order], s[order]
         step = np.linalg.norm(np.diff(xyz[:, :2], axis=0), axis=1)
-        dt = np.diff(s)
-        ok = dt > 1e-3
-        speed = step[ok] / dt[ok]
+        j = np.searchsorted(s, s + SPEED_WINDOW)
+        ok = j < len(s)
+        i, j = np.nonzero(ok)[0], j[ok]
+        speed = np.linalg.norm(xyz[j, :2] - xyz[i, :2], axis=1) / (s[j] - s[i])
         path, net = float(step.sum()), float(np.linalg.norm(xyz[-1, :2] - xyz[0, :2]))
         what = []
         if speed.size and np.percentile(speed, 99) > MAX_SPEED:
-            what.append("speed p99 %.1f m/s (max %.1f)" % (np.percentile(speed, 99), speed.max()))
+            fast = s[i][speed > MAX_SPEED] - s[0]
+            what.append("speed p99 %.1f m/s (max %.1f; over %.0f m/s from %.1f s to %.1f s)"
+                        % (np.percentile(speed, 99), speed.max(), MAX_SPEED, fast.min(), fast.max()))
         if np.ptp(xyz[:, 2]) > MAX_Z_SWING:
             what.append("z %.1f .. %.1f m" % (xyz[:, 2].min(), xyz[:, 2].max()))
         if (step > MAX_JUMP).any():
-            what.append("%d jumps > %.0f m (largest %.1f m)" % ((step > MAX_JUMP).sum(), MAX_JUMP, step.max()))
+            at = s[1:][step > MAX_JUMP] - s[0]
+            what.append("%d jumps > %.0f m (largest %.1f m; from %.1f s to %.1f s)"
+                        % ((step > MAX_JUMP).sum(), MAX_JUMP, step.max(), at.min(), at.max()))
         if what:
             out.append("%s: not a walking robot: %s; path %.0f m, net %.0f m over %.1f s" % (
                 name, ", ".join(what), path, net, s[-1] - s[0]))

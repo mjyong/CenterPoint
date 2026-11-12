@@ -193,7 +193,7 @@ tail -f /tmp/lidar_3d_detection_logs/lidar_3d_detection.INFO
 
 要看到 `lidar_3d_detection up`，配置是 `/opt/seres/perception/...`，没有 `publishing TF`。一直是 `waiting for a good INS solution` 或 `no pose for scan yet`：定位还不是好解（`ins_status` 要是 3），出门固定后再看，这时还没有框。这时每秒还有一行 `no frames yet (waiting for a pose) | clouds N frames 0 skipped N`：`clouds` 约 10、`skipped` 0，说明点云收齐了，等的只是定位。
 
-狗走起来以后日志里出现 error `the robot walks backwards in the body frame`：配置里的天线接法（`ins_azimuth_offset_deg`，现在是 0921 接反时的 180）和这台狗的不一样，框会叠出重影。接正的狗要把 `ins_azimuth_offset_deg` 改成 0、`ins_lever_arm` 改成 IMU 中心 `[0.0213, -0.18, 0.0]`（`docs/LOCALIZATION.md` 第 10 节）。
+狗走起来以后日志里出现 error `the robot walks backwards in the body frame`：配置里的天线接法（`ins_azimuth_offset_deg`，现在是 0921 接反时的 180）和这台狗的不一样，框会叠出重影。接正的狗要把 `ins_azimuth_offset_deg` 改成 0、`ins_lever_arm` 改成 IMU 中心 `[0.0213, -0.18, 0.0]`（`docs/LOCALIZATION.md` 第 10 节）。8 号狗是接正的，2026-11-12 已在狗上装好的配置里改成这两个值（T40，原配置备份为 `lidar_3d_detection.yaml.T40-180`）。
 
 **2. 狗上，前台开桥。** 环境必须和检测服务一样（systemd 不读 `.bashrc`）。看完在这个终端 Ctrl-C。服务是 root 跑的，车上的 CycloneDDS 开了共享内存。T34 用 `nvidia` 用户按这段环境起桥：`/perception/lidar_3d/*` 列得出来，三个话题都在桥的通道里；没有固定解时 objects、tracks 没有消息；原始点云 10 秒只收到 10 条，不是约 100 条。点云稀，再试把桥改成 root（和雷达节点同一个用户，才能走共享内存），试完停掉。先在同一个环境里 `ros2 topic list | grep perception` 看得到 `/perception/lidar_3d/*` 再开桥，看不到就停下报告。
 
@@ -206,12 +206,16 @@ source /opt/seres/perception/local_setup.bash
 ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765
 ```
 
-要看原始点云时用 root 起（车上的共享内存是 root 的 `iox-roudi`，机器人的节点和检测服务都是 root；`nvidia` 的进程只拿到一部分数据，T34 里连节点名都是 `_NODE_NAME_UNKNOWN_`）。还没在狗上试过：
+要看原始点云时用 root 起（车上的共享内存是 root 的 `iox-roudi`，机器人的节点和检测服务都是 root；`nvidia` 的进程只拿到一部分数据，T34 里连节点名都是 `_NODE_NAME_UNKNOWN_`）。
+
+**root 起桥一定要限定话题**（T40，2026-11-12）：不限话题时，桥一发现整张服务图就退出（`ICEORYX POSH__RUNTIME_ROUDI_PUBLISHER_LIST_FULL`，共享内存的发布者表满了）。T40 只订三个话题、关掉服务和参数，10 秒收到原始点云 100 条。按要看的话题改白名单：
 
 ```bash
 sudo bash -c 'set -a; source /etc/default/lidar-3d-detection; set +a; \
     source /opt/ros/humble/setup.bash; source /opt/seres/perception/local_setup.bash; \
-    ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765'
+    ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765 \
+      -p "topic_whitelist:=[\"^/perception/lidar_3d/.*\", \"^/robot/topic/rdap/top_point_cloud2$\", \"^/tf$\", \"^/tf_static$\"]" \
+      -p "capabilities:=[\"connectionGraph\"]"'
 ```
 
 **3. 笔记本上打开 Foxglove 桌面版。**

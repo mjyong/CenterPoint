@@ -35,7 +35,7 @@ def _make(ts, name, **fields):
     return ts.types[name](**values)
 
 
-def _write(path, old, wall_stamps=None, runaway=False, blocked=False):
+def _write(path, old, wall_stamps=None, runaway=False, blocked=False, jitter=False):
     wall_stamps = old if wall_stamps is None else wall_stamps
     from mcap.writer import CompressionType, Writer
     from rosbags.typesys import Stores, get_typestore
@@ -90,6 +90,12 @@ def _write(path, old, wall_stamps=None, runaway=False, blocked=False):
             put("/lightning/odom", "nav_msgs/msg/Odometry",
                 _make(ts, "nav_msgs/msg/Odometry", header=header(bag_t, "map"), child_frame_id="base_link",
                       pose=_make(ts, "geometry_msgs/msg/PoseWithCovariance", pose=pose)), wall_t)
+            if jitter:          # T43 B, INS-only odometry: another message 2 ms later, 1 cm off
+                pos2 = _make(ts, "geometry_msgs/msg/Point", x=78.0 + 0.075 * i, y=119.01, z=0.0)
+                pose2 = _make(ts, "geometry_msgs/msg/Pose", position=pos2, orientation=pose.orientation)
+                put("/lightning/odom", "nav_msgs/msg/Odometry",
+                    _make(ts, "nav_msgs/msg/Odometry", header=header(bag_t + 0.002, "map"), child_frame_id="base_link",
+                          pose=_make(ts, "geometry_msgs/msg/PoseWithCovariance", pose=pose2)), wall_t + 0.002)
             cells = np.zeros((20, 20), np.int8)            # 2 x 2 m around base_link at 0.1 m
             if blocked:
                 cells[9:11, 9:11] = 100                       # obstacles under the robot (T42's local costmap)
@@ -149,6 +155,20 @@ def test_check_planning_mcap_finds_odometry_no_robot_can_have(tmp_path, capsys):
     problems = [line for line in capsys.readouterr().out.splitlines() if line.startswith("PROBLEM ")]
     assert len(problems) == 1 and "/lightning/odom: not a walking robot" in problems[0] and "z -4.0 .." \
         in problems[0], problems
+
+
+def test_check_planning_mcap_reads_speed_over_a_window(tmp_path, capsys):
+    """100 Hz odometry 2 ms apart with 1 cm of jitter is 5 m/s message to message, 1.5 m/s over 0.2 s (T43 B)."""
+    pytest.importorskip("mcap")
+    pytest.importorskip("rosbags")
+    sys.path.insert(0, TOOL)
+    import check_planning_mcap
+
+    bag = str(tmp_path / "jitter.mcap")
+    _write(bag, old=False, jitter=True)
+    check_planning_mcap.main([bag])
+    out = capsys.readouterr().out
+    assert "/lightning/odom" in out and "not a walking robot" not in out, out
 
 
 def test_check_planning_mcap_finds_a_robot_inside_its_costmap(tmp_path, capsys):

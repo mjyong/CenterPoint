@@ -61,6 +61,7 @@ private:
                                  const grid_map::GridMap &map,
                                  double max_bound);
   Eigen::Vector2d findNearestFreePoint(const Eigen::Vector2d &end);
+  Eigen::Vector2d findNearestFreePoint(const Eigen::Vector2d &point, double max_radius);
 
 private:
   GridPathPlannerConf config_;

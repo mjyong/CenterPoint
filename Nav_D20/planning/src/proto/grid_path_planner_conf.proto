@@ -37,4 +37,8 @@ message GridPathPlannerConf {
   optional double smoother_weight_ref_deviation = 16 [default = 10.0];
   optional bool allow_collision_goal = 17 [default = false];
   optional double collision_goal_search_radius = 18 [default = 1.0];
+  // a start A* rejects (within safe_margin of an obstacle) moves to the nearest free point within the radius:
+  // on a route map 1.7 m wide (CJGC) the localized robot is often a few decimetres off its middle (T43)
+  optional bool allow_collision_start = 19 [default = false];
+  optional double collision_start_search_radius = 20 [default = 1.0];
 }

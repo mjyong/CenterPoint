@@ -371,6 +371,45 @@ def test_objects_bag_against_a_replay(tmp_path):
     assert code == 1 and rep["missing_frames"] == 1 and rep["per_pass"][1]["missing_frames"] == 1
 
 
+def test_objects_bag_aligns_the_world_origins(tmp_path):
+    """The online node's world origin is its first INS fix after it started, a replay's the bag's first (T40: the
+    same tracks 2.3 m apart). objects_bag.py estimates that constant shift and compares the tracks after it."""
+    pytest.importorskip("rosbags")
+    from rosbags.rosbag2 import Writer
+    sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
+    from objects_bag import typestore
+
+    ts = typestore()
+    Obj, Arr = ts.types["perception_interface/msg/LidarObject"], ts.types["perception_interface/msg/LidarObjectArray"]
+    Header, Time = ts.types["std_msgs/msg/Header"], ts.types["builtin_interfaces/msg/Time"]
+    Point, Vec, Pose = (ts.types["geometry_msgs/msg/" + n] for n in ("Point", "Vector3", "Pose"))
+    Quat = ts.types["geometry_msgs/msg/Quaternion"]
+    n, shift = 8, np.array([-2.11, -0.87])
+    bag = tmp_path / "live"
+    with Writer(bag, version=8) as w:
+        c = w.add_connection("/perception/lidar_3d/objects", Arr.__msgtype__, typestore=ts)
+        for k in range(n):
+            obj = Obj(id=4, label=0, label_name="vehicle", motion=Obj.MOTION_MOVING, score=0.7, coasting=False,
+                      age=1.0, position=Point(x=1.0 + k, y=2.0, z=0.8), yaw=0.0, size=Vec(x=4.5, y=1.9, z=1.6),
+                      velocity=Vec(x=10.0, y=0.0, z=0.0), covariance=np.eye(4).ravel(),
+                      prediction_times=np.array([0.5], np.float32), predictions=[])
+            m = Arr(header=Header(stamp=Time(sec=100, nanosec=k * 100_000_000), frame_id="lidar_det"),
+                    world_frame="camera_init", world_pose=Pose(position=Point(x=0.0, y=0.0, z=0.0),
+                                                               orientation=Quat(x=0.0, y=0.0, z=0.0, w=1.0)),
+                    objects=[obj])
+            w.write(c, int((100 + 0.1 * k + 0.03) * 1e9), ts.serialize_cdr(m, Arr.__msgtype__))
+    replay = tmp_path / "replay.npz"
+    np.savez(replay, stamp=100 + 0.1 * np.arange(n), trk_offsets=np.arange(n + 1), trk_id=np.full(n, 4),
+             trk_label=np.zeros(n, int), trk_position=np.column_stack([1.0 + np.arange(n) + shift[0],
+                                                                       np.full(n, 2.0 + shift[1]), np.zeros(n)]))
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "objects_bag.py"), "--bag", str(bag),
+                        "--replay", str(replay)], capture_output=True, text=True)
+    rep = json.loads(r.stdout)
+    assert r.returncode == 0 and rep["passed"] and rep["same_tracks_frames"] == n, rep
+    assert [rep["world_offset"][k] for k in ("dx", "dy")] == pytest.approx(shift.tolist())
+    assert rep["world_offset"]["frames"] == n and rep["world_offset"]["median_deviation"] == pytest.approx(0.0, abs=1e-6)
+
+
 def test_cut_bag_keeps_the_node_messages(tmp_path):
     """tools/deploy/cut_bag.py: the node's topics up to N clouds, in the source's rosbag2 version (5 here, what
     ROS 2 Humble writes), the messages a replay of the source with --max-clouds N reads."""

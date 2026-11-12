@@ -16,6 +16,10 @@ same_ids_frames compares the id lists, which one extra tentative track early in 
 it (the message order online is not quite the bag's: T31); same_tracks_frames compares the reported tracks
 without their ids, by class and world position (within TRACK_TOL).
 
+The two world frames need not share an origin: online it is the node's first INS fix after it started, in a
+replay the bag's first (T40: 2.3 m apart). world_offset is the constant shift (replay - live, the median over
+frames with exactly one track of a class on both sides); the live tracks are moved by it before comparing.
+
 The message definitions are read from deploy_deb's perception_interface package (rosbags, no ROS install).
 Recordings of the earlier node (T29, T30) carry dog_perception_msgs/ObjectArray, the same fields under other names:
 registered from the same files.
@@ -95,6 +99,27 @@ def same_tracks(live, labels, xy, tol=TRACK_TOL):
             return False
         free.remove(min(d)[1])
     return True
+
+
+def world_offset(rows, stamps, offsets, labels, positions, min_frames=5):
+    """(dx, dy, frames used, median deviation) of the replay's world frame from the live one, or None."""
+    by_stamp = {round(float(s), 6): k for k, s in enumerate(stamps)}
+    d = []
+    for r in rows:
+        k = by_stamp.get(round(r["stamp"], 6))
+        if k is None or "tracks" not in r:
+            continue
+        lab, pos = labels[offsets[k]:offsets[k + 1]], positions[offsets[k]:offsets[k + 1]]
+        for label in {t[0] for t in r["tracks"]}:
+            live = [t for t in r["tracks"] if t[0] == label]
+            rep = [j for j in range(len(lab)) if lab[j] == label]
+            if len(live) == 1 and len(rep) == 1:
+                d.append((pos[rep[0]][0] - live[0][1], pos[rep[0]][1] - live[0][2]))
+    if len(d) < min_frames:
+        return None
+    d = np.asarray(d)
+    m = np.median(d, axis=0)
+    return float(m[0]), float(m[1]), len(d), float(np.median(np.linalg.norm(d - m, axis=1)))
 
 
 def read_tf(bag):
@@ -185,6 +210,13 @@ def main():
         stamps, off, ids = z["stamp"], z["trk_offsets"], z["trk_id"]
         labels = z["trk_label"] if "trk_label" in z.files else None
         positions = z["trk_position"][:, :2] if labels is not None else None
+        if labels is not None:
+            off_xy = world_offset(rows, stamps, off, labels, positions)
+            if off_xy is not None:
+                dx, dy, n_used, spread = off_xy
+                report["world_offset"] = dict(dx=dx, dy=dy, frames=n_used, median_deviation=spread)
+                for r in rows:
+                    r["tracks"] = [(lab, x + dx, y + dy) for lab, x, y in r.get("tracks", [])]
         parts = split_passes(rows)
         per = [check_pass(p, stamps, off, ids, partial=len(parts) > 1 and i == len(parts) - 1, labels=labels,
                           positions=positions) for i, p in enumerate(parts)]

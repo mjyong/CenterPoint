@@ -147,14 +147,15 @@
 | H6 | 审 1104 挑出的场景：验证 14 个逐框、训练 18 个看红框（SUSTechPOINTS，只审车；Foxglove 里对照四路相机） | 人 | T37 续 | 1 天 | 完成，已复核（2026-11-06）：红框 422 → 8（二次补清后）；H6 补：`cp01_s003` 删掉的是牵引车拉的一串置物架，可要可不要，T38 恢复成忽略框 |
 | T38 | 导回 H6，训练场景传播、补空档，叉车兜底，写入划分（没审的 3 个训练场景 drop），和 0921 一起导出 v3 数据集 | Agent | H6 | 1 小时 | 完成，已复核（2026-11-07）：v3 在 `dog_veh_1106_1811`，训练 12,670 帧、验证 1,418 帧；新验证集 30 m 内运动的车 72 条 |
 | T39 | 训练 v3（Pillar、Voxel，配方同 v2）；24 个验证场景上和 nusc_pp、v2_pp 重跑比较（合计、0921、1104 分开），定上线的 Pillar 和上报阈值；v3 Voxel + TTA 对教师 | Agent，人定 | T38 | 半天 | 完成，已复核（2026-11-09）。上线仍用 nuScenes Pillar，上报阈值不改（0.40；T39 建议的 0.35 只看检测，没采用）。v3_pp 近处 ΔAP@2.0 只有 +0.006；v2_pp 在 1104 上 AP@2.0 低 0.049。教师不换 |
-| T40 | 收尾：删 v2 数据集；8 号狗装带开机锁频开关的 deb（默认关）；T35 A、B 两段（B 段用开关锁频）；剩下要人和别的团队定的事列在 T40 节里 | Agent + 人（B 段带狗出门） | T39 | 1 小时 + 出门 | 任务已写好 |
+| T40 | 收尾：删 v2 数据集；8 号狗装带开机锁频开关的 deb（默认关）；T35 A、B 两段（B 段用开关锁频）；剩下要人和别的团队定的事列在 T40 节里 | Agent + 人（B 段带狗出门） | T39 | 1 小时 + 出门 | 第 2–4 步完成，已复核（2026-11-12）：装好、开机锁频开着、天线改成接正；v2 没删掉（/public 只读，要有权限的人删）；改天线后还没走一段确认 |
 | T41 | Nav_D20 规划：补提交 .gitignore 漏掉的脚本和配置；重编（/tf 只发一棵树、局部代价地图用里程计的时间戳、标记寿命 0.5 s）；回放 0921 重录；查录包 | Agent | 无 | 1 小时 | 完成，已复核（2026-11-09）：规划的显示问题没了；录包还是不对是定位的问题，IMU 高频预测把 g 当成 m/s²，odom 一秒掉几米、跳几十米，规划因此起点在障碍里 |
 | T42 | Nav_D20 定位：高频预测的加速度按重力归一化以后重编、重跑；查 odom；看 LIO 每秒几帧；找配置的定位地图 | Agent | T41 | 1 小时 | 完成，已复核（2026-11-09）：高频预测修好（z 不再掉、LIO 9.9 帧/秒、规划进了 active）；还跳是内置定位地图倾斜 51°，配置的现场地图服务器上没有 |
-| T43 | Nav_D20 定位地图：从 8 号狗只读拷现场地图 ad68517c，查平不平；用它回放（A），再用 INS 直出回放（B）；两个录包都查 | Agent | T42 | 1 小时 | 任务已写好 |
-| H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T43 | 15 分钟 | 待做（等 T43 的录包；T42 的录包定位还在跳） |
+| T43 | Nav_D20 定位地图：从 8 号狗只读拷现场地图 ad68517c，查平不平；用它回放（A），再用 INS 直出回放（B）；两个录包都查 | Agent | T42 | 1 小时 | 完成，已复核（2026-11-12）：现场地图平、定位好了；规划卡在起点在障碍里：CJGC 是 1.7 m 宽的路网图，起点要挪到路上（规划已加），T47 重跑 |
+| H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T47 | 15 分钟 | 待做（等 T47 的录包：规划走起来以后再看） |
 | T44 | 路口让行门控：1104 上离线评测（8 条假想过路线，五组参数：默认、IMM 8 s、狗 2 m/s、σ 放宽、σ 收紧）；只读看 8 号狗的定位外参 | Agent | 无 | 1.5 小时 | 完成，已复核（2026-11-10）：默认 230 次不安全放行，216 次是车还在后方盲区或刚出来；调参数解决不了。门控加了刚出现的车、近处车拐弯两条，评测加了原因分类；外参没读到（狗不在线） |
 | T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 完成，已复核（2026-11-12）：新规则 230 → 207；盲区以外剩 12 次，6 次是停着的货车车头压在路线上、停 4 s 后开走，门控加了车身压在路线上要看满 15 s；狗当时不在线，第 1 步放进 T46 |
-| T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 任务已写好（2026-11-12 按人定的改过：不看补盲雷达、开机锁频） |
+| T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 完成，已复核（2026-11-12）：外参 A2；装包、锁频、室内外都做了；挡路车 15 s 后不安全 207 → 204 |
+| T47 | 规划回放第二次（起点挪到路上、bag 放完就收、新的回放脚本）；室外 bag 缺帧那一段的 INS；在线对离线扣掉原点差重比；狗在线时验 root 桥白名单 | Agent | T46 复核 | 1.5 小时 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8314,4 +8315,80 @@ EOF
   - `1104_cp04_s007` 原来 6 次不安全，base 里还剩 3 次，都是 go=0：fan000 arrive 3.05，cause detection（first_dt −2.90，range 5.07，bearing 63.28）；fan000 arrive 9.05，cause prediction（first_dt −8.90）；fan045 arrive 3.05，cause detection（first_dt −2.90）。另外 3 次没了。timeouts 为 0，没有 go>25。
 - 第 5 步：室外 bag `1112_t40` 已拷到 `/public/zjst/robot/cp_data/1112_t40`，狗上的 bag 已删。B1 没有再动开关，B4 没有改回 0。`orin_clocks.sh` 仍是 clocks locked。天线两个证据都是接正，配置已改成偏置 0.0、杠杆臂 `[0.0213, -0.18, 0.0]` 并重启。在线对离线、延迟和结论写在 T40 结果。改完以后的 30 秒确认走没有做。B7 没有看。
 
+### T46 复核（2026-11-12，连同 T40、T43 的结果）
+
+- **外参是 D20 A2**：雷达在 `base_link` 里 (0.319, 0.043, 0.143) m，和 docs/PLANNING_INTEGRATION.md 第 3 节的默认值一致。我们的节点按 `base_link` 输出可以照这组数做。
+- **8 号狗装好了，开机锁频开着**：
+  - 包是 `0.1.0+360.g3d6b0d5`，`/etc/default` 只多了 `LIDAR3D_LOCK_CLOCKS=1` 和三行注释；
+  - 室外 RTK 全程固定解，检测约 10 Hz、不丢帧（skipped 0），total_ms 中位 29.6 ms、p99 62.9 ms。
+- **天线是接正的，狗上的配置已改**：
+  - 两个证据一致：日志里有 "walks backwards"，转换报偏置 0。
+  - 狗上装好的配置改成偏置 0、杠杆臂 `[0.0213, -0.18, 0.0]`，原配置备份为 `lidar_3d_detection.yaml.T40-180`。这是 T35 B5 允许的改动。
+  - 改完以后还没走一段确认，下次出门先走 30 s，看日志里不再有 "walks backwards"。
+- **在线对离线 "passed false" 有两个原因**：
+  - **世界系原点不同**：在线节点的世界系原点是它启动后的第一条固定解，回放的是 bag 里的第一条，两边差一个固定平移（约 2.3 m）。按世界系位置比，有目标的帧全都对不上，"一致"的 811 帧全是两边都没有目标的帧。T40 自己扣掉平移后，1668 帧里有 1625 帧一致。
+    - 已改 `tools/deploy/objects_bag.py`：先用两边各只有一个同类目标的帧估出这个平移（`world_offset`），扣掉再比。加了测试。
+  - **录制末段 129–156 s 在线缺 8 帧**：日志在这一段报了 7 次 "no pose for scan yet"，回放这一段却不缺帧。说明 bag 里的 INS 是全的，而在线节点那时没及时收到 INS。原因待查（T47 第 3 步）。
+- **v2 数据集没删掉**：`/public` 对 Agent 是只读挂载。要有写权限的人删：`/public/zjst/robot/centerpoint_data/dog_veh_1026_1410`（37 GB）。
+- **root 起 Foxglove 桥要限定话题**：不限话题时，iceoryx 的发布者表满了，桥直接退出；只订三个话题时正常。README 已写上带白名单的命令，T47 在狗上验一次。
+- **A1 里发布者的节点名仍是 `_NODE_NAME_UNKNOWN_`**：root 视角也一样。不影响数据，先记下。
+- **T43：现场地图能用，规划还是没走起来**：
+  - **现场地图 ad68517c**：平（0.1°），盖得住 0921，定位只降质 2 帧、0 次重初始化。定位问题这一轮算解决了。
+  - **规划两次都卡在 "Start point is in collision"，`CMD:` 0 次。复核找到了原因**：
+    - CJGC 是一张**路网图**：能走的只有约 1.7 m 宽的一条条线，占全图 0.26%，其余都是障碍。
+    - A* 要起点离路边至少 0.3 m，所以只有路中间约 1.1 m 宽能当起点。0921 的起点按 INS 离路边只有 0.41 m，定位再偏几分米就落到外面。
+    - 局部代价地图也把路外当障碍，所以"狗身下被占"也是这个原因，不是定位错。
+    - 规划已加 `allow_collision_start`：起点不合格时，在 1 m 内挪到最近的空地（和终点已有的 `allow_collision_goal` 一样），D20 开着。0921 的起点挪 0.28 m 就够。
+  - **"bag 放完以后多录了一段"**：栈脚本 `--once` 时最后一直 `wait`，可定位、分割、规划不会自己退，所以录包一直录到被停掉。已改成 bag 放完就收。
+  - **INS 直出的 "speed p99 5.2 m/s" 是查包工具的误报**：100 Hz 的 odom 两条之间可能只差 1–2 ms，几厘米抖动就算出好几 m/s。查包工具已改成按至少 0.2 s 的窗口算速度，跳变也报出发生在第几秒。
+  - **回放步骤收成一个脚本** `Nav_D20/planning/script/replay_planning_check.sh`：录包、等录包和规划两个订阅者都连上再发目标（T43 里 `--once` 在录包连上时就发了，规划没收到）、bag 放完就收、查包、数规划日志的关键行。
+- **让行评测**：
+  - 挡路的停着的车看满 15 s 以后，不安全从 207 降到 204，cp04_s007 那 6 次去掉了 3 次，没有超时。
+  - 剩下的 3 次：两次是那辆 11.4 m 的货车就在狗旁边 5 m，一直没被跟上（检测没出框）；一次是跟上了，但货车的框可能比实际短，没压到路线。都是贴着狗的大车，先记下，等人行横道上的数据。
+
+
+---
+
+## T47 规划回放第二次（起点挪到路上、bag 放完就收）；室外 bag 缺帧那一段；在线对离线重比；root 桥白名单
+
+T46 复核改了四处（都在仓库里）：规划的 `allow_collision_start`（proto 加了两个字段）；栈脚本 `--once` 时 bag 放完就收；新的回放检查脚本 `replay_planning_check.sh`；查包工具按窗口算速度；`objects_bag.py` 扣掉世界系原点差再比。
+
+```text
+任务 T47：重编规划，用新的回放脚本回放 0921 两次（现场地图、INS 直出），看规划能不能进 active、发出速度；
+查室外 bag 1112_t40 在线缺帧那一段的 INS；在线对离线重比；狗在线的话在狗上验一次带白名单的 root 桥。
+先按通用约定做。可以改的范围：Nav_D20/、tools/。仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42（同 T41）。mkdir -p data/reports/T47
+
+0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_deploy.py -q | tail -1   （全过，有 skip 正常）
+1. 重编 planning：照 ONBOARDING"在这台机器上跑起来"的增量重编命令（colcon --packages-select planning），2>&1 | tail -20 存到 data/reports/T47/build.txt。
+   proto 改了，增量编不过就删掉 /public/zjst/robot/planning_humble_env/colcon/build/planning 重配再编（同 T41 第 3 步）。
+2. 回放两次（新脚本，一次一个，不要同时跑：都用 /tmp/nav_stack_debug）：
+     M=$PWD/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+     LOC_MAP_PATH=$M bash Nav_D20/planning/script/replay_planning_check.sh t47_map 80.0 126.9
+     LOC_INS_ONLY=1 bash Nav_D20/planning/script/replay_planning_check.sh t47_ins 80.0 126.9
+     cp work_dirs/planning_io_t47_map/report.txt data/reports/T47/report_map.txt
+     cp work_dirs/planning_io_t47_ins/report.txt data/reports/T47/report_ins.txt
+   - report 第一行要是"目标 … 已发"。"没发出去"的话先看 ros2 topic pub -h 有没有 -w：没有就把脚本里的 --once -w 2 换成 -t 3 -r 1，
+     报告里写明，再跑一次；
+   - 要看：Start adjusted 有没有、挪了多少（planning.INFO 里那一行）；Start point is in collision 是不是 0；
+     mission_state 里有没有 active；CMD: 的次数和头两条；查包的 PROBLEM 行（跳变和超速报的时间要在 bag 的 170 s 以内）。
+   - 录包按 T42 的办法走 LFS 提交（work_dirs/planning_io_t47_*）。
+3. 室外 bag 1112_t40 在线缺帧那一段（录制 129–156 s，日志 7 次 "no pose for scan yet"）：
+     python tools/dog/bag_survey.py --bag /public/zjst/robot/cp_data/1112_t40 --out data/survey/1112_t40 | tail -20 \
+         | tee data/reports/T47/survey_1112_t40.txt
+   - 抄 survey.json 里 INS 和雷达的最大间隔、log_minus_header（INS、IMU、雷达），survey.png 看 129–156 s 有没有异样；
+   - 再用 rosbags 读 /rte/rdap/rtk/inspvax 在 120–160 s 的 header 时间戳和 bag 记录时间，列出间隔 > 0.05 s 的地方、记录时间减 header 的最大值。
+     判断：是 INS 本身断了（bag 里也断），还是 INS 来得晚（bag 里不断、但记录时间比 header 晚得多），还是都没有（问题在我们节点那边）。
+4. 在线对离线重比（T40 B6 的回放 npz，同一个文件）：
+     python tools/deploy/objects_bag.py --bag /public/zjst/robot/cp_data/1112_t40 --replay <T40 B6 的 t35_replay.npz> \
+         --out data/reports/T47/live_vs_replay.json | tail -30 > data/reports/T47/live_vs_replay.txt
+   - world_offset 应约 2.3 m（T40 说的 [-2.110, -0.868] 的方向看是谁减谁）；same_tracks_frames 应接近 T40 手算的 1625。
+5. 狗在线的话：照 lidar_3d_detection/README"车上实车"第 2 步带白名单的 root 桥起一次，在狗上另一个 ssh 跑 10 秒探针（同 T35 A2），
+   停掉桥。命令要改才能跑的话，把能跑的那一版改进 README。狗不在线就跳过。
+
+停止条件：第 1 步编不过；第 2 步规划起不来；狗上的规矩同 T35（域 0 上除了我们的服务不发东西）。
+提交：data/reports/T47/、data/survey/1112_t40/、两个录包目录、改过的脚本和 README、本文档。
+报告（写进"T47 结果"）：
+- 编译最后几行；两份 report 的全文；
+- 第 3 步的判断和数；第 4 步的 world_offset、same_tracks_frames、passed；第 5 步的探针结果（或"狗不在线"）。
+```
 

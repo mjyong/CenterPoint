@@ -146,6 +146,19 @@ bool GridPathPlanner::plan(Eigen::Vector2d start, Eigen::Vector2d end,
           << adjusted_end.transpose();
     end = adjusted_end;
   }
+  // the planners reject a start whose distance_cost is above 0.99 ("Start point is in collision")
+  if (config_.allow_collision_start() && grid_map_.isInside(start) &&
+      grid_map_.atPosition("distance_cost", start) > 0.99) {
+    Eigen::Vector2d adjusted_start =
+        findNearestFreePoint(start, config_.collision_start_search_radius());
+    if (adjusted_start == start) {
+      AERROR << "No free point found near start within search radius";
+      return false;
+    }
+    AINFO << "Start adjusted from " << start.transpose() << " to "
+          << adjusted_start.transpose();
+    start = adjusted_start;
+  }
 
   if (!config_.use_smoother()) {
     return planner->plan(start, end, grid_map_, path,
@@ -435,8 +448,13 @@ bool GridPathPlanner::LoadVoronoi(const std::string &file_path) {
 
 Eigen::Vector2d
 GridPathPlanner::findNearestFreePoint(const Eigen::Vector2d &end) {
+  return findNearestFreePoint(end, config_.collision_goal_search_radius());
+}
+
+Eigen::Vector2d
+GridPathPlanner::findNearestFreePoint(const Eigen::Vector2d &end,
+                                      double max_radius) {
   double res = grid_map_.getResolution();
-  double max_radius = config_.collision_goal_search_radius();
   int max_rings = static_cast<int>(max_radius / res);
   for (int ring = 1; ring <= max_rings; ++ring) {
     int num_samples = static_cast<int>(2 * M_PI * ring);
