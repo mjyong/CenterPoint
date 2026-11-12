@@ -7728,13 +7728,19 @@ pytest tests/dog/test_deploy.py -q -k "lock_clocks or orin_clocks" | tail -1    
 
 ### T40 结果
 
-2026-11-12。包已装上，锁频开着。室内 A 做完。室外段未做。
+2026-11-12。包已装上，锁频开着。室内 A 和室外 B 都做完。天线已改成接正。确认走未做。
 
 - 1：`dog_veh_1026_1410` 37G。`/public` 只读，`rm` 失败，目录还在。v1 `dog_veh_1023_1529` 也是 37G，留着。`data/dog_veh` 指向 v3 `dog_veh_1106_1811`。明细 `data/reports/T40/delete_v2.txt`。
 - 2：装之前 `0.1.0+316.gdbde7ed`，enabled，active，clocks NOT locked，备份 `before.txt`。装之后 `0.1.0+360.g3d6b0d5`，enabled，active。diff 只多了 `LIDAR3D_LOCK_CLOCKS=1` 和上面三行注释（`install.txt`）。`ExecStartPre` 是 `lock_clocks.sh`。重启后 journal 有 `lock_clocks.sh: clocks locked`，`orin_clocks.sh` 打印 clocks locked（`switch_on.txt`）。
 - 3：A1（`collisions_root.txt`）三个检测话题各 1 个发布者，节点名仍是 `_NODE_NAME_UNKNOWN_`，订阅者 0。`/tf` 里是 `map`、`base_link`、`ptz_visible`、`ptz_infrared` 和它们的逆，没有 `camera_init`、`lidar_det`。A2：不限话题的 root 桥因 iceoryx 发布者表满而退出；只订三个话题的 root 桥 10 秒收到原始点云 100 条，objects 和 tracks 为 0（室内没有固定解）。桥已停，检测服务仍 active（`foxglove_probe.txt`）。A3（`load.txt`）：开机 28 分钟，不到任务写的一小时。load average 29.19 / 30.55 / 25.82。CPU 最高是 `mode_switch` 517%，`lidar_3d` 约 26%。GR3D_FREQ 0–44%。
-- 4：室外段未做。锁频保持开着，不改回 0。
-- 结论：室内这段检测服务在跑、锁频已开、点云能以约 10 Hz 进 root 桥。能不能交给规划，等室外固定解下的框和延迟。
+- 4：室外 bag `1112_t40`，18:59:04–19:01:51，167.7 s。服务器副本与狗上字节数一致（db3 5881380864，metadata 4580），狗上的 bag 已删。`pos_type` 全部是 56（16765 条）。雷达 1676 帧、IMU/INS 各约 100 Hz、objects 1669 条、四路相机各 3954 条。录的话题里没有 `/lidar_packets_loss`。
+  - 录制窗口内每秒一行：clouds 1674，frames 1666，skipped 0，total_ms 中位 29.6、p99 62.9、最大 89.1（`live_lines.txt`）。锁频开着，低于 T34 锁频的 37 / p99 68 ms。
+  - `walks backwards` 1 次（18:59:23）。`no pose for scan yet` 在 19:01:13–19:01:40 有 7 次。
+  - B5：日志有 backwards error，转换打印 `INS azimuth offset 0 deg (antennas fixed; median forward speed -1.56 m/s while moving > 0.5 m/s)`，杠杆臂 `[0.0213, -0.18, 0.0]`（`azimuth.txt`）。两个证据一致，天线是接正的。已备份为 `lidar_3d_detection.yaml.T40-180`，配置改成偏置 0.0、杠杆臂 `[0.0213, -0.18, 0.0]`，19:25 重启。journal 有 `lock_clocks.sh: clocks locked`，服务 active，`orin_clocks.sh` 仍是 clocks locked（`antenna.txt`）。人已经回到室内，改完以后的 30 秒确认走没有做。
+  - B6：回放用的是改之前的配置（180、杠杆臂 `[-0.06, -0.54, 0.0]`），`--gpu --threads 4`。1676 clouds、1676 frames，没有 `dropped (no pose)`，墙钟 115.5 s。`objects_bag.py`：messages 1669，replay_frames 1676，matched 1668，missing_frames 8，unmatched 1，same_ids_frames 811，same_tracks_frames 811，received_gap_max 0.211 s，passed false（`live_vs_replay.txt`）。缺的 8 帧都在录制末段 129–156 s，和 `no pose` 同一段。811 帧全部是双方都没有目标的帧；有目标的帧世界系位置差一个固定平移，中位 `[-2.110, -0.868]` m。在线原点是进程起来后的第一条固定解（`online.cpp` 只在 `origin_` 空时设置），回放原点是 bag 里第一条固定解 `29.73741039 106.77960768 217.52`。扣掉这个平移后，1668 帧里 1625 帧轨迹一致。示例是 vehicle，score 0.36。
+  - B7：人没有看 Foxglove，桥没开。
+  - B4：开关保持 `LIDAR3D_LOCK_CLOCKS=1`，没有改回 0。结束后 `orin_clocks.sh`：`clocks locked: cpu0 2201600 / 2201600 / 2201600 kHz, gpu 1300500000 / 1300500000 / 1300500000 Hz (min / max / current), power mode MAXN`。
+- 结论：室外这段 RTK 全程固定解，检测约 10 Hz，skipped 0，锁频下 total_ms 中位 29.6、p99 62.9。天线配置已改成接正，和这次走出来的证据一致。检测输出可以交给规划用。改配置之后没有再走 30 秒确认。在线世界系原点是节点启动后的第一条固定解，和事后回放差约 2.28 m 的固定平移。规划自己在 T43 回放里仍未进入 active。开机锁频建议保持开着。
 
 ---
 
@@ -8298,7 +8304,7 @@ EOF
 
 ### T46 结果
 
-2026-11-12。第 1、2、3、4 步做完。第 5 步等狗到室外。
+2026-11-12。第 1–5 步做完。锁频保持开着。天线已改成接正。
 
 - 第 1 步：外参是 D20 A2。fasterlio `extrinsic_T [-0.0213, 0.18, 0.009]`，imu2body `[0.13898, 0.02129, 0.134]`。定位进程是 `mode_switch_node`。`data/reports/T46/dog_extrinsic.txt`。
 - 第 4 步：`pytest tests/dog/test_yield_gate.py` 21 passed。三次退出码都是 1（有不安全放行）。`runs.txt`：v2 104 s，base 117 s，blocked3 118 s。
@@ -8306,6 +8312,6 @@ EOF
   - base（blocked_wait 15 s）all：episodes 3966，unknown 3106，unsafe 204，risky 314，timeouts 0，wait 0.0 / 3.2 / 15.1，extra 0.0 / 2.9 / 15.1。Why unsafe all：204 = blind 195，far 1，near 0，occluded 0，detection 5，prediction 3。
   - v2（狗 2 m/s）all：episodes 5025，unknown 2047，unsafe 128，risky 209，timeouts 0，wait 0.0 / 3.3 / 13.8，extra 0.0 / 2.9 / 13.8。Why unsafe all：128 = blind 103，far 0，near 0，occluded 0，detection 21，prediction 4。
   - `1104_cp04_s007` 原来 6 次不安全，base 里还剩 3 次，都是 go=0：fan000 arrive 3.05，cause detection（first_dt −2.90，range 5.07，bearing 63.28）；fan000 arrive 9.05，cause prediction（first_dt −8.90）；fan045 arrive 3.05，cause detection（first_dt −2.90）。另外 3 次没了。timeouts 为 0，没有 go>25。
-- 做到哪了：第 3 步已装上 `0.1.0+360.g3d6b0d5`，`LIDAR3D_LOCK_CLOCKS=1`，journal 有 `lock_clocks.sh: clocks locked`。室内 A 已做，明细在 T40 结果。第 5 步等聊天里说狗在室外。锁频保持开着。
+- 第 5 步：室外 bag `1112_t40` 已拷到 `/public/zjst/robot/cp_data/1112_t40`，狗上的 bag 已删。B1 没有再动开关，B4 没有改回 0。`orin_clocks.sh` 仍是 clocks locked。天线两个证据都是接正，配置已改成偏置 0.0、杠杆臂 `[0.0213, -0.18, 0.0]` 并重启。在线对离线、延迟和结论写在 T40 结果。改完以后的 30 秒确认走没有做。B7 没有看。
 
 

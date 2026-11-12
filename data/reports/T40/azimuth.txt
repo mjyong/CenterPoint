@@ -1,0 +1,8 @@
+bag: /public/zjst/robot/cp_data/1112_t40
+lidar XT32 on /robot/topic/rdap/top_point_cloud2 (time timestamp absolute)
+INS azimuth offset 0 deg (antennas fixed; median forward speed -1.56 m/s while moving > 0.5 m/s)
+INS lever arm [0.0213, -0.18, 0.0] m (body frame)
+1112_t40: odom t 1794481144.335 .. 1794481311.973  span 167.6s  pos_type {56: 16765}  base_height 0.70
+wrote 1676 scans, 16766 imu, 16765 odom, 15816 camera messages -> data/seq/1112_t40
+cameras: front, left, right, rear
+no "hardly moves" warning

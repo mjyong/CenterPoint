@@ -1,0 +1,17 @@
+evidence a: journal 18:59:23 one error
+  the robot walks backwards in the body frame: ins_azimuth_offset_deg 180 does not match the INS antennas
+evidence b: INS azimuth offset 0 deg (antennas fixed); see azimuth.txt
+both agree: antennas are the fixed wiring. Replay of the whole bag used the pre-change config (180 / lever [-0.06, -0.54, 0.0]).
+
+backup: /opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml.T40-180
+diff:
+-  ins_lever_arm: [-0.06, -0.54, 0.0]
+-  ins_azimuth_offset_deg: 180.0
++  ins_lever_arm: [0.0213, -0.18, 0.0]
++  ins_azimuth_offset_deg: 0.0
+restart 19:25:21: lock_clocks.sh: clocks locked (/usr/bin/jetson_clocks)
+service: active
+ENU origin after restart: 29.73781131 106.77951082 226.10
+orin_clocks.sh: clocks locked: cpu0 2201600 / 2201600 / 2201600 kHz, gpu 1300500000 / 1300500000 / 1300500000 Hz (min / max / current), power mode MAXN
+confirmation walk: not done; the dog was already back indoors
+switch left at LIDAR3D_LOCK_CLOCKS=1
