@@ -43,6 +43,8 @@ class YieldConfig:
     clear_time: float = 2.0         # [s] no conflict this long before going again
     stopped_speed: float = 0.5      # [m/s] slower (and not "moving" in the tracker): a standing vehicle
     stopped_wait: float = 3.0       # [s] a standing vehicle near the path must be seen standing this long
+    blocked_wait: float = 15.0      # [s] ... and this long when its body is on the path (T45: a truck across the
+                                    # path stood 4 s, then drove off across it); stopped_wait: no difference
     start_zone: float = 10.0        # [m] a standing vehicle this close to the path, nose or tail towards it
     stale_after: float = 0.3        # [s] perception older than this: wait
     # T44 (1104): vehicles out of the rear blind sector or round the corner were tracked only moments before the
@@ -60,7 +62,7 @@ class Assessment:
     stale: bool
     conflicts: list = field(default_factory=list)   # dicts: id, gap [s] (nan: young), s [m], kind
                                                     # (predicted / turn / young)
-    standing: list = field(default_factory=list)    # dicts: id, standing_for [s] or None
+    standing: list = field(default_factory=list)    # dicts: id, standing_for [s] or None, blocking (body on the path)
     approaching: set = field(default_factory=set)   # ids of moving vehicles heading towards the path
     present: set = field(default_factory=set)       # ids of every vehicle looked at
     in_lane: bool = False           # the robot's footprint is in a moving vehicle's swept body
@@ -70,7 +72,8 @@ class Assessment:
 @dataclass
 class Decision:
     go: bool
-    reason: str                     # clear / committed / vehicle / young / standing / clearing / not_passed / stale
+    reason: str                     # clear / committed / vehicle / young / standing / blocked / clearing /
+                                    # not_passed / stale
     ids: list = field(default_factory=list)
     gap: float = float("inf")
 
@@ -256,7 +259,8 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
                 standing_for = obj.get("standing_for")
                 if standing_for is None and obj.get("motion") == "static":
                     standing_for = obj.get("age")
-                a.standing.append(dict(id=oid, standing_for=standing_for))
+                blocking = bool(np.any((np.abs(across) <= hw0 + corridor) & (np.abs(along) <= hl0 + corridor)))
+                a.standing.append(dict(id=oid, standing_for=standing_for, blocking=blocking))
         # a new track: its velocity (and so its prediction) is not to be trusted yet
         if (not conflicted and cfg.young_range > 0 and obj.get("age") is not None and obj["age"] < cfg.young_age
                 and dist.min() <= cfg.young_range):
@@ -288,12 +292,13 @@ class YieldGate:
         for oid in list(self.still_since):
             if oid not in standing_ids:
                 del self.still_since[oid]
-        waiting_for = []
+        waiting_for, blocked = [], False
         for st in a.standing:
             t0 = self.still_since.setdefault(
                 st["id"], now - st["standing_for"] if st["standing_for"] is not None else now)
-            if now - t0 < cfg.stopped_wait:
+            if now - t0 < (cfg.blocked_wait if st.get("blocking") else cfg.stopped_wait):
                 waiting_for.append(st["id"])
+                blocked = blocked or bool(st.get("blocking"))
         conflict_ids = [c["id"] for c in a.conflicts]
         gap = min([c["gap"] for c in a.conflicts if c["gap"] == c["gap"]], default=a.min_gap)
         if dog_moving and not self.paused and a.in_lane:
@@ -303,7 +308,7 @@ class YieldGate:
             self.last_conflict = now
             self.yielded.update(conflict_ids + waiting_for)
             reason = ("young" if all(c["kind"] == "young" for c in a.conflicts) else "vehicle") if conflict_ids \
-                else "standing"
+                else "blocked" if blocked else "standing"
             return Decision(False, reason, conflict_ids + waiting_for, gap)
         if self.paused:
             if now - self.last_conflict < cfg.clear_time:

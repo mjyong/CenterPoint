@@ -260,3 +260,21 @@ def test_unsafe_episodes_are_explained_by_where_the_vehicle_came_from():
     assert m["unsafe"] > 0 and m["causes"]["blind"] == m["unsafe"], m
     why = next(e.why for e in eps if e.unsafe)
     assert why["first_dt"] > -1.5 and 125.0 < why["first_bearing"] < 145.0 and why["first_range"] < 8.0
+
+
+def test_a_standing_vehicle_across_the_path_is_watched_longer():
+    # body on the path (x -3.25 .. 1.25 m at y = 4 m): 15 s of standing, then 2 s clear
+    across = car(-1.0, 4.0, 0.0, motion="stopped", yaw=0.0)
+    a = assess(PATH, [across], 0.0, 0.0)
+    assert a.standing == [dict(id=1, standing_for=None, blocking=True)]
+    gate = YieldGate()
+    ds = [gate.update(assess(PATH, [across], t, t), t) for t in np.arange(0.0, 18.0, 0.1)]
+    assert ds[0].reason == "blocked" and 0.1 * next(i for i, d in enumerate(ds) if d.go) == pytest.approx(17.0, abs=0.15)
+    assert YieldGate().update(assess(PATH, [dict(across, standing_for=20.0)], 0.0, 0.0), 0.0).go
+    # the old rule: 3 s for every standing vehicle
+    gate = YieldGate(YieldConfig(blocked_wait=3.0))
+    ds = [gate.update(assess(PATH, [across], t, t), t) for t in np.arange(0.0, 6.0, 0.1)]
+    assert 0.1 * next(i for i, d in enumerate(ds) if d.go) == pytest.approx(5.0, abs=0.15)
+    # nose towards the path 6 m away: not on it, 3 s as before
+    assert assess(PATH, [car(-6.0, 4.0, 0.0, motion="stopped", yaw=0.0)], 0.0, 0.0).standing[0]["blocking"] is False
+

@@ -153,7 +153,8 @@
 | T43 | Nav_D20 定位地图：从 8 号狗只读拷现场地图 ad68517c，查平不平；用它回放（A），再用 INS 直出回放（B）；两个录包都查 | Agent | T42 | 1 小时 | 任务已写好 |
 | H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T43 | 15 分钟 | 待做（等 T43 的录包；T42 的录包定位还在跳） |
 | T44 | 路口让行门控：1104 上离线评测（8 条假想过路线，五组参数：默认、IMM 8 s、狗 2 m/s、σ 放宽、σ 收紧）；只读看 8 号狗的定位外参 | Agent | 无 | 1.5 小时 | 完成，已复核（2026-11-10）：默认 230 次不安全放行，216 次是车还在后方盲区或刚出来；调参数解决不了。门控加了刚出现的车、近处车拐弯两条，评测加了原因分类；外参没读到（狗不在线） |
-| T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 完成（2026-11-10）：狗不在线。关掉新规则对上 T44（unsafe 230、risky 350）。新默认 unsafe 207，blind 195，盲区以外还剩 12（far 1、detection 5、prediction 6），没到 0。狗 2 m/s 降到 133，再把 τ 收到 1 s 升到 158。新规则把 all 的 wait p90 从 0 抬到 3.2 s |
+| T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 完成，已复核（2026-11-12）：新规则 230 → 207；盲区以外剩 12 次，6 次是停着的货车车头压在路线上、停 4 s 后开走，门控加了车身压在路线上要看满 15 s；狗当时不在线，第 1 步放进 T46 |
+| T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步、T43、T40 第 1–3 步，T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8200,4 +8201,70 @@ EOF
 新规则的代价（base 对 t44）。timeouts 都是 0。all：wait median / p90 从 0.0 / 0.0 变成 0.0 / 3.2 s，extra median / p90 / max 从 0.0 / 0.0 / 13.2 变成 0.0 / 2.9 / 15.1。fan000：wait 从 0.0 / 0.0 / 11.8 变成 0.0 / 3.1 / 12.9，extra 从 0.0 / 0.0 / 11.8 变成 0.0 / 2.9 / 12.9，unsafe 从 35 降到 30。中位等待还是 0，多出来的等待在 p90，大约 3 s。
 
 运行时间（`runs.txt`）：t44 85 s，v2 100 s，v2pet1 101 s，base 119 s。四次同时跑。
+
+### T45 复核（2026-11-12）
+
+- 数和停止条件都对：两条新规则关掉，复现了 T44（230 / 350）。
+- 新规则把不安全从 230 降到 207，少掉的几乎都在 blind（217 → 195）：车刚从盲区出来、航迹不到 1 s 时，"刚出现的车"那条拦住了一部分。代价是等待 p90 从 0 到 3.2 s，中位仍是 0，没有超时。
+- 盲区以外剩 12 次，复核用标签逐条看了：
+  - **6 次是 cp04_s007 的 #1**：一辆 11.4 × 2.9 m 的货车，车头压在狗正前方的路线上（车中心在狗左边 4.6 m、前面 2.2 m）。它停了约 4 s 后开动，以 9 km/h 从狗面前拐过去；又停了 4 s，再开走。狗在第 3 s 到的时候，它从场景一开始就停在那儿，门控按"停着的车看满 3 s"就放行了。
+    - 门控加了一条：**停着的车车身压在路线上，要看它停满 15 s**（`blocked_wait`）。只是车头或车尾对着路线的，还是 3 s。
+    - `--blocked-wait 3` 就是原来的规则。T46 两种都跑。
+  - **3 次是 cp04_s000 的 #14**：放行前 2.4 s 才从盲区边上（137°、9 m）出来，一直没被跟上。其实还是盲区的问题，只是分类按 1.5 s 算成了 detection。
+  - **2 次是 cp01_s002 的 #2**：在 38 m 外、14 km/h，后来转了约 75°。它离路线超过 25 m，没加转弯假设。这种在远处拐进来的车，只靠匀速和"马上就转"的假设抓不住，要用地图上的车道。先记下，不改。
+  - **1 次是 cp04_s004 的 #15**：放行后 1.6 s 才在 48 m 外出现，是看得不够远（docs/PLANNING_INTEGRATION.md 第 5 节）。
+- 狗 2 m/s 降到 133，再把 τ 收到 1 s 反而升到 158：过得快有用，间隔留小了门控就等得少。
+- 狗不在线，第 1 步（外参、补盲雷达）没做，放进 T46。
+- Foxglove 视图（`work_dirs/yield_t45/`）：每辆标签车固定一种颜色，会撞上的那辆加粗、连线到路线、写明原因。没问题。
+
+
+---
+
+## T46 8 号狗在线：把要用狗的事按顺序做完
+
+2026-11-12 起服务器能连上 8 号狗。要用狗的事有四件，按"先只读、再拷、最后装"排：
+1. T45 第 1 步补做：外参、补盲雷达，只读，约 10 分钟；
+2. T43：只读拷现场定位地图，拷完以后在服务器上回放；
+3. T40 第 1–3 步：删 v2 数据集、装开机锁频开关的 deb、T35 A 段（室内）；
+4. T40 第 4 步（T35 B 段）：等人带狗出门。
+
+另外在服务器上重跑一次让行评测（T45 复核加了"车身压在路线上的停着的车看满 15 s"）。
+
+```text
+任务 T46：8 号狗在线时，按顺序做完要用狗的事；服务器上重跑让行评测。
+先按通用约定做。仓库根目录，export PYTHONPATH=.。mkdir -p data/reports/T46
+规矩同 T34、T35、T43：域 0 上除了我们的服务不发任何东西；不停、不改机器人别的服务；狗上不 apt install。
+每一步开始前先 ssh dog true；连不上就停在那一步，报告做到哪了。
+
+1. T45 第 1 步（外参、补盲雷达，只读），报告放到 data/reports/T46/（dog_extrinsic.txt、blindspot.txt）。
+   补盲雷达在发的话，用 root 的 ROS 环境录 20 s 样例（T34：nvidia 用户收的点云不全），拷回服务器，再删掉狗上的这一份：
+     RR='set -a; source /etc/default/lidar-3d-detection; set +a; source /opt/ros/humble/setup.bash; source /opt/seres/perception/local_setup.bash'
+     ssh dog "sudo bash -c \"$RR && mkdir -p /home/nvidia/bags && cd /home/nvidia/bags && timeout -s INT 22 ros2 bag record -o 1112_blindspot \
+         /BackBlindSpotLidar /FrontBlindSpotLidar /robot/topic/rdap/top_point_cloud2 /tf_static /rte/rdap/rtk/inspvax\"" \
+         2>&1 | tail -3 | tee data/reports/T46/blindspot_record.txt
+     ssh dog 'sudo -n chown -R nvidia:nvidia /home/nvidia/bags/1112_blindspot' && scp -r dog:/home/nvidia/bags/1112_blindspot /public/zjst/robot/cp_data/ \
+         && ssh dog 'rm -rf /home/nvidia/bags/1112_blindspot'
+     ros2 bag info /public/zjst/robot/cp_data/1112_blindspot | tee -a data/reports/T46/blindspot_record.txt
+   - 有人在狗旁边的话，请他录的时候从狗后方 10–20 m 处走过去（或开车过去）；没人也照录。报告里写有没有。
+2. T43 全部（第 0–6 步），报告照 T43 写进"T43 结果"，文件在 data/reports/T43/。
+   拷完地图（第 1 步）以后，后面都在服务器上，可以和第 3 步同时做。
+3. T40 第 1–3 步（删 v2 数据集、装新 deb、T35 A 段），报告照 T40 写进"T40 结果"，文件在 data/reports/T40/。
+   T35 A1 有同名坐标系就停下问人。
+4. 让行评测（服务器，只用 CPU，约 2 分钟）：
+     S=$(for d in data/labels/1104_*/labels_sustech2.pkl; do basename $(dirname $d); done)
+     pytest tests/dog/test_yield_gate.py -q | tail -1                       （19 passed）
+     run() { n=$1; shift; s=$(date +%s); python tools/dog/yield_eval.py --scenes $S --fan 8 --length 8 "$@" \
+         --details data/reports/T46/episodes_$n.csv > data/reports/T46/yield_$n.md 2>&1; echo "$n exit $? $(( $(date +%s) - s )) s"; }
+     { run base & run blocked3 --blocked-wait 3 & run v2 --dog-speed 2 & wait; } 2>&1 | tee data/reports/T46/runs.txt
+   - blocked3 应和 T45 的 base 一样（all 一行 unsafe 207、risky 319）；不一样就停下报告。
+   - 看 base：cp04_s007 那 6 次还在不在；timeouts 多了几次、在哪几个场景（停着的车挡了 30 s 以上）。
+5. T40 第 4 步（T35 B 段）：人在聊天里说"狗在室外、可以开始"再做。补盲雷达在发的话，B2 录包的话题里加上 /BackBlindSpotLidar、/FrontBlindSpotLidar。
+
+停止条件：各步自己的停止条件；第 4 步 blocked3 对不上 T45。
+提交：data/reports/T46/、T43、T40 的报告、本文档。不提交 bag 和拷来的地图。
+报告（写进"T46 结果"；T43、T40 的写在各自的"结果"里）：
+- 第 1 步：外参 A1 还是 A2；两路补盲雷达在不在发、频率、frame_id、TF、点数、距离 p50 / p95 / 最远、方位范围；样例录了没有、多大、有没有人从后面走过；
+- 第 4 步：三次的 all 一行和 "Why unsafe" 的 all 一行；cp04_s007 的 6 次；新增的超时；
+- 做到哪了、哪一步在等人。
+```
 
