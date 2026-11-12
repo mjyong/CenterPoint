@@ -7,7 +7,9 @@
 #
 # 环境变量同 run_planning_stack_debug.sh：LOC_MAP_PATH、LOC_INS_ONLY；ROS_DOMAIN_ID 默认 42（会发 /cmd_vel，不要用狗的域）。
 # MAP_SWITCH=<地图目录>（有 global_map.yaml 的）：发目标之前先发 /map/switch，规划换成这张图，读它的 semantic.osm。
-# 输出在 work_dirs/planning_io_<名字>/：录包（mcap）、logs/（各进程日志、规划的 glog）、report.txt（查包和关键行）。
+# 输出在 work_dirs/planning_io_<名字>/：录包（mcap）、logs/（各进程日志、规划的 glog）、report.txt（查包和关键行）、
+# viz/planning_viz.mcap 和 .png（tools/planning_mcap_viz.py：在 Foxglove 里用 script/planning_viz.json 看，不闪）。
+# RECORD_CLOUD=1：连 /fused_point_cloud 一起录（大，默认不录）。
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
@@ -38,7 +40,9 @@ ros2 bag record -s mcap -o "${out}" \
   /lightning/odom /map/occupancy_grid /tf /tf_static \
   /planning/debug/cost_map_production/occmap /planning/debug/global_map_manager/occmap \
   /planning/debug/goal_pose /planning/debug/path_tracking /planning/debug/plotjuggler/string \
-  /goal_pose /cmd_vel > "/tmp/replay_${name}_record.txt" 2>&1 &
+  /planning/debug/diagnostic /planning/debug/collision_checker /planning/debug/teb_planner /planning/debug/following \
+  /goal_pose /cmd_vel /map/switch $([[ "${RECORD_CLOUD:-0}" == 1 ]] && echo /fused_point_cloud) \
+  > "/tmp/replay_${name}_record.txt" 2>&1 &
 rec=$!
 bash "${nav_root}/planning/script/run_planning_stack_debug.sh" --once "$@" > "/tmp/replay_${name}_stack.txt" 2>&1 &
 stack=$!
@@ -101,4 +105,12 @@ fi
   else
     echo "没找到这次规划的 glog（/tmp/planning.*.log.INFO.*）"
   fi
+  # 给人看的版本：摊平到地图平面、换成 bag 时间、代价地图方向翻正；地图用规划这次用的那张（切过图就是切的那张），
+  # 人行横道从同一个地图目录的 semantic.osm 读
+  viz_args=()
+  [[ -n "${MAP_SWITCH:-}" ]] && viz_args+=(--map "${MAP_SWITCH}")
+  osm_dir="${MAP_SWITCH:-${LOC_MAP_PATH:-}}"
+  [[ -n "${osm_dir}" ]] && ls "${osm_dir}"/2d/*/semantic.osm > /dev/null 2>&1 && viz_args+=(--osm "${osm_dir}")
+  echo "== 可视化（tools/planning_mcap_viz.py）"
+  "${py}" "${nav_root}/planning/tools/planning_mcap_viz.py" "${out}" "${viz_args[@]}" || echo "可视化没生成"
 } 2>&1 | tee "${out}/report.txt"

@@ -151,7 +151,7 @@
 | T41 | Nav_D20 规划：补提交 .gitignore 漏掉的脚本和配置；重编（/tf 只发一棵树、局部代价地图用里程计的时间戳、标记寿命 0.5 s）；回放 0921 重录；查录包 | Agent | 无 | 1 小时 | 完成，已复核（2026-11-09）：规划的显示问题没了；录包还是不对是定位的问题，IMU 高频预测把 g 当成 m/s²，odom 一秒掉几米、跳几十米，规划因此起点在障碍里 |
 | T42 | Nav_D20 定位：高频预测的加速度按重力归一化以后重编、重跑；查 odom；看 LIO 每秒几帧；找配置的定位地图 | Agent | T41 | 1 小时 | 完成，已复核（2026-11-09）：高频预测修好（z 不再掉、LIO 9.9 帧/秒、规划进了 active）；还跳是内置定位地图倾斜 51°，配置的现场地图服务器上没有 |
 | T43 | Nav_D20 定位地图：从 8 号狗只读拷现场地图 ad68517c，查平不平；用它回放（A），再用 INS 直出回放（B）；两个录包都查 | Agent | T42 | 1 小时 | 完成，已复核（2026-11-12）：现场地图平、定位好了；规划卡在起点在障碍里：CJGC 是 1.7 m 宽的路网图，起点要挪到路上（规划已加），T47 重跑 |
-| H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T48 | 15 分钟 | 待做（等 T48 的录包：规划走起来以后再看） |
+| H7 | Foxglove 里看规划的新录包：`work_dirs/planning_io_t48_*/viz/planning_viz.mcap`，布局 `planning_viz.json`（T47 的两份已经转好，现在就能看） | 人 | T48 | 15 分钟 | 待做（T47 的可以先看；T48 的等录包） |
 | T44 | 路口让行门控：1104 上离线评测（8 条假想过路线，五组参数：默认、IMM 8 s、狗 2 m/s、σ 放宽、σ 收紧）；只读看 8 号狗的定位外参 | Agent | 无 | 1.5 小时 | 完成，已复核（2026-11-10）：默认 230 次不安全放行，216 次是车还在后方盲区或刚出来；调参数解决不了。门控加了刚出现的车、近处车拐弯两条，评测加了原因分类；外参没读到（狗不在线） |
 | T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 完成，已复核（2026-11-12）：新规则 230 → 207；盲区以外剩 12 次，6 次是停着的货车车头压在路线上、停 4 s 后开走，门控加了车身压在路线上要看满 15 s；狗当时不在线，第 1 步放进 T46 |
 | T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 完成，已复核（2026-11-12）：外参 A2；装包、锁频、室内外都做了；挡路车 15 s 后不安全 207 → 204 |
@@ -8449,13 +8449,15 @@ T46 复核改了四处（都在仓库里）：规划的 `allow_collision_start`�
 先按通用约定做。可以改的范围：Nav_D20/（编不过时只改我们的补丁，不改机器人团队的逻辑，改了写进 PATCHES.md）。
 仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42。mkdir -p data/reports/T48
 
-0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_yield_gate.py -q | tail -1
+0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py -q | tail -1
    补丁都在（每个都要 ≥ 1）：
      grep -c "G_m_s2 / p_imu_->GetMeanAccNorm" Nav_D20/slam/lightning-lm-master/src/core/lio/laser_mapping.cc
      grep -c "published_" Nav_D20/planning/src/common/util/tf_buffer.cc
      grep -c "DebugStamp" Nav_D20/planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.cc
      grep -c "allow_collision_start" Nav_D20/planning/robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt
      grep -c '"crosswalk"' Nav_D20/planning/third_party/osm_map/osm_parser.cc
+     grep -c "255.0, 0.0" Nav_D20/planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.cc   （要 2）
+     grep -c "StampMarkers" Nav_D20/planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.cc
    新地图解开（不提交）：mkdir -p data/loc_maps && for z in Nav_D20/map/*.zip; do unzip -oq $z -d data/loc_maps; done
    （T43 已经解过 ad68517c 的话，这一步会覆盖成同一份）
 1. 重编，三部分都要，输出存 data/reports/T48/build_*.txt（tail -30）：
@@ -8472,13 +8474,51 @@ T46 复核改了四处（都在仓库里）：规划的 `allow_collision_start`�
      for n in map ins switch; do cp work_dirs/planning_io_t48_$n/report.txt data/reports/T48/report_$n.txt; done
    - 三份 report 都要"已发"；看 mission_state 有没有 active、CMD: 的次数、Start adjusted、Start point is in collision；
    - 查包：odom 不能报跳变和超速（开头 1 s 内初始化的那一跳除外，报告里写明时间）；/tf 是一棵树；
-   - t48_switch 的 report 里要有 Map switch 1 次、"5 crosswalks in …semantic.osm" 1 次、OSM file not exist 0 次；
-     规划在新图上要能照样走（切图以后 A* 用的是 map.png，和 CJGC 是同一张）。
-   - 录包走 LFS 提交（work_dirs/planning_io_t48_*）。
-3. 提交：data/reports/T48/、录包、改过的补丁和 PATCHES.md、本文档。不提交解开的地图。
+     **不能再有 "inverted"**（重编后的代价地图话题是正的，这条证明调试桥的改动编进去了）；"NOTE display" 是正常的。
+   - t48_switch 的 report 里要有 Map switch 1 次、"5 crosswalks in …semantic.osm" 1 次、OSM file not exist 0 次。
+     切图以后规划读新图的 map.png：比 CJGC 多一段路，人行横道 6 往西那段（x 66–106、y 207–231），T47 的狗 107 s
+     以后就走在这段上。所以 report 末尾"可视化"那段的事件里：t48_map、t48_ins 在 107 s 前后有"狗脚下是障碍"，
+     t48_switch 那里应该没有。三份都抄下这些事件的时间。
+   - 每份 report 末尾有"可视化"一段（tools/planning_mcap_viz.py），生成 viz/planning_viz.mcap 和 .png；没生成就抄错误。
+   - 录包和 viz/ 都提交（录包走 LFS，.gitattributes 已经配好 work_dirs/planning_io_t48_*；viz/ 的几 MB 是普通文件）。
+3. 提交：data/reports/T48/、录包和 viz/、改过的补丁和 PATCHES.md、本文档。不提交解开的地图。
 
 停止条件：第 0 步补丁缺了；第 1 步机器人团队的代码编不过；第 2 步规划起不来。
 报告（写进"T48 结果"）：三部分编译的最后几行；三份 report 全文；和 T47 比（T47 是老版 TEB）：active 的比例、CMD 次数、起点挪了多少；
-t48_switch 里人行横道读进来没有；有没有改补丁、改了什么。
+t48_switch 里人行横道读进来没有；三份的"狗脚下是障碍"事件时间；有没有改补丁、改了什么。
 ```
 
+
+---
+
+### 规划录包为什么一闪一闪（2026-11-12，用 T47 的两份录包查）
+
+- **闪的原因有三个，都不是规划算错**：
+  - 两张栅格叠在一个会晃的平面上。局部代价地图（20 Hz）和感知的 `/map/occupancy_grid`（10 Hz）都挂在 `base_link` 上，Foxglove 按各自时间戳的 TF 摆。
+    - 狗走路时横滚、俯仰 1–4°，`base_link` 高度在 −1.1 到 0.07 m 之间。两张图时间戳差 0.1 s，两个倾斜的平面互相穿插。
+    - 默认空闲格子是不透明的白色，哪张在上面每帧都在变。
+    - 路径画在 `map` 的 z = 0，倾斜的栅格远端（前方 10 m）会冒上来盖住一段路径，再放开。
+  - 规划的 13.9 万个标记时间戳都是 0。在 `map` 里不影响；挂 `base_link` 的（碰撞点）被 Foxglove 摆在第一帧 TF 的位置。
+  - 录包用服务器的时钟，比 bag 的时间戳晚 52.1 天：时间轴、曲线、日志都和 bag、狗上的日志对不上。
+  - `/tf` 本身没问题：两路 `map -> base_link`（定位 100 Hz、规划 20 Hz）在同一时刻的位置、高度、姿态都一样。
+- **查出一个真问题：代价地图的调试话题是反的**。
+  - 代价地图的 obstacle 层是 255 = 空闲、0 = 障碍（`CostMapProduction::Proc` 里写着），调试桥按 (0, 1) 转成 OccupancyGrid：空闲全成了 100、障碍成了 0。
+  - 证据：感知的障碍会被抄进代价地图当障碍。两份录包里感知的 117045、118624 个障碍格，在代价地图话题里**全是 0**。
+  - Foxglove 里那条红带其实是狗要走的路。规划本身用的是对的，只是显示反了。
+  - **以前"狗脚下被占"的结论是反着读的**：T42 的"555 张里 346 张脚下有障碍"、T47 的"3280 张里 1974 张"，那些帧狗其实在路上。翻正以后：T47 现场地图那次 1411/3280 张狗站在障碍上，T47 INS 直出那次 1371/3284 张，都是狗走到了 CJGC 路网外面（下一条）。
+  - 已改：调试桥按 (255, 0) 转（局部、全局两处）；所有调试标记打上里程计的时间戳（`StampMarkers`）。写进了 `Nav_D20/PATCHES.md`，T48 重编后生效。
+- **规划默认的 CJGC 地图比新地图少一段路**：
+  - 新地图 ad68517c 的路网只比 CJGC 多一段：人行横道 6 往西，x 66–106、y 207–231（16907 格）。
+  - T47 两次的狗从 107 s 起就走在这段上，所以局部代价地图认为狗站在障碍里。T48 的切图那次应该就没有了。
+  - INS 直出那次开头（9.3 s）狗整个站在路外（160 格）：INS 的位置偏出了 1.7 m 宽的路，就是 A* 起点挪动要处理的情况。
+- **新工具：把录包转成给人看的版本** `Nav_D20/planning/tools/planning_mcap_viz.py`，布局 `Nav_D20/planning/script/planning_viz.json`：
+  - 全部换到 bag 的时间，摊平到地图平面，每一层一个高度；代价地图自动认方向、反的翻过来；空闲格子透明。
+  - 内容：规划地图的路网、人行横道（编号和横穿长度）、代价地图、感知栅格、走过的路（按速度着色、停下的地方标时间）、全局和局部路径、跟踪目标、终点、狗（实际速度和指令箭头、转向弧、状态文字）。
+  - 曲线：速度、转速、到终点、偏离全局路径、脚下障碍格、任务状态。事件日志：任务状态变化、输入超时、开始走和停下、规划断了多久、位姿跳变、狗站到路外、诊断。
+  - 还出一张总览图 `planning_viz.png`。T47 的两份已经转好：`work_dirs/planning_io_t47_{map,ins}/viz/`（5.5、7.5 MB，原包 341、351 MB），现在就能在 Foxglove 里看。
+  - 回放脚本最后自动转。它还多录了几个调试话题：诊断、碰撞点、TEB、跟随、`/map/switch`；`RECORD_CLOUD=1` 时连点云一起录。
+  - 我自己按 Foxglove 的摆法渲染了几帧对过：翻正后代价地图的空闲走廊和 CJGC 路网完全重合。
+- **查包工具**：
+  - 新报代价地图反着（`inverted`），翻正后再查"狗站在障碍上"（脚印里至少 10% 的格子）；
+  - 两张栅格挂在同一个会动的坐标系上时出一条 NOTE（不算问题）。
+- 测试：`tests/dog/test_planning_viz.py` 6 个，`test_planning_mcap.py` 6 个。

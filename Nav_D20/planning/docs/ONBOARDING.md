@@ -105,12 +105,12 @@ D20 默认 `pub_flag: false`，RViz 里看不到规划路径。本机调试把 `
 |------|------|
 | `/planning/debug/path_tracking` | 全局 / 局部路径 |
 | `/planning/debug/goal_pose` | 目标 |
-| `/planning/debug/cost_map_production/occmap` | TEB 用的局部代价 |
+| `/planning/debug/cost_map_production/occmap` | 局部规划用的代价地图（2026-11-12 之前的录包是反的：空闲 100、障碍 0，见下） |
 | `/planning/debug/global_map_manager/occmap` | A\* 用的全局图 |
 | `/planning/debug/plotjuggler/string` | 一帧调试字符串，含 `mission_type`、`cmd_vx` |
 | `/planning/debug/diagnostic` | 诊断 |
 
-录下来放到 Foxglove 里看（`script/planning_io.json` 布局，显示坐标系 `map`），先查一遍录包：
+录下来先查一遍录包，再转成给人看的版本（下一节）：
 
 ```bash
 python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap> --layout Nav_D20/planning/script/planning_io.json
@@ -120,6 +120,9 @@ python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap> --
 - `/tf` 是不是一棵树：`TfBuffer` 以前把每个变换连同它的逆一起发（`map -> base_link` 和 `base_link -> map`），云台还多发一条 `map -> ptz_*`，于是 `map`、`base_link`、`ptz_visible` 都有两个父坐标系，Foxglove 在它们之间来回跳；现在 `/tf` 只发 `map -> base_link`、`base_link -> ptz_*`。
 - 时间戳对不对得上：`base_link` 里的局部代价地图以前用本机时钟打戳，回放旧 bag 时比里程计（也就是 `map -> base_link`）晚几周，Foxglove 找不到那个时刻的变换；现在用里程计的时间戳。
 - 标记的寿命：以前 0.05 s，正好一个 20 Hz 周期，回放时一闪一闪、暂停时多半看不到；现在 0.5 s，个数会变的数组开头先发 DELETEALL。
+- 代价地图的方向：代价地图的 obstacle 层是 255 = 空闲、0 = 障碍，调试话题原来按 (0, 1) 转，空闲全成了 100，路显示成障碍、障碍显示成空的。
+  用感知的障碍格来认（规划把它们抄进代价地图当障碍）：T47 两次录包里 11.7 万个全是 0，报 `inverted`。`ros_debug_bridge` 已改成 (255, 0)。
+  以前查出来的"狗脚下被占"也是反着读的：那些帧狗其实在路上。现在翻正以后再查，报的是狗站在规划地图的路外面。
 - `/lightning/odom` 像不像一只在走的狗（速度、高度、跳变）。T41 回放 0921 时，定位的 IMU 高频预测把 kygi665 的加速度（单位 g）当成 m/s²，两次 LIO 更新之间每秒多掉 8.8 m/s²：17.5 s 里 z 掉到 −46 m、速度到 32 m/s、一跳 43 m。规划拿这个位置当起点，报 `Start point is in collision!`。`lightning-lm-master/src/core/lio/laser_mapping.cc` 已改成按重力归一化（同 `imu_processing.hpp`），T42 验证。
 
 日志关键字：
@@ -134,6 +137,40 @@ python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap> --
 - `Failed to load PGM` 路径或 `PLANNING_ROOT_DIR` 错了
 
 本机回放时，`ROS_DOMAIN_ID` 要和感知、定位一致。Docker 启动脚本里写的是 `22`，以狗上实际环境为准。QoS 不一致会表现为节点活着但收不到图：`/map` 和 `/map/switch` 是 reliable + transient_local；局部栅格跟随感知 yaml 里的 `qos`（D20 点云侧是 best_effort）。
+
+## 在 Foxglove 里看录包
+
+原始录包直接放进 Foxglove 会一闪一闪，原因有三个：
+- 局部代价地图（20 Hz）和感知的 `/map/occupancy_grid`（10 Hz）都挂在 `base_link` 上，Foxglove 按各自时间戳的 TF 摆。狗走路时横滚、俯仰 1–4°，两张图的时间戳差 0.1 s，两个倾斜的平面互相穿插；默认空闲格子是不透明的白色，哪张在上面每帧都在变。路径画在 `map` 的 z = 0，`base_link` 在 z ≈ −0.2 m，倾斜的栅格远端会冒上来盖住一段路径，再放开。
+- 规划的标记时间戳是 0。在 `map` 里不影响；挂 `base_link` 的（碰撞点）被摆在第一帧 TF 的位置。
+- 录包用服务器的时钟记时间（11 月），数据是 bag 的时间戳（9 月 21 日），时间轴、曲线、日志都和 bag、狗上的日志对不上。
+
+所以录完转一份给人看的版本（`replay_planning_check.sh` 最后会自动转），在 Foxglove 里用 `script/planning_viz.json` 打开：
+
+```bash
+python3 Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/planning_io_<名字> \
+    [--map <切过去的地图目录或 zip>] [--osm <有 semantic.osm 的地图目录或 zip>]
+# -> work_dirs/planning_io_<名字>/viz/planning_viz.mcap（几 MB，原包几百 MB）和 planning_viz.png（总览图）
+```
+
+- 全部换到 bag 的时间，摊平到地图平面（`/tf` 只剩 `map -> base_link` 的 x、y、朝向），每一层放在自己的高度上，不再互相抢。
+- 代价地图方向自动认（`--cost-map-values auto`），反着的翻过来。
+- 地图默认是规划的 CJGC（读 `CJGC.pgm`，和规划一样）；给地图目录或 zip 时读 `global_map.yaml` 第一层的 `map_image_file`（切图以后规划读的那张）。
+- 定位刚起来时的那一跳（T47：开头一帧在原点，离真实位置 142 m）不画进轨迹，事件里会记一条。
+
+| 话题 | 是什么 | 颜色 |
+|---|---|---|
+| `/viz/route_map` | 规划地图的路网（能走的路） | 灰蓝 |
+| `/viz/crosswalks` | 人行横道，带编号和横穿长度 | 黄 |
+| `/viz/cost_map` | 局部代价地图里的障碍（空闲透明） | 半透明红 |
+| `/viz/perception_grid` | 感知栅格里的障碍 | 橙 |
+| `/viz/trail` | 走过的路，按速度着色；停下 2 s 以上的地方画圈标时间 | 蓝→绿→黄→红 |
+| `/viz/plan` | 全局路径（蓝）、局部路径（绿）和它的脚印、跟踪目标点、碰撞圆、终点（红） | |
+| `/viz/robot` | 狗（青色，白三角是朝向）、实际速度箭头（浅蓝）、指令箭头和转向弧（橙）、状态文字 | |
+| `/viz/state` | 每个规划周期一条 JSON：任务和状态、速度和指令、到终点、偏离全局路径、脚下障碍格数、最近障碍，还有规划调试字符串里的全部数 | 右边曲线 |
+| `/viz/events` | 任务状态变化、输入超时、开始走和停下、规划或栅格断了多久、位姿跳变、狗站到路外、诊断，有规划 glog 时加上它的警告 | 右下日志 |
+
+布局右边四张曲线（速度、转速、距离、脚下障碍格）、任务状态条、事件日志，时间轴和 3D 同步，3D 跟着狗（俯视）。
 
 ## 代码从哪改
 
