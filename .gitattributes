@@ -10,4 +10,5 @@ work_dirs/planning_io_t41/**/*.mcap filter=lfs diff=lfs merge=lfs -text
 work_dirs/planning_io_t42/**/*.mcap filter=lfs diff=lfs merge=lfs -text
 work_dirs/planning_io_t47_map/**/*.mcap filter=lfs diff=lfs merge=lfs -text
 work_dirs/planning_io_t47_ins/**/*.mcap filter=lfs diff=lfs merge=lfs -text
+work_dirs/1112_t40/*.mcap filter=lfs diff=lfs merge=lfs -text
 Nav_D20/map/*.zip filter=lfs diff=lfs merge=lfs -text
