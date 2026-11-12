@@ -154,7 +154,7 @@
 | H7 | Foxglove 里看规划的新录包（planning_io.json） | 人 | T43 | 15 分钟 | 待做（等 T43 的录包；T42 的录包定位还在跳） |
 | T44 | 路口让行门控：1104 上离线评测（8 条假想过路线，五组参数：默认、IMM 8 s、狗 2 m/s、σ 放宽、σ 收紧）；只读看 8 号狗的定位外参 | Agent | 无 | 1.5 小时 | 完成，已复核（2026-11-10）：默认 230 次不安全放行，216 次是车还在后方盲区或刚出来；调参数解决不了。门控加了刚出现的车、近处车拐弯两条，评测加了原因分类；外参没读到（狗不在线） |
 | T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 完成，已复核（2026-11-12）：新规则 230 → 207；盲区以外剩 12 次，6 次是停着的货车车头压在路线上、停 4 s 后开走，门控加了车身压在路线上要看满 15 s；狗当时不在线，第 1 步放进 T46 |
-| T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步、T43、T40 第 1–3 步，T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 任务已写好 |
+| T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 任务已写好（2026-11-12 按人定的改过：不看补盲雷达、开机锁频） |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -7649,7 +7649,7 @@ T35 并入这里：步骤照 T35 原来写的，这里只写改了的地方。
 | 2 | 8 号狗装新 deb：开机锁频的开关 `LIDAR3D_LOCK_CLOCKS`（默认 0，什么都不改）；7432c90 的预测线也在里面 | Agent，ssh dog | 无 |
 | 3 | T35 A 段（室内）：root 视角的撞车检查、root 起 bridge、负载和 GPU | Agent | 2 |
 | 4 | T35 B 段（室外、固定解）：在线出框、天线接法、在线对离线、Foxglove；锁频改用开关，顺便在真狗上验开关 | 人带狗出门，Agent | 3 |
-| 5 | 8 号狗开不开开机锁频：`/etc/default/lidar-3d-detection` 里 `LIDAR3D_LOCK_CLOCKS=1`，然后 `systemctl restart lidar-3d-detection` | 机器人团队 | 4（看锁频前后的延迟和负载） |
+| 5 | 8 号狗开不开开机锁频：`/etc/default/lidar-3d-detection` 里 `LIDAR3D_LOCK_CLOCKS=1`，然后 `systemctl restart lidar-3d-detection` | 机器人团队 | 定了（2026-11-12）：开。T46 第 3 步打包时带上（`build_deb.sh --lock-clocks 1`） |
 | 6 | 规划确认 `ObjectArray` 的坐标系和字段 | 人、规划 | 无 |
 | 7 | H5：看最终效果，定上线参数 | 人 | 4 |
 | 8 | 下一批数据：另一天、另一片区域、狗在走（最好白天）。先留测试集，再看 v3（DATA_COLLECTION_PLAN 3.5） | 人录，Agent 照 T36–T39 做 | 无 |
@@ -8223,9 +8223,9 @@ EOF
 ## T46 8 号狗在线：把要用狗的事按顺序做完
 
 2026-11-12 起服务器能连上 8 号狗。要用狗的事有四件，按"先只读、再拷、最后装"排：
-1. T45 第 1 步补做：外参、补盲雷达，只读，约 10 分钟；
+1. T45 第 1 步补做：只看外参，只读，约 5 分钟。补盲雷达先不考虑（人定，2026-11-12），不用看；
 2. T43：只读拷现场定位地图，拷完以后在服务器上回放；
-3. T40 第 1–3 步：删 v2 数据集、装开机锁频开关的 deb、T35 A 段（室内）；
+3. T40 第 1–3 步：删 v2 数据集、装新 deb、T35 A 段（室内）。8 号狗开机锁频（人定，2026-11-12），包里直接带上开关；
 4. T40 第 4 步（T35 B 段）：等人带狗出门。
 
 另外在服务器上重跑一次让行评测（T45 复核加了"车身压在路线上的停着的车看满 15 s"）。
@@ -8236,34 +8236,31 @@ EOF
 规矩同 T34、T35、T43：域 0 上除了我们的服务不发任何东西；不停、不改机器人别的服务；狗上不 apt install。
 每一步开始前先 ssh dog true；连不上就停在那一步，报告做到哪了。
 
-1. T45 第 1 步（外参、补盲雷达，只读），报告放到 data/reports/T46/（dog_extrinsic.txt、blindspot.txt）。
-   补盲雷达在发的话，用 root 的 ROS 环境录 20 s 样例（T34：nvidia 用户收的点云不全），拷回服务器，再删掉狗上的这一份：
-     RR='set -a; source /etc/default/lidar-3d-detection; set +a; source /opt/ros/humble/setup.bash; source /opt/seres/perception/local_setup.bash'
-     ssh dog "sudo bash -c \"$RR && mkdir -p /home/nvidia/bags && cd /home/nvidia/bags && timeout -s INT 22 ros2 bag record -o 1112_blindspot \
-         /BackBlindSpotLidar /FrontBlindSpotLidar /robot/topic/rdap/top_point_cloud2 /tf_static /rte/rdap/rtk/inspvax\"" \
-         2>&1 | tail -3 | tee data/reports/T46/blindspot_record.txt
-     ssh dog 'sudo -n chown -R nvidia:nvidia /home/nvidia/bags/1112_blindspot' && scp -r dog:/home/nvidia/bags/1112_blindspot /public/zjst/robot/cp_data/ \
-         && ssh dog 'rm -rf /home/nvidia/bags/1112_blindspot'
-     ros2 bag info /public/zjst/robot/cp_data/1112_blindspot | tee -a data/reports/T46/blindspot_record.txt
-   - 有人在狗旁边的话，请他录的时候从狗后方 10–20 m 处走过去（或开车过去）；没人也照录。报告里写有没有。
+1. T45 第 1 步里只做外参那一条（同 T44 第 0 步），输出 data/reports/T46/dog_extrinsic.txt。补盲雷达不用看。
 2. T43 全部（第 0–6 步），报告照 T43 写进"T43 结果"，文件在 data/reports/T43/。
    拷完地图（第 1 步）以后，后面都在服务器上，可以和第 3 步同时做。
 3. T40 第 1–3 步（删 v2 数据集、装新 deb、T35 A 段），报告照 T40 写进"T40 结果"，文件在 data/reports/T40/。
-   T35 A1 有同名坐标系就停下问人。
+   T35 A1 有同名坐标系就停下问人。8 号狗开机锁频，所以 T40 第 2 步改三处：
+   - 先 git pull，pytest tests/dog/test_deploy.py -q -k "lock_clocks or orin_clocks" | tail -1（11 passed）；
+   - b 打包多加 --lock-clocks 1（开关写进包自带的 /etc/default，以后 --force-confnew 升级也不会改回 0）；settings 一行里是 LIDAR3D_LOCK_CLOCKS=1；
+   - c 的 diff 里 LIDAR3D_LOCK_CLOCKS 一行是 1（不是 0），别的要求不变；
+   - d 改成"开关开着"：restart 以后 journal 里要有 "lock_clocks.sh: clocks locked"，orin_clocks.sh 打印 clocks locked，服务 active，
+     输出 data/reports/T40/switch_on.txt。没锁上就停下报告。
+   T35 A3 的负载就是锁频以后的负载，报告里写明。
 4. 让行评测（服务器，只用 CPU，约 2 分钟）：
      S=$(for d in data/labels/1104_*/labels_sustech2.pkl; do basename $(dirname $d); done)
-     pytest tests/dog/test_yield_gate.py -q | tail -1                       （19 passed）
+     pytest tests/dog/test_yield_gate.py -q | tail -1                       （21 passed）
      run() { n=$1; shift; s=$(date +%s); python tools/dog/yield_eval.py --scenes $S --fan 8 --length 8 "$@" \
          --details data/reports/T46/episodes_$n.csv > data/reports/T46/yield_$n.md 2>&1; echo "$n exit $? $(( $(date +%s) - s )) s"; }
      { run base & run blocked3 --blocked-wait 3 & run v2 --dog-speed 2 & wait; } 2>&1 | tee data/reports/T46/runs.txt
    - blocked3 应和 T45 的 base 一样（all 一行 unsafe 207、risky 319）；不一样就停下报告。
    - 看 base：cp04_s007 那 6 次还在不在；timeouts 多了几次、在哪几个场景（停着的车挡了 30 s 以上）。
-5. T40 第 4 步（T35 B 段）：人在聊天里说"狗在室外、可以开始"再做。补盲雷达在发的话，B2 录包的话题里加上 /BackBlindSpotLidar、/FrontBlindSpotLidar。
+5. T40 第 4 步（T35 B 段）：人在聊天里说"狗在室外、可以开始"再做。已经开机锁频，B1 不用再开开关，B4 也不改回 0，只把 orin_clocks.sh 一行写进报告。
 
 停止条件：各步自己的停止条件；第 4 步 blocked3 对不上 T45。
 提交：data/reports/T46/、T43、T40 的报告、本文档。不提交 bag 和拷来的地图。
 报告（写进"T46 结果"；T43、T40 的写在各自的"结果"里）：
-- 第 1 步：外参 A1 还是 A2；两路补盲雷达在不在发、频率、frame_id、TF、点数、距离 p50 / p95 / 最远、方位范围；样例录了没有、多大、有没有人从后面走过；
+- 第 1 步：外参 A1 还是 A2；
 - 第 4 步：三次的 all 一行和 "Why unsafe" 的 all 一行；cp04_s007 的 6 次；新增的超时；
 - 做到哪了、哪一步在等人。
 ```

@@ -539,7 +539,7 @@ colcon 那一步和真机运行要在板上做（T31）。
 - 锁频以后多一个订阅者（发调试点云、开 bridge）：默认缓冲 452 帧，8 MB 缓冲 597 帧。约 3 MB 的点云比共享内存的段大，走 UDP；
 - deb 带上 `share/lidar_3d_detection/fastdds_large_buffers.xml`（send / listen 各 8 MB），`orin_foxglove.sh` 在 Fast DDS 下默认用它；`/etc/default` 列了 RMW、`CYCLONEDDS_URI`、这份 profile 的选项（默认都不开）；Depends 写打包板上装着的每个 RMW；
 - **车上的 DDS**（8 号狗，2026-11-04）：CycloneDDS、域 0、`/opt/ros/cyclonedds.xml`。这份 XML 只绑 eth1，开了共享内存，socket 收发至少 10 MB。服务的 RMW 要和这个一样。Fast DDS 的 8 MB profile 在 CycloneDDS 下不起作用；
-- 车上开机锁不锁频，由人定（不锁时慢 3 倍）。2026-11-09：deb 加了开关 `LIDAR3D_LOCK_CLOCKS`（`/etc/default/lidar-3d-detection`，默认 0），设成 1 时服务启动前先跑 `jetson_clocks`（`$L/README.md`）；开不开由机器人团队定。
+- 车上开机锁不锁频，由人定（不锁时慢 3 倍）。2026-11-09：deb 加了开关 `LIDAR3D_LOCK_CLOCKS`（`/etc/default/lidar-3d-detection`，默认 0），设成 1 时服务启动前先跑 `jetson_clocks`（`$L/README.md`）；开不开由机器人团队定。2026-11-12：8 号狗定了开，打包时加 `--lock-clocks 1`（写进包里的默认值，升级不会改回 0）。
 
 **8 号狗上装**（2026-11-04 试过，现成的 deb 没装）：
 

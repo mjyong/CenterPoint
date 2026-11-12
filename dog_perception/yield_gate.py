@@ -44,7 +44,7 @@ class YieldConfig:
     stopped_speed: float = 0.5      # [m/s] slower (and not "moving" in the tracker): a standing vehicle
     stopped_wait: float = 3.0       # [s] a standing vehicle near the path must be seen standing this long
     blocked_wait: float = 15.0      # [s] ... and this long when its body is on the path (T45: a truck across the
-                                    # path stood 4 s, then drove off across it); stopped_wait: no difference
+                                    # path stood 4 s, then drove off across it). Both decided 2026-11-12
     start_zone: float = 10.0        # [m] a standing vehicle this close to the path, nose or tail towards it
     stale_after: float = 0.3        # [s] perception older than this: wait
     # T44 (1104): vehicles out of the rear blind sector or round the corner were tracked only moments before the
@@ -72,10 +72,37 @@ class Assessment:
 @dataclass
 class Decision:
     go: bool
-    reason: str                     # clear / committed / vehicle / young / standing / blocked / clearing /
-                                    # not_passed / stale
+    reason: str                     # clear / committed / on_crosswalk / vehicle / young / standing / blocked /
+                                    # clearing / not_passed / stale
     ids: list = field(default_factory=list)
     gap: float = float("inf")
+
+
+def inside_polygon(points, polygon):
+    """(N,) bool: even-odd test of 2D points against a polygon (M, 2) (open or closed)."""
+    pts = np.asarray(points, dtype=float).reshape(-1, 2)
+    poly = np.asarray(polygon, dtype=float)[:, :2]
+    x, y = pts[:, 0:1], pts[:, 1:2]
+    x0, y0 = poly[:, 0][None], poly[:, 1][None]
+    x1, y1 = np.roll(poly[:, 0], -1)[None], np.roll(poly[:, 1], -1)[None]
+    crosses = (y0 > y) != (y1 > y)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        xc = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
+    return np.sum(crosses & (x < xc), axis=1) % 2 == 1
+
+
+def crosswalk_span(path_xy, polygon, step=0.1):
+    """Where the path first enters the crosswalk polygon and leaves it again: (s_in, s_out) [m] along the path
+    from its start, or None. Planning waits before s_in and checks the path up to s_out (plus a margin); once
+    the robot is on the crosswalk it does not stop for vehicles (YieldGate.update(on_crosswalk=True))."""
+    pts, s = resample_path(path_xy, step, np.inf)
+    inside = inside_polygon(pts, polygon)
+    if not inside.any():
+        return None
+    i = int(np.argmax(inside))
+    out = np.nonzero(~inside[i:])[0]
+    j = i + int(out[0]) - 1 if len(out) else len(s) - 1
+    return float(s[i]), float(s[j])
 
 
 def resample_path(path_xy, step, length):
@@ -282,8 +309,14 @@ class YieldGate:
         self.yielded = set()
         self.still_since = {}           # id -> first time seen standing (continuously)
 
-    def update(self, a, now, dog_moving=False):
+    def update(self, a, now, dog_moving=False, on_crosswalk=False):
+        """``on_crosswalk``: the robot's centre is on a crosswalk of the map. It does not stop there for vehicles,
+        stale perception included: vehicles have to give way, and stopping in a lane is worse (people, 2026-11-12)."""
         cfg = self.cfg
+        if on_crosswalk:
+            self.paused = False
+            self.yielded.clear()
+            return Decision(True, "on_crosswalk", [c["id"] for c in a.conflicts], a.min_gap)
         if a.stale:
             self.paused = True
             self.last_conflict = now

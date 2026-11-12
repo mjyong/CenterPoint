@@ -6,7 +6,8 @@ import pytest
 from dog_perception.detection.boxes import CLASSES, Detections
 from dog_perception.yield_eval import (Occupancy, evaluate_path, gap_after, gap_both, gt_tracks, summarize,
                                        track_objects)
-from dog_perception.yield_gate import YieldConfig, YieldGate, assess, required_sight_range, rollout
+from dog_perception.yield_gate import (YieldConfig, YieldGate, assess, crosswalk_span, inside_polygon,
+                                       required_sight_range, rollout)
 
 PATH = np.array([[0.0, 0.0], [0.0, 8.0]])          # the robot crosses 8 m along +y
 KMH30 = 30 / 3.6
@@ -278,3 +279,19 @@ def test_a_standing_vehicle_across_the_path_is_watched_longer():
     # nose towards the path 6 m away: not on it, 3 s as before
     assert assess(PATH, [car(-6.0, 4.0, 0.0, motion="stopped", yaw=0.0)], 0.0, 0.0).standing[0]["blocking"] is False
 
+
+def test_on_a_crosswalk_the_robot_does_not_stop_for_vehicles():
+    coming = assess(PATH, [car(-30.0, 4.0, KMH30)], 0.0, 0.0)
+    assert coming.conflicts and not YieldGate().update(coming, 0.0, dog_moving=True).go
+    assert YieldGate().update(coming, 0.0, dog_moving=True, on_crosswalk=True).reason == "on_crosswalk"
+    stale = assess(PATH, [], 1.0, 0.0)
+    assert YieldGate().update(stale, 1.0, on_crosswalk=True).go
+
+
+def test_crosswalk_span_along_the_path():
+    # a 4 m wide crosswalk from y = 2 m to y = 9 m (the road), the path goes straight across and on
+    zebra = np.array([[-2.0, 2.0], [2.0, 2.0], [2.0, 9.0], [-2.0, 9.0]])
+    assert inside_polygon([[0.0, 5.0], [0.0, 1.0], [3.0, 5.0]], zebra).tolist() == [True, False, False]
+    s_in, s_out = crosswalk_span(np.array([[0.0, 0.0], [0.0, 12.0]]), zebra)
+    assert s_in == pytest.approx(2.0, abs=0.11) and s_out == pytest.approx(9.0, abs=0.11)
+    assert crosswalk_span(np.array([[5.0, 0.0], [5.0, 12.0]]), zebra) is None

@@ -550,6 +550,30 @@ def test_lock_clocks_is_wired_into_the_service_and_off_by_default():
     assert "packaging/lock_clocks.sh DESTINATION bin" in cmake
 
 
+def test_build_deb_packages_lock_clocks_switched_on(tmp_path):
+    """build_deb.sh --lock-clocks 1 writes LIDAR3D_LOCK_CLOCKS=1 into the packaged /etc/default (dog 8 locks its clocks
+    at boot, 2026-11-12), so an upgrade with --force-confnew keeps it; anything but 0 / 1 is refused before building."""
+    import subprocess
+    node = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection")
+    if not os.path.isdir(node):
+        pytest.skip("no deploy_deb")
+    script = os.path.join(node, "scripts", "build_deb.sh")
+    r = subprocess.run(["bash", script, "--lock-clocks", "2", "--model", str(tmp_path)], capture_output=True, text=True,
+                       cwd=str(tmp_path))
+    assert r.returncode == 1 and "--lock-clocks must be 0 or 1" in r.stderr
+    text = open(script).read()
+    sed = 's/^LIDAR3D_LOCK_CLOCKS=.*/LIDAR3D_LOCK_CLOCKS=$LOCK_CLOCKS/'
+    assert sed in text and "--lock-clocks) LOCK_CLOCKS=$2" in text
+    # the substitution on the packaged default file: one line, switched
+    default = open(os.path.join(node, "packaging", "lidar-3d-detection.default")).read()
+    f = tmp_path / "default"
+    f.write_text(default)
+    subprocess.run(["sed", "-i", sed.replace("$LOCK_CLOCKS", "1"), str(f)], check=True)
+    out = f.read_text()
+    assert out.count("LIDAR3D_LOCK_CLOCKS=") == 1 + default.count("#LIDAR3D_LOCK_CLOCKS=") and \
+        "\nLIDAR3D_LOCK_CLOCKS=1\n" in out
+
+
 def test_objects_bag_reads_the_vehicle_messages(tmp_path):
     """objects_bag.py also reads deploy_deb's perception_interface/LidarObjectArray (the same fields)."""
     pytest.importorskip("rosbags")

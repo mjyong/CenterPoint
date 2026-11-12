@@ -89,7 +89,7 @@ sudo systemctl stop lidar-3d-detection
 - 配置和 `/etc/default` 那个文件是 conffile：升级时保留你改过的；`dpkg -r` 卸载时也留着，`dpkg -P` 才删掉；
 - 起来以后日志里有一行 "lidar_3d_detection up: ..."，之后每秒一行：框数、轨迹数、各段耗时（ms），最后是这一秒里最长的回调（`callback_max_ms`，含发布）和 `clouds N frames N skipped N`（收到几帧点云、发出几帧结果、按点云时间戳算中间缺了几帧）；
 - 延迟要在锁频后看：`sudo jetson_clocks`，重启就没了。`scripts/orin_clocks.sh` 查锁没锁。没锁时节点慢 2–3 倍（T32：每帧 55 ms，锁频时 15–21 ms）；
-- 开机锁频：`/etc/default/lidar-3d-detection` 里 `LIDAR3D_LOCK_CLOCKS=1`，服务每次启动前先跑 `jetson_clocks`（`packaging/lock_clocks.sh`，unit 的 `ExecStartPre=+`，以 root 跑）。默认 0，什么都不改。
+- 开机锁频：`/etc/default/lidar-3d-detection` 里 `LIDAR3D_LOCK_CLOCKS=1`，服务每次启动前先跑 `jetson_clocks`（`packaging/lock_clocks.sh`，unit 的 `ExecStartPre=+`，以 root 跑）。默认 0，什么都不改。要锁频的狗，打包时加 `build_deb.sh --lock-clocks 1`，开关就写在包自带的 `/etc/default` 里，以后用 `--force-confnew` 升级也不会改回 0（8 号狗，2026-11-12 人定开）。
   - 它把整台机器的 CPU、GPU、内存频率拉到最高，风扇也开到最大，功耗和发热跟着涨，影响机器人上所有进程，开不开由机器人团队定；
   - 找不到或跑失败只打一行日志，节点照常起来；
   - 改回 0 要等下次重启才恢复（脚本不解锁）；
