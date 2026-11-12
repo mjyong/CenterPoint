@@ -487,6 +487,11 @@ void OsmParser::loadDefaultRegister()
   semanticRegister_.emplace(
       "virtual_line",
       std::make_pair(SemanticType::VirtualLine, GeometryType::Line));
+  // the site maps' semantic.osm (2026-11): multipolygon relations, subtype crosswalk; the robot crosses roads
+  // only there (docs/PLANNING_INTEGRATION.md)
+  semanticRegister_.emplace(
+      "crosswalk",
+      std::make_pair(SemanticType::Crosswalk, GeometryType::Polygon));
 }
 
 bool OsmParser::parseOsmFile(const std::string& osm_file)

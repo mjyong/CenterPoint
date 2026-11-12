@@ -10,6 +10,14 @@
 
 D20 车型由 `robot_factory/default_robot_vin` 决定，当前内容是 `d20/001`。改这一行会换成 R1 / r11 的配置，不要在狗上随便改。
 
+**2026-11-12 起，`Nav_D20` 是机器人团队狗上在跑的新版**（04d3a34 同步）。和下文写的老版主要不同：
+- A\* 挪到了 `GlobalMapManager`（预处理），配置在 `preprocess_conf.pb.txt` 的 `global_map_manager_conf.grid_path_planner_conf`。D20 的 `safe_margin` 从 0.3 改成了 0.1。
+- Tracking 只取全局路径；D20 的局部规划是 MPPI（`mission_conf.pb.txt` 里 `tracking_conf.planner_type: MPPI`，`src/algorithm/mppi_planner/`），TEB 还在。
+- 新增跟随、回充、技能等任务。
+- 现场地图（`Nav_D20/map/*.zip`）的语义层叫 `semantic.osm`，里面标了人行横道。
+
+我们在上面打的补丁（定位的 IMU 单位、`/tf` 树、调试话题的时间戳、A\* 起点挪到路上、读人行横道、OpenCV 5）列在 `Nav_D20/PATCHES.md`。下次同步先看那一页，同步完把补丁重新打上。
+
 ## 数据怎么走
 
 ```text
@@ -82,7 +90,7 @@ Tracking 状态机：`off -> passive -> standby -> active -> standstill -> off`�
 - 全局图：`GlobalMapManager` 读 `robot_factory/data/astar_pgm/CJGC.pgm` + `CJGC.yaml`（分辨率 0.1 m，原点约 `[-716, -321]`）。`enable_overlay: false`，感知障碍 **不会** 画进这张图，A\* 只看见静态图。
   - **CJGC 是一张路网图**（2026-11-12，T46 复核）：像素 255 是能走的路，只占 0.26%，是一条条约 1.7 m 宽的线；其余都是障碍。`LoadPGMMap` 把 255 读成 `obstacle` 层的 255，`cv::distanceTransform` 把 0 当障碍，所以只有路上能走。
   - A\* 要起点离路边至少 `safe_margin`（0.3 m），也就是只有路中间约 1.1 m 宽的一条。定位偏几分米就报 `Start point is in collision!`：0921 的起点按 INS 离路边只有 0.41 m，T43 两次回放都卡在这里。
-  - 现在 D20 开了 `allow_collision_start`：起点不合格时，在 1 m 内挪到最近的空地（和终点的 `allow_collision_goal` 一样）。局部代价地图也把路外当障碍，狗偏出路面时 TEB 会报起点在障碍里。
+  - 现在 D20 开了 `allow_collision_start`（新版在 `preprocess_conf.pb.txt` 里）：起点不合格时，在 1 m 内挪到最近的空地（和终点的 `allow_collision_goal` 一样）。局部代价地图也把路外当障碍，狗偏出路面时局部规划会报起点在障碍里。
 - 局部图：`CostMapProduction`，车体前 10 m、后 5 m、左右各 5 m，分辨率 0.05 m，`enable_cuda: true`。TEB 避障看这张图，所以没有 `/map/occupancy_grid` 时全局路径还能搜，局部速度会不对。
 
 `/map` 是定位发出来的另一张全局栅格。`enable_global_map_reload: false` 时，规划启动用的仍是磁盘上的 CJGC，不是定位刚发出的 `/map`。切图要走 `/map/switch`。
@@ -136,8 +144,9 @@ python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap> --
 | 全局搜索安全距离、终点判定、TEB 权重和速度上限 | `robot_factory/d20/001/planning_conf/mission_conf.pb.txt` |
 | 局部代价地图范围和分辨率 | `robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt` |
 | 目标点怎么变成任务 | `src/runnable/communication/ros_bridge/ros_bridge.cc` 的 `OnGoalPose`，以及 `ros_bridge/tracking.cc` |
-| A\* | `src/algorithm/grid_path_planner/` |
-| 局部轨迹和速度 | `src/algorithm/teb_planner/`，调用在 `src/runnable/mission/tracking/tracking.cc` 的 `spin_s_active` |
+| A\* | `src/algorithm/grid_path_planner/`，新版由 `GlobalMapManager::PlanGlobalPath` 调 |
+| 局部轨迹和速度 | D20 新版是 `src/algorithm/mppi_planner/`（TEB 在 `src/algorithm/teb_planner/`），调用在 `src/runnable/mission/tracking/tracking.cc` 的 `spin_s_active` |
+| 人行横道 | `GlobalMapManager::crosswalks()`（`third_party/osm_map` 读 `semantic.osm`） |
 | 发给运控的速度 | `RosBridge::Publish`，发出前会过 `VelocityCalibration` |
 | 路口有车就停、车过去再走（接 3D 检测和预测） | 还没做，设计见仓库根目录 `docs/PLANNING_INTEGRATION.md`；停和走复用任务的 `pause()` / `resume()` |
 

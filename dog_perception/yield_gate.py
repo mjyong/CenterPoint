@@ -54,13 +54,23 @@ class YieldConfig:
     turn_range: float = 25.0        # [m] a moving vehicle this close to the path may also turn left / right (0: off)
     turn_radius: float = 10.0       # [m] of those turns, at the vehicle's speed ...
     turn_max_deg: float = 90.0      # ... up to this much, then straight on
+    # what makes a moving vehicle a conflict (2026-11-12):
+    #   "gap"  the robot and the vehicle pass every point of the path at least pet apart, over the whole crossing;
+    #   "stop" on a crosswalk vehicles must give way (people: a vehicle that hits the robot there is fully
+    #          liable), so the robot only waits for a vehicle that could not stop before the corridor: it reaches it
+    #          sooner than reaction_time + v / (2 brake_decel) + stop_margin. The real crosswalks are 9-32 m long;
+    #          "gap" would need 100-190 m of sight at 30 km/h, "stop" about 42 m
+    yield_rule: str = "gap"
+    reaction_time: float = 1.5      # [s] stop rule: the driver's
+    brake_decel: float = 3.0        # [m/s^2] stop rule: comfortable braking
+    stop_margin: float = 1.0        # [s] stop rule: to spare
 
 
 @dataclass
 class Assessment:
     now: float
     stale: bool
-    conflicts: list = field(default_factory=list)   # dicts: id, gap [s] (nan: young), s [m], kind
+    conflicts: list = field(default_factory=list)   # dicts: id, gap [s] (nan: young; stop rule: slack), s [m], kind
                                                     # (predicted / turn / young)
     standing: list = field(default_factory=list)    # dicts: id, standing_for [s] or None, blocking (body on the path)
     approaching: set = field(default_factory=set)   # ids of moving vehicles heading towards the path
@@ -257,10 +267,16 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
                 modes += turn_modes(obj, now, stamp, cfg, horizon, modes[0][2])
                 kinds += ["turn", "turn"]
             worst = (np.inf, None, None)
+            speed = float(np.hypot(*np.asarray(obj["velocity"], dtype=float)[:2]))
+            need = cfg.reaction_time + speed / (2.0 * cfg.brake_decel) + cfg.stop_margin
             for (centers, head, sigma), kind in zip(modes, kinds):
                 grow = cfg.vehicle_margin + cfg.sigma_k * sigma + corridor
                 first, last = occupancy(pts, centers, head, hl0 + grow, hw0 + grow, tau)
-                g = gaps(first, last, d_in, d_out)
+                if cfg.yield_rule == "stop":
+                    # slack [s] before the vehicle could no longer stop short of the corridor (negative: a conflict)
+                    g = np.where(np.isnan(first), np.inf, first) - need
+                else:
+                    g = gaps(first, last, d_in, d_out)
                 j = int(np.argmin(g))
                 if g[j] < worst[0]:
                     worst = (float(g[j]), float(s[j]), kind)
@@ -269,7 +285,7 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
                                              np.full(len(tau), hw0 + 0.5 * cfg.dog_width), tau)
                     a.in_lane = bool(np.any(~np.isnan(raw_first)))
             a.min_gap = min(a.min_gap, worst[0])
-            if worst[0] < cfg.pet:
+            if worst[0] < (0.0 if cfg.yield_rule == "stop" else cfg.pet):
                 a.conflicts.append(dict(id=oid, gap=worst[0], s=worst[1], kind=worst[2]))
                 conflicted = True
             r = pts[int(np.argmin(dist))] - p
@@ -360,3 +376,10 @@ def required_sight_range(crossing_length, v_vehicle, latency, cfg=YieldConfig())
     conflict point is the far end of the crossing."""
     t_out = (crossing_length + 0.5 * cfg.dog_length) / cfg.dog_speed
     return crossing_length + v_vehicle * (t_out + cfg.pet + latency)
+
+
+def required_sight_range_stop(v_vehicle, latency, cfg=YieldConfig()):
+    """[m] stop rule: how far from the corridor a vehicle at ``v_vehicle`` [m/s] must be seen so that it can still
+    stop for the robot (reaction, braking, margin and perception ``latency`` [s])."""
+    return v_vehicle * (cfg.reaction_time + v_vehicle / (2.0 * cfg.brake_decel) + cfg.stop_margin + latency)
+

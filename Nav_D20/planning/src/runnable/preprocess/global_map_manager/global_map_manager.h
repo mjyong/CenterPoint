@@ -42,6 +42,10 @@ public:
   std::vector<Pose2d> ExtractLocalPath(const Eigen::Vector2d &robot_pos,
                                        double ahead_s) const;
 
+  // crosswalk polygons of the loaded map's OSM (map frame); they do not change the obstacle layers.
+  // The yield gate checks vehicles where the global path crosses one (docs/PLANNING_INTEGRATION.md)
+  const std::vector<std::vector<Eigen::Vector2d>> &crosswalks() const { return crosswalks_; }
+
 private:
   bool LoadPGMMap(const std::string &pgm_file_path,
                   const std::string &yaml_file_path);
@@ -63,6 +67,7 @@ private:
   bool global_plan_flag_{false};
 
   lanelet::osm::OsmParser osm_parser_;
+  std::vector<std::vector<Eigen::Vector2d>> crosswalks_;
 };
 
 } // namespace preprocess

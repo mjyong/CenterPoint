@@ -1,5 +1,9 @@
 #include "src/runnable/preprocess/cost_map_production/cost_map_production.h"
 #include "src/common/util/config_helper.h"
+#include <opencv2/core/version.hpp>
+#if CV_VERSION_MAJOR >= 5
+#include <opencv2/geometry/2d.hpp>   // OpenCV 5 moved the 2D geometry functions here (the server's build env)
+#endif
 #include "src/common/util/math.h"
 #include "src/common/util/time_keeper.h"
 #include "src/runnable/entry/planning_entry.h"

@@ -78,6 +78,19 @@ bool RosDebugBridge::Init(PlanningEntry *planning_entry) {
 
 bool RosDebugBridge::Proc() { return true; }
 
+builtin_interfaces::msg::Time RosDebugBridge::DebugStamp() const {
+  const auto *odometry =
+      planning_entry_->communication_entry_ptr()->MainBridge()->odometry();
+  if (odometry == nullptr || odometry->timestamp <= 0.0) {
+    return node_->now();
+  }
+  const int64_t ns = static_cast<int64_t>(odometry->timestamp * 1e9);
+  builtin_interfaces::msg::Time stamp;
+  stamp.sec = static_cast<int32_t>(ns / 1000000000);
+  stamp.nanosec = static_cast<uint32_t>(ns % 1000000000);
+  return stamp;
+}
+
 bool RosDebugBridge::Publish() {
   rclcpp::spin_some(node_);
   std_msgs::msg::String debug_string;
@@ -117,6 +130,9 @@ bool RosDebugBridge::Publish() {
            ->cost_map_production()
            ->GridMap(),
       "obstacle", 0.0, 1.0, occmap_msg);
+  // the grid map is stamped with the wall clock; its base_link pose on /tf has the odometry's stamp
+  const auto debug_stamp = DebugStamp();
+  occmap_msg.header.stamp = debug_stamp;
   RosbagRecorder::Instance()->add(occmap_msg,
                                   "/planning/debug/cost_map_production/occmap",
                                   "nav_msgs/msg/OccupancyGrid");
@@ -175,7 +191,9 @@ bool RosDebugBridge::Publish() {
   tf2_msg.transforms = tf_msg;
   RosbagRecorder::Instance()->add(tf2_msg, "/tf", "tf2_msgs/msg/TFMessage");
   PathTrackingDebug();
-  goal_pose_pub_->publish(goal_pose_marker_);
+  if (!goal_pose_marker_.header.frame_id.empty()) {   // none before the first /goal_pose (an empty frame_id)
+    goal_pose_pub_->publish(goal_pose_marker_);
+  }
   TEBDebug();
   FollowingDebug();
 
@@ -183,6 +201,7 @@ bool RosDebugBridge::Publish() {
       planning_entry_->preprocess_entry_ptr()->collision_checker();
   if (collision_checker) {
     visualization_msgs::msg::MarkerArray marker_array;
+    VisualizationUtil::appendDeleteAll(&marker_array);
     for (size_t i = 0; i < collision_checker->contacts().size(); i++) {
       geometry_msgs::msg::Pose pose;
       pose.position.x = collision_checker->contacts()[i].x();
@@ -229,6 +248,8 @@ void RosDebugBridge::PathTrackingDebug() {
   auto mission_tracking =
       dynamic_cast<planning::mission::Tracking *>(mission_base_tracking);
   visualization_msgs::msg::MarkerArray marker_array;
+  // the footprints vary in number: clear the previous ones instead of waiting for their lifetime
+  VisualizationUtil::appendDeleteAll(&marker_array);
   int32_t marker_id = 1;
   auto global_path_2d = mission_tracking->global_path_2d();
   auto global_path_marker = VisualizationUtil::createLineStripMarker(
@@ -338,6 +359,7 @@ void RosDebugBridge::TEBDebug() {
 
   auto teb_planner = mission_tracking->teb_planner();
   visualization_msgs::msg::MarkerArray marker_array;
+  VisualizationUtil::appendDeleteAll(&marker_array);
   int32_t marker_id = 1;
 
   auto odometry =

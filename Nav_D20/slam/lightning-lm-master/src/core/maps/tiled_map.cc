@@ -7,6 +7,10 @@
 
 #include <pcl/io/pcd_io.h>
 #include <opencv2/opencv.hpp>
+#include <opencv2/core/version.hpp>
+#if CV_VERSION_MAJOR >= 5
+#include <opencv2/geometry/2d.hpp>   // OpenCV 5 moved the 2D geometry functions here (the server's build env)
+#endif
 
 namespace lightning {
 

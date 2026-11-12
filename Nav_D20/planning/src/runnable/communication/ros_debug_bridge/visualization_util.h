@@ -27,8 +27,11 @@ using std_msgs::msg::ColorRGBA;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
 
+// Seconds a marker stays up after it was received. It was 0.05, one 20 Hz cycle, so in Foxglove playback the
+// markers blinked and a paused frame mostly had none. Arrays whose marker count varies start with a DELETEALL
+// (appendDeleteAll); this is the fallback when planning stops publishing (2026-11-09).
 #ifndef LIFE_TIME
-#define LIFE_TIME 0.05
+#define LIFE_TIME 0.5
 #endif
 
 class VisualizationUtil {
@@ -171,6 +174,13 @@ public:
     marker.color = color;
     marker.frame_locked = true;
     return marker;
+  }
+
+  // A DELETEALL first in the array: RViz and Foxglove drop the topic's earlier markers, then add the rest.
+  static void appendDeleteAll(MarkerArray *marker_array) {
+    Marker marker;
+    marker.action = Marker::DELETEALL;
+    marker_array->markers.push_back(marker);
   }
 
   static void appendMarkerArray(const MarkerArray &additional_marker_array,

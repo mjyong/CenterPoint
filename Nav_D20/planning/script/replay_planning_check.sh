@@ -6,6 +6,7 @@
 #   例：LOC_MAP_PATH=data/loc_maps/ad68517c-... bash Nav_D20/planning/script/replay_planning_check.sh t47_map 80.0 126.9
 #
 # 环境变量同 run_planning_stack_debug.sh：LOC_MAP_PATH、LOC_INS_ONLY；ROS_DOMAIN_ID 默认 42（会发 /cmd_vel，不要用狗的域）。
+# MAP_SWITCH=<地图目录>（有 global_map.yaml 的）：发目标之前先发 /map/switch，规划换成这张图，读它的 semantic.osm。
 # 输出在 work_dirs/planning_io_<名字>/：录包（mcap）、logs/（各进程日志、规划的 glog）、report.txt（查包和关键行）。
 set -euo pipefail
 
@@ -48,6 +49,10 @@ sent=0
 for _ in $(seq 1 60); do
   if ros2 service list 2>/dev/null | grep -q '^/planning/debug/set_pub_flag$'; then
     ros2 service call /planning/debug/set_pub_flag std_srvs/srv/SetBool "{data: true}" > /dev/null 2>&1 || true
+    if [[ -n "${MAP_SWITCH:-}" ]]; then
+      timeout 30 ros2 topic pub --once -w 1 /map/switch std_msgs/msg/String "{data: '${MAP_SWITCH}'}" > /dev/null 2>&1 || true
+      sleep 3
+    fi
     timeout 30 ros2 topic pub --once -w 2 /goal_pose geometry_msgs/msg/PoseStamped \
       "{header: {frame_id: map}, pose: {position: {x: ${goal_x}, y: ${goal_y}, z: 0.0}, orientation: {w: 1.0}}}" \
       > /dev/null 2>&1 && sent=1
@@ -74,9 +79,15 @@ for f in /tmp/planning.*.log.INFO.*; do
 done
 [[ -n "${plan_log}" ]] && cp "${plan_log}" "${out}/logs/planning.INFO"
 
+# 查包要 numpy、mcap、rosbags：micromamba 的 python3 没有 mcap（T47），优先用仓库的 .venv，或者 PYTHON=<解释器>
+py="${PYTHON:-}"
+if [[ -z "${py}" ]]; then
+  py=python3
+  [[ -x "${repo_root}/.venv/bin/python" ]] && py="${repo_root}/.venv/bin/python"
+fi
 {
-  echo "== ${name}: 目标 (${goal_x}, ${goal_y}) $([[ ${sent} -eq 1 ]] && echo 已发 || echo 没发出去)；LOC_MAP_PATH=${LOC_MAP_PATH:-} LOC_INS_ONLY=${LOC_INS_ONLY:-0}"
-  python3 "${nav_root}/planning/tools/check_planning_mcap.py" "${out}" \
+  echo "== ${name}: 目标 (${goal_x}, ${goal_y}) $([[ ${sent} -eq 1 ]] && echo 已发 || echo 没发出去)；LOC_MAP_PATH=${LOC_MAP_PATH:-} LOC_INS_ONLY=${LOC_INS_ONLY:-0} MAP_SWITCH=${MAP_SWITCH:-}"
+  "${py}" "${nav_root}/planning/tools/check_planning_mcap.py" "${out}" \
     --layout "${nav_root}/planning/script/planning_io.json" || true
   if [[ -f "${out}/logs/planning.INFO" ]]; then
     p="${out}/logs/planning.INFO"
@@ -84,7 +95,7 @@ done
     echo "CMD: $(grep -c 'CMD: ' "${p}" || true) 次；头两条："
     grep -m 2 'CMD: ' "${p}" | sed 's/^/  /' || true
     for k in "Start adjusted" "Goal adjusted" "Start point is in collision" "Initial pose is in collision" \
-             "No free point found near start"; do
+             "No free point found near start" "Map switch" "crosswalks in" "OSM file not exist" "Failed to parse OSM"; do
       echo "${k}: $(grep -c "${k}" "${p}" || true)"
     done
   else

@@ -265,6 +265,13 @@ bool GlobalMapManager::ReloadMap(const std::string &map_dir) {
       map_osm_file =
           (std::filesystem::path(map_yaml_file).parent_path() / "map.osm")
               .string();
+      // the site maps of 2026-11 (ad68517c, a70c6db6) name it semantic.osm
+      const auto semantic_osm =
+          std::filesystem::path(map_yaml_file).parent_path() / "semantic.osm";
+      if (!std::filesystem::exists(map_osm_file) &&
+          std::filesystem::exists(semantic_osm)) {
+        map_osm_file = semantic_osm.string();
+      }
     }
   }
   // Load PGM map
@@ -342,6 +349,7 @@ bool GlobalMapManager::AddObstacleFromOSM(const std::string &osm_file_path) {
 }
 #else
 bool GlobalMapManager::AddObstacleFromOSM(const std::string &osm_file_path) {
+  crosswalks_.clear();
   if (!std::filesystem::exists(osm_file_path)) {
     AERROR << "OSM file not exist: " << osm_file_path;
     return false;
@@ -350,6 +358,18 @@ bool GlobalMapManager::AddObstacleFromOSM(const std::string &osm_file_path) {
     AERROR << "Failed to parse OSM file: " << osm_file_path;
     return false;
   }
+  for (const auto &semantic : osm_parser_.getMap().keyPoints) {
+    if (semantic.type == lanelet::SemanticType::Crosswalk &&
+        semantic.points.size() >= 3) {
+      std::vector<Eigen::Vector2d> polygon;
+      for (const auto &point : semantic.points) {
+        polygon.emplace_back(point.x, point.y);
+      }
+      crosswalks_.push_back(std::move(polygon));
+    }
+  }
+  AINFO << "GlobalMapManager: " << crosswalks_.size() << " crosswalks in "
+        << osm_file_path;
   bool has_fence = std::any_of(
       osm_parser_.getMap().keyPoints.begin(),
       osm_parser_.getMap().keyPoints.end(), [](const auto &semantic) {

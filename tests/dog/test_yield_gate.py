@@ -295,3 +295,47 @@ def test_crosswalk_span_along_the_path():
     s_in, s_out = crosswalk_span(np.array([[0.0, 0.0], [0.0, 12.0]]), zebra)
     assert s_in == pytest.approx(2.0, abs=0.11) and s_out == pytest.approx(9.0, abs=0.11)
     assert crosswalk_span(np.array([[5.0, 0.0], [5.0, 12.0]]), zebra) is None
+
+
+def test_the_stop_rule_waits_only_for_vehicles_that_could_not_stop():
+    # 30 km/h, reaction 1.5 s + braking 1.4 s + 1 s: a vehicle 40 m off can stop, 25 m off cannot
+    stop = YieldConfig(yield_rule="stop")
+    far = car(-40.0, 4.0, KMH30)
+    assert assess(PATH, [far], 0.0, 0.0).conflicts                       # the gap rule waits: it arrives in 4.4 s
+    a = assess(PATH, [far], 0.0, 0.0, stop)
+    assert a.conflicts == [] and a.min_gap == pytest.approx((40.0 - 3.45) / KMH30 - (1.5 + KMH30 / 6.0 + 1.0), abs=0.15)
+    near = assess(PATH, [car(-25.0, 4.0, KMH30)], 0.0, 0.0, stop)
+    assert near.conflicts and near.conflicts[0]["gap"] < 0
+    assert assess(PATH, [car(10.0, 4.0, KMH30)], 0.0, 0.0, stop).conflicts == []      # gone past
+
+
+def test_required_sight_range_for_the_stop_rule():
+    from dog_perception.yield_gate import required_sight_range_stop
+    assert required_sight_range_stop(KMH30, 1.1) == pytest.approx(KMH30 * (1.5 + KMH30 / 6.0 + 1.0 + 1.1))
+    assert 41.0 < required_sight_range_stop(KMH30, 1.1) < 42.5
+
+
+def test_read_crosswalks_from_the_site_maps_semantic_layer(tmp_path):
+    """dog_perception/semantic_map.py reads semantic.osm as the robot team exports it (multipolygon relations,
+    subtype crosswalk, one outer closed way of local_x / local_y nodes); other relations are left out."""
+    from dog_perception.semantic_map import crosswalk_size, read_crosswalks
+
+    def node(i, x, y):
+        return '<node id="%d" lat="" lon=""><tag k="local_x" v="%s"/><tag k="local_y" v="%s"/>' \
+               '<tag k="ele" v="-0.2"/></node>' % (i, x, y)
+    osm = ('<?xml version="1.0" encoding="UTF-8"?><osm generator="VMB">'
+           + node(1, 0, 0) + node(2, 12, 0) + node(4, 12, 5) + node(5, 0, 5) + node(7, 50, 50) + node(8, 51, 50)
+           + node(9, 51, 51)
+           + '<way id="3"><nd ref="1"/><nd ref="2"/><nd ref="4"/><nd ref="5"/><nd ref="1"/>'
+             '<tag k="type" v="line_thin"/><tag k="subtype" v="solid"/></way>'
+           + '<way id="6"><nd ref="7"/><nd ref="8"/><nd ref="9"/><nd ref="7"/></way>'
+           + '<relation id="10"><member type="way" role="outer" ref="3"/><tag k="type" v="multipolygon"/>'
+             '<tag k="subtype" v="crosswalk"/></relation>'
+           + '<relation id="11"><member type="way" role="outer" ref="6"/><tag k="type" v="multipolygon"/>'
+             '<tag k="subtype" v="prohibited_area"/></relation></osm>')
+    (tmp_path / "semantic.osm").write_text(osm)
+    cws = read_crosswalks(str(tmp_path / "semantic.osm"))
+    assert [c for c, _ in cws] == ["10"] and cws[0][1].shape == (4, 2)
+    assert crosswalk_size(cws[0][1]) == pytest.approx((12.0, 5.0))
+    span = crosswalk_span(np.array([[6.0, -3.0], [6.0, 10.0]]), cws[0][1])      # across it, 5 m of stripes
+    assert span == pytest.approx((3.0, 8.0), abs=0.11)

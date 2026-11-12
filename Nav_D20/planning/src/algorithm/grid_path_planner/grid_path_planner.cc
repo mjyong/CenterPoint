@@ -9,6 +9,10 @@
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core/version.hpp>
+#if CV_VERSION_MAJOR >= 5
+#include <opencv2/geometry/2d.hpp>   // OpenCV 5 moved the 2D geometry functions here (the server's build env)
+#endif
 #include <yaml-cpp/yaml.h>
 
 #include "src/algorithm/grid_path_planner/eigen2cv.hpp"

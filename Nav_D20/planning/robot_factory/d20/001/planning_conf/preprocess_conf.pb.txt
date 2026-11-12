@@ -7,6 +7,8 @@ confs{
         enable_overlay: false
         cell_timeout_seconds: 1.0
         grid_path_planner_conf{
+            allow_collision_start: true
+            collision_start_search_radius: 1.0
             planner_type: A_STAR
             input_type: PGM_MAP
             input_dir: "/../../data/astar_pgm/"
