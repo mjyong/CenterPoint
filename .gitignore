@@ -31,6 +31,7 @@ venv/
 data/labels/**/*.mcap
 !data/examples/**/*.pkl
 *.zip
+!Nav_D20/map/*.zip
 *.bin
 .vscode/
 # vendored SUSTechPOINTS: keep its sources; scenes exported into its data/ stay local (its own .gitignore)
