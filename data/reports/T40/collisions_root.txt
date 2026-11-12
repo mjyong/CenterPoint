@@ -1,0 +1,227 @@
+==== /perception/lidar_3d/objects ====
+Type: perception_interface/msg/LidarObjectArray
+
+Publisher count: 1
+
+Node name: _NODE_NAME_UNKNOWN_
+Node namespace: _NODE_NAMESPACE_UNKNOWN_
+Topic type: perception_interface/msg/LidarObjectArray
+Endpoint type: PUBLISHER
+GID: 01.10.3b.1f.a9.2d.5f.59.f3.c9.b5.61.00.00.18.03.00.00.00.00.00.00.00.00
+QoS profile:
+  Reliability: RELIABLE
+  History (Depth): KEEP_LAST (5)
+  Durability: VOLATILE
+  Lifespan: Infinite
+  Deadline: Infinite
+  Liveliness: AUTOMATIC
+  Liveliness lease duration: Infinite
+
+Subscription count: 0
+
+==== /perception/lidar_3d/tracks ====
+Type: visualization_msgs/msg/MarkerArray
+
+Publisher count: 1
+
+Node name: _NODE_NAME_UNKNOWN_
+Node namespace: _NODE_NAMESPACE_UNKNOWN_
+Topic type: visualization_msgs/msg/MarkerArray
+Endpoint type: PUBLISHER
+GID: 01.10.3b.1f.a9.2d.5f.59.f3.c9.b5.61.00.00.19.03.00.00.00.00.00.00.00.00
+QoS profile:
+  Reliability: RELIABLE
+  History (Depth): KEEP_LAST (5)
+  Durability: VOLATILE
+  Lifespan: Infinite
+  Deadline: Infinite
+  Liveliness: AUTOMATIC
+  Liveliness lease duration: Infinite
+
+Subscription count: 0
+
+==== /perception/lidar_3d/predictions ====
+Type: visualization_msgs/msg/MarkerArray
+
+Publisher count: 1
+
+Node name: _NODE_NAME_UNKNOWN_
+Node namespace: _NODE_NAMESPACE_UNKNOWN_
+Topic type: visualization_msgs/msg/MarkerArray
+Endpoint type: PUBLISHER
+GID: 01.10.3b.1f.a9.2d.5f.59.f3.c9.b5.61.00.00.1a.03.00.00.00.00.00.00.00.00
+QoS profile:
+  Reliability: RELIABLE
+  History (Depth): KEEP_LAST (5)
+  Durability: VOLATILE
+  Lifespan: Infinite
+  Deadline: Infinite
+  Liveliness: AUTOMATIC
+  Liveliness lease duration: Infinite
+
+Subscription count: 0
+
+==== TF_STATIC ====
+==== TF ====
+transforms:
+- header:
+    stamp:
+      sec: 1794476730
+      nanosec: 523679488
+    frame_id: map
+  child_frame_id: ptz_infrared
+  transform:
+    translation:
+      x: 56.936053131344195
+      y: -44.13142062025166
+      z: 3.6405648378607856
+    rotation:
+      x: 0.021752901987235423
+      y: 0.04107546440852146
+      z: -0.26025795911129834
+      w: 0.9644197282293534
+- header:
+    stamp:
+      sec: 1794476730
+      nanosec: 523679488
+    frame_id: ptz_infrared
+  child_frame_id: map
+  transform:
+    translation:
+      x: -70.77616139605884
+      y: 9.352922158904422
+      z: -10.286300093036179
+    rotation:
+      x: -0.021752901987235358
+      y: -0.04107546440852147
+      z: 0.26025795911129834
+      w: 0.9644197282293533
+- header:
+    stamp:
+      sec: 1794476730
+      nanosec: 523679488
+    frame_id: ptz_visible
+  child_frame_id: map
+  transform:
+    translation:
+      x: -70.78712373101921
+      y: 9.137120242329125
+      z: -10.286296266459335
+    rotation:
+      x: -0.021752901987235358
+      y: -0.04107546440852147
+      z: 0.26025795911129834
+      w: 0.9644197282293533
+- header:
+    stamp:
+      sec: 1794476730
+      nanosec: 523679488
+    frame_id: ptz_infrared
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.2583388520636408
+      y: 0.10875493411736385
+      z: -0.34621284382525175
+    rotation:
+      x: 1.5230870247432678e-08
+      y: 0.00017453291974764987
+      z: 8.726645920914302e-05
+      w: 0.9999999809614121
+- header:
+    stamp:
+      sec: 1794476730
+      nanosec: 523679488
+    frame_id: map
+  child_frame_id: ptz_visible
+  transform:
+    translation:
+      x: 57.05421046793233
+      y: -43.95054049042614
+      z: 3.6440090278528547
+    rotation:
+      x: 0.021752901987235423
+      y: 0.04107546440852146
+      z: -0.26025795911129834
+      w: 0.9644197282293534
+- header:
+    stamp:
+      sec: 1794476730
+      nanosec: 523679488
+    frame_id: base_link
+  child_frame_id: ptz_infrared
+  transform:
+    translation:
+      x: 0.258199
+      y: -0.1088
+      z: 0.34630299999999997
+    rotation:
+      x: -1.5230870189925626e-08
+      y: -0.00017453291974764372
+      z: -8.726645920914302e-05
+      w: 0.9999999809614121
+- header:
+    stamp:
+      sec: 1794476730
+      nanosec: 523679488
+    frame_id: base_link
+  child_frame_id: ptz_visible
+  transform:
+    translation:
+      x: 0.26919899999999997
+      y: 0.107
+      z: 0.34630299999999997
+    rotation:
+      x: -1.5230870189925626e-08
+      y: -0.00017453291974764372
+      z: -8.726645920914302e-05
+      w: 0.9999999809614121
+- header:
+    stamp:
+      sec: 1794476730
+      nanosec: 523679488
+    frame_id: ptz_visible
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.2693011870240127
+      y: -0.10704698245793888
+      z: -0.3462090172484065
+    rotation:
+      x: 1.5230870247432678e-08
+      y: 0.00017453291974764987
+      z: 8.726645920914302e-05
+      w: 0.9999999809614121
+- header:
+    stamp:
+      sec: 1794474985
+      nanosec: 471197696
+    frame_id: base_link
+  child_frame_id: map
+  transform:
+    translation:
+      x: -70.51273401744592
+      y: 9.256474159165517
+      z: -9.96470200627073
+    rotation:
+      x: -0.021801924353873008
+      y: -0.041241884354843654
+      z: 0.2601699966895986
+      w: 0.9644352523066875
+- header:
+    stamp:
+      sec: 1794474985
+      nanosec: 471197696
+    frame_id: map
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: 56.74486197022351
+      y: -43.88634957136086
+      z: 3.3214785606333166
+    rotation:
+      x: 0.021801924353872983
+      y: 0.0412418843548437
+      z: -0.2601699966895986
+      w: 0.9644352523066875
+---

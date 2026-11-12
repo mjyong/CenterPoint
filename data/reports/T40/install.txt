@@ -1,0 +1,14 @@
+deb: /home/nvidia/dogperc/deb/lidar-3d-detection_0.1.0+360.g3d6b0d5_arm64.deb
+dpkg: unpacked 0.1.0+360.g3d6b0d5 over 0.1.0+316.gdbde7ed
+Version: 0.1.0+360.g3d6b0d5
+enabled
+active
+ExecStartPre: /opt/seres/perception/lidar_3d_detection/bin/lock_clocks.sh
+settings: LIDAR3D_THREADS=4, LIDAR3D_LOCK_CLOCKS=1
+
+diff /etc/default/lidar-3d-detection.T40-before /etc/default/lidar-3d-detection:
+9a10,13
+> # lock the Orin's clocks (jetson_clocks) when the service starts: 1 on, 0 off. Unlocked the node is 2-3x slower
+> # (T32, T34), but it sets CPU / GPU / memory of the whole machine to maximum (power, heat): the robot team decides.
+> # Back to 0 takes effect at the next reboot.
+> LIDAR3D_LOCK_CLOCKS=1

@@ -1,0 +1,4 @@
+Nov 12 17:41:09 tegra-ubuntu lock_clocks.sh[10910]: lock_clocks.sh: clocks locked (/usr/bin/jetson_clocks)
+Nov 12 17:41:23 tegra-ubuntu lock_clocks.sh[11135]: lock_clocks.sh: clocks locked (/usr/bin/jetson_clocks)
+clocks locked: cpu0 2201600 / 2201600 / 2201600 kHz, gpu 1300500000 / 1300500000 / 1300500000 Hz (min / max / current), power mode MAXN
+active

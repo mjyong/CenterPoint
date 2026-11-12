@@ -7724,17 +7724,17 @@ pytest tests/dog/test_deploy.py -q -k "lock_clocks or orin_clocks" | tail -1    
 - 2：装之前 / 之后的版本，settings 一行，diff，ExecStartPre，开关关着时 orin_clocks.sh 前后两行；
 - 3、4：照 T35 的报告要求；B1 打开开关后 journal 里那一行和 orin_clocks.sh 的结果，B4 恢复后的结果；
 - 结论：8 号狗能不能交给规划用；开机锁频建议开不开（锁 / 不锁时的延迟和负载，T34 是 37 / 59 ms，p99 68 / 99 ms）。
+```
 
 ### T40 结果
 
-2026-11-12，做到第 2 步打包。安装和 T35 A 停在隧道断开。
+2026-11-12。包已装上，锁频开着。室内 A 做完。室外段未做。
 
 - 1：`dog_veh_1026_1410` 37G。`/public` 只读，`rm` 失败，目录还在。v1 `dog_veh_1023_1529` 也是 37G，留着。`data/dog_veh` 指向 v3 `dog_veh_1106_1811`。明细 `data/reports/T40/delete_v2.txt`。
-- 2：`pytest tests/dog/test_deploy.py -q -k "lock_clocks or orin_clocks"` 为 11 passed，19 deselected。装之前版本 `0.1.0+316.gdbde7ed`，enabled，active，clocks NOT locked，`/etc/default/lidar-3d-detection.T40-before` 备份成功（`before.txt`）。狗上已编出 `/home/nvidia/dogperc/deb/lidar-3d-detection_0.1.0+360.g3d6b0d5_arm64.deb`，settings 一行含 `LIDAR3D_LOCK_CLOCKS=1`（`pack_deb.txt`）。`dpkg -i` 没跑成：编完后 `ssh dog` 先是 banner exchange 超时，随后 `127.0.0.1:5038` Connection refused。diff、ExecStartPre、开关打开后的 journal 都还没有。
-- 3：T35 A 未做。
-- 4：室外段未做。隧道恢复后先装这个 deb，再做室内 A。室外段等人说狗在室外。
-- 结论：锁频后的 8 号狗这次还没交到规划。开机锁频开不开，要等开关打开、A 段负载出来再写。
-```
+- 2：装之前 `0.1.0+316.gdbde7ed`，enabled，active，clocks NOT locked，备份 `before.txt`。装之后 `0.1.0+360.g3d6b0d5`，enabled，active。diff 只多了 `LIDAR3D_LOCK_CLOCKS=1` 和上面三行注释（`install.txt`）。`ExecStartPre` 是 `lock_clocks.sh`。重启后 journal 有 `lock_clocks.sh: clocks locked`，`orin_clocks.sh` 打印 clocks locked（`switch_on.txt`）。
+- 3：A1（`collisions_root.txt`）三个检测话题各 1 个发布者，节点名仍是 `_NODE_NAME_UNKNOWN_`，订阅者 0。`/tf` 里是 `map`、`base_link`、`ptz_visible`、`ptz_infrared` 和它们的逆，没有 `camera_init`、`lidar_det`。A2：不限话题的 root 桥因 iceoryx 发布者表满而退出；只订三个话题的 root 桥 10 秒收到原始点云 100 条，objects 和 tracks 为 0（室内没有固定解）。桥已停，检测服务仍 active（`foxglove_probe.txt`）。A3（`load.txt`）：开机 28 分钟，不到任务写的一小时。load average 29.19 / 30.55 / 25.82。CPU 最高是 `mode_switch` 517%，`lidar_3d` 约 26%。GR3D_FREQ 0–44%。
+- 4：室外段未做。锁频保持开着，不改回 0。
+- 结论：室内这段检测服务在跑、锁频已开、点云能以约 10 Hz 进 root 桥。能不能交给规划，等室外固定解下的框和延迟。
 
 ---
 
@@ -8298,7 +8298,7 @@ EOF
 
 ### T46 结果
 
-2026-11-12。第 1、2、4 步做完。第 3 步停在装 deb。第 5 步未开始。
+2026-11-12。第 1、2、3、4 步做完。第 5 步等狗到室外。
 
 - 第 1 步：外参是 D20 A2。fasterlio `extrinsic_T [-0.0213, 0.18, 0.009]`，imu2body `[0.13898, 0.02129, 0.134]`。定位进程是 `mode_switch_node`。`data/reports/T46/dog_extrinsic.txt`。
 - 第 4 步：`pytest tests/dog/test_yield_gate.py` 21 passed。三次退出码都是 1（有不安全放行）。`runs.txt`：v2 104 s，base 117 s，blocked3 118 s。
@@ -8306,6 +8306,6 @@ EOF
   - base（blocked_wait 15 s）all：episodes 3966，unknown 3106，unsafe 204，risky 314，timeouts 0，wait 0.0 / 3.2 / 15.1，extra 0.0 / 2.9 / 15.1。Why unsafe all：204 = blind 195，far 1，near 0，occluded 0，detection 5，prediction 3。
   - v2（狗 2 m/s）all：episodes 5025，unknown 2047，unsafe 128，risky 209，timeouts 0，wait 0.0 / 3.3 / 13.8，extra 0.0 / 2.9 / 13.8。Why unsafe all：128 = blind 103，far 0，near 0，occluded 0，detection 21，prediction 4。
   - `1104_cp04_s007` 原来 6 次不安全，base 里还剩 3 次，都是 go=0：fan000 arrive 3.05，cause detection（first_dt −2.90，range 5.07，bearing 63.28）；fan000 arrive 9.05，cause prediction（first_dt −8.90）；fan045 arrive 3.05，cause detection（first_dt −2.90）。另外 3 次没了。timeouts 为 0，没有 go>25。
-- 做到哪了：第 3 步的 deb 已经在狗上（`0.1.0+360.g3d6b0d5`，`LIDAR3D_LOCK_CLOCKS=1`），`dpkg -i` 没跑成，因为 `ssh dog` 断了（5038 Connection refused）。室内 A 和室外 B 都还没做。室外段要等聊天里说狗在室外；锁频开关还没打开，室外段排在安装和室内 A 之后。
+- 做到哪了：第 3 步已装上 `0.1.0+360.g3d6b0d5`，`LIDAR3D_LOCK_CLOCKS=1`，journal 有 `lock_clocks.sh: clocks locked`。室内 A 已做，明细在 T40 结果。第 5 步等聊天里说狗在室外。锁频保持开着。
 
 

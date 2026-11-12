@@ -1,0 +1,7 @@
+不带话题白名单的 root 桥在发现整张服务图时退出：ICEORYX POSH__RUNTIME_ROUDI_PUBLISHER_LIST_FULL，随后 EXPECTS_ENSURES_FAILED。检测服务保持 active。
+
+第二次只订三个话题、关掉 service/param 能力，10 秒探针：
+/robot/topic/rdap/top_point_cloud2  100
+/perception/lidar_3d/objects         0  silent
+/perception/lidar_3d/tracks          0  silent
+桥已停。detection active。室内没有固定解，检测话题没有消息是预期。
