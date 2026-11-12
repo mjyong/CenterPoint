@@ -1,0 +1,96 @@
+{
+ "bag": "/public/zjst/robot/cp_data/1112_t40",
+ "duration_s": 167.65619707107544,
+ "topics": [
+  {
+   "topic": "/rte/rdap/rtk/inspvax",
+   "type": "kygi665_msgs/msg/INSPVAX",
+   "count": 16765
+  },
+  {
+   "topic": "/rte/rdap/rtk/imus/data_raw",
+   "type": "sensor_msgs/msg/Imu",
+   "count": 16766
+  },
+  {
+   "topic": "/robot/topic/rdap/top_point_cloud2",
+   "type": "sensor_msgs/msg/PointCloud2",
+   "count": 1676
+  },
+  {
+   "topic": "/robot/topic/rdap/right_sensor_camera",
+   "type": "foxglove_msgs/msg/CompressedVideo",
+   "count": 3954
+  },
+  {
+   "topic": "/robot/topic/rdap/front_sensor_camera",
+   "type": "foxglove_msgs/msg/CompressedVideo",
+   "count": 3954
+  },
+  {
+   "topic": "/robot/topic/rdap/rear_sensor_camera",
+   "type": "foxglove_msgs/msg/CompressedVideo",
+   "count": 3954
+  },
+  {
+   "topic": "/robot/topic/rdap/left_sensor_camera",
+   "type": "foxglove_msgs/msg/CompressedVideo",
+   "count": 3954
+  },
+  {
+   "topic": "/perception/lidar_3d/objects",
+   "type": "perception_interface/msg/LidarObjectArray",
+   "count": 1669
+  }
+ ],
+ "lidar": {
+  "frames": 1676,
+  "rate_hz": 10.000088308174737,
+  "max_gap_s": 0.10300397872924805,
+  "gaps_over_limit": 0,
+  "mean_msg_mb": 3.172103369719658
+ },
+ "imu": {
+  "msgs": 16766,
+  "rate_hz": 100.00096173277025,
+  "max_gap_s": 0.017189502716064453
+ },
+ "ins": {
+  "msgs": 16765,
+  "rate_hz": 100.00099236247289,
+  "good_share": 1.0,
+  "pos_type": {
+   "56": 16765
+  },
+  "path_m": 121.68226878754831
+ },
+ "log_minus_header": {
+  "/robot/topic/rdap/top_point_cloud2": {
+   "median_s": 0.10225570201873779,
+   "p5_s": 0.10103785991668701,
+   "p95_s": 0.10463953018188477
+  },
+  "/rte/rdap/rtk/imus/data_raw": {
+   "median_s": 0.0002551078796386719,
+   "p5_s": 0.00015783309936523438,
+   "p95_s": 0.0011826157569885254
+  },
+  "/rte/rdap/rtk/inspvax": {
+   "median_s": 0.00018525123596191406,
+   "p5_s": 0.00010037422180175781,
+   "p95_s": 0.0011038780212402344
+  }
+ },
+ "usable_s": 167.47127413749695,
+ "usable_intervals": [
+  [
+   0.017437219619750977,
+   167.4887113571167
+  ]
+ ],
+ "scenes": 6,
+ "scenes_kept": 5,
+ "train_s": 83.69999999999999,
+ "val_s": 55.8,
+ "val_path_within_10m_of_train": 0.916189111747851
+}

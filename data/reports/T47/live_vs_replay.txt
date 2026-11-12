@@ -1,0 +1,30 @@
+   4.3391426413837815,
+   1.9033336467005262,
+   1.5843830905589527
+  ],
+  "prediction_times": [
+   0.5,
+   1.0,
+   1.5,
+   2.0,
+   2.5,
+   3.0
+  ],
+  "paths": 1
+ },
+ "world_offset": {
+  "dx": 2.1100944715887984,
+  "dy": 0.8677429589975834,
+  "frames": 563,
+  "median_deviation": 0.0008954169657519207
+ },
+ "replay_frames": 1676,
+ "passes": 1,
+ "matched_frames": 1668,
+ "unmatched_messages": 1,
+ "missing_frames": 8,
+ "same_ids_frames": 811,
+ "same_tracks_frames": 1625,
+ "received_gap_max": 0.21120357513427734,
+ "passed": false
+}

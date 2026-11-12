@@ -8,6 +8,7 @@ data/*
 !data/examples/
 !data/labels/
 !data/reports/
+!data/reports/**/build.txt
 *.pyc
 venv/
 *.idea/
@@ -17,6 +18,8 @@ venv/
 !data/examples/**/metadata.yaml
 !work_dirs/planning_io_t41/**/metadata.yaml
 !work_dirs/planning_io_t42/**/metadata.yaml
+!work_dirs/planning_io_t47_map/**/metadata.yaml
+!work_dirs/planning_io_t47_ins/**/metadata.yaml
 *.sh
 !data/reports/**/*.sh
 *.pth

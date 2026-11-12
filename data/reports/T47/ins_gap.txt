@@ -1,0 +1,7 @@
+/rte/rdap/rtk/inspvax  16765 msgs, header span 167.638 s
+whole:    header gap max 0.0271 s, gaps > 0.05 s: 0, record-header max 0.0100 s, ins_status 3, pos_type 56
+120-160s: n 4000, header gap max 0.0271 s, gaps > 0.05 s: 0, record-header max 0.0098 s
+129-156s: n 2700, header gap max 0.0271 s, gaps > 0.05 s: 0, record-header max 0.0074 s
+survey: lidar max gap 0.103 s, imu max gap 0.017 s
+log-header median: lidar +0.102 s, imu +0.000 s, ins +0.000 s
+judgement: INS is continuous and on time in the bag. The 8 missing live frames are on the node side.

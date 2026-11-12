@@ -155,7 +155,7 @@
 | T44 | 路口让行门控：1104 上离线评测（8 条假想过路线，五组参数：默认、IMM 8 s、狗 2 m/s、σ 放宽、σ 收紧）；只读看 8 号狗的定位外参 | Agent | 无 | 1.5 小时 | 完成，已复核（2026-11-10）：默认 230 次不安全放行，216 次是车还在后方盲区或刚出来；调参数解决不了。门控加了刚出现的车、近处车拐弯两条，评测加了原因分类；外参没读到（狗不在线） |
 | T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 完成，已复核（2026-11-12）：新规则 230 → 207；盲区以外剩 12 次，6 次是停着的货车车头压在路线上、停 4 s 后开走，门控加了车身压在路线上要看满 15 s；狗当时不在线，第 1 步放进 T46 |
 | T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 完成，已复核（2026-11-12）：外参 A2；装包、锁频、室内外都做了；挡路车 15 s 后不安全 207 → 204 |
-| T47 | 规划回放第二次（起点挪到路上、bag 放完就收、新的回放脚本）；室外 bag 缺帧那一段的 INS；在线对离线扣掉原点差重比；狗在线时验 root 桥白名单 | Agent | T46 复核 | 1.5 小时 | 任务已写好 |
+| T47 | 规划回放第二次（起点挪到路上、bag 放完就收、新的回放脚本）；室外 bag 缺帧那一段的 INS；在线对离线扣掉原点差重比；狗在线时验 root 桥白名单 | Agent | T46 复核 | 1.5 小时 | 完成。两次回放都进了 active 并发出速度；缺帧那段 INS 在 bag 里没断；扣掉原点差后 same_tracks 1625；白名单桥 10 秒收到点云 99、objects 97 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8391,4 +8391,18 @@ T46 复核改了四处（都在仓库里）：规划的 `allow_collision_start`�
 - 编译最后几行；两份 report 的全文；
 - 第 3 步的判断和数；第 4 步的 world_offset、same_tracks_frames、passed；第 5 步的探针结果（或"狗不在线"）。
 ```
+
+### T47 结果
+
+2026-11-12。规划两次都进了 active，并发出了速度。室外缺帧那段 INS 在 bag 里是连续的。在线对离线扣掉原点差以后，same_tracks_frames 是 1625。
+
+- 第 0 步：`pytest tests/dog/test_planning_mcap.py tests/dog/test_deploy.py` 37 passed。
+- 第 1 步：增量重编 planning，2 分 23 秒完成。`Summary: 1 package finished`。装上的 D20 配置有 `allow_collision_start: true`。stderr 是原有的 Eigen 弃用警告。`data/reports/T47/build.txt`。
+- 第 2 步：目标都发出去了（`ros2 topic pub` 有 `-w`）。脚本里的 `python3` 是 micromamba 的，没有 `mcap`，查包改用仓库的 `.venv` 再跑了一遍，结果在 `check_map.txt`、`check_ins.txt`。
+  - 现场地图：`Start adjusted from 78.3096 119.394 to 77.9302 119.72`，挪了 0.50 m。`Start point is in collision` 0。mission_state：active 3218，passive 1，standby 1，standstill 24。`CMD:` 62 次，头两条 `0.177 0.025 0.014`、`0.614 0.098 0.006`。TEB 的 `Initial pose is in collision` 2026 次。查包：1 次跳变，最大 142.7 m，发生在 0.2 s（bag 的 170 s 以内）；足迹被占 1974/3280；录包里没有 `/goal_pose`。全文 `report_map.txt`。
+  - INS 直出：`Start adjusted` 0，`Start point is in collision` 0。mission_state：active 3222，passive 1，standby 1，standstill 37。`CMD:` 791 次，头两条 `0.024 0.027 0.018`、`0.084 0.095 0.064`。`Initial pose is in collision` 1364 次。查包没有跳变、没有超速；足迹被占 1985/3284；`/goal_pose` 1 条。全文 `report_ins.txt`。
+  - 两份录包都约 170 s，bag 放完脚本就退了。布局里的 `/fused_point_cloud` 本来就没录。
+- 第 3 步：INS 全程 `ins_status` 3、`pos_type` 56，16765 条。雷达最大间隔 0.103 s，IMU 0.017 s。log−header：雷达中位 +0.102 s，IMU 中位 +0.000 s，INS 中位 +0.000 s。120–160 s 和 129–156 s 里，INS header 间隔没有超过 0.05 s（最大 0.027 s），记录时间减 header 最大 0.0098 s。`survey.png` 这一段速度和航向在变，RTK 和雷达间隔没有断。判断：INS 没断，也没有来晚。缺的 8 帧是节点当时没拿到位姿，不在 bag 里的 INS。
+- 第 4 步：`world_offset` 是 replay−live，`dx` 2.110、`dy` 0.868（2.28 m），563 帧，中位偏差 0.0009 m。方向和 T40 手算的 `[-2.110, -0.868]` 相反，因为那边是 live−replay。`same_tracks_frames` 1625，`missing_frames` 8，`passed` false。
+- 第 5 步：README 里带白名单的 root 桥能起来。10 秒探针：原始点云 99，objects 97，tracks 96，`/tf` 200，调试点云 0（没开 `publish_cloud`）。桥已停，8765 已关，检测服务仍 active。`foxglove_probe.txt`。
 

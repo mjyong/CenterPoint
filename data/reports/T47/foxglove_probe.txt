@@ -1,0 +1,9 @@
+README 车上实车第 2 步的 root 桥（话题白名单 + capabilities connectionGraph）能起来。
+10 秒探针 ws://localhost:8765：
+/robot/topic/rdap/top_point_cloud2  99
+/perception/lidar_3d/objects         97
+/perception/lidar_3d/tracks          96
+/tf                                  200
+/perception/lidar_3d/cloud            0  silent（配置没开 publish_cloud）
+missing: 无
+桥已停，8765 关闭，lidar-3d-detection 仍 active。

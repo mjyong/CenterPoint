@@ -1,0 +1,36 @@
+== t47_map: 目标 (80.0, 126.9) 已发；LOC_MAP_PATH=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 LOC_INS_ONLY=0
+Traceback (most recent call last):
+  File "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/tools/check_planning_mcap.py", line 292, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/tools/check_planning_mcap.py", line 276, in main
+    topics, edges = read(args.bag)
+                    ~~~~^^^^^^^^^^
+  File "/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/tools/check_planning_mcap.py", line 68, in read
+    from mcap.reader import make_reader
+ModuleNotFoundError: No module named 'mcap'
+mission_state: active 3218, passive 1, standby 1, standstill 24, 
+CMD: 62 次；头两条：
+  I20261112 19:53:46.071607 140443596537856 tracking.cc:124] [PLANNING]CMD:  0.176987 0.0248277 0.0140281
+  I20261112 19:53:53.576417 140443596537856 tracking.cc:124] [PLANNING]CMD:   0.613854  0.0980737 0.00564256
+Start adjusted: 1
+Goal adjusted: 0
+Start point is in collision: 0
+Initial pose is in collision: 2026
+No free point found near start: 0
+
+== 查包（仓库 .venv，脚本激活的 python3 没有 mcap）
+work_dirs/planning_io_t47_map: 8 topics, 26913 transforms
+  /cmd_vel                                         geometry_msgs/msg/Twist                3255 msgs  frames -
+  /lightning/odom                                  nav_msgs/msg/Odometry                 17076 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid             1695 msgs  frames base_link
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid             3280 msgs  frames base_link
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker          3256 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     3279 msgs  frames map
+  /planning/debug/plotjuggler/string               std_msgs/msg/String                    3280 msgs  frames -
+  /tf                                              tf2_msgs/msg/TFMessage                20355 msgs  frames -
+PROBLEM /lightning/odom: not a walking robot: 1 jumps > 1 m (largest 142.7 m; from 0.2 s to 0.2 s); path 306 m, net 240 m over 170.7 s
+PROBLEM /planning/debug/cost_map_production/occmap: the robot's footprint is occupied in 1974 of 3280 grids; TEB will not plan from there
+PROBLEM layout: /fused_point_cloud is not in the recording
+PROBLEM layout: /goal_pose is not in the recording
+4 problems

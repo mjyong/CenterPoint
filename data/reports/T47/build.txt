@@ -1,0 +1,4 @@
+Finished <<< planning [2min 23s]
+
+Summary: 1 package finished [2min 25s]
+  1 package had stderr output: planning

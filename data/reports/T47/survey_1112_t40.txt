@@ -1,0 +1,8 @@
+reading /public/zjst/robot/cp_data/1112_t40 ...
+bag 168 s: lidar 1676 frames (10.0 Hz, max gap 0.10 s, 3.2 MB/msg), imu 100 Hz, ins 100 Hz
+  /robot/topic/rdap/top_point_cloud2       log - header stamp: median +0.102 s (5-95%: +0.101 .. +0.105)
+  /rte/rdap/rtk/imus/data_raw              log - header stamp: median +0.000 s (5-95%: +0.000 .. +0.001)
+  /rte/rdap/rtk/inspvax                    log - header stamp: median +0.000 s (5-95%: +0.000 .. +0.001)
+INS good 100%, pos_type {56: 16765}, path 122 m; usable 167 s in 1 stretches
+6 scenes (5 kept): train 84 s, val 56 s; val path within 10 m of train: 92%
+-> data/survey/1112_t40/{segments.csv,survey.png,survey.json}
