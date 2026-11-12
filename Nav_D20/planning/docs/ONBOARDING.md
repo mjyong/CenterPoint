@@ -1,316 +1,291 @@
-# D20 规划 onboarding
+# D20 规划入门
 
-狗上导航是三个独立进程，只通过 ROS 2 话题和 Action 通信：
+2026-11-12 重写。对应 `Nav_D20` 里机器人团队狗上在跑的新版（04d3a34 同步）：A\* 在 `GlobalMapManager` 里，D20 的局部规划是 MPPI。我们打的补丁在 `Nav_D20/PATCHES.md`，定位见 `Nav_D20/slam/docs/ONBOARDING.md`，路口让行的设计见仓库根目录 `docs/PLANNING_INTEGRATION.md`。
 
-| 角色 | 仓库目录 | 狗上安装位置 | 进程 |
-|------|----------|--------------|------|
-| 感知 | `Nav_D20/perception_combo_ros` | `/opt/seres/nav_perception`，服务 `nav_perception.service` | `lidar_seg`、`grid_map_memory_node` 等 |
-| 定位 | `Nav_D20/slam/lightning-lm-master` | 定位节点 `run_loc_online` | 发布里程计和全局栅格 |
-| 规划 | `Nav_D20/planning` | `/opt/seres/nav/planning`，服务 `planning.service` | 单个可执行文件 `planning` |
+先看什么：
+1. 第 0 节和第 1 节，知道一个周期干了什么；
+2. 在 Foxglove 里打开 `work_dirs/planning_io_t47_map/viz/planning_viz.mcap`，用布局 `Nav_D20/planning/script/planning_viz.json`（第 9 节）。右边"规划流程"面板就是第 1 节那张表，每个周期填着当时的数，边播边对着代码看；
+3. 想改什么，查第 7 节的表。
 
-D20 车型由 `robot_factory/default_robot_vin` 决定，当前内容是 `d20/001`。改这一行会换成 R1 / r11 的配置，不要在狗上随便改。
+## 0. 一页看懂
 
-**2026-11-12 起，`Nav_D20` 是机器人团队狗上在跑的新版**（04d3a34 同步）。和下文写的老版主要不同：
-- A\* 挪到了 `GlobalMapManager`（预处理），配置在 `preprocess_conf.pb.txt` 的 `global_map_manager_conf.grid_path_planner_conf`。D20 的 `safe_margin` 从 0.3 改成了 0.1。
-- Tracking 只取全局路径；D20 的局部规划是 MPPI（`mission_conf.pb.txt` 里 `tracking_conf.planner_type: MPPI`，`src/algorithm/mppi_planner/`），TEB 还在。
-- 新增跟随、回充、技能等任务。
-- 现场地图（`Nav_D20/map/*.zip`）的语义层叫 `semantic.osm`，里面标了人行横道。
+狗上导航是三个进程，只靠 ROS 2 话题和 Action 通信：
 
-我们在上面打的补丁（定位的 IMU 单位、`/tf` 树、调试话题的时间戳、A\* 起点挪到路上、读人行横道、OpenCV 5）列在 `Nav_D20/PATCHES.md`。下次同步先看那一页，同步完把补丁重新打上。
-
-## 数据怎么走
+| 角色 | 代码 | 狗上 | 给规划什么 |
+|---|---|---|---|
+| 感知 | `Nav_D20/perception_combo_ros` | `/opt/seres/nav_perception`，`nav_perception.service`：`lidar_seg`、`grid_map_memory_node` | `/map/occupancy_grid`：狗周围 10 x 10 m 的障碍栅格 |
+| 定位 | `Nav_D20/slam/lightning-lm-master` | `mode_switch_node`（建图 / 定位切换） | `/lightning/odom`：狗在 `map` 里的位姿和速度，100 Hz |
+| 规划 | `Nav_D20/planning` | `/opt/seres/nav/planning`，`planning.service`：一个可执行文件 `planning` | 发 `/cmd_vel`、`/mc/motion_control` 给运控 |
 
 ```text
-顶激光 / 补盲激光
-    -> lidar_seg
-    -> /patchworkpp/ground_seg_intensity
-    -> grid_map_memory_node          局部障碍
-    -> /map/occupancy_grid
-
-定位 run_loc_online
-    -> /lightning/odom               机器人在 map 下的位姿
-    -> /map                          定位地图的全局 OccupancyGrid（transient_local）
-
-任务侧 / RViz
-    -> /goal_pose  或  Action /nav/navigation
-    -> planning
-    -> /cmd_vel
-    -> /mc/motion_control            运控：MODE_WBMC + MOTION_GAIT_WALK，para = [vx, vy, yaw_rate]
+/goal_pose 或 Action /nav/navigation（终点）
+        │
+        ▼
+┌──────────────── planning，每周期约 50 ms ────────────────┐
+│ ① 输入   RosBridge：里程计、感知栅格、终点；断流就暂停      │
+│ ② 全局   GlobalMapManager：CJGC 路网图；A* 全局路径（一次） │
+│ ③ 局部图 CostMapProduction：狗周围 15 x 10 m 的代价地图    │
+│ ④ 任务   Tracking 状态机：off → passive → standby → active  │
+│ ⑤ 局部   MPPI：沿全局路径截 5 m，采样 3000 条轨迹挑最好的   │
+│ ⑥ 输出   /cmd_vel（vx, vy, ω）→ /mc/motion_control         │
+└──────────────────────────────────────────────────────────┘
 ```
 
-规划主循环大约 20 Hz，顺序固定：
+车型由 `robot_factory/default_robot_vin` 决定，现在是 `d20/001`；配置都在 `robot_factory/d20/001/planning_conf/`。
 
-1. `CommunicationEntry` 收话题、检查输入是否超时
-2. `PreprocessEntry` 维护全局静态图和车体周围代价地图
-3. `MissionEntry` 跑当前任务（D20 上是 Tracking 或 Recharging）
-4. `Publish` 把速度发给运控，并 `spin_some`
+## 1. 一个周期怎么跑
 
-入口在 `src/runnable/entry/main.cc`。配置目录是 `$PLANNING_ROOT_DIR/robot_factory/<vin>/planning_conf/`。`PLANNING_ROOT_DIR` 由 `install` 里的环境钩子写成 `.../lib/planning`，这个目录下才有 `robot_factory/`。日志在 `/tmp`。
+入口 `src/runnable/entry/main.cc` 读三份配置，然后一直循环 `PlanningEntry::Proc()`（`src/runnable/entry/planning_entry.cc`）：
 
-## D20 实际订阅和发布
+```cpp
+communication_entry_.Proc();   // ① 收话题、查超时
+preprocess_entry_.Proc();      // ② ③ 全局图、局部代价地图
+mission_entry_.Proc();         // ④ ⑤ 当前任务的状态机，active 时跑 MPPI
+communication_entry_.Publish();// ⑥ 发速度、调试话题
+```
 
-配置文件：`robot_factory/d20/001/planning_conf/communication_conf.pb.txt`。没写进配置的管道不会创建。
+| 步 | 做什么 | 代码 | 在可视化里看哪 |
+|---|---|---|---|
+| ① 输入 | 订阅 `/lightning/odom`、`/map/occupancy_grid`、`/goal_pose`；任务在 active / standstill 时，里程计或感知栅格断流 1 s 就 `pause()`，恢复 3 s 后 `resume()` | `src/runnable/communication/ros_bridge/ros_bridge.cc`（`Proc`、`checkTimeout`、`OnGoalPose`） | 流程面板 ①；事件"输入超时" |
+| ② 全局 | 启动时读 CJGC 路网图；进 standby 时 A\* 从狗到终点搜一条路并平滑；每周期给出从狗往前的一段（`ExtractLocalPath`） | `src/runnable/preprocess/global_map_manager/global_map_manager.cc`；A\* 在 `src/algorithm/grid_path_planner/` | 灰蓝路网、蓝色全局路径 |
+| ③ 局部图 | 全部置空闲 → 全局图按狗的位姿叠进来 → 感知栅格的障碍叠进来 → 算到障碍的距离场 | `src/runnable/preprocess/cost_map_production/cost_map_production.cc`（`Proc`） | 半透明红（障碍）、橙（感知） |
+| ④ 任务 | 当前任务（D20：跟踪 Tracking、回充 Recharging 等）的状态机走一步 | `src/runnable/mission/mission_entry.cc`、`tracking/tracking.cc`（`Proc` → `mission_fsm_ctx_.Proc()`） | 任务状态条；狗后面的文字 |
+| ⑤ 局部 | active 时：截 5 m 参考路径 → 变到 `base_link` → MPPI 优化 → 局部路径和速度 | `Tracking::spin_s_active`；`src/algorithm/mppi_planner/` | 紫色参考路径、绿色局部路径和脚印 |
+| ⑥ 输出 | 速度经 `VelocityCalibration` 发 `/cmd_vel`、`/mc/motion_control`（`MODE_WBMC` + `MOTION_GAIT_WALK`，`para = [vx, vy, ω]`）；`RosDebugBridge` 发调试话题 | `RosBridge::Publish`；`src/runnable/communication/ros_debug_bridge/` | 橙色指令箭头和转向弧 |
+
+## 2. 任务和状态机
+
+终点有两条入口，最后都是"把任务设成 Tracking 并 `start()`"：
+- `/goal_pose`：当前必须是 Idle 或任务已 off。默认当 `map` 系；终点朝向要求到点（`constraint_theta`）。
+- Action `/nav/navigation`：当前不是 Idle 会先 `stop()` 并拒绝这次目标；接受后用 `poses[0]`，`max_speed > 0.01` 会改目标速度。
+
+Tracking 的状态（`src/runnable/mission/mission_state_machine/mission_fsm_base.h`；`check_e_*` 决定转不转，`on_entry_s_*` 进来时做一次，`spin_s_*` 每周期做）：
+
+| 状态 | 进来时 / 每周期做什么 | 什么时候离开 |
+|---|---|---|
+| off | 清掉全局路径、局部参考、速度 | 收到终点（`need_start`）→ passive |
+| passive | 什么都不做 | 下一周期 → standby |
+| standby | **进来时做一次全局规划**：A\* 从狗到终点（`GlobalMapManager::PlanGlobalPath`） | A\* 成功（`global_plan_flag`）→ active；失败 → fault；要停 → off |
+| active | **每周期**：截局部参考 → MPPI → 速度 | 到终点 0.5 m 内、朝向差 0.2 rad 内、速度 0.15 以下，保持 1 s → off；`need_pause` 或被挡（`nav_blocked`）→ standstill |
+| standstill | 速度 0 | `need_resume` → active；要停 → off |
+| fault | 全局规划失败 | 要停 → off |
+
+调试字符串 `/planning/debug/plotjuggler/string` 里的 `mission_type`（0 空闲、1 跟踪、2 跟随、3 回充、4 技能）和 `mission_status`（0 off、1 passive、2 standby、3 active、4 standstill、5 fault）就是这两个枚举。
+
+路口让行（有车就停、车过去再走）还没做，会用这里的 `pause()` / `resume()`，设计见 `docs/PLANNING_INTEGRATION.md`。
+
+## 3. 全局地图和全局路径
+
+- **CJGC 是一张路网图**：`robot_factory/data/astar_pgm/CJGC.pgm` + `CJGC.yaml`（0.1 m 一格，10293 x 11412，原点 `[-716, -321]`）。像素 255 是能走的路，是一条条约 1.7 m 宽的线，只占全图 0.26%；其余都是障碍。
+- `GlobalMapManager::LoadPGMMap` 读 `<input_name>.pgm`（不管 yaml 里的 `image` 写的什么；`CJGC.yaml` 里写的是 `map.pgm`，那是同目录另一张图）。读进来以后 `obstacle` 层 **255 = 空闲、0 = 障碍**（`negate: 0` 时把像素反一下再按阈值判）。
+- A\*（`src/algorithm/grid_path_planner/`）用距离场：离障碍至少 `safe_margin`（D20 0.1 m）再加 `inflation_margin`（0.05 m）的格子才能走。
+  - 起点不合格（定位偏几分米就会落到 1.7 m 宽的路外面）：`allow_collision_start` 开着，在 1 m 内挪到最近的空地，日志 `Start adjusted`（我们加的，T47 验证）。终点同理 `allow_collision_goal`。
+  - 搜完用平滑器平滑（`use_smoother`）。
+- 切地图：`/map/switch`（`std_msgs/String`，地图目录）。`ReloadMap` 读那个目录 `global_map.yaml` 第一层的 `map_image_file`（ad68517c 是 `2d/<id>/map.png`）和 `map_yaml_file`，再读同目录的 `map.osm`，没有就读 `semantic.osm`（人行横道在这里面）。
+- **新地图 ad68517c 比 CJGC 多一段路**：人行横道 6 往西那段（x 66–106、y 207–231）。T47 的狗 107 s 以后走在这段上，用 CJGC 时局部代价地图认为狗站在障碍里。
+- 人行横道：`GlobalMapManager::crosswalks()`（`third_party/osm_map` 读，我们注册了 `crosswalk`），只存多边形，不改障碍层。
+
+## 4. 局部代价地图
+
+`CostMapProduction`，狗前 10 m、后 5 m、左右各 5 m，0.05 m 一格，跟着狗转（`base_link` 里），`enable_cuda: true`。每周期（`Proc`）：
+
+1. `obstacle` 层全部置 255（空闲）；
+2. `AddObstacleFromMap`：全局图的 `pgm_obstacle` 层按狗的位姿采样进来——路网外面全是障碍；
+3. `AddObstacleFromPerception`：感知栅格里的障碍格写成 0（障碍）；
+4. `UpdateObstacleDistance`：`cv::distanceTransform`（0 当障碍）得到到障碍的距离场；
+5. 再算参考路径偏移、合成代价，给 MPPI 的 `obstacles_critic` 和碰撞检查用。
+
+**调试话题 `/planning/debug/cost_map_production/occmap` 在 T47 复核之前是反的**：调试桥按 (0, 1) 转，空闲全成了 100、障碍成了 0，Foxglove 里路显示成障碍。已改成 (255, 0)，T48 重编后生效；老录包转可视化时会自动认出来并翻过来（第 9 节）。以前"狗脚下被占"的结论也是反着读的。
+
+## 5. 局部规划：MPPI
+
+`mission_conf.pb.txt` 里 `tracking_conf.planner_type: MPPI`（TEB 还在，`teb_planner_conf`）。`Tracking::spin_s_active` 每周期：
+
+1. `ExtractLocalPath`：从全局路径上离狗最近处往前截 `local_reference_path_length`（5 m），变到 `base_link`——这是 MPPI 的**参考路径**（可视化里紫色）；
+2. `MppiPlanner::solver(参考路径, 当前位姿 = 0, 当前速度)`：在上一周期的控制序列上加噪声（`sampling_std`：vx 0.4、vy 0.2、ω 0.2）采样 `batch_size` 3000 条控制序列（当前速度做了均值滤波后当起点），每条 `time_steps` 50 步 x `model_dt` 0.1 s = 5 s，用全向模型（`motion_model: Omni`，vx、vy、ω）推出轨迹，各代价项打分，按 `temperature` 0.3 加权平均出新的控制序列（`src/algorithm/mppi_planner/optimizer.cc`；`enable_cuda` 时在 GPU 上算）；
+3. `getOptimizePath()`：优化后的轨迹，变回 `map` 存成 `local_path_2d`（绿色）；`getVelocityCmd(0.01)`：这一刻的速度。
+
+速度限制（`dynamic_constraints`）：vx −1.0 ~ 3.0 m/s，vy ±0.5 m/s，ω ±1.5 rad/s，加速度 3 m/s²。
+
+代价项（`critics/`，每项在配置里有 `enabled`、`weight`）：
+
+| 代价 | 管什么 |
+|---|---|
+| `constraint_critic` | 超出速度、加速度限制 |
+| `obstacles_critic` | 离障碍太近（排斥）、撞上（`collision_cost` 1e6）；用第 4 节的距离场 |
+| `path_follow_critic` | 沿参考路径往前走 |
+| `path_align_critic` | 轨迹贴着参考路径 |
+| `path_angle_critic` | 朝向对着路径 |
+| `goal_critic`、`goal_angle_critic` | 离终点 3 m 以内时，到点、到点时的朝向 |
+| `prefer_forward_critic` | 少倒着走 |
+| `twirling_critic` | 少原地打转 |
+| `velocity_deadband_critic` | 避开太小的速度（运控做不出来） |
+| `reference_velocity_critic` | 跟上目标速度 |
+
+## 6. 话题和超时
+
+`robot_factory/d20/001/planning_conf/communication_conf.pb.txt`，没写进配置的管道不会创建。
 
 | 方向 | 话题 / Action | 类型 | 谁产生 | 超时 |
-|------|----------------|------|--------|------|
-| 订 | `/lightning/odom` | `nav_msgs/Odometry` | 定位 | 0.2 s，只在 Tracking 时检查 |
-| 订 | `/map/occupancy_grid` | `nav_msgs/OccupancyGrid` | 感知 `grid_map_memory_node` | 0.5 s，只在 Tracking 时检查 |
-| 订 | `/map` | `nav_msgs/OccupancyGrid` | 定位，QoS 为 reliable + transient_local | 无 |
-| 订 | `/map/switch` | `std_msgs/String` | 切图指令，定位和规划都会听 | 无 |
-| 订 | `/goal_pose` | `geometry_msgs/PoseStamped` | RViz / 调试 | 无 |
-| 订 | `/initialpose` | `PoseWithCovarianceStamped` | RViz 初始位姿 | 无 |
-| 订 | `/reflector_position` | `PoseStamped` | 回充反光板 | 0.5 s |
-| 订 | `/robot/topic/rdap/battery_states` | `rte_interface/BatteryStates` | 整机 | 1.0 s |
-| 订 | `/mc/state` | `mc_interface/State` | 运控 | 1.0 s |
-| 发 | `/cmd_vel` | `geometry_msgs/Twist` | 规划 | |
-| 发 | `/mc/motion_control` | `mc_interface/Motion` | 规划，行走时 `para=[vx,vy,wz]` | |
-| Action | `/nav/navigation` | `nav2_interface/action/Navigation` | 任务侧下发目标点 | |
-| Action | `/nav/back_charge` | `nav2_interface/action/BackCharge` | 回充 | |
-| Action | `/nav/ptz_camera` | 云台，`D20PtzBridge`，`assist: true` | | |
+|---|---|---|---|---|
+| 订 | `/lightning/odom` | `nav_msgs/Odometry` | 定位 | 0.2 s |
+| 订 | `/map/occupancy_grid` | `nav_msgs/OccupancyGrid` | 感知 `grid_map_memory_node` | 0.5 s |
+| 订 | `/map` | `nav_msgs/OccupancyGrid` | 定位（reliable + transient_local） | |
+| 订 | `/map/switch` | `std_msgs/String` | 切图指令，定位和规划都听 | |
+| 订 | `/goal_pose` | `geometry_msgs/PoseStamped` | RViz / 调试 | |
+| 订 | `/initialpose` | `PoseWithCovarianceStamped` | RViz | |
+| 订 | `/reflector_position`、`/robot/topic/rdap/battery_states`、`/mc/state` | | 回充、整机、运控 | 0.5–1 s |
+| 发 | `/cmd_vel` | `geometry_msgs/Twist` | | |
+| 发 | `/mc/motion_control` | `mc_interface/Motion` | | |
+| Action | `/nav/navigation`、`/nav/back_charge`、`/nav/ptz_camera` | `nav2_interface` | 任务侧 | |
 
-D20 这套配置没有跟随任务（没有 `action_following`，也没有障碍物目标订阅）。`sync_odom_occ` 是 false，里程计和局部栅格各自回调，不对齐时间戳。
+断流：任务在 active / standstill 时，里程计或感知栅格超时持续 1 s（`timeout_pause_duration`）就暂停，恢复连续 3 s（`timeout_resume_duration`）后继续。回放旧 bag 时脚本会设 `PLANNING_TIMEOUT_WALL_CLOCK=1`，按收到消息的时刻判断；狗上不要设。
 
-输入超时：Tracking 处于 active 或 standstill 时，odom 或局部栅格断流持续 1 s（`timeout_pause_duration`）会 `pause`；恢复连续 3 s（`timeout_resume_duration`）后 `resume`。空闲时不检查。
-
-## 一次去目标点
-
-两条入口，最后都是把任务设成 Tracking 并 `start()`：
-
-- `/goal_pose`：当前必须是 Idle，或当前任务已经 off。目标默认当 map 系；`header.frame_id` 不是 `map` 时会用内部 TF 变过去。`setTargetPose(..., constraint_theta=true)`。
-- `/nav/navigation`：当前不是 Idle 会先 `stop()` 并 **拒绝** 这次 goal。接受后用 `poses[0]`，四元数任一非零就约束终点航向；`max_speed > 0.01` 会改 TEB 目标速度。
-
-Tracking 状态机：`off -> passive -> standby -> active -> standstill -> off`。
-
-- 进入 **standby**：用全局图做 A\*（`GridPathPlanner`，启发式欧式，`safe_margin` 0.3 m）。失败进 fault，Action 反馈 `NAV_STA_PLAN_PATH_FAILED`。
-- **active**：从全局路径上截大约 5 m，变到 `base_link`，交给 TEB。TEB 用局部代价地图避障，输出未来 0.5 s 的速度。D20 速度上限大约 vx 2 m/s、vy 1 m/s、yaw rate π rad/s。
-- 终点误差同时满足 1 s 后进 standstill，再过 `reset_idle_time`（2 s）回到 Idle：位置 0.2 m、航向 0.2 rad、速度 0.15。
-
-全局图和局部图是分开的：
-
-- 全局图：`GlobalMapManager` 读 `robot_factory/data/astar_pgm/CJGC.pgm` + `CJGC.yaml`（分辨率 0.1 m，原点约 `[-716, -321]`）。`enable_overlay: false`，感知障碍 **不会** 画进这张图，A\* 只看见静态图。
-  - **CJGC 是一张路网图**（2026-11-12，T46 复核）：像素 255 是能走的路，只占 0.26%，是一条条约 1.7 m 宽的线；其余都是障碍。`LoadPGMMap` 把 255 读成 `obstacle` 层的 255，`cv::distanceTransform` 把 0 当障碍，所以只有路上能走。
-  - A\* 要起点离路边至少 `safe_margin`（0.3 m），也就是只有路中间约 1.1 m 宽的一条。定位偏几分米就报 `Start point is in collision!`：0921 的起点按 INS 离路边只有 0.41 m，T43 两次回放都卡在这里。
-  - 现在 D20 开了 `allow_collision_start`（新版在 `preprocess_conf.pb.txt` 里）：起点不合格时，在 1 m 内挪到最近的空地（和终点的 `allow_collision_goal` 一样）。局部代价地图也把路外当障碍，狗偏出路面时局部规划会报起点在障碍里。
-- 局部图：`CostMapProduction`，车体前 10 m、后 5 m、左右各 5 m，分辨率 0.05 m，`enable_cuda: true`。TEB 避障看这张图，所以没有 `/map/occupancy_grid` 时全局路径还能搜，局部速度会不对。
-
-`/map` 是定位发出来的另一张全局栅格。`enable_global_map_reload: false` 时，规划启动用的仍是磁盘上的 CJGC，不是定位刚发出的 `/map`。切图要走 `/map/switch`。
-
-## 调试时看什么
-
-D20 默认 `pub_flag: false`，RViz 里看不到规划路径。本机调试把 `communication_conf.pb.txt` 里 `RosDebugBridge` 的 `pub_flag` 改成 `true`（狗上的发布包不要带着这个改动）。也可以在运行中调用服务 `/planning/debug/set_pub_flag`。
-
-打开之后这些话题才有内容：
+调试话题要 `pub_flag: true`（D20 默认 false；本机运行中可以 `ros2 service call /planning/debug/set_pub_flag std_srvs/srv/SetBool "{data: true}"`）：
 
 | 话题 | 内容 |
-|------|------|
-| `/planning/debug/path_tracking` | 全局 / 局部路径 |
-| `/planning/debug/goal_pose` | 目标 |
-| `/planning/debug/cost_map_production/occmap` | 局部规划用的代价地图（2026-11-12 之前的录包是反的：空闲 100、障碍 0，见下） |
-| `/planning/debug/global_map_manager/occmap` | A\* 用的全局图 |
-| `/planning/debug/plotjuggler/string` | 一帧调试字符串，含 `mission_type`、`cmd_vx` |
-| `/planning/debug/diagnostic` | 诊断 |
+|---|---|
+| `/planning/debug/path_tracking` | 全局路径、局部参考（`local_reference_2d`，T49 重编后才有）、局部路径和脚印、跟踪目标点、狗、碰撞圆 |
+| `/planning/debug/goal_pose` | 终点 |
+| `/planning/debug/cost_map_production/occmap` | 局部代价地图（T47 复核之前是反的） |
+| `/planning/debug/global_map_manager/occmap` | 全局图（有订阅者时才发一次） |
+| `/planning/debug/plotjuggler/string` | 每周期一条"key: value"：`mission_type`、`mission_status`、`cmd_vx/vy/omega`、`odom_*`、`odom_ts`、`occ_ts`、超时标志 |
+| `/planning/debug/diagnostic`、`collision_checker`、`teb_planner`、`following` | 诊断、碰撞点、TEB、跟随 |
+| `/tf` | `map -> base_link`、`base_link -> ptz_*`（一棵树，我们改的） |
 
-录下来先查一遍录包，再转成给人看的版本（下一节）：
+## 7. 想改什么看哪
 
-```bash
-python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap> --layout Nav_D20/planning/script/planning_io.json
-```
+| 想改 | 看 |
+|---|---|
+| 话题名、超时、调试开关 | `planning_conf/communication_conf.pb.txt` |
+| 车体尺寸 | `robot_factory/d20/001/robot_param.pb.txt`（1.0 x 0.4 m） |
+| 全局地图、A\*（安全距离、起点挪动） | `planning_conf/preprocess_conf.pb.txt` 的 `global_map_manager_conf`；代码 `global_map_manager.cc`、`grid_path_planner.cc` |
+| 局部代价地图范围、分辨率 | `preprocess_conf.pb.txt` 的 `cost_map_production_conf` |
+| 到点判定、局部参考长度、局部规划用哪个 | `planning_conf/mission_conf.pb.txt` 的 `tracking_conf` |
+| MPPI 速度限制、采样、代价权重 | `mission_conf.pb.txt` 的 `mppi_planner_conf`；代码 `src/algorithm/mppi_planner/` |
+| 终点怎么变成任务 | `ros_bridge.cc` 的 `OnGoalPose`、Action 回调 |
+| 状态机 | `src/runnable/mission/tracking/tracking.cc` 的 `check_e_*`、`on_entry_s_*`、`spin_s_*` |
+| 发给运控的速度 | `RosBridge::Publish`、`VelocityCalibration` |
+| 调试话题 | `ros_debug_bridge.cc`、`visualization_util.h` |
+| 路口让行 | 还没做；`docs/PLANNING_INTEGRATION.md`，Python 参考实现 `dog_perception/yield_gate.py` |
 
-它查四件事，2026-11-09 之前前三件都有问题，第四件是定位：
-- `/tf` 是不是一棵树：`TfBuffer` 以前把每个变换连同它的逆一起发（`map -> base_link` 和 `base_link -> map`），云台还多发一条 `map -> ptz_*`，于是 `map`、`base_link`、`ptz_visible` 都有两个父坐标系，Foxglove 在它们之间来回跳；现在 `/tf` 只发 `map -> base_link`、`base_link -> ptz_*`。
-- 时间戳对不对得上：`base_link` 里的局部代价地图以前用本机时钟打戳，回放旧 bag 时比里程计（也就是 `map -> base_link`）晚几周，Foxglove 找不到那个时刻的变换；现在用里程计的时间戳。
-- 标记的寿命：以前 0.05 s，正好一个 20 Hz 周期，回放时一闪一闪、暂停时多半看不到；现在 0.5 s，个数会变的数组开头先发 DELETEALL。
-- 代价地图的方向：代价地图的 obstacle 层是 255 = 空闲、0 = 障碍，调试话题原来按 (0, 1) 转，空闲全成了 100，路显示成障碍、障碍显示成空的。
-  用感知的障碍格来认（规划把它们抄进代价地图当障碍）：T47 两次录包里 11.7 万个全是 0，报 `inverted`。`ros_debug_bridge` 已改成 (255, 0)。
-  以前查出来的"狗脚下被占"也是反着读的：那些帧狗其实在路上。现在翻正以后再查，报的是狗站在规划地图的路外面。
-- `/lightning/odom` 像不像一只在走的狗（速度、高度、跳变）。T41 回放 0921 时，定位的 IMU 高频预测把 kygi665 的加速度（单位 g）当成 m/s²，两次 LIO 更新之间每秒多掉 8.8 m/s²：17.5 s 里 z 掉到 −46 m、速度到 32 m/s、一跳 43 m。规划拿这个位置当起点，报 `Start point is in collision!`。`lightning-lm-master/src/core/lio/laser_mapping.cc` 已改成按重力归一化（同 `imu_processing.hpp`），T42 验证。
+## 8. 在这台机器上跑
 
-日志关键字：
+命令都在 CenterPoint 仓库根目录执行。
 
-- `Load robot config:` 确认读的是 `d20/001`
-- `GlobalMapManager: PGM map loaded` 确认 CJGC 读到了
-- `Set mission to Tracking` / `Navigation started` 确认目标进了状态机
-- `mission_state:` 看 off / standby / active
-- `CMD:` TEB 速度；没有这行就还没进 active
-- `Data timeout exceeded, pausing mission` 里程计或局部栅格断了
-- `teb_planner_ solver failed` 局部规划失败，速度被清零
-- `Failed to load PGM` 路径或 `PLANNING_ROOT_DIR` 错了
+**编译环境**：规划是 ROS 2 Humble 的 C++ 节点（acados、Ceres、g2o、OSQP 0.6、grid_map、OctoMap、PCL、CUDA）。狗上的 aarch64 包走官方镜像和 `bash build.sh -arm`；这台机器连不上那个镜像仓库，本机调试用 `/public/zjst/robot/planning_humble_env`：
+- `env/`：micromamba 的 robostack-humble（加 grid_map、octomap、PCL、OpenCV 5、Ceres、g2o、glog、Eigen、Protobuf）；
+- 源码装进同一前缀的 acados 0.5.1、OSQP 0.6.3（规划用 0.6 的接口，不能换 1.0）、OsqpEigen 0.10.0；
+- `colcon/install/`：接口包、x86 的 `planning`、感知的 `lidar_seg`、`grid_map_memory_node`、定位的 `lightning`；
+- gcc 10、`/usr/local/cuda` 的 nvcc；运行前 `micromamba activate`，让 conda 的 `libstdc++` 盖过系统的。
 
-本机回放时，`ROS_DOMAIN_ID` 要和感知、定位一致。Docker 启动脚本里写的是 `22`，以狗上实际环境为准。QoS 不一致会表现为节点活着但收不到图：`/map` 和 `/map/switch` 是 reliable + transient_local；局部栅格跟随感知 yaml 里的 `qos`（D20 点云侧是 best_effort）。
-
-## 在 Foxglove 里看录包
-
-原始录包直接放进 Foxglove 会一闪一闪，原因有三个：
-- 局部代价地图（20 Hz）和感知的 `/map/occupancy_grid`（10 Hz）都挂在 `base_link` 上，Foxglove 按各自时间戳的 TF 摆。狗走路时横滚、俯仰 1–4°，两张图的时间戳差 0.1 s，两个倾斜的平面互相穿插；默认空闲格子是不透明的白色，哪张在上面每帧都在变。路径画在 `map` 的 z = 0，`base_link` 在 z ≈ −0.2 m，倾斜的栅格远端会冒上来盖住一段路径，再放开。
-- 规划的标记时间戳是 0。在 `map` 里不影响；挂 `base_link` 的（碰撞点）被摆在第一帧 TF 的位置。
-- 录包用服务器的时钟记时间（11 月），数据是 bag 的时间戳（9 月 21 日），时间轴、曲线、日志都和 bag、狗上的日志对不上。
-
-所以录完转一份给人看的版本（`replay_planning_check.sh` 最后会自动转），在 Foxglove 里用 `script/planning_viz.json` 打开：
+增量重编规划（新版多了 `third_party/nav_interface` 消息包，用 `--packages-up-to planning`）：
 
 ```bash
-python3 Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/planning_io_<名字> \
-    [--map <切过去的地图目录或 zip>] [--osm <有 semantic.osm 的地图目录或 zip>]
-# -> work_dirs/planning_io_<名字>/viz/planning_viz.mcap（几 MB，原包几百 MB）和 planning_viz.png（总览图）
-```
-
-- 全部换到 bag 的时间，摊平到地图平面（`/tf` 只剩 `map -> base_link` 的 x、y、朝向），每一层放在自己的高度上，不再互相抢。
-- 代价地图方向自动认（`--cost-map-values auto`），反着的翻过来。
-- 地图默认是规划的 CJGC（读 `CJGC.pgm`，和规划一样）；给地图目录或 zip 时读 `global_map.yaml` 第一层的 `map_image_file`（切图以后规划读的那张）。
-- 定位刚起来时的那一跳（T47：开头一帧在原点，离真实位置 142 m）不画进轨迹，事件里会记一条。
-
-| 话题 | 是什么 | 颜色 |
-|---|---|---|
-| `/viz/route_map` | 规划地图的路网（能走的路） | 灰蓝 |
-| `/viz/crosswalks` | 人行横道，带编号和横穿长度 | 黄 |
-| `/viz/cost_map` | 局部代价地图里的障碍（空闲透明） | 半透明红 |
-| `/viz/perception_grid` | 感知栅格里的障碍 | 橙 |
-| `/viz/trail` | 走过的路，按速度着色；停下 2 s 以上的地方画圈标时间 | 蓝→绿→黄→红 |
-| `/viz/plan` | 全局路径（蓝）、局部路径（绿）和它的脚印、跟踪目标点、碰撞圆、终点（红） | |
-| `/viz/robot` | 狗（青色，白三角是朝向）、实际速度箭头（浅蓝）、指令箭头和转向弧（橙）、状态文字 | |
-| `/viz/state` | 每个规划周期一条 JSON：任务和状态、速度和指令、到终点、偏离全局路径、脚下障碍格数、最近障碍，还有规划调试字符串里的全部数 | 右边曲线 |
-| `/viz/events` | 任务状态变化、输入超时、开始走和停下、规划或栅格断了多久、位姿跳变、狗站到路外、诊断，有规划 glog 时加上它的警告 | 右下日志 |
-
-布局右边四张曲线（速度、转速、距离、脚下障碍格）、任务状态条、事件日志，时间轴和 3D 同步，3D 跟着狗（俯视）。
-
-## 代码从哪改
-
-| 想改的行为 | 先看 |
-|------------|------|
-| 话题名、超时、要不要调试可视化 | `robot_factory/d20/001/planning_conf/communication_conf.pb.txt` |
-| 车体尺寸 | `robot_factory/d20/001/robot_param.pb.txt`（长 1.0 m，宽 0.4 m） |
-| 全局搜索安全距离、终点判定、TEB 权重和速度上限 | `robot_factory/d20/001/planning_conf/mission_conf.pb.txt` |
-| 局部代价地图范围和分辨率 | `robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt` |
-| 目标点怎么变成任务 | `src/runnable/communication/ros_bridge/ros_bridge.cc` 的 `OnGoalPose`，以及 `ros_bridge/tracking.cc` |
-| A\* | `src/algorithm/grid_path_planner/`，新版由 `GlobalMapManager::PlanGlobalPath` 调 |
-| 局部轨迹和速度 | D20 新版是 `src/algorithm/mppi_planner/`（TEB 在 `src/algorithm/teb_planner/`），调用在 `src/runnable/mission/tracking/tracking.cc` 的 `spin_s_active` |
-| 人行横道 | `GlobalMapManager::crosswalks()`（`third_party/osm_map` 读 `semantic.osm`） |
-| 发给运控的速度 | `RosBridge::Publish`，发出前会过 `VelocityCalibration` |
-| 路口有车就停、车过去再走（接 3D 检测和预测） | 还没做，设计见仓库根目录 `docs/PLANNING_INTEGRATION.md`；停和走复用任务的 `pause()` / `resume()` |
-
-## 在这台机器上跑起来
-
-下面的命令都在 CenterPoint 仓库根目录执行（`Nav_D20/` 在仓库里；以前在 `d20car_predict/` 下）。
-2026-11-09 之前仓库的 `.gitignore` 把 `Nav_D20` 里所有 `*.sh`、`*.yaml` 都漏掉了（启动脚本、A* 地图的 `CJGC.yaml`、定位和感知的配置），那之前的克隆缺这些文件，跑不起来。
-
-规划是 ROS 2 Humble 的 C++ 节点，链接 acados、Ceres、g2o、OSQP、OsqpEigen、grid_map、OctoMap、PCL、CUDA。狗上的 aarch64 包仍走官方镜像 `10.42.11.106:5000/jetpack6.1-crosscompile-aarch64-x86:v2.2.1` 和 `bash build.sh -arm`。这台机器访问该仓库会超时，主机也没有 `/opt/ros`，所以本机调试不用镜像，编译环境单独放在 `/public/zjst/robot/planning_humble_env`。
-
-这个前缀里有：
-
-- micromamba 环境 `env/`：robostack-humble 的 ROS 2 Humble，加上 grid_map、octomap、PCL、OpenCV、Ceres、g2o、glog、Eigen、Protobuf。`CONDA_OVERRIDE_CUDA=""`，避免再拉一套 CUDA。
-- 源码装进同一前缀的 acados 0.5.1、OSQP 0.6.3、OsqpEigen 0.10.0。规划源码用的是 OSQP 0.6 的 `c_int` / `OSQPData`，不能换回 conda 的 OSQP 1.0。
-- `colcon/install/`：`seres_interface` 的接口包、`woosh_robot_msgs`、x86 的 `planning`，以及规划要接的 `lidar_seg`、`grid_map_memory_node`、`lightning`（`run_loc_online`）。定位用的 Livox 消息、NovAtel / KYGI665 消息和 `basic` 也在这里。本机没有 Livox SDK，所以没有编 Livox 驱动进程，只编了 `livox_ros_driver2` 的点云消息。
-- 编译器是系统 gcc 10 和 `/usr/local/cuda` 的 nvcc。运行时要先 `micromamba activate`，让 conda 的 `libstdc++` 盖过系统的。
-
-二进制：
-
-```text
-/public/zjst/robot/planning_humble_env/colcon/install/planning/lib/planning/planning
-```
-
-`install/setup.bash` 会把 `PLANNING_ROOT_DIR` 指到同级的 `lib/planning`，里面有 `robot_factory`。
-
-改过 planning 源码后，在这个前缀里增量重编：
-
-```bash
-# 激活 /public 上的 Humble 前缀，增量重编 planning。
 ENV=/public/zjst/robot/planning_humble_env/env
 export MAMBA_ROOT_PREFIX=/public/zjst/robot/planning_humble_env/root CONDA_BUILD=0
-set +u
-eval "$(/public/zjst/robot/planning_humble_env/micromamba shell hook -s bash)"
-micromamba activate "$ENV"
-set -u
-export PATH="/usr/local/cuda/bin:$PATH" CUDA_HOME=/usr/local/cuda
-export LIBRARY_PATH="$ENV/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+set +u; eval "$(/public/zjst/robot/planning_humble_env/micromamba shell hook -s bash)"; micromamba activate "$ENV"; set -u
+export PATH="/usr/local/cuda/bin:$PATH" CUDA_HOME=/usr/local/cuda LIBRARY_PATH="$ENV/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 cd Nav_D20/planning
-set +u
-source /public/zjst/robot/planning_humble_env/colcon/install/setup.bash
-set -u
+set +u; source /public/zjst/robot/planning_humble_env/colcon/install/setup.bash; set -u
 colcon build \
   --build-base /public/zjst/robot/planning_humble_env/colcon/build \
   --install-base /public/zjst/robot/planning_humble_env/colcon/install \
-  --packages-select planning \
+  --packages-up-to planning \
   --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
   -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
-  -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
-  -DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++ \
-  -DCMAKE_EXE_LINKER_FLAGS="-L${ENV}/lib" \
-  -DProtobuf_PROTOC_EXECUTABLE="$ENV/bin/protoc"
+  -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++ \
+  -DCMAKE_EXE_LINKER_FLAGS="-L${ENV}/lib" -DProtobuf_PROTOC_EXECUTABLE="$ENV/bin/protoc"
 ```
 
-不要加 `-DROS2_JAZZY`。Ceres 2.2 走 `Manifold`，humble 的 rosbag 仍用 `time_stamp`，这两处已经按版本分开。
+不要加 `-DROS2_JAZZY`。编不过先看是不是我们的补丁（`Nav_D20/PATCHES.md` 里的文件）。
 
-启动（脚本会激活前缀并检查二进制，缺了会直接退出）：
+**回放一遍、录包、发终点、查包、转可视化，一条命令**：
 
 ```bash
-# run_planning_debug.sh：只启动 planning。前面的感知和定位要自己先起来。
-bash Nav_D20/planning/script/run_planning_debug.sh
+M=$PWD/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13      # Nav_D20/map/*.zip 解开
+LOC_MAP_PATH=$M bash Nav_D20/planning/script/replay_planning_check.sh <名字> 80.0 126.9
+#   LOC_INS_ONLY=1：定位用 INS 直出；MAP_SWITCH=$M：发终点前先切到这张图；RECORD_CLOUD=1：连感知点云一起录
 ```
 
-`lidar_3d_detection` 用的 2026-09-21 bag 里只有三路，和这条链路用的是同一份：
+它播 `bags0921/rosbag2_2026_09_21-16_41_27`（约 173 s；只有顶激光、IMU、INSPVAX 三路），拉起地面分割、局部栅格、定位、规划（`run_planning_stack_debug.sh --once`），`ROS_DOMAIN_ID` 默认 42。**不要在狗的域上跑**：规划会发 `/cmd_vel` 和 `/mc/motion_control`。输出在 `work_dirs/planning_io_<名字>/`：录包、`logs/`（各进程日志、规划的 glog）、`report.txt`（查包结果、mission_state 次数、`CMD:` 次数、起点挪没挪）、`viz/`（第 9 节）。
 
-| bag 话题 | 谁用 |
-|----------|------|
-| `/robot/topic/rdap/top_point_cloud2` | `lidar_seg`、定位 |
-| `/rte/rdap/rtk/imus/data_raw` | 定位 |
-| `/rte/rdap/rtk/inspvax` | 定位 |
+单独起某一个：`script/run_planning_debug.sh`（只起规划）、`script/run_planning_stack_debug.sh [--no-planning] [--bag 目录] [--once]`，日志在 `/tmp/nav_stack_debug/`。
 
-规划不订 `lidar_3d_detection` 的检测框。D20 局部障碍来自 `lidar_seg` 的 `/patchworkpp/ground_seg_intensity`，再由 `grid_map_memory_node` 发成 `/map/occupancy_grid`。定位发 `/lightning/odom`。默认 bag 是 `bags0921/rosbag2_2026_09_21-16_41_27`，大约 173 秒。
+狗上是 systemd：`sudo systemctl start planning.service`，`journalctl -u planning.service -f`；服务里是 `source /opt/seres/nav/planning/setup.bash; ros2 run planning planning`。
 
-定位配置里的 `/opt/seres` 地图这台机器没有，会回退到仓库里的 `0c3f8a2d-...`。**这张内置地图不能用来定位**（2026-11-09，T42 复核）：它是用 0921 这包的 15 s 建的，对齐到 INS 后整张图倾斜约 51°（`slam/lightning-lm-master/scripts/check_map_tilt.py`），定位每帧只匹配上几十个点，每 10 s 重初始化一次、位置来回跳。本机回放用 `LOC_MAP_PATH=<现场地图目录>` 换成真的现场地图，或者 `LOC_INS_ONLY=1` 用 INS 直出（全程 RTK 固定解的包），见 `slam/lightning-lm-master/scripts/loc_debug_config.sh`。那不是这包录制时的那张图，激光定位可能对不上，里程计仍会按 LIO 往外发。规划的全局 A* 用的是磁盘上的 CJGC，不跟这张定位图走。
+## 9. 看录包
 
-bag 的时间戳是 9 月，规划超时比较的是本机时钟。一键脚本会设 `PLANNING_TIMEOUT_WALL_CLOCK=1`，按收到消息的时刻判断断流，狗上的正式进程不要设这个变量。
+原始录包直接放进 Foxglove 会一闪一闪：
+- 规划的代价地图和感知栅格都挂在 `base_link` 上，狗走路时横滚、俯仰 1–4°，两个倾斜的平面互相穿插，空闲格子默认不透明，哪张在上面每帧都在变；
+- 规划的标记时间戳是 0；
+- 录包用服务器时钟（比 bag 的时间戳晚 52 天）。
+
+所以转一份给人看的（回放脚本最后会自动转）：
 
 ```bash
-# run_planning_stack_debug.sh：播这份 bag，并启动 lidar_seg、grid_map、定位和 planning。
-bash Nav_D20/planning/script/run_planning_stack_debug.sh
+python3 Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/planning_io_<名字> \
+    [--map <切过去的地图目录或 zip>] [--osm <有 semantic.osm 的目录或 zip>] [--loc-map <定位地图目录或 zip>]
+# -> viz/planning_viz.mcap（十几 MB，原包几百 MB）和 viz/planning_viz.png（总览图）
 ```
 
-只要前置节点、不启规划：`bash Nav_D20/planning/script/run_planning_stack_debug.sh --no-planning`。换 bag：`--bag <目录>`。只播一遍：`--once`（bag 放完就收，2026-11-12 起；以前会一直等）。日志在 `/tmp/nav_stack_debug/`。
+在 Foxglove 里打开它，加载布局 `Nav_D20/planning/script/planning_viz.json`（看规划）或 `loc_viz.json`（看定位）。
 
-回放一遍、录包、发目标、查包，一条命令（2026-11-12）：
+- 一切换到 bag 的时间，摊平到地图平面，每一层一个高度；代价地图方向自动认、反的翻过来；空闲透明。
+- 左边 3D 跟着狗俯视。右边：速度（实际 / 指令）、距离（到终点、偏离全局路径、最近感知障碍）、任务状态条，下面一组标签页：
+  - **规划流程**：这一周期按第 1 节的六步，每步写着当时的数和代码位置——边播边对着代码看；
+  - **事件**：任务状态变化、输入超时、开始走和停下、规划或栅格断了多久、位姿跳变、狗站到路外、定位故障、INS，有 glog 时加上规划和定位自己的警告；
+  - **数**：这一周期 `/viz/state` 的全部数（含调试字符串的原始值）；
+  - **图例**：每个颜色是什么。
+
+| 图层 | 是什么 |
+|---|---|
+| 灰蓝 `/viz/route_map` | 规划地图的路网 |
+| 黄 `/viz/crosswalks` | 人行横道（编号、横穿长度） |
+| 半透明红 `/viz/cost_map` | 局部代价地图里的障碍 |
+| 橙 `/viz/perception_grid` | 感知栅格里的障碍 |
+| 彩色线 `/viz/trail` | 走过的路按速度着色；白圈是停下的地方 |
+| 蓝 / 紫 / 绿 `/viz/plan` | 全局路径 / 局部参考（MPPI 的输入）/ 局部路径和脚印；还有跟踪目标点、碰撞圆、终点 |
+| `/viz/robot` | 狗（青色）、实际速度（浅蓝箭头）、指令（橙箭头、转向弧）、状态文字 |
+| `/viz/loc/*` | 定位：地图点云、当前帧（按贴不贴地图着色）、INS（见定位文档） |
+
+T47 的两份已经转好：`work_dirs/planning_io_t47_{map,ins}/viz/`。
+
+## 10. 查问题
+
+先查包：
 
 ```bash
-LOC_MAP_PATH=<现场地图目录> bash Nav_D20/planning/script/replay_planning_check.sh <名字> <目标 x> <目标 y>
+python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap>
 ```
 
-输出在 `work_dirs/planning_io_<名字>/`：录包、`logs/`（各进程日志和规划的 glog）、`report.txt`（查包结果，mission_state 各状态出现的次数，`CMD:` 的次数，起点、终点挪了没有，起点在不在障碍里）。目标点会等录包和规划两个订阅者都连上再发。
+它查：`/tf` 是不是一棵树；时间戳对不对得上 TF；标记寿命；`/lightning/odom` 像不像一只在走的狗（速度、高度、跳变）；代价地图话题是不是反的；狗是不是站在障碍上（脚印里至少 10% 的格子）。两张栅格挂在同一个会动的坐标系上时出一条 NOTE（不算问题，看可视化就行）。
 
-感知和定位用同一套前缀，各开一个终端。脚本在 `ROS_DOMAIN_ID` 没设置时用 `42`，三个进程要设成同一个值，并且不要跟正在跑的狗撞车。
+规划日志（`/tmp/planning.*.log.INFO.*`，回放脚本会拷到 `logs/planning.INFO`）的关键字：
 
-```bash
-# run_lidar_seg_debug.sh：启动地面分割，发布 /patchworkpp/ground_seg_intensity。
-bash Nav_D20/perception_combo_ros/script/run_lidar_seg_debug.sh
+| 关键字 | 意思 |
+|---|---|
+| `Load robot config:` | 读的是不是 `d20/001` |
+| `GlobalMapManager: PGM map loaded` | CJGC 读到了 |
+| `Set mission to Tracking`、`Navigation started` | 终点进了状态机 |
+| `mission_state:` | 状态 |
+| `Start adjusted`、`Goal adjusted` | A\* 起点 / 终点挪到了路上 |
+| `Start point is in collision`、`No free point found near start` | 起点在路外、1 m 内也没路 |
+| `local planner solver failed` | MPPI / TEB 失败，速度清零 |
+| `Data timeout exceeded, pausing mission` | 里程计或感知栅格断了 |
+| `Map switch`、`crosswalks in`、`OSM file not exist` | 切图、读人行横道 |
+| `Failed to load PGM` | 路径或 `PLANNING_ROOT_DIR` 错了 |
 
-# run_grid_map_debug.sh：用上面的点云做局部栅格，发布 /map/occupancy_grid。
-bash Nav_D20/perception_combo_ros/script/run_grid_map_debug.sh
+以前遇到过的：
 
-# run_loc_online_debug.sh：按 default_d20.yaml 启动定位，发布 /lightning/odom 和 /map。
-bash Nav_D20/slam/lightning-lm-master/scripts/run_loc_online_debug.sh
-```
+| 现象 | 原因 | 怎么发现 / 修 |
+|---|---|---|
+| Foxglove 里坐标系来回跳 | `TfBuffer` 每条变换连逆变换一起发、云台多一条边 | 查包工具；已改成一棵树（T41） |
+| `/lightning/odom` 一路往下掉（z −46 m） | 定位高频预测把 kygi665 的加速度（单位 g）当 m/s² | 已按重力归一化（T42） |
+| `Start point is in collision` | CJGC 只有 1.7 m 宽的路，定位偏几分米起点就在路外 | 起点挪到路上（T47） |
+| 录包一闪一闪、路显示成障碍 | 两张栅格挂 `base_link`；代价地图话题反了 | 可视化工具；调试桥改 (255, 0)（T47 复核） |
+| 107 s 起狗站在障碍里 | CJGC 没有人行横道 6 那段路 | 切到新地图（T48） |
 
-定位配置里的地图路径是 `/opt/seres/nav/data/...`。这台机器没有这个目录时，节点会回退到仓库里的 `lightning-lm-master/map/0c3f8a2d-41eb-416d-8fca-aaad500e2be9`。没有顶激光和 IMU 时，定位进程能起来，但不会持续发布里程计。`lidar_seg` 同样在等点云。
+## 11. 我们的改动
 
-`ROS_DOMAIN_ID` 要和感知、定位一致。没有 `/lightning/odom` 和 `/map/occupancy_grid` 时，Tracking 大约 1 秒后会被超时逻辑暂停。不要在连着狗的 domain 上随便起 planning，它会发 `/cmd_vel` 和 `/mc/motion_control`。
-
-狗上正式进程是 systemd，不是这个脚本：
-
-```bash
-sudo systemctl start planning.service
-journalctl -u planning.service -f
-```
-
-服务里的启动命令是：
-
-```bash
-source /opt/seres/nav/planning/setup.bash
-ros2 run planning planning
-```
-
-给一个目标（规划已经起来、odom 和局部栅格在跳）：
-
-```bash
-ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
-  "{header: {frame_id: map}, pose: {position: {x: 1.0, y: 0.0, z: 0.0}, orientation: {w: 1.0}}}"
-```
-
-回放时 bag 里至少要有 `/lightning/odom` 和 `/map/occupancy_grid`。只有全局图、没有这两路，Tracking 会在大约 1 秒后被超时逻辑暂停。
+都列在 `Nav_D20/PATCHES.md`（改在哪、为什么、怎么验、哪个提交）。从机器人团队同步代码前先看那一页，同步完重新打上。

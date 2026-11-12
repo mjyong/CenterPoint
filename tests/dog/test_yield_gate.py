@@ -6,11 +6,21 @@ import pytest
 from dog_perception.detection.boxes import CLASSES, Detections
 from dog_perception.yield_eval import (Occupancy, evaluate_path, gap_after, gap_both, gt_tracks, summarize,
                                        track_objects)
-from dog_perception.yield_gate import (YieldConfig, YieldGate, assess, crosswalk_span, inside_polygon,
-                                       required_sight_range, rollout)
+from dog_perception import yield_gate as yg
+from dog_perception.yield_gate import YieldConfig, crosswalk_span, inside_polygon, required_sight_range, rollout
 
 PATH = np.array([[0.0, 0.0], [0.0, 8.0]])          # the robot crosses 8 m along +y
 KMH30 = 30 / 3.6
+GAP = YieldConfig(yield_rule="gap")                # most tests below were written for the gap rule (the default
+                                                   # until 2026-11-12); the wait rule's tests are at the end
+
+
+def assess(path, objects, now, stamp, cfg=GAP):
+    return yg.assess(path, objects, now, stamp, cfg)
+
+
+def YieldGate(cfg=GAP):
+    return yg.YieldGate(cfg)
 
 
 def car(x, y, vx, vy=0.0, oid=1, motion="moving", yaw=None, **kw):
@@ -37,7 +47,7 @@ def test_cars_that_passed_or_are_too_far_do_not():
 def test_gap_is_post_encroachment_time():
     # a car crossing at y = 6.5 m: its box grows to half-length 2.25 + 0.5 + 0.7 = 3.45 m, half-width 2.15 m,
     # so it covers s = 4.35 .. 8 m of the path; from x = -45.05 m its front reaches the path after 41.6 m
-    cfg = YieldConfig(sigma_k=0.0)
+    cfg = YieldConfig(yield_rule="gap", sigma_k=0.0)
 
     def gap(arrive):
         a = assess(PATH, [car(-45.05, 6.5, 41.6 / arrive)], 0.0, 0.0, cfg)
@@ -218,7 +228,7 @@ def test_a_new_track_near_the_path_makes_the_robot_wait_until_it_settles():
     assert YieldGate().update(a, 0.0).reason == "young"
     assert assess(PATH, [dict(young, age=1.5)], 0.0, 0.0).conflicts == []
     assert assess(PATH, [car(-40.0, 4.0, -5.0, age=0.3)], 0.0, 0.0).conflicts == []      # beyond 30 m
-    assert assess(PATH, [young], 0.0, 0.0, YieldConfig(young_range=0.0)).conflicts == []
+    assert assess(PATH, [young], 0.0, 0.0, YieldConfig(yield_rule="gap", young_range=0.0)).conflicts == []
 
 
 def test_a_vehicle_passing_the_end_of_the_path_may_turn_into_it():
@@ -226,7 +236,7 @@ def test_a_vehicle_passing_the_end_of_the_path_may_turn_into_it():
     passing = car(-10.0, 12.0, 5.0)
     a = assess(PATH, [passing], 0.0, 0.0)
     assert [c["kind"] for c in a.conflicts] == ["turn"]
-    assert assess(PATH, [passing], 0.0, 0.0, YieldConfig(turn_range=0.0)).conflicts == []
+    assert assess(PATH, [passing], 0.0, 0.0, YieldConfig(yield_rule="gap", turn_range=0.0)).conflicts == []
     assert assess(PATH, [car(-10.0, 40.0, 5.0)], 0.0, 0.0).conflicts == []              # 32 m away: no turns
 
 
@@ -273,7 +283,7 @@ def test_a_standing_vehicle_across_the_path_is_watched_longer():
     assert ds[0].reason == "blocked" and 0.1 * next(i for i, d in enumerate(ds) if d.go) == pytest.approx(17.0, abs=0.15)
     assert YieldGate().update(assess(PATH, [dict(across, standing_for=20.0)], 0.0, 0.0), 0.0).go
     # the old rule: 3 s for every standing vehicle
-    gate = YieldGate(YieldConfig(blocked_wait=3.0))
+    gate = YieldGate(YieldConfig(yield_rule="gap", blocked_wait=3.0))
     ds = [gate.update(assess(PATH, [across], t, t), t) for t in np.arange(0.0, 6.0, 0.1)]
     assert 0.1 * next(i for i, d in enumerate(ds) if d.go) == pytest.approx(5.0, abs=0.15)
     # nose towards the path 6 m away: not on it, 3 s as before
@@ -339,3 +349,51 @@ def test_read_crosswalks_from_the_site_maps_semantic_layer(tmp_path):
     assert crosswalk_size(cws[0][1]) == pytest.approx((12.0, 5.0))
     span = crosswalk_span(np.array([[6.0, -3.0], [6.0, 10.0]]), cws[0][1])      # across it, 5 m of stripes
     assert span == pytest.approx((3.0, 8.0), abs=0.11)
+
+
+# ------------------------------------------------------------------ the wait rule (decided 2026-11-12)
+WAIT = YieldConfig()                               # the default
+
+
+def test_the_default_rule_is_wait():
+    assert WAIT.yield_rule == "wait"
+
+
+def test_wait_rule_waits_for_any_moving_vehicle_that_may_pass_however_far_or_slow():
+    slow_far = car(-35.0, 4.0, 2.0)                # 2 m/s, 35 m off: reaches the path in about 14 s
+    assert assess(PATH, [slow_far], 0.0, 0.0).conflicts == []          # gap rule: later than the crossing
+    a = yg.assess(PATH, [slow_far], 0.0, 0.0, WAIT)
+    assert [c["kind"] for c in a.conflicts] == ["predicted"] and 12.0 < a.conflicts[0]["gap"] < 16.0
+    assert not yg.YieldGate(WAIT).update(a, 0.0).go
+    # going away, or on a road that never comes near the path: no wait
+    assert yg.assess(PATH, [car(10.0, 4.0, KMH30)], 0.0, 0.0, WAIT).conflicts == []
+    assert yg.assess(PATH, [car(-30.0, 30.0, KMH30)], 0.0, 0.0, WAIT).conflicts == []
+    # a slow car on a side road that may turn into the crossing: the gap rule lets it go (beyond its horizon)
+    side = car(-15.0, -6.0, 0.0, 1.5)
+    assert assess(PATH, [side], 0.0, 0.0).conflicts == []
+    assert [c["kind"] for c in yg.assess(PATH, [side], 0.0, 0.0, WAIT).conflicts] == ["turn"]
+
+
+def test_wait_rule_goes_when_the_vehicle_has_stayed_clear_for_wait_clear():
+    gate = yg.YieldGate(WAIT)
+    last_conflict, go_at = None, None
+    for k in range(200):                           # a car crossing at 30 km/h, 30 m off at the start
+        t = 0.1 * k
+        a = yg.assess(PATH, [car(-30.0 + KMH30 * t, 4.0, KMH30)], t, t, WAIT)
+        if a.conflicts:
+            last_conflict = t
+        d = gate.update(a, t)
+        if d.go:
+            go_at = t
+            break
+        assert d.reason in ("vehicle", "clearing"), d
+    assert last_conflict is not None and go_at == pytest.approx(last_conflict + WAIT.wait_clear, abs=0.11)
+
+
+def test_wait_rule_holds_a_lost_vehicle_for_lost_hold():
+    gate = yg.YieldGate(WAIT)
+    assert not gate.update(yg.assess(PATH, [car(-30.0, 4.0, KMH30)], 0.0, 0.0, WAIT), 0.0).go
+    # it is not seen any more (occluded, out of range): wait lost_hold from the last sighting, then go
+    ds = [(t, gate.update(yg.assess(PATH, [], t, t, WAIT), t)) for t in np.arange(0.1, 8.0, 0.1)]
+    assert all(d.reason == "lost" and d.ids == [1] for t, d in ds if t < WAIT.lost_hold - 0.05)
+    assert next(t for t, d in ds if d.go) == pytest.approx(WAIT.lost_hold, abs=0.11)

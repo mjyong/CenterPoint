@@ -65,6 +65,7 @@ import numpy as np
 NAV_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 DEFAULT_MAP = os.path.join(NAV_ROOT, "planning", "robot_factory", "data", "astar_pgm", "CJGC.yaml")
 DEFAULT_LAYOUT = os.path.join(NAV_ROOT, "planning", "script", "planning_viz.json")
+DEFAULT_LOC_CONFIG = os.path.join(NAV_ROOT, "slam", "lightning-lm-master", "config", "default_d20.yaml")
 
 TOPICS = dict(
     tf="/tf", tf_static="/tf_static", odom="/lightning/odom", plan="/planning/debug/path_tracking",
@@ -72,12 +73,15 @@ TOPICS = dict(
     perception="/map/occupancy_grid", global_map="/planning/debug/global_map_manager/occmap", cmd="/cmd_vel",
     string="/planning/debug/plotjuggler/string", diagnostic="/planning/debug/diagnostic",
     collision="/planning/debug/collision_checker", teb="/planning/debug/teb_planner",
-    following="/planning/debug/following", cloud="/fused_point_cloud")
+    following="/planning/debug/following", cloud="/fused_point_cloud",
+    # localization (lightning; loc_viz.py)
+    scan_world="/lightning/current_scan_world", map_cloud="/lightning/map_cloud", inspvax="/rte/rdap/rtk/inspvax",
+    loc_event="/rhr/topic/event_info")
 OTHER_MARKERS = (("collision", "/viz/collision"), ("teb", "/viz/teb"), ("following", "/viz/following"))
 
 # heights of the flattened layers [m]
 Z = dict(route=-0.06, crosswalk=-0.05, global_map=-0.055, cost_map=-0.03, perception=-0.02, trail=0.0,
-         stops=0.005, global_path=0.01, footprints=0.015, local_path=0.02, circles=0.025, other=0.028,
+         stops=0.005, global_path=0.01, footprints=0.015, reference=0.018, local_path=0.02, circles=0.025, other=0.028,
          target=0.03, goal=0.03, robot=0.04, arrows=0.06, label=0.5)
 
 MISSION_TYPES = {0: "idle", 1: "tracking", 2: "following", 3: "recharging", 4: "skill"}   # MissionConf::Type
@@ -100,6 +104,7 @@ STATE_COLOR = {"active": GREEN, "standstill": YELLOW, "standby": (0.85, 0.85, 0.
 PLAN_STYLE = {
     "global_path_2d": ("global_path", BLUE, 0.15),
     "local_path_2d": ("local_path", GREEN, 0.08),
+    "local_reference_2d": ("reference", (0.75, 0.35, 1.0, 0.9), 0.05),   # MPPI's input (recorded from T49 on)
     "local_path_footprint": ("footprints", (0.19, 0.82, 0.35, 0.35), 0.02),
     "target_pt": ("target", None, None),
     "robot_circle": ("circles", PINK, None),
@@ -164,6 +169,28 @@ class Ros:
     def decode(self, data, typename):
         return self.ts.deserialize_cdr(data, typename)
 
+    def register(self, name, schema_text):
+        """Types the humble store does not know (kygi665_msgs/msg/INSPVAX, rhr_interface/...), from the ros2msg
+        schema the recorder wrote: the main definition, then "MSG: pkg/Type" sections."""
+        if name in self.ts.types:
+            return
+        from rosbags.typesys import get_types_from_msg
+        parts = re.split(r"^=+\s*$", schema_text, flags=re.M)
+        types = {}
+        for k, part in enumerate(parts):
+            body, typ = part, name
+            if k:
+                m = re.search(r"^MSG:\s*(\S+)\s*$", part, re.M)
+                if not m:
+                    continue
+                typ = m.group(1)
+                if typ.count("/") == 1:
+                    typ = typ.replace("/", "/msg/")
+                body = part[m.end():]
+            if typ not in self.ts.types:
+                types.update(get_types_from_msg(body, typ))
+        self.ts.register(types)
+
     def encode(self, msg, typename):
         return bytes(self.ts.serialize_cdr(msg, typename))
 
@@ -220,11 +247,15 @@ def stamp_of(header):
 
 # ---------------------------------------------------------------- reading
 
-def mcap_files(path):
-    files = sorted(glob.glob(os.path.join(path, "*.mcap"))) if os.path.isdir(path) else [path]
-    if not files or not all(os.path.isfile(f) for f in files):
-        raise SystemExit("%s: no .mcap" % path)
-    return files
+def mcap_files(paths):
+    """The .mcap files of one or more recordings (directories or files)."""
+    out = []
+    for path in ([paths] if isinstance(paths, str) else paths):
+        files = sorted(glob.glob(os.path.join(path, "*.mcap"))) if os.path.isdir(path) else [path]
+        if not files or not all(os.path.isfile(f) for f in files):
+            raise SystemExit("%s: no .mcap" % path)
+        out += files
+    return out
 
 
 def read_recording(path, ros, topics):
@@ -232,7 +263,10 @@ def read_recording(path, ros, topics):
     from mcap.reader import make_reader
 
     rec = dict(tf=defaultdict(list), odom=[], cmd=[], strings=[], goals=[], plans=[], grids=defaultdict(list),
-               markers=defaultdict(list), clouds=[], diagnostics=[], types={}, counts=defaultdict(int))
+               markers=defaultdict(list), clouds=[], diagnostics=[], types={}, counts=defaultdict(int),
+               loc_raw=defaultdict(list), loc_raw_events=[])
+    from loc_viz import SCAN_RATE
+    last_scan = -1e18
     wanted = set(topics.values())
     last_cloud = -1e18
     for f in mcap_files(path):
@@ -240,7 +274,14 @@ def read_recording(path, ros, topics):
             for schema, channel, message in make_reader(fh).iter_messages(topics=sorted(wanted),
                                                                            log_time_order=True):
                 topic, typ, log = channel.topic, schema.name, message.log_time * 1e-9
+                if topic not in rec["types"] and typ not in ros.ts.types and schema.encoding == "ros2msg":
+                    try:
+                        ros.register(typ, schema.data.decode("utf-8", "replace"))
+                    except Exception as e:      # noqa: BLE001 - a type we cannot read is left out, not fatal
+                        print("  %s (%s): cannot read the type (%s), left out" % (topic, typ, e))
                 rec["types"][topic] = typ
+                if typ not in ros.ts.types:
+                    continue
                 rec["counts"][topic] += 1
                 data = message.data
                 if typ == "tf2_msgs/msg/TFMessage":
@@ -253,8 +294,10 @@ def read_recording(path, ros, topics):
                 elif topic == topics["odom"]:
                     m = ros.decode(data, typ)
                     p, tw = m.pose.pose, m.twist.twist
+                    # lightning: covariance[1] = localization valid (1) or failed (0), covariance[0] = system time
                     rec["odom"].append((stamp_of(m.header), log, p.position.x, p.position.y, p.position.z,
-                                        yaw_of(p.orientation), tw.linear.x, tw.linear.y, tw.angular.z))
+                                        yaw_of(p.orientation), tw.linear.x, tw.linear.y, tw.angular.z,
+                                        float(m.pose.covariance[1])))
                 elif topic == topics["cmd"]:
                     m = ros.decode(data, typ)
                     if typ.endswith("TwistStamped"):
@@ -276,6 +319,16 @@ def read_recording(path, ros, topics):
                 elif topic == topics["diagnostic"]:
                     m = ros.decode(data, typ)
                     rec["diagnostics"].append((log, [(s.name, int(s.level), s.message) for s in m.status]))
+                elif topic == topics["scan_world"]:
+                    if log - last_scan >= 1.0 / SCAN_RATE - 1e-3:
+                        rec["loc_raw"]["scan_world"].append((log, data))
+                        last_scan = log
+                elif topic in (topics["map_cloud"], topics["inspvax"]):
+                    rec["loc_raw"]["map_cloud" if topic == topics["map_cloud"] else "inspvax"].append((log, data))
+                elif topic == topics["loc_event"]:
+                    m = ros.decode(data, typ)
+                    text = " / ".join(str(v) for v in vars(m).values() if isinstance(v, str) and v)
+                    rec["loc_raw_events"].append((log, text))
                 elif topic == topics["cloud"]:
                     if log - last_cloud >= 1.0 / CLOUD_RATE - 1e-3:
                         rec["clouds"].append((log, data))
@@ -653,6 +706,7 @@ class GridStats:
             return None, None
         occ = data >= 50
         nearest = float(dist[occ].min()) if occ.any() else None
+        self.last_occupied = int(np.count_nonzero(occ))
         return int(np.count_nonzero(occ & inside)), nearest
 
 
@@ -741,6 +795,135 @@ def jnum(v, nd=4):
     return round(v, nd) if math.isfinite(v) else None
 
 
+
+# what each mission state does (src/runnable/mission/tracking/tracking.cc: check_e_* decide the transitions,
+# on_entry_s_* run once on entry, spin_s_* every cycle)
+STATE_EXPLAIN = {
+    "off": ("没有任务，等 /goal_pose", "收到目标（need_start）-> passive"),
+    "passive": ("收到目标", "下一周期 -> standby"),
+    "standby": ("进来时做一次全局规划：A* 在全局地图上从狗到终点（GlobalMapManager::PlanGlobalPath）",
+                "A* 成功（global_plan_flag）-> active；失败 -> fault；要停（need_stop）-> off"),
+    "active": ("每周期：从全局路径截一段局部参考（ExtractLocalPath），交给 MPPI 优化出局部路径和速度指令",
+               "到终点附近、速度和朝向都满足并停稳一段时间 -> off；暂停或被挡（need_pause / nav_blocked）-> standstill"),
+    "standstill": ("暂停，速度 0（输入超时、被挡、外部暂停）", "恢复（need_resume）-> active；要停 -> off"),
+    "fault": ("全局规划失败", "要停 -> off"),
+    "idle": ("没有任务", "收到目标 -> 跟踪任务"),
+}
+CODE = {
+    "input": "src/runnable/communication/ros_bridge/ros_bridge.cc：订阅 /lightning/odom、/map/occupancy_grid、"
+             "/goal_pose；数据超时（timeout_pause_duration）就暂停任务",
+    "global": "src/runnable/preprocess/global_map_manager/global_map_manager.cc：读 CJGC 路网图（255 = 能走）；"
+              "PlanGlobalPath = A*（grid_path_planner.cc，起点不在路上先挪到最近的路上）+ 平滑；ExtractLocalPath",
+    "costmap": "src/runnable/preprocess/cost_map_production/cost_map_production.cc：Proc = 全部置空闲 -> "
+               "AddObstacleFromMap（全局图按狗的位姿叠进来）-> AddObstacleFromPerception（感知栅格的障碍）-> 距离场；"
+               "obstacle 层 255 = 空闲、0 = 障碍",
+    "fsm": "src/runnable/mission/tracking/tracking.cc：Proc -> mission_fsm_ctx_.Proc()",
+    "local": "Tracking::spin_s_active -> MppiPlanner::solver（src/algorithm/mppi_planner/mppi_planner.cc，"
+             "参考路径 + 当前速度，代价在 critics/）-> getOptimizePath（局部路径）、getVelocityCmd（速度）",
+    "output": "RosBridge 发 /cmd_vel（MPPI 的速度，base_link 里：vx 向前、vy 向左、ω 逆时针）",
+}
+
+
+def _num(v, fmt):
+    return fmt % v if v is not None and v == v else "没有"
+
+
+def describe_cmd(vx, vy, w):
+    if vx is None:
+        return "没有指令"
+    bits = []
+    if abs(vx) > 0.02:
+        bits.append("%s %.2f m/s" % ("向前" if vx > 0 else "向后", abs(vx)))
+    if abs(vy or 0) > 0.02:
+        bits.append("%s平移 %.2f m/s" % ("向左" if vy > 0 else "向右", abs(vy)))
+    if abs(w or 0) > 0.02:
+        bits.append("%s %.2f rad/s" % ("左转" if w > 0 else "右转", abs(w)))
+    return "，".join(bits) if bits else "停（全是 0）"
+
+
+def planning_flow(s, t0):
+    """One planning cycle as the code runs it, with this cycle's numbers: for learning the flow."""
+    raw = s["raw"]
+    plan_t = raw.get("planning")
+    stat = s["mission_status"] or ("idle" if s["mission_type"] == "idle" else "")
+    doing, nxt = STATE_EXPLAIN.get(stat, ("", ""))
+    return {
+        "时间_s": round(s["t"] - t0, 2),
+        "① 输入（RosBridge）": {
+            "代码": CODE["input"],
+            "里程计": "x %.2f, y %.2f, 朝向 %.0f°, 速度 %s m/s" % (s["x"], s["y"], math.degrees(s["yaw"]),
+                                                          _num(s["odom_v"], "%.2f")),
+            "里程计到规划的延迟_s": _num(plan_t - raw["odom_ts"] if plan_t and raw.get("odom_ts") else None, "%.3f"),
+            "感知栅格到规划的延迟_s": _num(plan_t - raw["occ_ts"] if plan_t and raw.get("occ_ts") else None, "%.3f"),
+            "输入超时": {None: "没有", 0.0: "否", 1.0: "是"}.get(s["input_timeout"], s["input_timeout"]),
+            "终点": "没有" if not s["goal"] else "(%.1f, %.1f)" % (s["goal"][1], s["goal"][2]),
+        },
+        "② 全局地图和全局路径（GlobalMapManager）": {
+            "代码": CODE["global"],
+            "全局路径点数": _num(s["global_path_points"], "%d"),
+            "到终点_m": _num(s["goal_distance"], "%.2f"),
+            "狗离全局路径_m": _num(s["path_offset"], "%.2f"),
+        },
+        "③ 局部代价地图（CostMapProduction）": {
+            "代码": CODE["costmap"],
+            "范围": "狗前 10 m、后 5 m、左右各 5 m，5 cm 一格，跟着狗转",
+            "障碍格数": _num(s["cost_map_occupied"], "%d"),
+            "狗脚下的障碍格（脚印 1.0 x 0.4 m）": _num(s["cost_map_footprint_cells"], "%d"),
+            "感知栅格的障碍格数": _num(s["perception_occupied"], "%d"),
+            "最近的感知障碍_m": _num(s["perception_nearest"], "%.2f"),
+        },
+        "④ 任务状态机（Tracking）": {
+            "代码": CODE["fsm"],
+            "任务": s["mission_type"] or "没有",
+            "状态": stat or "没有",
+            "这个状态在做什么": doing,
+            "怎么离开这个状态": nxt,
+        },
+        "⑤ 局部规划（D20 是 MPPI，tracking_conf.planner_type；T48 之前的录包是 TEB）": {
+            "代码": CODE["local"],
+            "参考路径（MPPI 的输入）点数": _num(len(s["reference"]) if s["reference"] else None, "%d"),
+            "参考路径长_m": _num(polyline_length(s["reference"]) if s["reference"] else None, "%.2f"),
+            "优化后的局部路径点数": _num(s["local_path_points"], "%d"),
+            "局部路径长_m": _num(s["local_path_length"], "%.2f"),
+        },
+        "⑥ 输出（/cmd_vel）": {
+            "代码": CODE["output"],
+            "指令": describe_cmd(s["cmd_vx"], s["cmd_vy"], s["cmd_omega"]),
+            "实际速度_m/s": _num(s["odom_v"], "%.2f"),
+        },
+    }
+
+
+FLOW_SCHEMA = {"type": "object", "title": "planning_viz.Flow", "additionalProperties": True}
+LEGEND = {
+    "怎么看": "3D 是俯视，跟着狗。左键拖动平移、滚轮缩放、右键拖动转视角。右边的曲线和下面的状态条和 3D 同一个时间轴，"
+           "点曲线上任一处就跳到那一刻。",
+    "图层（3D 面板左边的话题列表可以逐个开关）": {
+        "/viz/route_map 灰蓝": "规划地图（CJGC 路网）上能走的路，约 1.7 m 宽的一条条线",
+        "/viz/crosswalks 黄": "地图标的人行横道，写着编号和横穿长度",
+        "/viz/cost_map 半透明红": "规划的局部代价地图里的障碍（狗周围 15 x 10 m）：路外面全是障碍，再加感知看到的",
+        "/viz/perception_grid 橙": "感知栅格里的障碍（雷达看到的近处障碍）",
+        "/viz/trail 彩色线": "狗走过的路，按速度着色（蓝慢、绿、黄、红快）；白圈是停下的地方",
+        "/viz/plan 蓝线": "全局路径（A* 在规划地图上找的，进 standby 时算一次）",
+        "/viz/plan 紫线": "局部参考路径：每周期从全局路径截出来交给 MPPI 的那一段（T49 起的录包才有）",
+        "/viz/plan 绿线和绿框": "MPPI 优化后的局部路径和沿路的脚印",
+        "/viz/plan 红/绿箭头": "跟踪目标点（红：要求到点时的朝向）",
+        "/viz/plan 粉色圆": "规划用来查碰撞的圆",
+        "/viz/plan 红圆 + 终点": "终点",
+        "/viz/robot": "狗（青色，白三角是朝前）；浅蓝箭头 = 实际速度（1 s 走多远），橙箭头 = 速度指令，橙弧 = 转向指令；"
+                      "后面的文字是这一刻的状态",
+        "/viz/loc/map_cloud": "定位地图的点云（按高度着色）",
+        "/viz/loc/scan": "这一帧雷达点云，按 LIO 的位姿放进地图；颜色是离地图最近点的距离：绿 = 贴在地图上，红 = 对不上",
+        "/viz/loc/ins": "INS 的轨迹（紫 = RTK 固定解，灰 = 不是），和它现在的位置",
+    },
+    "面板": {
+        "/viz/flow（规划流程）": "每个规划周期按代码的顺序：输入 -> 全局 -> 代价地图 -> 状态机 -> MPPI -> 输出，每步写这一周期的数和代码位置",
+        "/viz/loc/flow（定位流程）": "lightning 每一步：IMU 预测 -> 点云 -> 配准 -> 健康 -> INS -> 输出",
+        "/viz/state、/viz/loc/state": "画曲线用的数",
+        "/viz/events": "事件：任务状态变化、超时、停下、断流、跳变、狗站到路外、定位故障、INS、规划和定位自己的警告",
+    },
+}
+
 # ---------------------------------------------------------------- conversion
 
 class Converter:
@@ -759,7 +942,7 @@ class Converter:
         a, ros = self.args, self.ros
         topics = dict(TOPICS)
         topics.update(odom=a.odom_topic, cloud=a.cloud_topic)
-        rec = read_recording(a.recording, ros, topics)
+        rec = read_recording([a.recording] + list(a.extra), ros, topics)
         self.rec, self.topics = rec, topics
         self.build_clock_track()
         if self.track is None:
@@ -776,7 +959,12 @@ class Converter:
         self.write_robot()
         self.write_trail()
         self.write_static()
+        self.write_legend()
         self.convert_cloud()
+        self.loc = None
+        if any(self.rec["loc_raw"].values()) or self.args.loc_map:
+            from loc_viz import LocLayers
+            self.loc = LocLayers(self).run()
         self.collect_events()
         self.write_events()
         self.out.write(a.output)
@@ -893,7 +1081,7 @@ class Converter:
             if stamps:
                 t = max(stamps)
             out = [ros.delete_all(t, self.fixed)]
-            gp, lp, target = None, None, None
+            gp, lp, target, reference = None, None, None, None
             for mk in arr.markers:
                 if mk.action != 0:
                     continue
@@ -904,6 +1092,8 @@ class Converter:
                     lp = [(pt.x, pt.y) for pt in mk.points]
                 elif mk.ns == "target_pt":
                     target = (mk.pose.position.x, mk.pose.position.y)
+                elif mk.ns == "local_reference_2d":
+                    reference = [(pt.x, pt.y) for pt in mk.points]
                 if style is None:
                     continue
                 layer, color, width = style
@@ -920,7 +1110,7 @@ class Converter:
                 self.event(last_t, "warn", "规划 %.2f s 没有输出（%s）" % (t - last_t, self.topics["plan"]))
             last_t = t
             times.append(t)
-            info.append(dict(global_path=gp, local_path=lp, target=target))
+            info.append(dict(global_path=gp, local_path=lp, target=target, reference=reference))
         order = np.argsort(times, kind="stable")
         return [times[i] for i in order], [info[i] for i in order]
 
@@ -1023,7 +1213,7 @@ class Converter:
                     g.data = np.where(d >= 0, 100 - d, d).astype(np.int8)
                 t = self.data_time(stamp_of(g.header), log)
                 frame = g.header.frame_id.lstrip("/")
-                fp = stats(g) if frame == self.base else (None, None)
+                fp = stats(g) + (stats.last_occupied,) if frame == self.base else (None, None, None)
                 o = g.info.origin
                 placed = self.to_fixed(frame, t, o.position.x, o.position.y, yaw_of(o.orientation))
                 if placed is None:
@@ -1043,9 +1233,10 @@ class Converter:
                                                        ", %d in unknown frames" % skipped if skipped else ""))
 
     def grid_at(self, layer, t):
+        """(occupied cells under the footprint, nearest occupied [m], occupied cells) of the newest grid."""
         times, st = self.grid_stats.get(layer, ([], []))
         i = latest(times, t)
-        return st[i] if i >= 0 and t - times[i] < 1.0 else (None, None)
+        return st[i] if i >= 0 and t - times[i] < 1.0 else (None, None, None)
 
     # -- per-cycle state
     def build_states(self):
@@ -1080,8 +1271,8 @@ class Converter:
             plan = self.plan_info[pi] if pi >= 0 and t - self.plan_times[pi] < 1.0 else {}
             gp, lp = plan.get("global_path"), plan.get("local_path")
             goal = self.goal_at(t)
-            cm_fp, cm_near = self.grid_at("cost_map", t)
-            pg_fp, pg_near = self.grid_at("perception", t)
+            cm_fp, cm_near, cm_occ = self.grid_at("cost_map", t)
+            pg_fp, pg_near, pg_occ = self.grid_at("perception", t)
             states.append(dict(
                 t=t, x=x, y=y, yaw=yaw, mission_type=type_name, mission_status=stat_name,
                 mission_type_id=mtype, mission_status_id=mstat,
@@ -1095,8 +1286,9 @@ class Converter:
                 global_path_points=len(gp) if gp is not None else None,
                 local_path_points=len(lp) if lp is not None else None,
                 local_path_length=polyline_length(lp) if lp else None,
-                cost_map_footprint_cells=cm_fp, cost_map_nearest=cm_near,
-                perception_footprint_cells=pg_fp, perception_nearest=pg_near, raw=raw))
+                cost_map_footprint_cells=cm_fp, cost_map_nearest=cm_near, cost_map_occupied=cm_occ,
+                perception_footprint_cells=pg_fp, perception_nearest=pg_near, perception_occupied=pg_occ,
+                reference=plan.get("reference"), local_path=lp, raw=raw))
         for s in states:
             mission = "%s/%s" % (s["mission_type"], s["mission_status"]) if s["mission_type"] else ""
             moving = None
@@ -1116,6 +1308,7 @@ class Converter:
             obj["goal_y"] = jnum(s["goal"][2]) if s["goal"] else None
             obj["planning"] = {k: jnum(v, 6) for k, v in s["raw"].items() if jnum(v, 6) is not None}
             self.out.json_msg("/viz/state", "planning_viz.State", STATE_SCHEMA, s["t"], obj)
+            self.out.json_msg("/viz/flow", "planning_viz.Flow", FLOW_SCHEMA, s["t"], planning_flow(s, self.t0))
         return states
 
     def state_at(self, t):
@@ -1174,6 +1367,9 @@ class Converter:
             return "\n".join(lines)
         mission = MISSION_ZH.get(s["mission_type"], s["mission_type"])
         lines[0] += "  %s %s" % (mission, s["mission_status"])
+        short = {"standby": "（A* 全局规划）", "active": "（MPPI 跟着走）", "standstill": "（暂停）", "fault": "（规划失败）",
+                 "off": "（等目标）"}.get(s["mission_status"], "")
+        lines[0] += short
         cmd = "指令 %.2f m/s  转 %.2f" % (s["cmd_v"], s["cmd_omega"] or 0.0) if s["cmd_v"] is not None else "无指令"
         lines.append("速度 %.2f m/s  %s" % (v, cmd))
         bits = []
@@ -1310,6 +1506,10 @@ class Converter:
                 self.out.ros_msg("/viz/crosswalks", "visualization_msgs/msg/MarkerArray", float(t),
                                  ros.new("visualization_msgs/msg/MarkerArray",
                                          markers=self.crosswalk_markers(float(t), near)))
+
+    def write_legend(self):
+        for t in np.arange(self.t0, self.t1 + 1e-6, STATIC_PERIOD):
+            self.out.json_msg("/viz/legend", "planning_viz.Legend", FLOW_SCHEMA, float(t), LEGEND)
 
     def crosswalk_markers(self, t, near):
         ros = self.ros
@@ -1490,10 +1690,11 @@ class Converter:
             path = cand if os.path.isfile(cand) else None
         if not path:
             return
-        lines = parse_glog(path)
+        wall0 = self.clock.log[0] if self.clock.log is not None else None
+        import time as _time
+        lines = parse_glog(path, default_year=None if wall0 is None else _time.gmtime(wall0).tm_year)
         if not lines:
             return
-        wall0 = self.clock.log[0] if self.clock.log is not None else None
         tz = 0.0
         if wall0 is not None:
             tz = round((lines[0][0] - wall0) / 900.0) * 900.0
@@ -1530,8 +1731,9 @@ GLOG_KEYWORDS = ("Start adjusted", "Goal adjusted", "in collision", "No free poi
 GLOG_LINE = re.compile(r"^([IWEF])(\d\d)(\d\d) (\d\d):(\d\d):(\d\d)\.(\d+)\s+\S+\s+([^\]]+)\]\s?(.*)$")
 
 
-def parse_glog(path):
-    """[(naive epoch as if UTC, level, file:line, text)] of a glog file."""
+def parse_glog(path, default_year=None):
+    """[(naive epoch as if UTC, level, file:line, text)] of a glog file (stderr output has no "Log file created
+    at" line: default_year then)."""
     year = None
     out = []
     with open(path, "r", errors="replace") as f:
@@ -1545,7 +1747,7 @@ def parse_glog(path):
             if not m:
                 continue
             lv, mo, d, hh, mi, ss, frac, where, text = m.groups()
-            y = year or 1970
+            y = year or default_year or 1970
             naive = calendar.timegm((y, int(mo), int(d), int(hh), int(mi), int(ss), 0, 0, 0)) + float("0." + frac)
             out.append((naive, {"I": "info", "W": "warn", "E": "error", "F": "fatal"}[lv], where.strip(), text))
     return out
@@ -1758,6 +1960,8 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("recording", help="planning recording: a ros2 bag directory with .mcap files, or one .mcap")
+    p.add_argument("extra", nargs="*", help="more recordings of the same run read with it (the replay script records "
+                                            "the heavy point clouds into a separate bag that is not kept)")
     p.add_argument("-o", "--output", help="default <recording>/viz/planning_viz.mcap")
     p.add_argument("--map", default=DEFAULT_MAP if os.path.isfile(DEFAULT_MAP) else None,
                    help="planning map: map.yaml, a map directory with 2d/<id>/map.yaml (and semantic.osm), or its "
@@ -1765,6 +1969,11 @@ def main(argv=None):
     p.add_argument("--osm", help="semantic.osm (or a map directory / zip with one) for the crosswalks; default the "
                                  "one beside --map")
     p.add_argument("--glog", help="planning's glog; default <recording>/logs/planning.INFO")
+    p.add_argument("--loc-map", help="localization map directory or zip (3d/global.pcd) for /viz/loc/map_cloud and the "
+                                     "scans' match; default /lightning/map_cloud of the recording")
+    p.add_argument("--loc-config", default=DEFAULT_LOC_CONFIG,
+                   help="lightning config with system.ins_lat / ins_lon / ins_height (the INS's map origin)")
+    p.add_argument("--loc-glog", help="lightning's log; default <recording>/logs/loc.log")
     p.add_argument("--overview", help="overview image; default beside the output (.png); 'none' for no image")
     p.add_argument("--footprint", type=float, nargs=2, default=(1.0, 0.4), metavar=("LENGTH", "WIDTH"))
     p.add_argument("--cost-map-values", choices=("auto", "ros", "inverted"), default="auto",

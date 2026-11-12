@@ -130,6 +130,32 @@
           "colorField": "z",
           "colorMode": "colormap",
           "colorMap": "turbo"
+        },
+        "/viz/loc/map_cloud": {
+          "visible": false,
+          "pointSize": 1.5,
+          "colorMode": "colormap",
+          "colorField": "height",
+          "colorMap": "turbo",
+          "minValue": -1.0,
+          "maxValue": 4.0,
+          "explicitAlpha": 0.6
+        },
+        "/viz/loc/scan": {
+          "visible": true,
+          "pointSize": 2.5,
+          "colorMode": "gradient",
+          "colorField": "match",
+          "gradient": [
+            "#30d158ff",
+            "#ff453aff"
+          ],
+          "minValue": 0.0,
+          "maxValue": 0.5,
+          "explicitAlpha": 1.0
+        },
+        "/viz/loc/ins": {
+          "visible": true
         }
       },
       "publish": {
@@ -289,20 +315,47 @@
       "diffMethod": "custom",
       "diffTopicPath": "",
       "showFullMessageForDiff": false,
-      "foxglovePanelTitle": "这一周期的状态"
+      "expansion": "all",
+      "foxglovePanelTitle": "这一周期的数"
     },
     "Tab!side": {
       "activeTabIdx": 0,
       "tabs": [
         {
+          "title": "规划流程",
+          "layout": "RawMessages!flow"
+        },
+        {
           "title": "事件",
           "layout": "RosOut!events"
         },
         {
-          "title": "状态",
+          "title": "数",
           "layout": "RawMessages!state"
+        },
+        {
+          "title": "图例",
+          "layout": "RawMessages!legend"
         }
       ]
+    },
+    "RawMessages!flow": {
+      "topicPath": "/viz/flow",
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "diffTopicPath": "",
+      "showFullMessageForDiff": false,
+      "expansion": "all",
+      "foxglovePanelTitle": "规划流程（这一周期）"
+    },
+    "RawMessages!legend": {
+      "topicPath": "/viz/legend",
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "diffTopicPath": "",
+      "showFullMessageForDiff": false,
+      "expansion": "all",
+      "foxglovePanelTitle": "图例和怎么看"
     }
   },
   "globalVariables": {},
@@ -315,28 +368,18 @@
     "second": {
       "first": "Plot!speed",
       "second": {
-        "first": "Plot!omega",
+        "first": "Plot!distance",
         "second": {
-          "first": "Plot!distance",
-          "second": {
-            "first": "Plot!footprint",
-            "second": {
-              "first": "StateTransitions!mission",
-              "second": "Tab!side",
-              "direction": "column",
-              "splitPercentage": 30
-            },
-            "direction": "column",
-            "splitPercentage": 25
-          },
+          "first": "StateTransitions!mission",
+          "second": "Tab!side",
           "direction": "column",
-          "splitPercentage": 20
+          "splitPercentage": 16
         },
         "direction": "column",
-        "splitPercentage": 17
+        "splitPercentage": 22
       },
       "direction": "column",
-      "splitPercentage": 15
+      "splitPercentage": 18
     },
     "direction": "row",
     "splitPercentage": 60

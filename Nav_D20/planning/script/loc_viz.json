@@ -1,0 +1,350 @@
+{
+  "configById": {
+    "3D!loc": {
+      "cameraState": {
+        "perspective": false,
+        "distance": 60,
+        "phi": 0,
+        "thetaOffset": 0,
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-position",
+      "followTf": "base_link",
+      "scene": {
+        "backgroundColor": "#121418",
+        "labelScaleFactor": 1,
+        "transforms": {
+          "visible": false,
+          "showLabel": false,
+          "editable": false
+        },
+        "enableStats": false,
+        "ignoreColladaUpAxis": false,
+        "meshUpAxis": "z_up"
+      },
+      "transforms": {},
+      "layers": {
+        "grid": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "10 m grid",
+          "instanceId": "grid",
+          "layerId": "foxglove.Grid",
+          "frameId": "map",
+          "size": 2000,
+          "divisions": 200,
+          "lineWidth": 0.5,
+          "color": "#ffffff1a",
+          "position": [
+            0,
+            0,
+            -0.08
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        }
+      },
+      "topics": {
+        "/viz/route_map": {
+          "visible": true,
+          "frameLocked": false,
+          "colorMode": "custom",
+          "minColor": "#00000000",
+          "maxColor": "#4b5d70ff",
+          "unknownColor": "#00000000",
+          "invalidColor": "#00000000"
+        },
+        "/viz/global_map": {
+          "visible": false,
+          "frameLocked": false,
+          "colorMode": "custom",
+          "minColor": "#00000000",
+          "maxColor": "#4b5d70ff",
+          "unknownColor": "#00000000",
+          "invalidColor": "#00000000"
+        },
+        "/viz/cost_map": {
+          "visible": false,
+          "frameLocked": false,
+          "colorMode": "custom",
+          "minColor": "#00000000",
+          "maxColor": "#e0403a59",
+          "unknownColor": "#00000000",
+          "invalidColor": "#00000000"
+        },
+        "/viz/perception_grid": {
+          "visible": false,
+          "frameLocked": false,
+          "colorMode": "custom",
+          "minColor": "#00000000",
+          "maxColor": "#ff9f0aff",
+          "unknownColor": "#00000000",
+          "invalidColor": "#00000000"
+        },
+        "/viz/crosswalks": {
+          "visible": true
+        },
+        "/viz/trail": {
+          "visible": true
+        },
+        "/viz/plan": {
+          "visible": false
+        },
+        "/viz/robot": {
+          "visible": true
+        },
+        "/viz/collision": {
+          "visible": true
+        },
+        "/viz/teb": {
+          "visible": true
+        },
+        "/viz/following": {
+          "visible": true
+        },
+        "/viz/cloud": {
+          "visible": true,
+          "pointSize": 2,
+          "colorField": "z",
+          "colorMode": "colormap",
+          "colorMap": "turbo"
+        },
+        "/viz/loc/map_cloud": {
+          "visible": true,
+          "pointSize": 1.5,
+          "colorMode": "colormap",
+          "colorField": "height",
+          "colorMap": "turbo",
+          "minValue": -1.0,
+          "maxValue": 4.0,
+          "explicitAlpha": 0.6
+        },
+        "/viz/loc/scan": {
+          "visible": true,
+          "pointSize": 2.5,
+          "colorMode": "gradient",
+          "colorField": "match",
+          "gradient": [
+            "#30d158ff",
+            "#ff453aff"
+          ],
+          "minValue": 0.0,
+          "maxValue": 0.5,
+          "explicitAlpha": 1.0
+        },
+        "/viz/loc/ins": {
+          "visible": true
+        }
+      },
+      "publish": {
+        "type": "pose",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {},
+      "foxglovePanelTitle": "定位（俯视，跟着狗）"
+    },
+    "Plot!match": {
+      "paths": [
+        {
+          "value": "/viz/loc/state.match_inlier",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "贴上的比例",
+          "color": "#30d158"
+        },
+        {
+          "value": "/viz/loc/state.match_median",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "距离中位 m",
+          "color": "#ff453a"
+        }
+      ],
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240,
+      "foxglovePanelTitle": "点云贴在地图上的比例（< 0.2 m）和离地图的距离中位 m",
+      "minYValue": 0
+    },
+    "Plot!ins": {
+      "paths": [
+        {
+          "value": "/viz/loc/state.odom_minus_ins",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "定位 - INS",
+          "color": "#bf5af2"
+        }
+      ],
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240,
+      "foxglovePanelTitle": "定位减 INS m",
+      "minYValue": 0
+    },
+    "Plot!attitude": {
+      "paths": [
+        {
+          "value": "/viz/loc/state.z",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "高度",
+          "color": "#64d2ff"
+        },
+        {
+          "value": "/viz/loc/state.roll",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "横滚",
+          "color": "#ff9f0a"
+        },
+        {
+          "value": "/viz/loc/state.pitch",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "俯仰",
+          "color": "#ffd60a"
+        }
+      ],
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240,
+      "foxglovePanelTitle": "高度 m / 横滚、俯仰 deg"
+    },
+    "StateTransitions!loc": {
+      "paths": [
+        {
+          "value": "/viz/loc/state.valid",
+          "timestampMethod": "receiveTime",
+          "label": "定位有效"
+        },
+        {
+          "value": "/viz/loc/state.ins_fixed",
+          "timestampMethod": "receiveTime",
+          "label": "INS RTK 固定"
+        },
+        {
+          "value": "/viz/state.mission",
+          "timestampMethod": "receiveTime",
+          "label": "规划任务"
+        }
+      ],
+      "isSynced": true,
+      "foxglovePanelTitle": "状态"
+    },
+    "RawMessages!locflow": {
+      "topicPath": "/viz/loc/flow",
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "diffTopicPath": "",
+      "showFullMessageForDiff": false,
+      "expansion": "all",
+      "foxglovePanelTitle": "定位流程（这一刻）"
+    },
+    "RosOut!events": {
+      "searchTerms": [],
+      "minLogLevel": 1,
+      "topicToRender": "/viz/events",
+      "foxglovePanelTitle": "事件"
+    },
+    "RawMessages!legend": {
+      "topicPath": "/viz/legend",
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "diffTopicPath": "",
+      "showFullMessageForDiff": false,
+      "expansion": "all",
+      "foxglovePanelTitle": "图例和怎么看"
+    },
+    "Tab!locside": {
+      "activeTabIdx": 0,
+      "tabs": [
+        {
+          "title": "定位流程",
+          "layout": "RawMessages!locflow"
+        },
+        {
+          "title": "事件",
+          "layout": "RosOut!events"
+        },
+        {
+          "title": "图例",
+          "layout": "RawMessages!legend"
+        }
+      ]
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "first": "3D!loc",
+    "second": {
+      "first": "Plot!match",
+      "second": {
+        "first": "Plot!ins",
+        "second": {
+          "first": "Plot!attitude",
+          "second": {
+            "first": "StateTransitions!loc",
+            "second": "Tab!locside",
+            "direction": "column",
+            "splitPercentage": 22
+          },
+          "direction": "column",
+          "splitPercentage": 22
+        },
+        "direction": "column",
+        "splitPercentage": 20
+      },
+      "direction": "column",
+      "splitPercentage": 17
+    },
+    "direction": "row",
+    "splitPercentage": 58
+  }
+}

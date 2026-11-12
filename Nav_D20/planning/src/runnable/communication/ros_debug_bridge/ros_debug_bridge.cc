@@ -280,6 +280,14 @@ void RosDebugBridge::PathTrackingDebug() {
   //       VisualizationUtil::getColor(VisualizationUtil::BLUE));
   //   marker_array.markers.push_back(footprint_marker);
   // }
+  // the local planner's input: the reference cut from the global path (Tracking::spin_s_active)
+  const auto &local_reference_2d = mission_tracking->local_reference_2d();
+  if (local_reference_2d.size() >= 2) {
+    marker_array.markers.push_back(VisualizationUtil::createLineStripMarker(
+        "map", "local_reference_2d", marker_id++,
+        VisualizationUtil::getColor(VisualizationUtil::PURPLE),
+        local_reference_2d));
+  }
   auto local_path_2d = mission_tracking->local_path_2d();
   auto local_path_marker = VisualizationUtil::createLineStripMarker(
       "map", "local_path_2d", marker_id++,

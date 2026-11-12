@@ -54,24 +54,36 @@ class YieldConfig:
     turn_range: float = 25.0        # [m] a moving vehicle this close to the path may also turn left / right (0: off)
     turn_radius: float = 10.0       # [m] of those turns, at the vehicle's speed ...
     turn_max_deg: float = 90.0      # ... up to this much, then straight on
-    # what makes a moving vehicle a conflict (2026-11-12):
+    # what makes a moving vehicle a conflict:
+    #   "wait" (decided 2026-11-12, the default): perception sees about 40 m of point cloud, too short for "gap" and
+    #          tight for "stop". So the robot waits for every moving vehicle that may pass through the checked path
+    #          (the crosswalk), straight on or turning, however far and however slow: no timing at all. It goes
+    #          again once each vehicle waited for has stayed clear of the path wait_clear, or has not been seen for
+    #          lost_hold. Rather wait more: safety first. What is left is a vehicle never seen (beyond about 40 m):
+    #          on the crosswalk the robot does not stop and the vehicle has to give way
     #   "gap"  the robot and the vehicle pass every point of the path at least pet apart, over the whole crossing;
     #   "stop" on a crosswalk vehicles must give way (people: a vehicle that hits the robot there is fully
     #          liable), so the robot only waits for a vehicle that could not stop before the corridor: it reaches it
     #          sooner than reaction_time + v / (2 brake_decel) + stop_margin. The real crosswalks are 9-32 m long;
     #          "gap" would need 100-190 m of sight at 30 km/h, "stop" about 42 m
-    yield_rule: str = "gap"
+    yield_rule: str = "wait"
     reaction_time: float = 1.5      # [s] stop rule: the driver's
     brake_decel: float = 3.0        # [m/s^2] stop rule: comfortable braking
     stop_margin: float = 1.0        # [s] stop rule: to spare
+    wait_reach: float = 60.0        # [m] wait rule: a moving vehicle is followed this far along its paths ...
+    wait_max_horizon: float = 30.0  # [s] ... for at most this long (a vehicle at 1 m/s: 30 m), at least horizon
+    wait_margin: float = 1.5        # [m] wait rule: each side of a vehicle, on top of vehicle_margin
+    wait_clear: float = 3.0         # [s] wait rule: a vehicle waited for must stay clear of the path this long
+    lost_hold: float = 5.0          # [s] wait rule: a vehicle waited for and then lost is waited for this much longer
 
 
 @dataclass
 class Assessment:
     now: float
     stale: bool
-    conflicts: list = field(default_factory=list)   # dicts: id, gap [s] (nan: young; stop rule: slack), s [m], kind
-                                                    # (predicted / turn / young)
+    conflicts: list = field(default_factory=list)   # dicts: id, gap [s] (nan: young; stop rule: slack; wait rule:
+                                                    # when it reaches the path), s [m], kind (predicted / turn /
+                                                    # young)
     standing: list = field(default_factory=list)    # dicts: id, standing_for [s] or None, blocking (body on the path)
     approaching: set = field(default_factory=set)   # ids of moving vehicles heading towards the path
     present: set = field(default_factory=set)       # ids of every vehicle looked at
@@ -83,7 +95,7 @@ class Assessment:
 class Decision:
     go: bool
     reason: str                     # clear / committed / on_crosswalk / vehicle / young / standing / blocked /
-                                    # clearing / not_passed / stale
+                                    # clearing / not_passed / lost / stale
     ids: list = field(default_factory=list)
     gap: float = float("inf")
 
@@ -261,18 +273,25 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
         dist = np.linalg.norm(pts - p, axis=1)
         conflicted = False
         if _is_moving(obj, cfg):
-            modes, tau = rollout(obj, now, stamp, cfg, horizon)
+            speed = float(np.hypot(*np.asarray(obj["velocity"], dtype=float)[:2]))
+            wait = cfg.yield_rule == "wait"
+            h = horizon
+            if wait:     # far enough to cover the vehicle's reach, whatever its speed
+                h = float(np.clip(cfg.wait_reach / max(speed, 1e-3), horizon, max(horizon, cfg.wait_max_horizon)))
+            modes, tau = rollout(obj, now, stamp, cfg, h)
             kinds = ["predicted"] * len(modes)
-            if cfg.turn_range > 0 and dist.min() <= cfg.turn_range:
-                modes += turn_modes(obj, now, stamp, cfg, horizon, modes[0][2])
+            if (wait or cfg.turn_range > 0) and (wait or dist.min() <= cfg.turn_range):
+                modes += turn_modes(obj, now, stamp, cfg, h, modes[0][2])
                 kinds += ["turn", "turn"]
             worst = (np.inf, None, None)
-            speed = float(np.hypot(*np.asarray(obj["velocity"], dtype=float)[:2]))
             need = cfg.reaction_time + speed / (2.0 * cfg.brake_decel) + cfg.stop_margin
             for (centers, head, sigma), kind in zip(modes, kinds):
-                grow = cfg.vehicle_margin + cfg.sigma_k * sigma + corridor
+                grow = cfg.vehicle_margin + cfg.sigma_k * sigma + corridor + (cfg.wait_margin if wait else 0.0)
                 first, last = occupancy(pts, centers, head, hl0 + grow, hw0 + grow, tau)
-                if cfg.yield_rule == "stop":
+                if wait:
+                    # when it reaches the path [s] (+inf: never); any reach is a conflict
+                    g = np.where(np.isnan(first), np.inf, first)
+                elif cfg.yield_rule == "stop":
                     # slack [s] before the vehicle could no longer stop short of the corridor (negative: a conflict)
                     g = np.where(np.isnan(first), np.inf, first) - need
                 else:
@@ -285,7 +304,8 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
                                              np.full(len(tau), hw0 + 0.5 * cfg.dog_width), tau)
                     a.in_lane = bool(np.any(~np.isnan(raw_first)))
             a.min_gap = min(a.min_gap, worst[0])
-            if worst[0] < (0.0 if cfg.yield_rule == "stop" else cfg.pet):
+            limit = np.inf if cfg.yield_rule == "wait" else 0.0 if cfg.yield_rule == "stop" else cfg.pet
+            if worst[0] < limit:
                 a.conflicts.append(dict(id=oid, gap=worst[0], s=worst[1], kind=worst[2]))
                 conflicted = True
             r = pts[int(np.argmin(dist))] - p
@@ -313,7 +333,9 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
 
 class YieldGate:
     """Hysteresis on top of ``assess``: wait at once on a conflict; go again only after ``clear_time``
-    without one, when every vehicle waited for has passed (moving away), gone, or stood ``stopped_wait``."""
+    without one, when every vehicle waited for has passed (moving away), gone, or stood ``stopped_wait``.
+    Wait rule: per vehicle instead, each one waited for has stayed clear of the path ``wait_clear``, or has not
+    been seen for ``lost_hold``."""
 
     def __init__(self, cfg=YieldConfig()):
         self.cfg = cfg
@@ -324,6 +346,8 @@ class YieldGate:
         self.last_conflict = -np.inf
         self.yielded = set()
         self.still_since = {}           # id -> first time seen standing (continuously)
+        self.conflict_last = {}         # id -> last time it was a conflict (wait rule)
+        self.seen_last = {}             # id -> last time it was seen (wait rule)
 
     def update(self, a, now, dog_moving=False, on_crosswalk=False):
         """``on_crosswalk``: the robot's centre is on a crosswalk of the map. It does not stop there for vehicles,
@@ -350,6 +374,11 @@ class YieldGate:
                 blocked = blocked or bool(st.get("blocking"))
         conflict_ids = [c["id"] for c in a.conflicts]
         gap = min([c["gap"] for c in a.conflicts if c["gap"] == c["gap"]], default=a.min_gap)
+        if cfg.yield_rule == "wait":
+            for oid in a.present:
+                self.seen_last[oid] = now
+            for oid in conflict_ids:
+                self.conflict_last[oid] = now
         if dog_moving and not self.paused and a.in_lane:
             return Decision(True, "committed", conflict_ids, gap)     # never stop in front of a vehicle
         if conflict_ids or waiting_for:
@@ -359,6 +388,18 @@ class YieldGate:
             reason = ("young" if all(c["kind"] == "young" for c in a.conflicts) else "vehicle") if conflict_ids \
                 else "blocked" if blocked else "standing"
             return Decision(False, reason, conflict_ids + waiting_for, gap)
+        if self.paused and cfg.yield_rule == "wait":
+            clearing = sorted(i for i in self.yielded if i in a.present
+                              and now - self.conflict_last.get(i, -np.inf) < cfg.wait_clear)
+            if clearing:
+                return Decision(False, "clearing", clearing, gap)
+            lost = sorted(i for i in self.yielded if i not in a.present
+                          and now - self.seen_last.get(i, -np.inf) < cfg.lost_hold)
+            if lost:
+                return Decision(False, "lost", lost, gap)
+            self.paused = False
+            self.yielded.clear()
+            return Decision(True, "clear", [], gap)
         if self.paused:
             if now - self.last_conflict < cfg.clear_time:
                 return Decision(False, "clearing", sorted(self.yielded), gap)

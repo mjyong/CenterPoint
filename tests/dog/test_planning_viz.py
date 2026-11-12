@@ -114,8 +114,10 @@ def _write(path, inverted):
             contact = _make(ts, "visualization_msgs/msg/Marker", header=header(0.0, "base_link"), ns="contact", id=3,
                             type=2, action=0, pose=pose(0.5, 0.0))
             clear = _make(ts, "visualization_msgs/msg/Marker", header=header(0.0, ""), action=3)
+            ref = _make(ts, "visualization_msgs/msg/Marker", header=header(0.0, "map"), ns="local_reference_2d", id=4,
+                        type=4, action=0, points=[point(*_pose(t + k)) for k in (0.0, 1.0, 2.0)])
             put("/planning/debug/path_tracking", "visualization_msgs/msg/MarkerArray",
-                _make(ts, "visualization_msgs/msg/MarkerArray", markers=[clear, path, body, contact]), t)
+                _make(ts, "visualization_msgs/msg/MarkerArray", markers=[clear, path, body, contact, ref]), t)
             put("/planning/debug/goal_pose", "visualization_msgs/msg/Marker",
                 _make(ts, "visualization_msgs/msg/Marker", header=header(0.0, "map"), ns="goal_pose", id=1, type=0,
                       action=0, pose=pose(gx, gy, 0.0, YAW)), t)
@@ -248,6 +250,15 @@ def test_planning_mcap_viz_flattens_retimes_and_turns_the_costmap_over(tmp_path,
     assert abs(states[-1]["goal_distance"] - SPEED * (6.0 - 3.95)) < 0.06
     events = [m.msg for _, m in msgs["/viz/events"]]
     assert any("跟踪 standby → 跟踪 active" in e for e in events), events
+    # the planning flow, step by step with this cycle's numbers; the legend
+    flow = msgs["/viz/flow"][-1][1]
+    steps = [k for k in flow if k[0] in "①②③④⑤⑥"]
+    assert len(steps) == 6 and flow["④ 任务状态机（Tracking）"]["状态"] == "active"
+    local = [v for k, v in flow.items() if k.startswith("⑤")][0]
+    assert local["参考路径（MPPI 的输入）点数"] == "3" and local["参考路径长_m"] == "2.00"
+    assert "向前 0.80 m/s" in flow["⑥ 输出（/cmd_vel）"]["指令"]
+    assert "/viz/legend" in msgs and "图层（3D 面板左边的话题列表可以逐个开关）" in msgs["/viz/legend"][0][1]
+    assert any(m.ns == "local_reference_2d" for m in msgs["/viz/plan"][40][1].markers)
     assert any("位姿跳了" in e and "定位初始化" in e for e in events), events
 
     # the map around the run and the crosswalk
@@ -323,3 +334,182 @@ def test_planning_mcap_viz_reads_the_image_planning_reads(tmp_path):
     (floor / "CJGC.yaml").write_text((floor / "map.yaml").read_text())
     pgm("CJGC.pgm", 200)
     assert viz.load_map(str(floor / "CJGC.yaml"))["img"].tolist() == [[200, 200]]
+
+
+# ------------------------------------------------------------------ localization layers (loc_viz.py)
+ORIGIN = (29.731405029387507, 106.78389112052452, 217.1952074889191)     # default_d20.yaml (the site)
+
+
+def _kygi_schema():
+    """INSPVAX's ros2msg schema as the recorder writes it: the main definition, then MSG: sections."""
+    base = os.path.join(ROOT, "kygi665_msgs", "msg")
+    text = open(os.path.join(base, "INSPVAX.msg")).read()
+    for dep in ("Kygi665Header", "InertialSolutionStatus", "PositionOrVelocityType", "INSExtendedSolutionStatus"):
+        text += "\n" + "=" * 80 + "\nMSG: kygi665_msgs/%s\n" % dep + open(os.path.join(base, dep + ".msg")).read()
+    return text
+
+
+def _loc_recording(path, map_pts, shift_after=None, ins_fixed_until=None):
+    """A dog walking along +x at 1 m/s for 4 s: /tf, /lightning/odom (covariance[1] = 1 valid), the scans as
+    lightning publishes them (current_scan_world: the map's points around the dog, 1 m off after shift_after),
+    the INS (INSPVAX, RTK fixed until ins_fixed_until)."""
+    from mcap.writer import CompressionType, Writer
+    from rosbags.typesys import Stores, get_typestore, get_types_from_msg
+
+    sys.path.insert(0, TOOL)
+    import loc_viz
+
+    ts = get_typestore(Stores.ROS2_HUMBLE)
+    sch = _kygi_schema()
+    parts = sch.split("=" * 80)
+    types = dict(get_types_from_msg(parts[0], "kygi665_msgs/msg/INSPVAX"))
+    for part in parts[1:]:
+        name = part.strip().splitlines()[0].split()[1].replace("/", "/msg/")
+        types.update(get_types_from_msg(part.split("\n", 2)[2], name))
+    ts.register(types)
+    channels = {}
+    with open(path, "wb") as fh:
+        w = Writer(fh, compression=CompressionType.NONE)
+        w.start(profile="ros2", library="test")
+
+        def put(topic, typename, msg, t, schema=None):
+            if topic not in channels:
+                text = schema or ts.generate_msgdef(typename, ros_version=2)[0]
+                sid = w.register_schema(typename, "ros2msg", text.encode())
+                channels[topic] = w.register_channel(topic, "cdr", sid)
+            ns = int((t + OFFSET) * 1e9)
+            w.add_message(channels[topic], ns, bytes(ts.serialize_cdr(msg, typename)), ns)
+
+        def header(t, frame):
+            ns = int(round(t * 1e9))
+            return _make(ts, "std_msgs/msg/Header", stamp=_make(ts, "builtin_interfaces/msg/Time", sec=ns // 10 ** 9,
+                                                                 nanosec=ns % 10 ** 9), frame_id=frame)
+        for i in range(80):
+            t = BAG_T0 + 0.05 * i
+            x, y = 10.0 + (t - BAG_T0), 5.0
+            q = _make(ts, "geometry_msgs/msg/Quaternion", x=0.0, y=0.0, z=0.0, w=1.0)
+            tr = _make(ts, "geometry_msgs/msg/TransformStamped", header=header(t, "map"), child_frame_id="base_link",
+                       transform=_make(ts, "geometry_msgs/msg/Transform",
+                                       translation=_make(ts, "geometry_msgs/msg/Vector3", x=x, y=y, z=0.0),
+                                       rotation=q))
+            put("/tf", "tf2_msgs/msg/TFMessage", _make(ts, "tf2_msgs/msg/TFMessage", transforms=[tr]), t)
+            cov = np.zeros(36)
+            cov[1] = 1.0
+            pose = _make(ts, "geometry_msgs/msg/PoseWithCovariance",
+                         pose=_make(ts, "geometry_msgs/msg/Pose",
+                                    position=_make(ts, "geometry_msgs/msg/Point", x=x, y=y, z=0.0), orientation=q),
+                         covariance=cov)
+            put("/lightning/odom", "nav_msgs/msg/Odometry",
+                _make(ts, "nav_msgs/msg/Odometry", header=header(t, "map"), child_frame_id="base_link", pose=pose), t)
+            if i % 2 == 0:          # scans at 10 Hz
+                near = map_pts[np.hypot(map_pts[:, 0] - x, map_pts[:, 1] - y) < 8.0].copy()
+                if shift_after is not None and t - BAG_T0 >= shift_after:
+                    near[:, 1] += 1.0           # (sliding along the floor alone would still sit on the floor)
+                    near[:, 2] += 0.6
+                ros = loc_viz
+                msg = ros.cloud_msg(_Ros(ts), t, "map", near, {"intensity": np.zeros(len(near))})
+                put("/lightning/current_scan_world", "sensor_msgs/msg/PointCloud2", msg, t)
+            # the INS, 20 Hz: at the dog's position
+            fixed = ins_fixed_until is None or t - BAG_T0 < ins_fixed_until
+            dlat = y / 6378137.0 * 180.0 / np.pi
+            dlon = x / (6378137.0 * np.cos(np.radians(ORIGIN[0]))) * 180.0 / np.pi
+            ins = ts.types["kygi665_msgs/msg/INSPVAX"]
+            m = _make(ts, "kygi665_msgs/msg/INSPVAX", header=header(t, "imu"),
+                      ins_status=_make(ts, "kygi665_msgs/msg/InertialSolutionStatus", data=3),
+                      pos_type=_make(ts, "kygi665_msgs/msg/PositionOrVelocityType", data=56 if fixed else 55),
+                      latitude=ORIGIN[0] + dlat, longitude=ORIGIN[1] + dlon, height=ORIGIN[2], azimuth=90.0)
+            assert ins is not None
+            put("/rte/rdap/rtk/inspvax", "kygi665_msgs/msg/INSPVAX", m, t, schema=_kygi_schema())
+        w.finish()
+
+
+class _Ros:
+    """The bits of planning_mcap_viz.Ros that cloud_msg uses, on a given typestore."""
+
+    def __init__(self, ts):
+        self.ts = ts
+
+    def new(self, typename, **kw):
+        msg = _make(self.ts, typename)          # PointField has a field called name: set the fields afterwards
+        for k, v in kw.items():
+            setattr(msg, k, v)
+        return msg
+
+    def header(self, t, frame):
+        ns = int(round(t * 1e9))
+        return _make(self.ts, "std_msgs/msg/Header",
+                     stamp=_make(self.ts, "builtin_interfaces/msg/Time", sec=ns // 10 ** 9, nanosec=ns % 10 ** 9),
+                     frame_id=frame)
+
+
+def _loc_map(tmp_path):
+    """A site map directory with 3d/global.pcd: a wall along y = 8 m and a floor grid, binary PCD."""
+    xs, ys = np.meshgrid(np.arange(0.0, 30.0, 0.1), np.arange(0.0, 12.0, 0.1))
+    floor = np.column_stack([xs.ravel(), ys.ravel(), np.full(xs.size, -0.4)])
+    wx, wz = np.meshgrid(np.arange(0.0, 30.0, 0.1), np.arange(-0.4, 2.0, 0.1))
+    wall = np.column_stack([wx.ravel(), np.full(wx.size, 8.0), wz.ravel()])
+    pts = np.vstack([floor, wall]).astype(np.float32)
+    folder = tmp_path / "locmap" / "3d"
+    folder.mkdir(parents=True)
+    head = ("# .PCD v0.7\nVERSION 0.7\nFIELDS x y z intensity\nSIZE 4 4 4 4\nTYPE F F F F\nCOUNT 1 1 1 1\n"
+            "WIDTH %d\nHEIGHT 1\nVIEWPOINT 0 0 0 1 0 0 0\nPOINTS %d\nDATA binary\n" % (len(pts), len(pts)))
+    body = np.column_stack([pts, np.zeros(len(pts), np.float32)]).astype("<f4").tobytes()
+    (folder / "global.pcd").write_bytes(head.encode() + body)
+    return str(tmp_path / "locmap"), pts.astype(float)
+
+
+def test_loc_viz_scans_on_the_map_ins_and_events(tmp_path, capsys):
+    pytest.importorskip("mcap")
+    pytest.importorskip("rosbags")
+    pytest.importorskip("scipy")
+    sys.path.insert(0, TOOL)
+    import planning_mcap_viz as viz
+
+    locmap, pts = _loc_map(tmp_path)
+    bag = tmp_path / "rec"
+    bag.mkdir()
+    _loc_recording(str(bag / "rec_0.mcap"), pts, shift_after=2.0, ins_fixed_until=3.0)
+    cfg = tmp_path / "loc.yaml"
+    cfg.write_text("system:\n  ins_lat: %r\n  ins_lon: %r\n  ins_height: %r\n" % ORIGIN)
+    out = str(tmp_path / "viz.mcap")
+    assert viz.main([str(bag), "-o", out, "--map", "none", "--overview", "none", "--loc-map", locmap,
+                     "--loc-config", str(cfg)]) == 0
+    text = capsys.readouterr().out
+    assert "localization map:" in text and "/viz/loc/scan: 20 scans" in text, text
+    msgs = _read(out)
+    # the scans: on the map first, 1 m off after 2 s
+    scans = msgs["/viz/loc/scan"]
+    names = [f.name for f in scans[0][1].fields]
+    assert names == ["x", "y", "z", "height", "match"]
+
+    def match(m):
+        arr = np.frombuffer(bytes(m.data), dtype=[(n, "<f4") for n in names])
+        return arr["match"]
+    assert len(scans) == 7               # read at 5 Hz (0, 0.2, ...), drawn at most 2 Hz: 0, 0.6, 1.2, ... 3.6 s
+    assert np.median(match(scans[1][1])) < 0.05 and np.median(match(scans[-1][1])) > 0.3
+    states = [m for _, m in msgs["/viz/loc/state"]]
+    assert states[3]["valid"] == 1 and states[3]["match_inlier"] > 0.9 and states[-2]["match_inlier"] < 0.5
+    # the INS in the map frame where the dog is, RTK fixed until 3 s
+    assert abs(states[3]["odom_minus_ins"]) < 0.05 and states[3]["ins_fixed"] == 1 and states[-2]["ins_fixed"] == 0
+    flow = msgs["/viz/loc/flow"][3][1]
+    assert "③ LIO 和地图配准" in flow and "laser_mapping.cc" in flow["③ LIO 和地图配准"]["代码"]
+    events = [m.msg for _, m in msgs["/viz/events"]]
+    assert any("贴在地图上" in e for e in events), events
+    assert any("不是 RTK 固定解" in e for e in events), events
+    assert "/viz/loc/map_cloud" in msgs and "/viz/loc/ins" in msgs
+
+
+def test_lla_to_enu_matches_local_cartesian():
+    sys.path.insert(0, TOOL)
+    import loc_viz
+
+    # 100 m north and 50 m east of the origin, 2 m up: within a millimetre of a tangent-plane conversion
+    lat0, lon0, h0 = ORIGIN
+    r_n = 6378137.0 / np.sqrt(1 - 0.00669437999014 * np.sin(np.radians(lat0)) ** 2)
+    r_m = r_n * (1 - 0.00669437999014) / (1 - 0.00669437999014 * np.sin(np.radians(lat0)) ** 2)
+    lat = lat0 + np.degrees(100.0 / (r_m + h0))
+    lon = lon0 + np.degrees(50.0 / ((r_n + h0) * np.cos(np.radians(lat0))))
+    e, n, u = loc_viz.lla_to_enu(lat, lon, h0 + 2.0, ORIGIN)
+    assert e == pytest.approx(50.0, abs=0.01) and n == pytest.approx(100.0, abs=0.01) and u == pytest.approx(2.0, abs=0.01)
+    assert loc_viz.read_loc_origin("system:\n  ins_lat:  29.7\n  ins_lon: 106.7\n  ins_height: 217.1\n") == (
+        29.7, 106.7, 217.1)
