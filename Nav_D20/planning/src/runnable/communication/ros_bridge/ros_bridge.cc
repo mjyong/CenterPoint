@@ -1,32 +1,12 @@
 #include "src/runnable/communication/ros_bridge/ros_bridge.h"
-
-#include <cstdlib>
-
-#include "src/common/util/time_keeper.h"
-#include "grid_map_ros/GridMapRosConverter.hpp"
-#include "src/common/util/debug_datas.h"
-#include "src/common/util/math.h"
-#include "src/common/util/tf_buffer.h"
-#include "src/common/util/velocity_calibration.h"
+#include "src/common/util/config_helper.h"
 #include "src/runnable/entry/planning_entry.h"
 #include "src/runnable/mission/recharging/recharging.h"
 #include "src/runnable/mission/tracking/tracking.h"
+using planning::common::util::ConfigHelper;
+
 namespace planning {
 namespace communication {
-using planning::common::util::DebugDatas;
-using planning::common::util::normalize_angle;
-using planning::common::util::TfBuffer;
-using planning::common::util::VelocityCalibration;
-
-// Bag 回放时消息时间戳和本机时钟差几周，按戳做超时会一直暂停。
-// 只有调试脚本设置 PLANNING_TIMEOUT_WALL_CLOCK=1 时，改用收到消息的时刻。
-double TimeoutReference(double message_stamp) {
-  const char *flag = std::getenv("PLANNING_TIMEOUT_WALL_CLOCK");
-  if (flag != nullptr && flag[0] == '1' && flag[1] == '\0') {
-    return planning::common::util::TimeKeeper::TimeNowSec();
-  }
-  return message_stamp;
-}
 
 RosBridge::RosBridge(const CommunicationConf::Conf &conf) : rate_(20) {
   conf_ = conf;
@@ -39,6 +19,7 @@ bool RosBridge::ok() { return rclcpp::ok(); }
 bool RosBridge::Init(PlanningEntry *planning_entry) {
   planning_entry_ = planning_entry;
   node_ = std::make_shared<rclcpp::Node>("planning");
+  diagnostic_bridge_ = std::make_unique<DiagnosticBridge>(node_);
 
   if (config_.has_sub_odom()) {
     odom_sub_ = std::make_unique<OdomSub>(
@@ -94,6 +75,14 @@ bool RosBridge::Init(PlanningEntry *planning_entry) {
         std::bind(&RosBridge::map_switch_callback, this,
                   std::placeholders::_1));
   }
+  if (config_.has_sub_map_update()) {
+    sub_map_update_ =
+        node_->create_subscription<common_interface::msg::PathFile>(
+            config_.sub_map_update().name(),
+            config_.sub_map_update().queue_size(),
+            std::bind(&RosBridge::map_update_callback, this,
+                      std::placeholders::_1));
+  }
 
   if (config_.has_sub_joint_state()) {
     sub_joint_state_ = node_->create_subscription<sensor_msgs::msg::JointState>(
@@ -130,13 +119,14 @@ bool RosBridge::Init(PlanningEntry *planning_entry) {
         config_.pub_motion().name(), config_.pub_motion().queue_size());
   }
 
-  if (config_.has_client_woosh_twist()) {
-    woosh_twist_client_ = node_->create_client<woosh_robot_msgs::srv::Twist>(
-        config_.client_woosh_twist().name());
-  }
-
-  TrackingInitPipe();
-  RechargingInitPipe();
+  tracking_bridge_ =
+      std::make_unique<TrackingBridge>(node_, planning_entry_, config_);
+  recharging_bridge_ = std::make_unique<RechargingBridge>(
+      node_, planning_entry_, config_, timeout_states_);
+  following_bridge_ = std::make_unique<FollowingBridge>(
+      node_, planning_entry_, config_, timeout_states_);
+  skill_bridge_ = std::make_unique<SkillBridge>(
+      node_, planning_entry_, config_, timeout_states_);
 
   odometry_.pose.position.x() = 1;
   odometry_.pose.position.y() = -1;
@@ -162,7 +152,6 @@ bool RosBridge::Init(PlanningEntry *planning_entry) {
 }
 
 bool RosBridge::Proc() {
-  // 可配置关闭输入超时检测（关闭后不触发超时暂停/恢复）
   bool necessary_input_timeout =
       config_.enable_timeout_check() ? checkTimeout() : false;
   auto mission_entry = planning_entry_->mission_entry_ptr();
@@ -211,11 +200,19 @@ bool RosBridge::Proc() {
                                   is_timeout_paused_);
   DebugDatas::Instance()->emplace("mission_input_timeout",
                                   necessary_input_timeout);
+  DebugDatas::Instance()->emplace("odom_x", odometry_.pose.position.x());
+  DebugDatas::Instance()->emplace("odom_y", odometry_.pose.position.y());
+  DebugDatas::Instance()->emplace("odom_theta", odometry_.pose.euler().z());
+  DebugDatas::Instance()->emplace("odom_vx", odometry_.twist.linear.x());
+  DebugDatas::Instance()->emplace("odom_vy", odometry_.twist.linear.y());
+  DebugDatas::Instance()->emplace("odom_omega", odometry_.twist.angular.z());
   return true;
 }
 
 bool RosBridge::Publish() {
   auto mission_entry = planning_entry_->mission_entry_ptr();
+  // Fault edge events (raised/cleared) are independent of the mission state
+  diagnostic_bridge_->Publish();
   if (mission_entry->GetCurrentMissionType() != MissionConf::Idle) {
     auto current_mission = mission_entry->GetCurrentMissionPtr();
     auto cmd = current_mission->GetTwist();
@@ -225,6 +222,9 @@ bool RosBridge::Publish() {
     Eigen::Vector3d actual_vel(odometry_.twist.linear.x(),
                                odometry_.twist.linear.y(),
                                odometry_.twist.angular.z());
+    DebugDatas::Instance()->emplace("cmd_vx", cmd.twist.linear.x());
+    DebugDatas::Instance()->emplace("cmd_vy", cmd.twist.linear.y());
+    DebugDatas::Instance()->emplace("cmd_omega", cmd.twist.angular.z());
     cmd_vel =
         VelocityCalibration::Instance()->ComputeCommand(cmd_vel, actual_vel);
     cmd.twist.linear.x() = cmd_vel.x();
@@ -233,12 +233,9 @@ bool RosBridge::Publish() {
 
     const auto *integral_state =
         VelocityCalibration::Instance()->IntegralState();
-    DebugDatas::Instance()->emplace("cmd_vx", cmd.twist.linear.x());
-    DebugDatas::Instance()->emplace("cmd_vy", cmd.twist.linear.y());
-    DebugDatas::Instance()->emplace("cmd_omega", cmd.twist.angular.z());
-    DebugDatas::Instance()->emplace("integral_vx", integral_state[0]);
-    DebugDatas::Instance()->emplace("integral_vy", integral_state[1]);
-    DebugDatas::Instance()->emplace("integral_omega", integral_state[2]);
+    DebugDatas::Instance()->emplace("cmd_re_vx", cmd.twist.linear.x());
+    DebugDatas::Instance()->emplace("cmd_re_vy", cmd.twist.linear.y());
+    DebugDatas::Instance()->emplace("cmd_re_omega", cmd.twist.angular.z());
 
     geometry_msgs::msg::Twist cmd_msg;
     cmd_msg.linear.x = cmd.twist.linear.x();
@@ -277,7 +274,8 @@ bool RosBridge::Publish() {
           motion_msg.motion = mc_interface::msg::MotionSkill::MOTION_GAIT_WALK;
           motion_msg.para = {static_cast<float>(cmd.twist.linear.x()),
                              static_cast<float>(cmd.twist.linear.y()),
-                             static_cast<float>(cmd.twist.angular.z())};
+                             static_cast<float>(cmd.twist.angular.z()),
+                             1.0f}; // 1.0 = 精细化控制
           pub_motion_->publish(motion_msg);
         }
       }
@@ -287,22 +285,25 @@ bool RosBridge::Publish() {
       motion_msg.header.stamp = node_->now();
       motion_msg.uuid = "planning";
       motion_msg.mode = mc_interface::msg::Mode::MODE_WBMC;
-      motion_msg.motion = mc_interface::msg::MotionSkill::MOTION_GAIT_WALK;
+      if (ConfigHelper::Instance()
+              ->GetConfig()
+              .robot_param()
+              .robot_id()
+              .appellation() == "d20") {
+        motion_msg.motion = mc_interface::msg::MotionSkill::MOTION_GAIT_WALK;
+      } else {
+        motion_msg.motion = mc_interface::msg::MotionSkill::MOTION_GAIT_RUN;
+      }
       motion_msg.para = {static_cast<float>(cmd.twist.linear.x()),
                          static_cast<float>(cmd.twist.linear.y()),
                          static_cast<float>(cmd.twist.angular.z())};
       pub_motion_->publish(motion_msg);
     }
-
-    if (woosh_twist_client_) {
-      auto request = std::make_shared<woosh_robot_msgs::srv::Twist::Request>();
-      request->arg.linear = cmd.twist.linear.x();
-      request->arg.angular = cmd.twist.angular.z();
-      woosh_twist_client_->async_send_request(request);
-    }
   }
-  TrackingFeedback();
-  RechargingFeedback();
+  tracking_bridge_->Publish();
+  recharging_bridge_->Publish();
+  following_bridge_->Publish();
+  skill_bridge_->Publish();
 
   rclcpp::spin_some(node_);
   rate_.sleep();
@@ -336,12 +337,12 @@ void RosBridge::sync_callback(
   TfBuffer::Instance()->add(tf);
   auto it = timeout_states_.find(config_.sub_odom().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = TimeoutReference(odometry_.timestamp);
+    it->second.last_time = odometry_.timestamp;
   }
 
   it = timeout_states_.find(config_.sub_occupancy_grid().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = TimeoutReference(odometry_.timestamp);
+    it->second.last_time = odometry_.timestamp;
   }
   grid_map::GridMapRosConverter::fromOccupancyGrid(*occ_msg, "obstacle",
                                                    grid_map_);
@@ -368,16 +369,9 @@ void RosBridge::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
   TransformStamped tf(odometry_.timestamp, "map", "base_link",
                       odometry_.pose.position, odometry_.pose.orientation);
   TfBuffer::Instance()->add(tf);
-  DebugDatas::Instance()->emplace("odom_x", odometry_.pose.position.x());
-  DebugDatas::Instance()->emplace("odom_y", odometry_.pose.position.y());
-  DebugDatas::Instance()->emplace("odom_theta", odometry_.pose.euler().z());
-  DebugDatas::Instance()->emplace("odom_vx", odometry_.twist.linear.x());
-  DebugDatas::Instance()->emplace("odom_vy", odometry_.twist.linear.y());
-  DebugDatas::Instance()->emplace("odom_omega", odometry_.twist.angular.z());
   auto it = timeout_states_.find(config_.sub_odom().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = TimeoutReference(odometry_.timestamp);
-    DebugDatas::Instance()->emplace("odom_ts", it->second.last_time);
+    it->second.last_time = odometry_.timestamp;
   }
 }
 
@@ -412,7 +406,7 @@ void RosBridge::joint_state_callback(
   collision_checker->updateTransforms(link_transforms);
   auto it = timeout_states_.find(config_.sub_joint_state().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = TimeoutReference(odometry_.timestamp);
+    it->second.last_time = odometry_.timestamp;
   }
 }
 
@@ -428,7 +422,7 @@ void RosBridge::local_octomap_callback(
   }
   auto it = timeout_states_.find(config_.sub_octomap().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = TimeoutReference(odometry_.timestamp);
+    it->second.last_time = odometry_.timestamp;
   }
   auto collision_checker =
       planning_entry_->preprocess_entry_ptr()->collision_checker();
@@ -439,9 +433,8 @@ void RosBridge::occupancy_callback(
     const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
   auto it = timeout_states_.find(config_.sub_occupancy_grid().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = TimeoutReference(msg->header.stamp.sec +
-                                            msg->header.stamp.nanosec * 1e-9);
-    DebugDatas::Instance()->emplace("occ_ts", it->second.last_time);
+    it->second.last_time =
+        msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
   }
   grid_map::GridMapRosConverter::fromOccupancyGrid(*msg, "obstacle", grid_map_);
   auto &matrix = grid_map_.get("obstacle");
@@ -484,11 +477,22 @@ void RosBridge::map_switch_callback(
     global_map_manager->ReloadMap(msg->data);
   }
 }
+void RosBridge::map_update_callback(
+    const common_interface::msg::PathFile::SharedPtr msg) {
+  AINFO << "Map update: " << msg->path;
+  auto global_map_manager =
+      planning_entry_->preprocess_entry_ptr()->global_map_manager();
+  if (global_map_manager) {
+    global_map_manager->ReloadMap(msg->path);
+  }
+}
 
 bool RosBridge::checkTimeout() {
   double now = TimeKeeper::TimeNowSec();
   bool any_timeout = false;
+  DebugDatas::Instance()->emplace("planning_ts", now);
   for (auto &[name, state] : timeout_states_) {
+    DebugDatas::Instance()->emplace(name, state.last_time);
     if (state.is_active && !state.is_active()) {
       state.timed_out = false;
       continue;
@@ -496,7 +500,6 @@ bool RosBridge::checkTimeout() {
     if ((now - state.last_time) > state.threshold) {
       AERROR << name << " timeout! Last received: " << (now - state.last_time)
              << "s ago, threshold: " << state.threshold << "s";
-      DebugDatas::Instance()->emplace("timeout: " + name, 1);
       state.timed_out = true;
       any_timeout = true;
     } else {

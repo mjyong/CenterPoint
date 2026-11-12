@@ -18,7 +18,6 @@ find_package(tf2_ros REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(novatel_oem7_msgs REQUIRED)
-find_package(kygi665_msgs REQUIRED)
 # GeographicLib: use bundled thirdparty libs instead of find_package
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8|arm")
     set(GEOGRAPHICLIB_ARCH_DIR "ARM")
@@ -30,6 +29,8 @@ set(GeographicLib_LIBRARIES ${PROJECT_SOURCE_DIR}/thirdparty/geographiclib/${GEO
 find_package (livox_ros_driver2 REQUIRED)
 find_package (basic REQUIRED)
 find_package (nav2_interface REQUIRED)
+find_package (kygi665_msgs REQUIRED)
+find_package (rhr_interface REQUIRED)
 
 # OpenMP 并行优化
 find_package(OpenMP)

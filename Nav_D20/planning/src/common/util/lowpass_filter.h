@@ -1,12 +1,4 @@
-/*
- * @Descripttion:
- * @version:
- * @Author: ZhaoTian
- * @Date: 2023-03-30 13:57:50
- * @LastEditors: tian.zhao tian.zhao@seres.cn
- * @LastEditTime: 2024-03-28 09:17:20
- */
-
+#pragma once
 #include <algorithm>
 #include <cmath>
 #include <iostream>

@@ -8,24 +8,6 @@ confs{
         off_velocity_threshold: 0.2
         off_angular_velocity_threshold: 0.2
         off_duration_threshold: 1.0
-        grid_path_planner_conf{
-            planner_type: A_STAR
-            input_type: PGM_MAP
-            input_dir: "/../../data/astar_pgm/"
-            input_name: "map"
-            safe_margin: 0.4
-            inflation_margin: 0.05
-            max_obstacle_dist: 2.0
-            heuristic: EUCLIDEAN
-            unknown_as_free: false
-            use_smoother: true
-            smoother_safety_margin: 0.4
-            smoother_safety_factor: 0.5
-            smoother_far_away_obstacle_dist: 1.0
-            smoother_weight_fem_pos_deviation: 10.0
-            smoother_weight_path_length: 1e6
-            smoother_weight_ref_deviation: 1.0
-        }
         teb_planner_conf{
             coarse_search_conf{
                 xy_resolution: 0.1

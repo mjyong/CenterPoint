@@ -1,0 +1,15 @@
+# Request
+uint8 dev_type
+---
+
+# Response
+DevResources devs       # Array of DevResources
+#------------------------------
+# dev_type
+#DEV_RESOURCE_ALL = 0, // CCU-All
+#DEV_RESOURCE_SOC = 1, // CCU-SOC
+#DEV_RESOURCE_MCU = 2, // CCU-MCU
+
+
+
+

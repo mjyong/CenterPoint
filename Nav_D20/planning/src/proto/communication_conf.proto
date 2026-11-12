@@ -42,6 +42,8 @@ message CommunicationConf {
     optional RosPipeConf sub_battery_states = 16;
     optional RosPipeConf sub_motion_state = 17;
     optional RosPipeConf sub_map_switch = 18;
+    optional RosPipeConf sub_follow_target = 19;
+    optional RosPipeConf sub_map_update = 20;
 
     // -- Publishers --
     optional RosPipeConf pub_cmd_vel = 10;
@@ -51,9 +53,7 @@ message CommunicationConf {
     optional RosPipeConf action_navigation = 12;
     optional RosPipeConf action_backcharge = 13;
     optional RosPipeConf action_following = 14;
-
-    // -- Service Clients --
-    optional RosPipeConf client_woosh_twist = 15;
+    optional RosPipeConf action_skill = 15;
 
     // -- 全局配置 --
     optional bool sync_odom_occ = 26 [ default = false ];

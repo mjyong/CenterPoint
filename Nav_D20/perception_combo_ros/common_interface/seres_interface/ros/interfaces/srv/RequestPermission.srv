@@ -1,0 +1,11 @@
+# request
+uint8 ACQUIRE = 0  # 获取控制权限
+uint8 RELEASE = 1  # 释放控制权限
+
+string name  # 请求方名称
+uint8  type  # 请求类型: ACQUIRE/RELEASE
+
+---
+# result
+bool   result   # true: 成功; false: 失败
+string message  # 附加消息

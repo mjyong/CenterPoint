@@ -1,0 +1,4 @@
+common_interface/Header header
+uint8 poi_id
+uint8 nav_task_exestate
+uint8 act_task_exestate

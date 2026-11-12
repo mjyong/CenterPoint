@@ -1,0 +1,20 @@
+#请求:
+std_msgs/Header header
+#蓝牙设置类型
+uint8 type
+uint8 BT_SET_UNKNOWN = 0 #蓝牙设置类型未知
+uint8 BT_DEVICE_CONNECT = 1 #设置连接蓝牙设备
+uint8 BT_DEVICE_DISCONNECT = 2 #设置断开蓝牙设备
+
+#设备地址
+string address
+#蓝牙开关
+uint8 bluetooth_switch
+uint8 BT_CLOSE=0     # 关闭蓝牙
+uint8 BT_OPEN=1      # 打开蓝牙
+
+---
+#响应:
+#设置结果
+uint8 result
+#0-成功，1-失败

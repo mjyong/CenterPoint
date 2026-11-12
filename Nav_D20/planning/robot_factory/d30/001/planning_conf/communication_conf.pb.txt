@@ -1,0 +1,46 @@
+main_type: RosBridge
+debug_type: RosDebugBridge
+
+types: RosBridge
+confs{
+    type: RosBridge
+    ros_bridge_conf{
+        sync_odom_occ: false
+        sub_odom             { name: "/Odometry"                      queue_size: 10 }
+        #sub_odom             { name: "/odom"                          queue_size: 10 }
+        sub_occupancy_grid   { name: "/map/occupancy_grid"            queue_size: 10 }
+        sub_motion_state     { name: "/mc/state"            queue_size: 10  }
+        sub_map_switch       { name: "/map/switch" }
+        sub_map_update       { name: "/map/file_update" }
+
+        pub_cmd_vel          { name: "/cmd_vel"                       queue_size: 10 }
+        pub_motion           { name: "/mc/motion_control"             queue_size: 10 }
+
+        action_navigation    { name: "/nav_internal/navigation" }
+
+        action_following     { name: "/nav_internal/follow" }
+        sub_follow_target    { name: "/perception/follow_target"      queue_size: 10 timeout: 5.5}
+
+        action_skill          { name: "/nav_internal/skill" }
+
+        action_backcharge    { name: "/nav_internal/backcharge" }
+        sub_charging_goal    { name: "/reflector_position"  queue_size: 10  }
+        sub_battery_states   { name: "/robot/topic/rdap/battery_states"  queue_size: 10  timeout: 1.0 }
+
+        enable_timeout_check: false
+        timeout_pause_duration: 1.0
+        timeout_resume_duration: 3.0
+        sub_init_pose        { name: "/initialpose"                   queue_size: 10 }
+        sub_goal_pose        { name: "/goal_pose"                     queue_size: 10 }
+    }
+}
+
+types: RosDebugBridge
+confs{
+    type: RosDebugBridge
+    ros_debug_bridge_conf{
+        enable_global_map_pub: true
+        pub_flag: true
+        record_flag: false
+    }
+}

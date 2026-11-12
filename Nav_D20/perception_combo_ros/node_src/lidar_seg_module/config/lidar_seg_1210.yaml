@@ -7,6 +7,7 @@ patchworkpp_wild:
   ncr_thresh : 0.03
   detect_num: 200
   loc_subscribe: /seres/insmodule/devpvt
+  inspvax_subscribe: /rte/rdap/rtk/inspvax
   lidar_subscribe: /merged_cloud # AT128
   lidar_subscribe_left_front: /LeftBlindSpotLidar # RSE1
   lidar_subscribe_right_front: /RightBlindSpotLidar # RSE1

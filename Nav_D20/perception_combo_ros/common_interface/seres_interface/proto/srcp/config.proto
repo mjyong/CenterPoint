@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package srcp;
+
+enum ConfigType
+{
+    ACTION_LIST   = 0; // 机器人支持的动作数据文件列表
+    STAGE_SCRIPT  = 1; // 舞台剧本
+    NAVI_MAP_LIST = 2; // 机器人支持的地图文件列表
+    PARAM_QUERY = 3;   //查询参数
+    PARAM_UPDATE = 4;  //更新参数 
+    PARAM_DELETE=5;    //删除参数
+    DEVICE_PARAM_QUERY = 6; // 设备参数查询
+}
+
+message RemoteConfig
+{
+    ConfigType type = 1; // 配置类型
+    string json     = 2; // 配置内容的 Json 序列化字符串
+}
+
+message ReportConfig
+{
+    string json_param = 1; //上报所有配置参数或者设备参数json格式字符串 
+}

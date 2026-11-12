@@ -1,0 +1,15 @@
+# 接口描述：告警查询
+# 客户端：本地web
+# 服务端：rhr模块
+# service:/rhr/service/alarm_request
+
+# request
+# 告警类型枚举定义
+uint8 ALARM_CURRENT=1 # 当前告警
+uint8 ALARM_HISTORY=2 # 历史告警
+
+uint8 alarm_type    # 告警类型，参考告警类型枚举定义
+---
+
+# response
+AlarmInfo[] alarm_array

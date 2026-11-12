@@ -49,6 +49,7 @@ class LoopClosing {
         double ins_rot_noise_ = 30.0 * M_PI / 180.0;      // INS 旋转噪声 (弧度)
         bool use_ins_covariance_ = false;                // 是否使用 INS 协方差（如果可用）
         bool ins_prior_position_only_ = false;           // 如果为 true，只约束位置，不约束姿态
+        double ins_constraint_gap_ = 10.0;               // INS 先验约束的最小里程间隔（米），0 表示每个关键帧都加约束
     };
 
     LoopClosing(Options options = Options()) { options_ = options; }

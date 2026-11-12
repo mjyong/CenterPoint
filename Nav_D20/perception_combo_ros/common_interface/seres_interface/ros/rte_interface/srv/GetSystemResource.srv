@@ -1,0 +1,8 @@
+# Request
+
+---
+
+# Response
+float64[] result  # [0]: cpu_usage, [1]: cpu_temperature, [2]: memory_available, [3]: disk_free_space
+
+

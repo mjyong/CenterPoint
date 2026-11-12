@@ -23,8 +23,8 @@
 // DEFINE_bool(overwrite, false, "是否覆盖已存在的输出目录");
 
 using namespace lightning;
-std::string input_pcd = "/home/c37263/SaiLiSi/dog_robot/D20/lightning-lm-master/data/wuyuhu_1f/global.pcd";
-std::string output_dir = "/home/c37263/SaiLiSi/dog_robot/D20/lightning-lm-master/data/wuyuhu_1f/map/";
+std::string input_pcd = "/home/c37263/SaiLiSi/dog_robot/D20/A2/lightning_arm_loc_new_map/data/test/merged/3d/global.pcd";
+std::string output_dir = "/home/c37263/SaiLiSi/dog_robot/D20/A2/lightning_arm_loc_new_map/data/test/merged/3d";
 double chunk_size = 100.0;
 double voxel_size = 0.1;
 bool overwrite = false;

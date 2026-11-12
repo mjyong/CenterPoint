@@ -14,6 +14,7 @@ double RosbagRecorder::duration_;
 double RosbagRecorder::prev_check_time_;
 std::string RosbagRecorder::bag_file_name_;
 std::string RosbagRecorder::bag_dir_;
+BagRecordConf RosbagRecorder::conf_;
 
 static std::string DatetimeToString(time_t time) {
   tm *tm_ = localtime(&time);
@@ -50,8 +51,9 @@ static std::string DatetimeToString(time_t time) {
 }
 
 RosbagRecorder::RosbagRecorder() {
-  bag_dir_ = "/tmp/planning_" + DatetimeToString(time(nullptr));
-  duration_ = 60.0;
+  conf_ = ConfigHelper::Instance()->GetConfig().bag_record_conf();
+  bag_dir_ = conf_.bag_dir() + "/planning_" + DatetimeToString(time(nullptr));
+  duration_ = conf_.duration();
   rcpputils::fs::remove_all(bag_dir_);
   rosbag2_storage::StorageOptions storage_options;
   storage_options.uri = bag_dir_;
@@ -82,14 +84,14 @@ void RosbagRecorder::RestrictCheck() {
           files.push_back(entry);
         }
       }
-      if (files.size() <= 2) {
+      if (files.size() <= conf_.max_bag_num()) {
         return;
       }
       std::sort(files.begin(), files.end(),
                 [](const fs::directory_entry &a, const fs::directory_entry &b) {
                   return fs::last_write_time(a) > fs::last_write_time(b);
                 });
-      for (size_t i = 2; i < files.size(); ++i) {
+      for (size_t i = conf_.max_bag_num(); i < files.size(); ++i) {
         try {
           fs::remove(files[i].path());
         } catch (const fs::filesystem_error &ex) {

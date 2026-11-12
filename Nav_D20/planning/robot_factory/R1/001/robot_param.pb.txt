@@ -3,7 +3,24 @@ robot_param {
       appellation: "R1 Pro"
       vin: "001"
   }
-  length: 0.6
-  width: 0.7
+  length: 1.2
+  width: 0.5
   height: 1.75
+  footprint_model: MULTI
+}
+
+bag_record_conf{
+  enable: false
+  bag_dir: "/tmp/"
+  duration: 60
+  max_bag_num: 10
+}
+
+process_conf{
+    enable_cpu_affinity: false
+    cpu_affinity: 2
+    cpu_affinity: 3
+    enable_mlockall: false
+    enable_realtime: false
+    realtime_priority: 60
 }

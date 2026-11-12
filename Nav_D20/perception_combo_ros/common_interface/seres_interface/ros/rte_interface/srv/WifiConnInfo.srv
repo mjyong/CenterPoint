@@ -1,0 +1,14 @@
+# 请求部分：
+string ssid
+string password
+bool action
+string ip_alloc
+string ipv4
+string ipv4_gw
+string ipv6
+string ipv6_gw
+
+---
+# 响应部分：
+string ssid
+bool connected

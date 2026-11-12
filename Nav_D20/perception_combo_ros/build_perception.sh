@@ -72,7 +72,7 @@ colcon_compile_node=(
   lidar_seg
   grid_map_memory_node
   ptz_data_detection
-  lidar_3d_detection
+  perception_recharge
 )
 
 # 1. 编译 gflags

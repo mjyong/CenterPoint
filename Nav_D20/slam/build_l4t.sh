@@ -130,9 +130,9 @@ function build_arm() {
     init_cross_compile_env
     
     
-    log_info "编译 kygi665_msgs nav2_interface  common_interface 和 novatel_oem7_msgs..."
+    log_info "编译 kygi665_msgs rhr_interface nav2_interface  common_interface 和 novatel_oem7_msgs..."
     colcon build --base-paths ../seres_interface/ \
-        --packages-select  kygi665_msgs nav2_interface common_interface  \
+        --packages-select  kygi665_msgs rhr_interface nav2_interface common_interface  \
         --cmake-force-configure \
         --cmake-args \
             -DCMAKE_BUILD_TYPE=${build_type} \
@@ -147,11 +147,11 @@ function build_arm() {
             ${CMAKE_CCP_PARAM}
 
     if [ $? -ne 0 ]; then
-        log_error " kygi665_msgs nav2_interface common_interface  novatel_oem7_msgs 交叉编译失败"
+        log_error " kygi665_msgs rhr_interface nav2_interface common_interface  novatel_oem7_msgs 交叉编译失败"
         exit 1
     fi
 
-    log_ok " kygi665_msgs nav2_interface common_interface  novatel_oem7_msgs 编译完成！开始编译 basic..."
+    log_ok " kygi665_msgs rhr_interface nav2_interface common_interface  novatel_oem7_msgs 编译完成！开始编译 basic..."
     sleep 3
 
     source install/setup.bash
@@ -237,16 +237,16 @@ function build_x86() {
     
 
     
-    log_info "编译  kygi665_msgs nav2_interface common_interface 和 novatel_oem7_msgs..."
+    log_info "编译  kygi665_msgs rhr_interface nav2_interface common_interface 和 novatel_oem7_msgs..."
     colcon build \
-        --packages-select kygi665_msgs nav2_interface common_interface  novatel_oem7_msgs
+        --packages-select kygi665_msgs rhr_interface nav2_interface common_interface  novatel_oem7_msgs
 
     if [ $? -ne 0 ]; then
-        log_error " kygi665_msgs nav2_interface common_interface  novatel_oem7_msgs 编译失败"
+        log_error " kygi665_msgs rhr_interface nav2_interface common_interface  novatel_oem7_msgs 编译失败"
         exit 1
     fi
 
-    log_ok " kygi665_msgs  nav2_interface common_interface novatel_oem7_msgs 编译完成！开始编译 lightning..."
+    log_ok " kygi665_msgs  rhr_interface nav2_interface common_interface novatel_oem7_msgs 编译完成！开始编译 lightning..."
     sleep 3
 
     source install/setup.bash

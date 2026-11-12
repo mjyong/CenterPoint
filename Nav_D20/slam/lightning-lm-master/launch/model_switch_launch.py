@@ -43,6 +43,12 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
         output='screen',
     )
+    rdap_sensor_monitor_node = Node(
+        package='lightning',
+        executable='rdap_sensor_monitor_node',
+        parameters=[{'use_sim_time': True}],
+        output='screen',
+    )
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -58,6 +64,6 @@ def generate_launch_description():
     ld.add_action(declare_rviz_config_path_cmd)
     ld.add_action(rviz_node)
     ld.add_action(lighting_loc_node)
-
+    ld.add_action(rdap_sensor_monitor_node)
 
     return ld

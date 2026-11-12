@@ -5,17 +5,16 @@
  * @LastEditTime: 2025-02-13 10:45:23
  */
 #pragma once
+#include <deque>
+#include <optional>
 #include <string_view>
 
 #include "src/runnable/mission/mission_base.h"
 #include "src/runnable/mission/mission_state_machine/mission_fsm_base.h"
 #include "src/runnable/mission/mission_state_machine/mission_fsm_base_ctx.h"
 
-#include "src/algorithm/grid_path_planner/grid_path_planner.h"
+#include "src/algorithm/mppi_planner/mppi_planner.h"
 #include "src/algorithm/teb_planner/teb_planner.h"
-
-#include "src/common/path2d.h"
-using planning::algorithm::GridPathPlanner;
 
 namespace planning {
 namespace mission {
@@ -55,6 +54,10 @@ public:
     constraint_theta_ = constraint_theta;
   }
   void setTargetSpeed(double target_speed) {
+    if (mppi_planner_ != nullptr) {
+      mppi_planner_->set_target_speed(target_speed);
+      return;
+    }
     if (teb_planner_ == nullptr) {
       return;
     }
@@ -63,11 +66,9 @@ public:
   const Pose3d &target_pose() const { return target_pose_; }
   bool constraint_theta() const { return constraint_theta_; }
 
-  // const Path2d &global_path_2d() const { return global_path_2d_; }
-  // const std::vector<Pose2d> &local_path_2d() const { return local_path_2d_; }
-  const std::vector<Pose2d> *global_path_2d() override {
-    return global_path_2d_.poses_ptr();
-  }
+  // Global path is owned by GlobalMapManager; forward for the communication
+  // bridges that consume it via the MissionBase interface.
+  const std::vector<Pose2d> *global_path_2d() override;
   const std::vector<Pose2d> *local_path_2d() override {
     return &local_path_2d_;
   }
@@ -76,10 +77,10 @@ public:
     return mission_state_;
   }
 
-  GridPathPlanner *grid_path_planner() const {
-    return grid_path_planner_.get();
-  }
+  bool nav_blocked() const { return nav_blocked_; }
+
   teb_planner::TebPlanner *teb_planner() const { return teb_planner_.get(); }
+  algorithm::MppiPlanner *mppi_planner() const { return mppi_planner_.get(); }
 
 private:
   // friend class MissionFSMBaseCtx;
@@ -111,6 +112,7 @@ private:
   void transition_e_active_standstill() override;
   void transition_e_active_standby() override;
   void transition_e_active_fault() override;
+  void transition_e_active_off() override;
   void transition_e_standstill_active() override;
   void transition_e_standstill_standby() override;
   void transition_e_standstill_fault() override;
@@ -135,21 +137,15 @@ private:
   void on_exit_s_standstill() override;
   void on_exit_s_fault() override;
 
-  bool LoadSimRefPathAndObs();
-
 private:
   bool init_flag_{false};
   MissionFSMBaseCtx mission_fsm_ctx_;
   MissionFSMBase::StateType mission_state_;
-  std::shared_ptr<GridPathPlanner> grid_path_planner_;
   std::shared_ptr<teb_planner::TebPlanner> teb_planner_;
+  std::shared_ptr<algorithm::MppiPlanner> mppi_planner_;
 
-  // Point3d target_point_;
-  // std::vector<Eigen::Vector3d> global_path_;
   Pose3d target_pose_;
   bool constraint_theta_{false};
-  Path2d global_path_2d_;
-  bool global_plan_flag_{false};
   std::vector<Pose2d> local_path_2d_;
 
   bool update_fail_{false};
@@ -160,6 +156,13 @@ private:
   int motion_s_idx_{1};
   double global_remain_dis_{0.0};
   double off_condition_met_time_{-1};
+
+  std::deque<std::pair<double, double>> nav_dist_history_;
+  double nav_blocked_met_time_{-1};
+  bool nav_blocked_{false};
+
+  void UpdateNavBlocked(double time_now, double dist_to_end);
+  void ResetNavBlocked();
 };
 
 } // namespace mission

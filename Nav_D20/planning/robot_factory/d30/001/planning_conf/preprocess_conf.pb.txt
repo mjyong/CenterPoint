@@ -1,0 +1,56 @@
+types: GlobalMapManager
+confs{
+    type: GlobalMapManager
+    global_map_manager_conf{
+        input_dir: "/../../data/astar_pgm/"
+        input_name: "sim"
+        enable_overlay: false
+        cell_timeout_seconds: 1.0
+        grid_path_planner_conf{
+            planner_type: A_STAR
+            input_type: PGM_MAP
+            input_dir: "/../../data/astar_pgm/"
+            input_name: "map"
+            safe_margin: 0.1
+            inflation_margin: 0.05
+            max_obstacle_dist: 2.0
+            heuristic: EUCLIDEAN
+            unknown_as_free: false
+            use_smoother: true
+            smoother_safety_margin: 0.4
+            smoother_safety_factor: 0.5
+            smoother_far_away_obstacle_dist: 1.0
+            smoother_weight_fem_pos_deviation: 10.0
+            smoother_weight_path_length: 1
+            smoother_weight_ref_deviation: 1.0
+        }
+    }
+}
+types: CostMapProduction
+confs{
+    type: CostMapProduction
+    cost_map_production_conf{
+        enable_overlay_global_map: true
+        enable_cuda: false
+        front_to_base_length: 10.0
+        back_to_base_length: 5.0
+        left_to_base_width: 5.0
+        right_to_base_width: 5.0
+        resolution: 0.05
+        max_obstacle_dist: 1.5
+        safe_margin: 0.3
+        inflation_margin: 0.0
+
+        max_reference_offset: 3.0
+    }
+}
+
+#types: CollisionChecker
+#confs{
+#    type: CollisionChecker
+#    collision_checker_conf{
+#        urdf_dir: "/../../data/urdf/r1pro_description"
+#        urdf_name: "r1pro.urdf"
+#    }
+#}
+#

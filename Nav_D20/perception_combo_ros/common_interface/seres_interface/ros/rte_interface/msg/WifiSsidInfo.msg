@@ -1,0 +1,2 @@
+string ssid
+int32 signal_level

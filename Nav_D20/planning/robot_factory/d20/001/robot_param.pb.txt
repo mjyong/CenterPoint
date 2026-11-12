@@ -1,9 +1,24 @@
 robot_param {
   robot_id {
-      appellation: "D20"
+      appellation: "d20"
       vin: "001"
   }
   length: 1.0
   width: 0.4
   height: 1.0
+  footprint_model: MULTI
+}
+bag_record_conf{
+  enable: true
+  bag_dir: "/tmp/"
+  duration: 60
+  max_bag_num: 10
+}
+process_conf{
+    enable_cpu_affinity: false
+    cpu_affinity: 2
+    cpu_affinity: 3
+    enable_mlockall: false
+    enable_realtime: false
+    realtime_priority: 60
 }

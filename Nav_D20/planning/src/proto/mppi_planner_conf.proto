@@ -1,0 +1,185 @@
+syntax = "proto2";
+
+package planning.config;
+
+// MPPI local planner configuration, ported from mppi_controller_ros
+// (mppi_controller_params.yaml). Default values follow the reference yaml.
+message MppiPlannerConf {
+  enum MotionModel {
+    DiffDrive = 0;
+    Omni = 1;
+    Ackermann = 2;
+  }
+
+  message DynamicConstraints {
+    optional double max_vx = 1 [ default = 0.5 ];
+    optional double min_vx = 2 [ default = -0.35 ];
+    optional double max_vy = 3 [ default = 0.0 ];
+    optional double max_omega = 4 [ default = 1.9 ];
+    optional double max_accel_vx = 5 [ default = 3.0 ];
+    optional double min_accel_vx = 6 [ default = -3.0 ];
+    optional double max_accel_vy = 7 [ default = 3.0 ];
+    optional double max_accel_omega = 8 [ default = 3.5 ];
+
+    optional bool lateral_coupling_enabled = 9 [ default = false ];
+    optional double lateral_blend_vx_start = 10 [ default = 0.3 ];
+    optional double lateral_blend_vx_end = 11 [ default = 1.2 ];
+
+    optional double response_tau_vx = 12 [ default = 0.0 ];
+    optional double response_tau_vy = 13 [ default = 0.0 ];
+    optional double response_tau_wz = 14 [ default = 0.0 ];
+  }
+
+  message SamplingStd {
+    optional double vx = 1 [ default = 0.2 ];
+    optional double vy = 2 [ default = 0.2 ];
+    optional double wz = 3 [ default = 0.4 ];
+  }
+
+  message OptimizerConf {
+    optional double model_dt = 1 [ default = 0.05 ];
+    optional int32 time_steps = 2 [ default = 56 ];
+    optional int32 batch_size = 3 [ default = 2000 ];
+    optional int32 iteration_count = 4 [ default = 1 ];
+    optional double temperature = 5 [ default = 0.3 ];
+    optional double gamma = 6 [ default = 0.015 ];
+    optional int32 retry_attempt_limit = 7 [ default = 1 ];
+  }
+
+  message ConstraintCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 power = 2 [ default = 1 ];
+    optional double weight = 3 [ default = 4.0 ];
+  }
+
+  message GoalCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 power = 2 [ default = 1 ];
+    optional double weight = 3 [ default = 5.0 ];
+    optional double threshold_to_consider = 4 [ default = 1.4 ];
+  }
+
+  message GoalAngleCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 power = 2 [ default = 1 ];
+    optional double weight = 3 [ default = 3.0 ];
+    optional double threshold_to_consider = 4 [ default = 0.5 ];
+  }
+
+  message ObstaclesCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 power = 3 [ default = 1 ];
+    optional double repulsion_weight = 4 [ default = 0.0 ];
+    optional double critical_weight = 5 [ default = 0.0 ];
+    optional double collision_cost = 6 [ default = 100000.0 ];
+    optional double collision_margin_distance = 7 [ default = 0.1 ];
+    optional double near_goal_distance = 8 [ default = 0.5 ];
+    // Distance field based repulsion radius, replaces the costmap inflation
+    // radius of the reference implementation
+    optional double repulsion_radius = 9 [ default = 1.0 ];
+  }
+
+  message PathAlignCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 offset_from_furthest = 2 [ default = 20 ];
+    optional int32 trajectory_point_step = 3 [ default = 4 ];
+    optional double threshold_to_consider = 4 [ default = 0.5 ];
+    optional double max_path_occupancy_ratio = 5 [ default = 0.07 ];
+    optional bool use_path_orientations = 6 [ default = false ];
+    optional int32 power = 7 [ default = 1 ];
+    optional double weight = 8 [ default = 10.0 ];
+  }
+
+  message PathAngleCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 offset_from_furthest = 2 [ default = 4 ];
+    optional int32 power = 3 [ default = 1 ];
+    optional double weight = 4 [ default = 2.2 ];
+    optional double max_angle_to_furthest = 5 [ default = 0.785398 ];
+    optional double threshold_to_consider = 6 [ default = 0.5 ];
+    // 0: forward preference, 1: no directional preference,
+    // 2: consider feasible path orientations
+    optional int32 mode = 7 [ default = 0 ];
+  }
+
+  message PathFollowCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 power = 2 [ default = 1 ];
+    optional double weight = 3 [ default = 5.0 ];
+    optional double threshold_to_consider = 4 [ default = 1.4 ];
+    optional int32 offset_from_furthest = 5 [ default = 6 ];
+  }
+
+  message PreferForwardCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 power = 2 [ default = 1 ];
+    optional double weight = 3 [ default = 5.0 ];
+    optional double threshold_to_consider = 4 [ default = 0.5 ];
+  }
+
+  message TwirlingCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 power = 2 [ default = 1 ];
+    optional double weight = 3 [ default = 0.0 ];
+    // Only apply within this distance of the goal (terminal heading damping)
+    optional double threshold_to_consider = 4 [ default = 0.25 ];
+  }
+
+  message VelocityDeadbandCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 power = 2 [ default = 1 ];
+    optional double weight = 3 [ default = 35.0 ];
+    optional double vx_deadband = 4 [ default = 0.0 ];
+    optional double vy_deadband = 5 [ default = 0.0 ];
+    optional double wz_deadband = 6 [ default = 0.0 ];
+  }
+
+  message ReferenceVelocityCriticConf {
+    optional bool enabled = 1 [ default = true ];
+    optional int32 power = 2 [ default = 1 ];
+    optional double weight = 3 [ default = 10.0 ];
+    // Distance to the goal at which deceleration starts; the envelope
+    // deceleration is derived as reference_velocity^2 / (2 * this)
+    optional double decel_start_dist = 4 [ default = 5.0 ];
+    // Configured cruise speed; overridable at runtime via
+    // MppiPlanner::set_target_speed (external injection, 0 = use this value)
+    optional double reference_velocity = 5 [ default = 0.0 ];
+    // Near-start suppression: while the robot has not advanced past
+    // near_start_max_segments path segments AND its heading deviates from the
+    // path start orientation by more than near_start_heading_error radians,
+    // the critic is disabled so reorienting in place is not penalized as a
+    // speed deficit (the payoff of aligning lies beyond the horizon).
+    optional bool near_start_disable = 6 [ default = false ];
+    optional int32 near_start_max_segments = 7 [ default = 5 ];
+    optional double near_start_heading_error = 8 [ default = 1.57 ];
+  }
+
+  optional MotionModel motion_model = 1 [ default = DiffDrive ];
+  optional DynamicConstraints dynamic_constraints = 2;
+  optional SamplingStd sampling_std = 3;
+  optional OptimizerConf optimizer_conf = 4;
+  // Enabled critics, evaluated in the listed order. Empty means all critics
+  // with the reference default ordering.
+  repeated string critics = 5;
+  optional double min_turning_r = 7 [ default = 0.2 ];
+  optional double velocity_cmd_time = 8 [ default = 0.65 ];
+  optional bool regenerate_noises = 9 [ default = true ];
+
+  // Offload the MPPI hot path (rollout propagation + fused critic scoring)
+  // to CUDA. Requires a build with PLANNING_ENABLE_CUDA and a GPU backend
+  // that accepts the configured motion model and enabled critic set;
+  // otherwise the planner transparently uses the CPU path.
+  optional bool enable_cuda = 13 [ default = false ];
+
+  optional ConstraintCriticConf constraint_critic = 20;
+  optional GoalCriticConf goal_critic = 22;
+  optional GoalAngleCriticConf goal_angle_critic = 23;
+  optional ObstaclesCriticConf obstacles_critic = 24;
+  optional PathAlignCriticConf path_align_critic = 25;
+  optional PathAngleCriticConf path_angle_critic = 26;
+  optional PathFollowCriticConf path_follow_critic = 27;
+  optional PreferForwardCriticConf prefer_forward_critic = 28;
+  optional TwirlingCriticConf twirling_critic = 29;
+  optional VelocityDeadbandCriticConf velocity_deadband_critic = 30;
+  optional ReferenceVelocityCriticConf reference_velocity_critic = 31;
+}

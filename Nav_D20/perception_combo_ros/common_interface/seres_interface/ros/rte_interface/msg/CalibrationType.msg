@@ -1,0 +1,7 @@
+# CalibrationType.msg:
+uint8 type
+
+uint8 CALIBRATION_DYNAMIC = 1
+uint8 CALIBRATION_EOL = 2
+uint8 CALIBRATION_AFTER_SALE = 3
+uint8 CALIBRATION_TYPE_UNKNOWN = 0

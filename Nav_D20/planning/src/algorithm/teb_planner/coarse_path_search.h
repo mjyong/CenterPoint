@@ -214,16 +214,25 @@ public:
               << " collision=" << total_rejected_collision
               << " visited=" << total_rejected_visited;
         path_.clear();
+        // Reconstruct from the goal node (last emplaced in close_list) back to
+        // the start. The father chain already contains the start node: do NOT
+        // push `start` again, a duplicate head would shift every
+        // PathFollowing anchor in TebPlanner by one pose.
+        int node_idx = static_cast<int>(close_list.size()) - 1;
         if (constant_final_theta) {
+          // Use the exact end pose instead of the grid-snapped goal node.
           path_.push_back(end);
+          node_idx = close_list[node_idx].father;
         }
-        int father_idx = current_node.father;
-        while (father_idx >= 0) {
-          path_.push_back(close_list[father_idx].coord);
-          father_idx = close_list[father_idx].father;
+        while (node_idx >= 0) {
+          path_.push_back(close_list[node_idx].coord);
+          node_idx = close_list[node_idx].father;
         }
-        path_.push_back(start);
         std::reverse(path_.begin(), path_.end());
+        if (path_.size() < 2) {
+          // Degenerate case: goal adjacent to start.
+          path_.push_back(path_.back());
+        }
         return true;
       }
       for (int i = -1; i <= 1; ++i) {

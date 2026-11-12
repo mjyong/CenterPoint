@@ -98,6 +98,9 @@ void LoopClosing::Init(const std::string yaml_path) {
         if (yaml_node["loop_closing"]["ins_prior_position_only"]) {
             options_.ins_prior_position_only_ = yaml_node["loop_closing"]["ins_prior_position_only"].as<bool>();
         }
+        if (yaml_node["loop_closing"]["ins_constraint_gap"]) {
+            options_.ins_constraint_gap_ = yaml_node["loop_closing"]["ins_constraint_gap"].as<double>();
+        }
         if (yaml_node["loop_closing"]["motion_trans_noise"]) {
             options_.motion_trans_noise_ = yaml_node["loop_closing"]["motion_trans_noise"].as<double>();
         }
@@ -137,7 +140,7 @@ void LoopClosing::HandleKF(Keyframe::Ptr kf) {
 
     cur_kf_ = kf;
     all_keyframes_.emplace_back(kf);
-    //if(0) {
+    if(0) {
         // 检测回环候选
         DetectLoopCandidates();
 
@@ -150,7 +153,7 @@ void LoopClosing::HandleKF(Keyframe::Ptr kf) {
 
         // 位姿图优化
         PoseOptimization();
-    //}
+    }
     last_kf_ = kf;
 }
 
@@ -477,40 +480,73 @@ void LoopClosing::GlobalOptimizationWithINS() {
     // 因此我们跳过回环约束，只添加INS约束
     
     // 添加INS先验约束
-    int ins_constraint_count = 0;
-    for (auto& kf : all_keyframes_) {
-        if (kf->HasInsPose()) {
-            auto e = std::make_shared<miao::EdgeSE3Prior>();
-            e->SetVertex(0, optimizer_->GetVertex(kf->GetID()));
-            e->SetMeasurement(SE3(kf->GetInsPose()));
-            Mat6d info_ins_current = info_ins_;
-            if (options_.use_ins_covariance_) {
-                Eigen::Vector3d pos_cov = kf->GetInsPositionCovariance();
-                Eigen::Vector3d ori_cov = kf->GetInsOrientationCovariance();
-                if (pos_cov.norm() > 1e-6 && ori_cov.norm() > 1e-6) {
-                    Mat6d info_from_cov = Mat6d::Zero();
-                    info_from_cov(0,0) = 1.0 / (pos_cov.x() * pos_cov.x());
-                    info_from_cov(1,1) = 1.0 / (pos_cov.y() * pos_cov.y());
-                    info_from_cov(2,2) = 1.0 / (pos_cov.z() * pos_cov.z());
-                    info_from_cov(3,3) = 1.0 / (ori_cov.x() * ori_cov.x());
-                    info_from_cov(4,4) = 1.0 / (ori_cov.y() * ori_cov.y());
-                    info_from_cov(5,5) = 1.0 / (ori_cov.z() * ori_cov.z());
-                    info_ins_current = info_from_cov;
-                }
+    // 按里程间隔抽稀：每累计 ins_constraint_gap_ 米里程才融合一个INS点（0 表示不抽稀，每个关键帧都加）
+    // 首个和最后一个带INS位姿的关键帧始终加入，用于锚定轨迹两端
+    std::vector<Keyframe::Ptr> ins_kfs;
+    int ins_kf_total = 0;
+    {
+        double accum_dist = 0.0;               // 距上一个被选中关键帧的累计里程
+        Vec3d prev_pos = Vec3d::Zero();        // 上一关键帧位置
+        bool has_prev = false;
+        Keyframe::Ptr pending_tail = nullptr;  // 暂存未选中的带INS关键帧，作为尾部锚点候选
+        for (auto& kf : all_keyframes_) {
+            if (has_prev) {
+                accum_dist += (kf->GetLIOPose().translation() - prev_pos).norm();
             }
-            if (options_.ins_prior_position_only_) {
-                info_ins_current.block<3,3>(3,3) *= 1e-9;
+            prev_pos = kf->GetLIOPose().translation();
+            has_prev = true;
+
+            if (!kf->HasInsPose()) {
+                continue;
             }
-            // 降低INS约束的权重，避免数值问题
-            // info_ins_current *= 0.1;
-            e->SetInformation(info_ins_current);
-            
-            auto rk = std::make_shared<miao::RobustKernelCauchy>();
-            rk->SetDelta(1.0);
-            e->SetRobustKernel(rk);
-            optimizer_->AddEdge(e);
-            ins_constraint_count++;
+            ins_kf_total++;
+            if (ins_kfs.empty() || accum_dist >= options_.ins_constraint_gap_) {
+                ins_kfs.emplace_back(kf);
+                accum_dist = 0.0;
+                pending_tail = nullptr;
+            } else {
+                pending_tail = kf;
+            }
         }
+        if (pending_tail != nullptr) {
+            ins_kfs.emplace_back(pending_tail);  // 保证轨迹末端也有INS锚点
+        }
+    }
+    LOG(INFO) << "INS prior constraint subsampling: gap = " << options_.ins_constraint_gap_
+              << " m, selected " << ins_kfs.size() << "/" << ins_kf_total << " keyframes with INS pose";
+
+    int ins_constraint_count = 0;
+    for (auto& kf : ins_kfs) {
+        auto e = std::make_shared<miao::EdgeSE3Prior>();
+        e->SetVertex(0, optimizer_->GetVertex(kf->GetID()));
+        e->SetMeasurement(SE3(kf->GetInsPose()));
+        Mat6d info_ins_current = info_ins_;
+        if (options_.use_ins_covariance_) {
+            Eigen::Vector3d pos_cov = kf->GetInsPositionCovariance();
+            Eigen::Vector3d ori_cov = kf->GetInsOrientationCovariance();
+            if (pos_cov.norm() > 1e-6 && ori_cov.norm() > 1e-6) {
+                Mat6d info_from_cov = Mat6d::Zero();
+                info_from_cov(0,0) = 1.0 / (pos_cov.x() * pos_cov.x());
+                info_from_cov(1,1) = 1.0 / (pos_cov.y() * pos_cov.y());
+                info_from_cov(2,2) = 1.0 / (pos_cov.z() * pos_cov.z());
+                info_from_cov(3,3) = 1.0 / (ori_cov.x() * ori_cov.x());
+                info_from_cov(4,4) = 1.0 / (ori_cov.y() * ori_cov.y());
+                info_from_cov(5,5) = 1.0 / (ori_cov.z() * ori_cov.z());
+                info_ins_current = info_from_cov;
+            }
+        }
+        if (options_.ins_prior_position_only_) {
+            info_ins_current.block<3,3>(3,3) *= 1e-9;
+        }
+        // 降低INS约束的权重，避免数值问题
+        // info_ins_current *= 0.1;
+        e->SetInformation(info_ins_current);
+
+        auto rk = std::make_shared<miao::RobustKernelCauchy>();
+        rk->SetDelta(1.0);
+        e->SetRobustKernel(rk);
+        optimizer_->AddEdge(e);
+        ins_constraint_count++;
     }
     if(ins_constraint_count==0) {
         LOG(WARNING) << "No INS prior constraints added, skipping global optimization with INS";
@@ -532,7 +568,8 @@ void LoopClosing::GlobalOptimizationWithINS() {
     // 获取优化结果（INS坐标系下的位姿）并更新关键帧位姿（转换为LIO坐标系）
     for (auto& vert : kf_vert_) {
         SE3 ins_pose_opt = vert->Estimate();
-        // SE3 lio_pose_opt = T_ins_lio_.inverse() * ins_pose_opt;
+        //SE3 lio_pose = kf->GetLIOPose();
+        //SE3 lio_pose_opt = T_ins_lio_.inverse() * ins_pose_opt;
         all_keyframes_[vert->GetId()]->SetOptPose(ins_pose_opt);
     }
     

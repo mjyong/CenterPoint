@@ -1,17 +1,13 @@
 #include "src/runnable/preprocess/cost_map_production/cost_map_production.h"
 #include "src/common/util/config_helper.h"
-#include <opencv2/core/version.hpp>
-#if CV_VERSION_MAJOR >= 5
-#include <opencv2/geometry/2d.hpp>
-#endif
 #include "src/common/util/math.h"
-#include "src/common/util/tf_buffer.h"
 #include "src/common/util/time_keeper.h"
 #include "src/runnable/entry/planning_entry.h"
 
+#include <algorithm>
+#include <cmath>
+
 using planning::common::util::ConfigHelper;
-using planning::common::util::normalize_angle;
-using planning::common::util::TfBuffer;
 using planning::common::util::TimeKeeper;
 
 namespace planning {
@@ -25,6 +21,7 @@ CostMapProduction::CostMapProduction(const PreprocessConf::Conf &conf)
           "reference_path",
           "reference_offset_dist",
           "composite_obstacle",
+          "composite_obstacle_dist",
           "composite_cost",
           "composite_gradient_x",
           "composite_gradient_y",
@@ -35,6 +32,7 @@ CostMapProduction::CostMapProduction(const PreprocessConf::Conf &conf)
   layers_[Layer::REFERENCE_PATH] = "reference_path";
   layers_[Layer::REFERENCE_OFFSET_DIST] = "reference_offset_dist";
   layers_[Layer::COMPOSITE_OBSTACLE] = "composite_obstacle";
+  layers_[Layer::COMPOSITE_OBSTACLE_DIST] = "composite_obstacle_dist";
   layers_[Layer::COMPOSITE_COST] = "composite_cost";
   layers_[Layer::COMPOSITE_GRADIENT_X] = "composite_gradient_x";
   layers_[Layer::COMPOSITE_GRADIENT_Y] = "composite_gradient_y";
@@ -81,15 +79,20 @@ bool CostMapProduction::Init(PlanningEntry *planning_entry) {
 
 bool CostMapProduction::Proc() {
   TimeKeeper time_keeper("CostMapProduction::Proc");
+  const std::string layer_name = layers_[Layer::OBSTACLE];
+  auto &obstacle_data = grid_map_[layer_name];
+  obstacle_data.setConstant(255.0); // set free
   time_keeper.RecordTime("AddObstacleFromMap");
   AddObstacleFromMap();
   time_keeper.RecordTime("AddObstacleFromPerception");
   AddObstacleFromPerception();
   time_keeper.RecordTime("UpdateObstacleDistance");
   UpdateObstacleDistance();
+  if (config_.enable_obstacle_scan()) {
+    time_keeper.RecordTime("UpdateScanObstacles");
+    UpdateScanObstacles();
+  }
 
-  time_keeper.RecordTime("ExtractLocalReferencePath");
-  ExtractLocalReferencePath();
   time_keeper.RecordTime("UpdateReferenceOffsetDist");
   UpdateReferenceOffsetDist();
 
@@ -105,39 +108,9 @@ bool CostMapProduction::Proc() {
   return true;
 }
 
-void CostMapProduction::SetGlobalReferencePath(const Path2d &global_ref_path) {
-  global_ref_path_ = global_ref_path;
-}
-
-void CostMapProduction::ExtractLocalReferencePath() {
-  local_ref_path_.clear();
-  if (global_ref_path_.poses().empty()) {
-    return;
-  }
-
-  auto main_bridge = planning_entry_->communication_entry_ptr()->MainBridge();
-  const auto &odom = main_bridge->odometry();
-  Pose2d start_pose;
-  start_pose.position.x() = odom->pose.position.x();
-  start_pose.position.y() = odom->pose.position.y();
-  start_pose.theta = odom->pose.euler().z();
-
-  auto local_poses = global_ref_path_.pose_subset(
-      start_pose.position, config_.reference_path_length());
-
-  Transform3d tf;
-  if (!TfBuffer::Instance()->get("map", "base_link", tf)) {
-    AWARN << "Failed to get map->base_link transform";
-    return;
-  }
-
-  for (const auto &pose : local_poses) {
-    auto base_pt =
-        tf.inverse() * Eigen::Vector3d(pose.position.x(), pose.position.y(), 0);
-    auto base_theta = normalize_angle(pose.theta - odom->pose.euler().z());
-    local_ref_path_.emplace_back(
-        Eigen::Vector3d(base_pt.x(), base_pt.y(), base_theta));
-  }
+void CostMapProduction::SetLocalReferencePath(
+    const std::vector<Eigen::Vector3d> &local_ref_path) {
+  local_ref_path_ = local_ref_path;
 }
 
 void CostMapProduction::UpdateObstacleDistance() {
@@ -162,6 +135,37 @@ void CostMapProduction::UpdateObstacleDistance() {
       eigen2cv(grid_map_.get(layers_[Layer::OBSTACLE_DISTANCE])), cv::DIST_L2,
       cv::DIST_MASK_PRECISE);
   grid_map_.get(layers_[Layer::OBSTACLE_DISTANCE]) *= config_.resolution();
+}
+
+void CostMapProduction::UpdateScanObstacles() {
+  const double angle_res = config_.scan_angle_resolution_deg() * M_PI / 180.0;
+  const int num_sectors = static_cast<int>(std::ceil(2.0 * M_PI / angle_res));
+  scan_obstacles_.assign(num_sectors, ScanObstaclePoint());
+
+  const auto &obstacle = grid_map_.get(layers_[Layer::OBSTACLE]);
+  for (grid_map::GridMapIterator iterator(grid_map_); !iterator.isPastEnd();
+       ++iterator) {
+    const grid_map::Index index(*iterator);
+    if (obstacle(index(0), index(1)) > 0.5f) {
+      continue; // 255=free, 0=obstacle
+    }
+    grid_map::Position pos;
+    grid_map_.getPosition(index, pos);
+    const double dist = pos.norm();
+    if (dist < 1e-9) {
+      continue; // 跳过原点自身
+    }
+    // atan2 ∈ [-π, π] 映射到扇区 [0, num_sectors)
+    const int sector = std::clamp(
+        static_cast<int>((std::atan2(pos.y(), pos.x()) + M_PI) / angle_res), 0,
+        num_sectors - 1);
+    auto &point = scan_obstacles_[sector];
+    if (std::isnan(point.distance) || dist < point.distance) {
+      point.x = pos.x();
+      point.y = pos.y();
+      point.distance = dist;
+    }
+  }
 }
 
 void CostMapProduction::BuildCompositeObstacle() {
@@ -264,6 +268,9 @@ void CostMapProduction::UpdateCompositeCost() {
     int rows = grid_map_.getSize()(0);
     int cols = grid_map_.getSize()(1);
     cuda_pipeline_.ProcComposite(nullptr, rows, cols);
+    cuda_pipeline_.DownloadCompositeDistField(
+        grid_map_.get(layers_[Layer::COMPOSITE_OBSTACLE_DIST]).data(),
+        rows * cols);
     cuda_pipeline_.DownloadCompositeCostField(
         grid_map_.get(layers_[Layer::COMPOSITE_COST]).data(), rows * cols);
     cuda_pipeline_.DownloadGradientXField(
@@ -274,14 +281,30 @@ void CostMapProduction::UpdateCompositeCost() {
         rows * cols);
     return;
   }
-  Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> binary =
-      grid_map_.get(layers_[Layer::COMPOSITE_OBSTACLE]).cast<unsigned char>();
-  cv::distanceTransform(eigen2cv(binary),
-                        eigen2cv(grid_map_.get(layers_[Layer::COMPOSITE_COST])),
-                        cv::DIST_L2, cv::DIST_MASK_PRECISE);
+  auto &composite_dist = grid_map_.get(layers_[Layer::COMPOSITE_OBSTACLE_DIST]);
+  const double inflation_safe_margin =
+      config_.safe_margin() + config_.inflation_margin();
+  if (local_ref_path_.empty()) {
+    const auto &obstacle_distance =
+        grid_map_.get(layers_[Layer::OBSTACLE_DISTANCE]);
+    composite_dist =
+        (obstacle_distance.array() - inflation_safe_margin).cwiseMax(0.0);
+  } else {
+    Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> binary =
+        grid_map_.get(layers_[Layer::COMPOSITE_OBSTACLE]).cast<unsigned char>();
+    cv::distanceTransform(eigen2cv(binary), eigen2cv(composite_dist),
+                          cv::DIST_L2, cv::DIST_MASK_PRECISE);
+    composite_dist *= config_.resolution();
+  }
+
+  // Derive the normalized [0, 1] cost layer from the metric distance field.
   auto &cost_matrix = grid_map_.get(layers_[Layer::COMPOSITE_COST]);
-  double max_dist = cost_matrix.maxCoeff();
-  cost_matrix = 1.0 - ((cost_matrix.array()) / (max_dist));
+  double max_dist = composite_dist.maxCoeff();
+  if (max_dist > 0.0) {
+    cost_matrix = 1.0 - (composite_dist.array() / max_dist);
+  } else {
+    cost_matrix.setConstant(0.0);
+  }
 
   auto &composite_gx = grid_map_.get(layers_[Layer::COMPOSITE_GRADIENT_X]);
   auto &composite_gy = grid_map_.get(layers_[Layer::COMPOSITE_GRADIENT_Y]);
@@ -347,7 +370,19 @@ double CostMapProduction::GetObstacleDistance(const grid_map::Position &pos) {
     return grid_map_.atPosition(layers_[Layer::OBSTACLE_DISTANCE], pos,
                                 grid_map::InterpolationMethods::INTER_LINEAR);
   } else {
-    return 1e6;
+    return 0.0;
+  }
+}
+
+double
+CostMapProduction::GetCompositeObstacleDistance(const double relative_x,
+                                                const double relative_y) {
+  grid_map::Position pos(relative_x, relative_y);
+  if (grid_map_.isInside(pos)) {
+    return grid_map_.atPosition(layers_[Layer::COMPOSITE_OBSTACLE_DIST], pos,
+                                grid_map::InterpolationMethods::INTER_LINEAR);
+  } else {
+    return 0.0;
   }
 }
 bool CostMapProduction::IsCollisionExact(const double &relative_x,
@@ -370,6 +405,9 @@ bool CostMapProduction::IsCollisionExact(const double &relative_x,
 }
 
 void CostMapProduction::AddObstacleFromMap() {
+  if (!config_.enable_overlay_global_map()) {
+    return;
+  }
   auto &global_map = planning_entry_->preprocess_entry_ptr()
                          ->global_map_manager()
                          ->global_map();
@@ -526,16 +564,6 @@ void CostMapProduction::AddObstacleFromPerception() {
 
 double CostMapProduction::GetReferenceOffsetDist(const double relative_x,
                                                  const double relative_y) {
-  grid_map::Position pos(relative_x, relative_y);
-  if (grid_map_.isInside(pos)) {
-    return grid_map_.atPosition(layers_[Layer::REFERENCE_OFFSET_DIST], pos,
-                                grid_map::InterpolationMethods::INTER_LINEAR);
-  }
-  return 1.0;
-}
-
-double CostMapProduction::GetReferenceOffset(const double relative_x,
-                                             const double relative_y) {
   grid_map::Position pos(relative_x, relative_y);
   if (grid_map_.isInside(pos)) {
     return grid_map_.atPosition(layers_[Layer::REFERENCE_OFFSET_DIST], pos,

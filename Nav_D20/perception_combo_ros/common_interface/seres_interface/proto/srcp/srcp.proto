@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+import "msgtype.proto";
+
+import "task.proto";
+import "result.proto";
+import "rhr.proto";
+import "config.proto";
+import "nav_operation.proto";
+
+package srcp;   // seres remote control protocal
+
+//==========================================================================================
+message Header
+{
+    string version      = 1;
+    string robot_type   = 2;
+    string robot_id     = 3;
+    uint64 timestamp    = 4;
+    uint64 seq          = 5;    // 发送端seq自增；回复类消息seq与发送端保持一致
+    MsgType.ID msgtype  = 6;    // body消息类型名
+}
+
+//-----------------------------------------------------------------------------------------
+// 云端响应消息
+message RemoteResponse
+{
+    Header head = 1;
+    GeneralResult result = 2;        // 通用返回
+
+    MsgType.ID resp_data_type  = 3;  // 附加响应数据【可选】data数据类型，不需要携带数据时填0
+    oneof data                       // 附加响应数据【可选】（比如查询结果）, resp_data_type != 0时有效
+    {
+        RobotLogUploadTaskInitResponse taskInitResponse = 4;  // 日志上报任务响应
+    }
+}
+
+//-----------------------------------------------------------------------------------------
+// 机器人响应消息
+message RobotResponse
+{
+    Header head                = 1;
+    GeneralResult result       = 2;  // 通用返回,所有指令均需回复此字段
+
+    // 以下定义附加响应数据【可选】@begin {
+    MsgType.ID resp_data_type  = 3;  // data数据类型
+    // 附加响应数据（比如查询结果）, resp_data_type != 0时有效
+    oneof data
+    {
+        TaskSkills taskSkills          = 4;  // 任务技能集
+        TaskStateResponse taskStateRsp = 5;  // 任务状态查询回复
+        RobotMode robotMode            = 6;  // 机器人模式
+        ReportConfig reportConfig      = 7;  //上报配置参数信息
+        EmptyLogComponents emptyLogComponents    = 8;  // 远程日志获取，返回无日志文件的节点信息
+    }
+    // 附加响应数据 @end }
+}
+
+//-----------------------------------------------------------------------------------------
+message Login
+{
+    message Data
+    {
+        string dev_name   = 1;
+        string sw_ver     = 2;
+        bool   sys_reboot = 3;
+    }
+    Header head = 1;
+    Data data   = 2;
+}
+
+message Logout
+{
+    Header head = 1;
+}
+
+// 基础状态遗言
+message Status
+{
+    Header head   = 1;
+    string status = 2;
+}
+//-----------------------------------------------------------------------------------------
+// 远端发送的消息体
+message RemotePush
+{
+    Header head = 1;
+    oneof data
+    {
+        TaskOperate     task        = 2;  // 任务操作
+        TaskSkillsQuery skills      = 3;  // 任务技能查询
+        TaskStateQuery  taskState   = 4;  // 任务状态查询
+        RobotModeQuery  robotMode   = 5;  // 机器人模式查询 
+        GetRhrLog rhrLog            = 6;  // 请求RHR上传日志
+        RemoteConfig   remoteConfig = 7;  // 配置管理参数信息
+        NavOperation  navOperation  = 8;  // 地图编辑请求下发
+        RhrConfigs    rhrConfigs    = 9;  // RHR配置
+    }
+}
+
+// 本体对外发送的消息体
+message RobotReport
+{
+    Header head = 1;
+    oneof data
+    {
+        RobotMode robotMode   = 2;  // 机器人模式上报
+        TaskSkills taskSkills = 3;  // 机器人技能集
+        TaskState taskState   = 4;  // 当前任务状态，状态变更时主动上报
+        RobotAlarm alarm      = 5;  // 告警上报
+        ReportConfig config   = 6;  // 设备参数信息
+        RobotStates robotStates = 10;  // RHR上报机器人状态
+        RobotLogUploadTaskInit logUploadTaskInit = 11; // 日志上报任务初始化
+        LocationStatus locationStatus            = 12; // 定位信息上报
+        NavOperationResult navOperationResult    = 13; // 云端地图编辑任务处理结果上报
+        TaskMapPointReport taskMapPointReport    = 14; // 巡逻任务 点位上报(目前仅D10涉及)
+        TrackPointReport   trackPointReport      = 15; // 巡逻轨迹点上报(目前仅D10涉及)
+        EventRecord eventRecord = 20;                  // 事件记录上报
+    }
+}

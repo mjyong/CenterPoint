@@ -9,6 +9,8 @@
 #include "src/common/util/diagnostic.h"
 #include "src/runnable/entry/planning_entry.h"
 #include <dirent.h>
+#include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -18,10 +20,6 @@
 using planning::common::util::ConfigHelper;
 int main(int argc, char *argv[]) {
 
-  // planning::common::util::SetCpuAffinity({2, 3});
-  // mlockall(MCL_CURRENT | MCL_FUTURE);
-  // planning::common::util::SetRealtimePriority(60);
-
   google::InitGoogleLogging(argv[0]);
   FLAGS_logtostderr = false;
   FLAGS_stderrthreshold = 0;
@@ -29,7 +27,29 @@ int main(int argc, char *argv[]) {
   FLAGS_log_dir = "/tmp";
 
   planning::PlanningEntry planning_entry;
-  ConfigHelper::Instance();
+  ConfigHelper::Instance()->Init();
+
+  const planning::config::ProcessConf &process_conf =
+      ConfigHelper::GetConfig().process_conf();
+  if (process_conf.enable_cpu_affinity() &&
+      !process_conf.cpu_affinity().empty()) {
+    std::vector<int> cores(process_conf.cpu_affinity().begin(),
+                           process_conf.cpu_affinity().end());
+    if (!planning::common::util::SetCpuAffinity(cores)) {
+      AWARN << "SetCpuAffinity failed, cores inherited from parent.";
+    }
+  }
+  if (process_conf.enable_mlockall()) {
+    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+      AWARN << "mlockall failed: " << strerror(errno);
+    }
+  }
+  if (process_conf.enable_realtime()) {
+    if (!planning::common::util::SetRealtimePriority(
+            process_conf.realtime_priority())) {
+      AWARN << "SetRealtimePriority failed, running with default policy.";
+    }
+  }
 
   planning::common::util::Diagnostic::Instance()->Init(
       "planning", ConfigHelper::GetConfDir() + "/../../data/fault_info.csv");

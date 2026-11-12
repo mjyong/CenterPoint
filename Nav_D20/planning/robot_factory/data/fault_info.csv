@@ -1,59 +1,8 @@
-index	code	module	fault_type	fault_level	fault_index	fault_describe
-1	0x01101	0-Canbus	1-通讯故障	1	1	底盘信号超时，信号ID:0x165
-2	0x01102	0-Canbus	1-通讯故障	1	2	底盘信号超时，信号ID:0x144
-3	0x01103	0-Canbus	1-通讯故障	1	3	底盘信号超时，信号ID:0x23a
-4	0x01104	0-Canbus	1-通讯故障	1	4	底盘信号超时，信号ID:0x214
-5	0x01105	0-Canbus	1-通讯故障	1	5	底盘信号超时，信号ID:0xa2
-6	0x01106	0-Canbus	1-通讯故障	1	6	底盘信号超时，信号ID:0x11b
-7	0x01107	0-Canbus	1-通讯故障	1	7	底盘信号超时，信号ID:0x142
-8	0x01108	0-Canbus	1-通讯故障	1	8	底盘信号超时，信号ID:0x101
-9	0x01109	0-Canbus	1-通讯故障	1	9	中间件信号超时，信号/control_cmd
-10	0x0110a	0-Canbus	1-通讯故障	1	10	中间件信号超时，车辆状态管理信号
-11	0x0110b	0-Canbus	1-通讯故障	1	11	中间件信号超时，遥控指令信号
-12	0x0110c	0-Canbus	1-通讯故障	1	12	底盘信号超时，信号ID:0x160
-13	0x0110d	0-Canbus	1-通讯故障	1	13	底盘信号超时，信号ID:0x161
-14	0x0110e	0-Canbus	1-通讯故障	1	14	底盘信号超时，信号ID:0xfb
-15	0x0110f	0-Canbus	1-通讯故障	1	15	底盘信号超时，信号ID:0x183
-16	0x01110	0-Canbus	1-通讯故障	1	16	底盘信号超时，信号ID:0xf2
-17	0x01111	0-Canbus	1-通讯故障	1	17	底盘信号超时，信号ID:0x3f9
-18	0x01112	0-Canbus	1-通讯故障	1	18	底盘信号超时，信号ID:0xf4
-19	0x04201	0-Canbus	4-硬件故障	2	1	CAN0无法打开
-20	0x04202	0-Canbus	4-硬件故障	2	2	CAN1无法打开
-21	0x02101	0-Canbus	2-软件故障	1	1	刹车踏板触发导致线控使能退出
-22	0x11101	1-Control	1-通讯故障	1	1	底盘信超时，信号/chassis_state
-23	0x11102	1-Control	1-通讯故障	1	2	规划信息接收超时，信号/trajectory
-24	0x11103	1-Control	1-通讯故障	1	3	规划信息点列为空
-25	0x11104	1-Control	1-通讯故障	1	4	定位信号超时，信号/localization
-26	0x13101	1-Control	3-算法故障	1	1	航向误差偏大
-27	0x13102	1-Control	3-算法故障	1	2	横向位置误差偏大
-28	0x13103	1-Control	3-算法故障	1	3	纵向到点位置误差过大
-29	0x13104	1-Control	3-算法故障	1	4	速度跟随误差过大
-30	0x13105	1-Control	3-算法故障	1	5	控制指令解算异常
-31	0x13106	1-Control	3-算法故障	1	6	控制指令解算超时
-32	0x13107	1-Control	3-算法故障	1	7	横向误差跳变
-33	0x13108	1-Control	3-算法故障	1	8	航向误差跳变
-34	0x21101	2-Planning	1-通讯故障	1	1	定位信号超时 信号/serespilot/localization/localization
-35	0x21102	2-Planning	1-通讯故障	1	2	任务信号超时 信号/serespilot/strategy/mission_context
-36	0x21103	2-Planning	1-通讯故障	1	3	底盘信号超时 信号/serespilot/canbus/chassis_state
-37	0x21104	2-Planning	1-通讯故障	1	4	融合占用栅格信号超时 信号serespilot/fusion/fs_occ_grid
-38	0x21105	2-Planning	1-通讯故障	1	5	融合可行驶区域信号超时 信号serespilot/fusion/fs_freespace
-39	0x21106	2-Planning	1-通讯故障	1	6	融合障碍物信号超时 serespilot/fusion/fs_objects
-40	0x21107	2-Planning	1-通讯故障	1	7	状态管理模块信号超时 /seres/smm/vehicle_state_notify
-41	0x23200	2-Planning	3-算法故障	2	0	全局参考路径为空
-42	0x23201	2-Planning	3-算法故障	2	1	当前位置与全局参考路径偏差过大
-43	0x23202	2-Planning	3-算法故障	2	2	局部参考路径提取错误
-44	0x23203	2-Planning	3-算法故障	2	3	行车横向路径规划错误
-45	0x23204	2-Planning	3-算法故障	2	4	行车纵向速度规划错误
-46	0x23205	2-Planning	3-算法故障	2	5	航向调整轨迹规划错误
-47	0x23206	2-Planning	3-算法故障	2	6	行车横向路径规划搜索失败
-48	0x23207	2-Planning	3-算法故障	2	7	行车横向路径规划优化失败
-49	0x23208	2-Planning	3-算法故障	2	8	行车纵向速度规划优化失败
-50	0x23209	2-Planning	3-算法故障	2	9	行车纵向速度规划优化存在非数
-51	0x2320a	2-Planning	3-算法故障	2	10	航向调整目标位置有碰撞
-52	0x2320b	2-Planning	3-算法故障	2	11	航向调整路径搜索失败
-53	0x2320c	2-Planning	3-算法故障	2	12	航向调整路径后处理失败
-54	0x2320d	2-Planning	3-算法故障	2	13	航向调整，检测到起点有障碍物，且脱困失败
-55	0x31101	3-Strategy	1-通讯故障	1	1	定位信号超时 信号/serespilot/localization
-56	0x31102	3-Strategy	1-通讯故障	1	2	底盘信号超时 信号/serespilot/chassis_state
-57	0x33201	3-Strategy	3-算法故障	2	1	地图全局路径为空
-58	0x33202	3-Strategy	3-算法故障	2	2	全局路径规划失败
+code	module	type	level	name	describe 
+0x04040005	planning	event	1	全局规划无解	无法找到从起点到目标点的路径
+0x04040006	planning	event	1	局部规划振荡	机器人在障碍物附近来回摆动
+0x04040007	planning	event	1	导航停障	导航停障触发
+0x04040009	planning	event	2	未找到充电桩	机器人尝试重新寻找1min（可配置）仍未找到充电桩
+0x0404000A	planning	event	2	对桩失败	机器人尝试对桩重试后仍失败
+0x0404000C	planning	event	2	导航停障解除	导航停障结束
+0x0404000D	planning	alarm	1	alarm_test	alarm_test

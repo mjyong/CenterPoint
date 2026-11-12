@@ -1,0 +1,23 @@
+syntax = "proto3";
+package srcp;
+
+import "app.proto";
+
+/*
+  机器人作为服务端。
+  1. 通过"请求-响应"接口向户端提供登录/登出/远程控制/查询等能力；
+  2. 通过一个长连接向客户端主动推送消息；
+*/
+// RPC接口定义
+service RobotService
+{
+  rpc Login(AppLogin) returns (AppLoginResponse) {};
+  
+  rpc Logout(AppLogout) returns (AppLogoutResponse) {};
+
+  // App向机器人发送控制/查询等指令
+  rpc RobotCommand(AppReq) returns (RobotResp) {};
+
+  // App订阅机器人状态、任务状态/数据等消息
+  rpc SubscribeRobotReport(stream AppSubscription) returns (stream RobotPublish) {};
+}

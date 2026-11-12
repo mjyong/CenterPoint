@@ -1,0 +1,15 @@
+# Goal
+uint8 FOLLOW_MODE_AUTO = 0    #跟踪当前正对目标
+uint8 FOLLOW_MODE_UWB = 1     #UWB目标信标跟随
+uint8 FOLLOW_MODE_PIC = 2     #目标图像跟随
+
+uint8 follow_mode
+sensor_msgs/CompressedImage[] object    # FOLLOW_MODE_PIC时有效，目标图像与正对目标对比，sensor_msgs/msg/CompressedImage
+
+---
+# Result
+string message               # 结果描述
+
+---
+# Feedback
+uint32 state             # 详见 nav2_interface/msg/NavState.msg

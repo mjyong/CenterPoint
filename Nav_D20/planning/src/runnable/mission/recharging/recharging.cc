@@ -5,9 +5,12 @@
  * @LastEditTime: 2026-08-24 00:00:00
  */
 #include "src/runnable/mission/recharging/recharging.h"
+#include "src/common/util/diagnostic.h"
 #include "src/common/util/math.h"
 #include "src/runnable/entry/planning_entry.h"
 #include <mc_interface/msg/motion_skill.hpp>
+
+using planning::common::util::Diagnostic;
 
 namespace planning {
 namespace mission {
@@ -144,7 +147,11 @@ TwistStamped Recharging::FineTuning(const Pose3d &relative_target) {
   double dt = conf_.recharging_conf().period();
 
   // PID control for vx
-  pid_vx_integral_ += dx * dt;
+  if (std::abs(dx) < conf_.recharging_conf().vx_deadband()) {
+    pid_vx_integral_ += dx * dt;
+  } else {
+    pid_vx_integral_ = 0;
+  }
   double vx_derivative = (dx - pid_vx_prev_error_) / dt;
   pid_vx_prev_error_ = dx;
   double vx = conf_.recharging_conf().vx_gain() * dx +
@@ -154,7 +161,9 @@ TwistStamped Recharging::FineTuning(const Pose3d &relative_target) {
                   conf_.recharging_conf().vx_max());
 
   // PID control for vy
-  pid_vy_integral_ += dy * dt;
+  if (std::abs(dy) < conf_.recharging_conf().vy_deadband()) {
+    pid_vy_integral_ += dy * dt;
+  }
   double vy_derivative = (dy - pid_vy_prev_error_) / dt;
   pid_vy_prev_error_ = dy;
   double vy = conf_.recharging_conf().vy_gain() * dy +
@@ -164,7 +173,9 @@ TwistStamped Recharging::FineTuning(const Pose3d &relative_target) {
                   conf_.recharging_conf().vy_max());
 
   // PID control for yaw_rate
-  pid_yaw_integral_ += dtheta * dt;
+  if (std::abs(dtheta) < conf_.recharging_conf().yaw_rate_deadband()) {
+    pid_yaw_integral_ += dtheta * dt;
+  }
   double yaw_derivative = (dtheta - pid_yaw_prev_error_) / dt;
   pid_yaw_prev_error_ = dtheta;
   double yaw_rate = conf_.recharging_conf().yaw_rate_gain() * dtheta +
@@ -200,21 +211,21 @@ bool Recharging::check_e_active_standstill() {
     return true;
   }
   // 仅进桩运动阶段因桩数据持续失效暂停
-  if (recharging_fsm_ctx_.current_state() ==
-      RechargingFSMBase::StateType::inserting) {
-    if (IsDetected()) {
-      data_lost_start_ = 0.0;
-    } else {
-      const auto now = TimeKeeper::TimeNowSec();
-      if (data_lost_start_ <= 0.0) {
-        data_lost_start_ = now;
-      } else if (now - data_lost_start_ > kDataLostPauseTime) {
-        return true;
-      }
-    }
-  } else {
-    data_lost_start_ = 0.0;
-  }
+  // if (recharging_fsm_ctx_.current_state() ==
+  //     RechargingFSMBase::StateType::inserting) {
+  //   if (IsDetected()) {
+  //     data_lost_start_ = 0.0;
+  //   } else {
+  //     const auto now = TimeKeeper::TimeNowSec();
+  //     if (data_lost_start_ <= 0.0) {
+  //       data_lost_start_ = now;
+  //     } else if (now - data_lost_start_ > kDataLostPauseTime) {
+  //       return true;
+  //     }
+  //   }
+  // } else {
+  //   data_lost_start_ = 0.0;
+  // }
   return false;
 }
 bool Recharging::check_e_active_off() {
@@ -304,6 +315,11 @@ void Recharging::spin_s_standstill() {
 }
 void Recharging::spin_s_fault() {
   twist_ = TwistStamped(Twist(), TimeKeeper::TimeNowSec());
+  if (searching_timeout_) {
+    Diagnostic::Instance()->emplace("0x04040009");
+  } else {
+    Diagnostic::Instance()->emplace("0x0404000A");
+  }
 }
 
 // ---- on_entry ----
@@ -332,7 +348,9 @@ void Recharging::on_entry_s_fault() {
 // ---- check ----
 bool Recharging::check_e_detected() { return IsDetected(); }
 bool Recharging::check_e_searching_timeout() {
-  return InnerStateElapsed() > conf_.recharging_conf().time_out_threshold();
+  searching_timeout_ =
+      InnerStateElapsed() > conf_.recharging_conf().time_out_threshold();
+  return searching_timeout_;
 }
 bool Recharging::check_e_aligning_arrived() {
   return IsArrived(ready_position_.pose,
@@ -362,7 +380,7 @@ bool Recharging::check_e_charge_fail() {
   return InnerStateElapsed() > kChargeWaitTimeout;
 }
 bool Recharging::check_e_motion_done() {
-  return IsMotionDone(mc_interface::msg::MotionSkill::MOTION_STAND);
+  return IsMotionDone(mc_interface::msg::MotionSkill::MOTION_GAIT_WALK);
 }
 bool Recharging::check_e_backoff_arrived() {
   return IsArrived(ready_position_.pose,
@@ -431,7 +449,13 @@ void Recharging::spin_s_inserting() {
 }
 void Recharging::spin_s_sitting() {
   twist_ = TwistStamped(Twist(), TimeKeeper::TimeNowSec());
-  // 动作序列：蹲下完成后下发趴下
+  // 动作序列：先控制身体高度下降（MOTION_BODY_TARGET_POSE），
+  // 完成后下发蹲下（MOTION_SQUAT），蹲下完成后下发趴下（MOTION_LIE_BACK）
+  if (!squat_cmd_sent_ &&
+      IsMotionDone(mc_interface::msg::MotionSkill::MOTION_BODY_TARGET_POSE)) {
+    squat_cmd_sent_ = true;
+    QueueMotionSkill(mc_interface::msg::MotionSkill::MOTION_SQUAT);
+  }
   if (!lie_cmd_sent_ &&
       IsMotionDone(mc_interface::msg::MotionSkill::MOTION_SQUAT)) {
     lie_cmd_sent_ = true;
@@ -461,6 +485,8 @@ void Recharging::on_entry_s_idle() {
   pause_by_data_loss_ = false;
   data_lost_start_ = 0.0;
   lie_cmd_sent_ = false;
+  squat_cmd_sent_ = false;
+  searching_timeout_ = false;
   // 清残留待发指令，避免上一任务停止前的排队指令在下个任务误发
   has_pending_motion_ = false;
   pending_para_.clear();
@@ -478,11 +504,16 @@ void Recharging::on_entry_s_inserting() {
 }
 void Recharging::on_entry_s_sitting() {
   inner_state_enter_time_ = TimeKeeper::TimeNowSec();
-  // 动作序列起点：下发蹲下，完成后由 spin_s_sitting 下发趴下
+  // 动作序列起点：先下发身体目标姿态控制（MOTION_BODY_TARGET_POSE）控制高度下降，
+  // 完成后由 spin_s_sitting
+  // 依次下发蹲下（MOTION_SQUAT）和趴下（MOTION_LIE_BACK）
   lie_cmd_sent_ = false;
-  QueueMotionSkill(mc_interface::msg::MotionSkill::MOTION_SQUAT);
-  AINFO << "Enter sitting, wait for charge (timeout " << kChargeWaitTimeout
-        << "s)";
+  squat_cmd_sent_ = false;
+  QueueMotionSkill(
+      mc_interface::msg::MotionSkill::MOTION_BODY_TARGET_POSE,
+      {0.0f, 0.0f, static_cast<float>(sitting_height()), 0.0f, 0.0f, 0.0f});
+  AINFO << "Enter sitting, lower body height by " << sitting_height()
+        << "m, wait for charge (timeout " << kChargeWaitTimeout << "s)";
 }
 void Recharging::on_entry_s_standing_up() {
   inner_state_enter_time_ = TimeKeeper::TimeNowSec();

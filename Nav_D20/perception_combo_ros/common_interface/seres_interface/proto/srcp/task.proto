@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+package srcp;
+
+import "task_args.proto";
+
+//-----------------------------------------------------------------------------------------
+// 任务操作
+message TaskOperate
+{
+    enum Mode
+    {
+        START           = 0;    // 启动任务
+        CANCEL          = 1;    // 取消任务
+        PAUSE           = 2;    // 暂停任务
+        RECOVER         = 3;    // 恢复任务
+        ISSUED          = 4;    // 任务下发(目前仅D10项目涉及)
+    }
+  
+    uint64 timestamp     = 1;   // 任务下发时刻时间戳，单位ms
+    uint64 delay         = 2;   // 延迟执行时间，单位ms，由timestamp，delay共同确定任务开始执行时间
+    string name          = 3;   // 任务名称
+    string id            = 4;   // 任务UUID；当为取消任务时，id:”current”表示取消当前正在执行的任务，id:”all”表示取消所有任务，其他则表示取消指定UUID的任务
+    Mode mode            = 6;   // 任务控制方式，目前大都使用START，部分任务支持CANCEL，暂不支持PAUSE和RECOVER。
+    TaskTree task        = 7;   // 任务树，具体任务执行块，可以是单个或组合任务
+}
+
+// 任务树
+message TaskTree 
+{
+    enum Type {
+        // --- 基础 ---
+        ACTION                = 0;   // 执行动作
+        SEQUENCE              = 1;   // 顺序执行
+        PARALLEL              = 2;   // 并行执行
+    }
+
+    Type type                   = 1;    // 任务树类型
+    repeated TaskTree subTree   = 2;    // Type非ACTION时有效
+    string skill                = 3;    // 技能项名称, Type:ACTION时有效，须与提供的技能名称匹配
+
+// 一个指令参数对应一个技能
+// 技能名称规则为技能参数名称首字母小写
+// 例如：
+// SitDown对应技能sitDown技能名称
+// Stand对应技能stand技能名称
+// 其余类推
+
+    oneof skillPara {
+        srcp.args.SitDown sitDown                   = 4;
+        srcp.args.MoveLevel moveLevel               = 5;
+        srcp.args.Move move                         = 6;
+        srcp.args.StopMove stopMove                 = 7;
+        srcp.args.Squat squat                       = 8;
+        srcp.args.LieDown lieDown                   = 9;
+        srcp.args.Damp damp                         = 10;
+        srcp.args.Wave wave                         = 11;
+        srcp.args.JointDisable jointDisable         = 12;
+        srcp.args.LockJoint lockJoint               = 13;
+        srcp.args.UnlockJoint unlockJoint           = 14;
+        srcp.args.PowerOff powerOff                 = 15;
+        srcp.args.PlayTTS playTTS                   = 16;
+        srcp.args.MonitorAVStream monitorAVStream   = 17;
+        srcp.args.Call call                         = 18;
+        srcp.args.Mapping mapping                   = 19;
+        srcp.args.Navigate navigate                 = 20;
+        srcp.args.Grab grab                         = 21;
+        srcp.args.TakePhoto photo                   = 22;
+        srcp.args.PanTiltAngle angle                = 23;
+        srcp.args.VisibleLightFocalLength focal     = 24;
+        srcp.args.GaitCtrl gaitCtrl                 = 25;
+        srcp.args.PatrolMissions patrolMissions     = 26;
+        srcp.args.Relocation relocation             = 27;
+        srcp.args.LightCtrl lightCtrl               = 28;
+        srcp.args.Stand stand                       = 29;// 站立
+    }
+}
+
+//-----------------------------------------------------------------------------------------
+// 任务技能集, 查询回复及主动上报对象
+message TaskSkills
+{
+    repeated string skill = 1;
+}
+
+// 查询支持的任务技能
+message TaskSkillsQuery
+{
+}
+
+//-----------------------------------------------------------------------------------------
+// 查询任务状态
+message TaskStateQuery
+{
+    string id = 1;      // id:”current”查询当前正在执行的任务，id:”all”查询所有任务，其他则表示查询指定UUID的任务
+}
+// 任务状态查询回复
+message TaskStateResponse
+{
+    repeated TaskState state = 1;
+}
+
+// 任务状态，变更时主动上报
+message TaskState 
+{
+    enum State
+    {
+        RUNNING     = 0;  
+        SUCCESS     = 1;
+        FAILURE     = 2;
+        CANCELED    = 3;    // 已取消
+    }
+
+    string name     = 1;    // 任务名称
+    string id       = 2;    // 任务UUID
+    State state     = 3;    // 任务状态
+    TaskTree tree   = 4;
+}
+
+//-----------------------------------------------------------------------------------------
+//机器人模式查询
+message RobotModeQuery
+{
+}
+// 机器人模式查询回复，状态变更时主动上报
+message RobotMode
+{
+    enum Mode {
+        UNKNOWN     = 0;
+        IDLE        = 1;    // 空闲模式
+        WORKING     = 2;    // 作业模式
+        INACTIVE    = 3;    // 未激活模式
+        UPGRADE     = 4;    // 升级模式
+        FAULT       = 5;    // 故障模式
+        SLEEP       = 6;    // 睡眠模式
+        FACTORY     = 7;    // 工厂模式
+        CALIBRATION = 8;    // 标定模式    
+    }
+    Mode mode = 1;
+}

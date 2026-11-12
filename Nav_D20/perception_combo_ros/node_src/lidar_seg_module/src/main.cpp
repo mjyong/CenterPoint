@@ -9,6 +9,7 @@
 #include <iomanip> // 设置输出格式
 #include <atomic>
 #include <thread>
+#include <cstdlib>
 #include "../include/Wildpatchworkpp.h"
 #include "../include/logging.h"
 #include <filesystem>
@@ -26,11 +27,15 @@ int main(int argc, char** argv) {
     std::filesystem::path parentPath = currentPath.parent_path();
     LOG(INFO) << "parentPath  " << std::string(parentPath);
     
-    // std::string config_path = std::string(parentPath) + "/../config/lidar_seg.yaml";
+    // 部署脚本会导出 SERES_PERCEPTION_INSTALL_DIR；本地直接 ros2 run 时该变量为空
     const char* root_dir = std::getenv("SERES_PERCEPTION_INSTALL_DIR");
-    std::string perception_root = root_dir;
-    std::string config_path = perception_root + "/lidar_seg/config/lidar_seg.yaml";
-    // std::string config_path = "/opt/seres/package/nav/lidar_seg/config/lidar_seg.yaml";
+    std::string config_path;
+    if (root_dir != nullptr && root_dir[0] != '\0') {
+        config_path = std::string(root_dir) + "/lidar_seg/config/lidar_seg.yaml";
+    } else {
+        config_path = std::string(parentPath) + "/../config/lidar_seg.yaml";
+        LOG(WARNING) << "SERES_PERCEPTION_INSTALL_DIR is not set, fallback to " << config_path;
+    }
 
     LOG(INFO) << " config_path  " << config_path;
     YAML::Node config = YAML::LoadFile(config_path);
@@ -58,8 +63,11 @@ int main(int argc, char** argv) {
 
     std::atomic<bool> spin_running{true};
     std::thread spin_thread([&]() {
+        // spin_some 无消息时立即返回；必须限频，否则空转占满 1 核
+        rclcpp::WallRate spin_rate(50);
         while (spin_running.load() && rclcpp::ok()) {
             node->SpinOnce();
+            spin_rate.sleep();
         }
     });
 

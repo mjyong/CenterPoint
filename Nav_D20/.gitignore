@@ -1,4 +1,8 @@
-install/
-log/
-**/install/
-**/log/
+/perception_combo_ros/install/
+/perception_combo_ros/common_interface/build/
+/perception_combo_ros/common_interface/log/
+/perception_combo_ros/node_src/build/
+/perception_combo_ros/node_src/log/
+/perception_combo_ros/orin_release/
+/perception_combo_ros/deb_output/
+/perception_combo_ros/tmp/

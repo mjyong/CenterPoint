@@ -81,8 +81,8 @@ system:
   pub_tf: true
   with_ins: true
   ins_only_mode: false # INS直出模式: 不运行LIO和激光定位, 直接用INS位姿发布odom
-  publish_map_cloud: false # 是否发布地图点云
-  publish_occ_grid: false
+  publish_map_cloud: true # 是否发布地图点云
+  publish_occ_grid: true
   #超级工厂
   ins_lat:  29.731405029387507
   ins_lon: 106.78389112052452
@@ -102,7 +102,7 @@ system:
                 -1., 0., 0., 
                 0., 0., 1.]
 
-  init_t:   [ -456.329 ,  679.281 ,0.0775522]  #[  -109.89054801282  , 400.61349477412 ,-0.31035993351074]
+  init_t:  [  -109.89054801282  , 400.61349477412 ,-0.31035993351074] #[ -456.329 ,  679.281 ,0.0775522]  #[  -109.89054801282  , 400.61349477412 ,-0.31035993351074]
   init_r: [ 1., 0., 0., 
                 0., 1., 0., 
                 0., 0., 1.]           
@@ -116,10 +116,11 @@ loop_closing:
   motion_trans_noise: 0.05            # 位移权重 (运动约束)
   motion_rot_noise: 0.0052            # 旋转权重 (运动约束), 3.0 * M_PI / 180.0
   with_ins_prior: true
-  ins_trans_noise: 1.0
-  ins_rot_noise: 0.052 #3.0 * M_PI / 180.0
+  ins_trans_noise: 0.5
+  ins_rot_noise: 0.0175 #1.0 * M_PI / 180.0
   use_ins_covariance: false
   ins_prior_position_only: true  # 如果为 true，只约束位置，不约束姿态
+  ins_constraint_gap: 10.0       # 每累计多少米里程才融合一个INS先验约束（0表示每个关键帧都加）
 
 ### localization ================================================================================================
 lidar_loc:

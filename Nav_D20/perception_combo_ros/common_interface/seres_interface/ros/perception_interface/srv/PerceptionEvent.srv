@@ -1,0 +1,6 @@
+# Request
+PerceptionEvent percept             # 单点检测，detect_cycle忽略
+---
+# Response
+
+EventInfo[] event_info              # 事件信息

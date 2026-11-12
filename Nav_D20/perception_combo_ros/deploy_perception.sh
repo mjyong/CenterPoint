@@ -182,7 +182,7 @@ perception_nodes=(
     pedestrian_code_conduct
     grid_map_memory_node
     ptz_data_detection
-    lidar_3d_detection
+    perception_recharge
 )
 # ROS2 接口消息包（运行时依赖）
 interface_pkgs=(
@@ -197,7 +197,6 @@ interface_pkgs=(
     seres_proto
     perception_interface
     nav2_interface
-    kygi665_msgs
 )
 
 # 拷贝感知节点
@@ -359,7 +358,7 @@ Maintainer: seres-nav_perception <nav_perception@seres.cn>
 Description: Seres ${prodct_name} Perception Package (${ros2_name})
  Installs to ${PERCEPTION_INSTALL_TARGET}, includes lidar_seg,
  visual_perception, pedestrian_code_conduct, grid_map_memory_node,
- ptz_data_detection and supporting libraries.
+ ptz_data_detection, perception_recharge and supporting libraries.
 EOF
 
 # ============================================================

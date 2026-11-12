@@ -34,6 +34,7 @@
 #include "common/ins.h" 
 #include "lightning/srv/loc_cmd.hpp"
 #include "core/localization/localization_result.h"
+#include "core/system/health_reporter.h"
 namespace lightning {
 namespace loc {
 class Localization;
@@ -161,16 +162,33 @@ class LocSystem {
     double first_imu_sys_time_ = 0.0;
     double last_imu_sys_time_ = 0.0;
     size_t imu_cnt_ = 0;
+    size_t imu_win_cnt_ = 0;           // 上次帧率评估窗口的帧计数
+    double imu_freq_check_time_ = 0.0;  // 上次IMU帧率评估的系统时间
     double first_lidar_time_ = 0.0;
     double last_lidar_time_ = 0.0;
     double first_lidar_sys_time_ = 0.0;
     double last_lidar_sys_time_ = 0.0;
     size_t lidar_cnt_ = 0;
+    int lidar_jitter_cnt_ = 0;          // 连续帧间隔超限的帧数
+    double lidar_cloud_baseline_ = 0.0; // 点云数目基线(EMA)
+    int lidar_cloud_drop_cnt_ = 0;      // 连续点云骤降的帧数
     double first_ins_time_ = 0.0;
     double last_ins_time_ = 0.0;
     double first_ins_sys_time_ = 0.0;
     double last_ins_sys_time_ = 0.0;
     size_t ins_cnt_ = 0;
+
+    /// 健康上报(告警/事件)
+    std::shared_ptr<HealthReporter> health_ = nullptr;
+    bool was_localized_ = false;        // 上一周期定位是否正常
+    bool lost_after_localized_ = false; // 本次异常是"定位后丢失"还是"从未匹配成功"
+    bool loc_lost_reported_ = false;    // 本轮定位丢失是否已上报
+    bool reloc_fail_reported_ = false;  // 本轮定位丢失是否已上报重定位失败
+    bool map_match_fail_reported_ = false;  // 本轮是否已上报地图匹配失败
+    double loc_lost_since_ = 0.0;       // 定位异常开始的系统时间
+    static constexpr double LOC_LOST_DEBOUNCE_ = 1.0;    // 丢失去抖时长(秒)
+    static constexpr double RELOC_FAIL_TIMEOUT_ = 10.0;  // 丢失持续该时长上报重定位失败(秒)
+    static constexpr double MAP_MATCH_FAIL_TIMEOUT_ = 30.0;  // 启动后该时长未定位成功上报地图匹配失败(秒)
 
     /// LIO 路径轨迹
     nav_msgs::msg::Path lio_path_;
@@ -188,9 +206,17 @@ class LocSystem {
     double last_lidar_recv_time_ = 0.0;
     double last_ins_recv_time_ = 0.0;
 
+    /// 传感器断流检测: 由 location_timer_(1Hz) 在 PublishLocationTimer 中调用,
+    /// IMU/点云完全断流时兜底触发告警(不依赖数据回调)
+    double watchdog_start_sec_ = 0.0;  // 启动时刻(用于启动宽限期)
+    static constexpr double SENSOR_LOST_TIMEOUT_ = 3.0;   // 断流判定时长(秒)
+    static constexpr double SENSOR_STARTUP_GRACE_ = 20.0; // 启动宽限期(秒)
+    void SensorWatchdogTimer();
+
     /// 监测函数
     void MonitorIMUFrameRate(double sensor_time, double sys_time);
     void MonitorLidarFrameRate(double sensor_time, double sys_time);
+    void MonitorLidarCloudSize(size_t cloud_size);
     void MonitorINSFrameRate(double sensor_time, double sys_time);
 
     /// 创建 INS 订阅(根据 ins_type_ 选择 novatel 或 kygi665)

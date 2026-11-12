@@ -148,11 +148,7 @@ void LaserMapping::ProcessIMU(const lightning::IMUPtr &imu) {
 
     if (p_imu_->IsIMUInited()) {
         /// 更新最新imu状态
-        // 2026-11-09: 加速度和 ImuProcess::UndistortPcl 一样按初始化时的重力归一化。kygi665 的 IMU 发的是 g（静止时约 1.0），
-        // 原来直接用原始读数，重力状态是 9.81，两帧 LIO 之间每秒多出约 8.8 m/s^2 的下坠；
-        // /lightning/odom 用的就是这个高频预测（GetIMUState），回放 0921 时 z 掉到 -46 m、速度 30 m/s。
-        const Vec3d acc = imu->linear_acceleration * (G_m_s2 / p_imu_->GetMeanAccNorm());
-        kf_imu_.Predict(timestamp - last_timestamp_imu_, p_imu_->Q_, imu->angular_velocity, acc);
+        kf_imu_.Predict(timestamp - last_timestamp_imu_, p_imu_->Q_, imu->angular_velocity, imu->linear_acceleration);
 
         // LOG(INFO) << "newest wrt lidar: " << timestamp - kf_.GetX().timestamp_;
 
@@ -1051,6 +1047,7 @@ bool LaserMapping::YawSearch(SE3& pose, double& confidence, CloudPtr input, Clou
 }
 
 void LaserMapping::ProcessINS(const INSPtr& ins) {
+    //return;
     if (!ins || ins->state != INS_VALID) return;
     // 存储 INS 位姿和协方差，供 GPSObsModel 使用
     ins_pose_ = SE3(ins->pose.block<3, 3>(0, 0), ins->pose.block<3, 1>(0, 3));

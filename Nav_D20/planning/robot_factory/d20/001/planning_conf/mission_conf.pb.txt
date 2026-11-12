@@ -3,33 +3,18 @@ types: Tracking
 confs{
     type: Tracking
     tracking_conf{
-        off_distance_threshold: 0.2
+        off_distance_threshold: 0.5
         off_yaw_threshold: 0.2
         off_velocity_threshold: 0.15
         off_angular_velocity_threshold: 0.15
         off_duration_threshold: 1.0
-        grid_path_planner_conf{
-            allow_collision_goal: true
-            collision_goal_search_radius: 2.0
-            allow_collision_start: true
-            collision_start_search_radius: 1.0
-            planner_type: A_STAR
-            input_type: PGM_MAP
-            input_dir: "/../../data/astar_pgm/"
-            input_name: "map"
-            safe_margin: 0.3
-            inflation_margin: 0.0
-            max_obstacle_dist: 2.0
-            heuristic: EUCLIDEAN
-            unknown_as_free: false
-            use_smoother: true
-            smoother_safety_margin: 0.6
-            smoother_safety_factor: 0.5
-            smoother_far_away_obstacle_dist: 1.0
-            smoother_weight_fem_pos_deviation: 10.0
-            smoother_weight_path_length: 1e6
-            smoother_weight_ref_deviation: 1.0
-        }
+
+        nav_blocked_enable: true
+        nav_blocked_progress_epsilon: 0.1
+        nav_blocked_window: 1.5
+        nav_blocked_enter_duration: 3.0
+        local_reference_path_length: 5.0
+        planner_type: MPPI
         teb_planner_conf{
             coarse_search_conf{
                 xy_resolution: 0.05
@@ -40,8 +25,8 @@ confs{
                 max_y: 5.0
                 max_search_nodes_no_theta: 1000
                 max_search_nodes_with_theta: 3000
-                weight_reference_path: 0.0
-                ref_grid_resolution: 0.25
+                weight_reference_path: 2.0
+                ref_grid_resolution: 0.05
                 weight_last_path_consistency: 1.0
             }
             optimizer_conf{
@@ -49,7 +34,7 @@ confs{
                 function_tolerance: 1e-6
                 gradient_tolerance: 1e-10
                 parameter_tolerance: 1e-8
-                num_threads: 1
+                num_threads: 8
             }
             time_conf{
                 time_delta_lower_bound: 0.01
@@ -57,34 +42,156 @@ confs{
                 time_delta_init: 0.1
             }
             dynamic_constraints{
-                max_vx: 2.0
-                max_vy: 1.0
-                max_omega: 3.14
-                max_accel_vx: 2.0
-                max_accel_vy: 1.0
-                max_accel_omega: 3.14
+                max_vx: 3.0
+                max_vy: 0.8
+                max_omega: 2.0
+                max_accel_vx: 3.0
+                max_accel_vy: 0.8
+                max_accel_omega: 2.0
                 reference_velocity: 2.0
             }
             weight_conf{
                 weight_path_following: 10.0
-                weight_initial_velocity: 10.0
-                weight_final_velocity: 3.0
-                weight_accel_smooth: 10.0
-                weight_accel_limit: 20.0
-                weight_velocity_limit: 20.0
+                weight_initial_velocity: 100.0
+                weight_final_velocity: 100.0
+                weight_accel_smooth: 100.0
+                weight_accel_limit: 1000.0
+                weight_velocity_limit: 1000.0
                 weight_obstacle_warning: 10.0
                 weight_obstacle_danger: 1000.0
                 obstacle_warning_distance: 0.25
                 obstacle_danger_distance: 0.05
-                weight_time_optimal: 5.0
-                weight_path_smoothness: 1000.0
+                weight_time_optimal: 50.0
+                weight_path_smoothness: 10.0
                 weight_lateral_velocity: 5.0
                 weight_reference_velocity: 20.0
                 non_holonomic_min_speed: 0.8
-                weight_non_holonomic: 1000.0
+                weight_non_holonomic: 5.0
                 weight_prefer_forward: 100.0
             }
             velocity_cmd_time: 0.5
+        }
+        mppi_planner_conf{
+            motion_model: Omni
+            #min_turning_r: 0.2
+            velocity_cmd_time: 0.01
+            regenerate_noises: true
+            enable_cuda: true
+            dynamic_constraints{
+                max_vx: 3.0
+                min_vx: -1.0
+                max_vy: 0.5
+                max_omega: 1.5
+                max_accel_vx: 3.0
+                min_accel_vx: -3.0
+                max_accel_vy: 3.0
+                max_accel_omega: 3.0
+
+                lateral_coupling_enabled: true
+                lateral_blend_vx_start: 0.5
+                lateral_blend_vx_end: 1.0
+
+                response_tau_vx: 0.0
+                response_tau_vy: 0.0
+                response_tau_wz: 0.0
+            }
+            sampling_std{
+                vx: 0.4
+                vy: 0.2
+                wz: 0.2
+            }
+            optimizer_conf{
+                model_dt: 0.1
+                time_steps: 50
+                batch_size: 3000
+                iteration_count: 1
+                temperature: 0.3
+                gamma: 0.015
+                retry_attempt_limit: 1
+            }
+            constraint_critic{
+                enabled: true
+                power: 1
+                weight: 4.0
+            }
+            goal_critic{
+                enabled: true
+                power: 1
+                weight: 10.0
+                threshold_to_consider: 3.0
+            }
+            goal_angle_critic{
+                enabled: true
+                power: 1
+                weight: 3.0
+                threshold_to_consider: 3.0
+            }
+            obstacles_critic{
+                enabled: true
+                power: 1
+                repulsion_weight: 5.0
+                critical_weight: 25.0
+                collision_cost: 1e6
+                collision_margin_distance: 0.05
+                near_goal_distance: 0.5
+                repulsion_radius: 0.25
+            }
+            path_align_critic{
+                enabled: true
+                power: 1
+                weight: 1.0
+                offset_from_furthest: 20
+                trajectory_point_step: 4
+                threshold_to_consider: 3.0
+                max_path_occupancy_ratio: 0.07
+                use_path_orientations: true
+            }
+            path_angle_critic{
+                enabled: true
+                power: 1
+                weight: 2.2
+                offset_from_furthest: 4
+                max_angle_to_furthest: 0.25
+                threshold_to_consider: 3.0
+                mode: 2
+            }
+            path_follow_critic{
+                enabled: true
+                power: 1
+                weight: 5.0
+                threshold_to_consider: 3.0
+                offset_from_furthest: 6
+            }
+            prefer_forward_critic{
+                enabled: true
+                power: 1
+                weight: 10.0
+                threshold_to_consider: 3.0
+            }
+            twirling_critic{
+                enabled: false
+                power: 1
+                weight: 10.0
+                threshold_to_consider: 0.25
+            }
+            velocity_deadband_critic{
+                enabled: true
+                power: 1
+                weight: 5.0
+                vx_deadband: 0.15
+                vy_deadband: 0.15
+                wz_deadband: 0.15
+            }
+            reference_velocity_critic{
+                enabled: true
+                power: 1
+                weight: 5.0
+                decel_start_dist: 5.0
+                reference_velocity: 1.5
+                near_start_disable: true
+                near_start_max_segments: 5
+                near_start_heading_error: 1.57
+            }
         }
     }
 }
@@ -97,26 +204,33 @@ confs{
         vx_max: 0.3
         vy_max: 0.3
         yaw_rate_max: 0.3
-        vx_gain: 3.0
+        vx_gain: 0.4
         vx_ki: 0.02
-        vx_kd: 0.2
-        vy_gain: 3.5
-        vy_ki: 0.02
-        vy_kd: 0.2
-        yaw_rate_gain: 1.0
-        yaw_rate_ki: 0.01
-        yaw_rate_kd: 0.1
+        vx_kd: 0.0
+        vy_gain: 0.2
+        vy_ki: 0.01
+        vy_kd: 0.0
+        yaw_rate_gain: 0.5
+        yaw_rate_ki: 0.0
+        yaw_rate_kd: 0.0
         detect_spin_rate: 0.5
         ready_distance: 2.0
         period: 0.05
         time_out_threshold: 60.0
-        standby_pos_tolerance: 0.3
+        standby_pos_tolerance: 0.1
         standby_euler_tolerance: 0.1
         standby_stable_time: 2.0
-        standstill_pos_x_tolerance: 0.05
+        standstill_pos_x_tolerance: 0.15
         standstill_pos_y_tolerance: 0.02
         standstill_euler_tolerance: 0.1
         standstill_stable_time: 2.0
-        charging_station_offset_x: -0.035
+        charging_station_offset_x: 0.2
+        charging_station_offset_y: -0.035
+        charging_station_offset_yaw: 0.0
+        vx_deadband: 0.1
+        vy_deadband: 0.1
+        yaw_rate_deadband: 0.1
+        sitting_height: -0.15
     }
 }
+     

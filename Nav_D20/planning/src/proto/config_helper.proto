@@ -4,16 +4,45 @@ package planning.config;
 
 message RobotParam {
   message RobotID {
-    optional string vin = 1;
-    optional string plate = 2;
+    optional string vin             = 1;
+    optional string plate           = 2;
     optional string other_unique_id = 3;
-    optional string appellation = 4;
+    optional string appellation     = 4;
   }
   optional RobotID robot_id = 2;
 
   optional double length = 3 [ default = nan ];
-  optional double width = 4 [ default = nan ];
+  optional double width  = 4 [ default = nan ];
   optional double height = 5 [ default = nan ];
+
+  enum FootprintModel {
+    SINGLE = 0;
+    DOUBLE = 1;
+    MULTI  = 2;
+  }
+  optional FootprintModel footprint_model = 6 [ default = MULTI ];
 }
 
-message RobotConfig { optional RobotParam robot_param = 1; }
+message BagRecordConf {
+  optional bool   enable      = 1 [ default = false ];
+  optional string bag_dir     = 2;
+  optional double duration    = 3 [ default = 60.0 ];
+  optional int32  max_bag_num = 4 [ default = 3 ];
+}
+
+message ProcessConf {
+  // CPU 亲和性: 绑定核心列表, 空列表或关闭时不绑定
+  optional bool   enable_cpu_affinity   = 1 [ default = false ];
+  repeated int32  cpu_affinity          = 2;
+  // 内存锁定: 阻止进程内存被换出(实时性)
+  optional bool   enable_mlockall       = 3 [ default = false ];
+  // 实时调度优先级: SCHED_FIFO, 1-99 越大越高
+  optional bool   enable_realtime       = 4 [ default = false ];
+  optional int32  realtime_priority     = 5 [ default = 60 ];
+}
+
+message RobotConfig {
+  optional RobotParam    robot_param     = 1;
+  optional BagRecordConf bag_record_conf = 2;
+  optional ProcessConf   process_conf    = 3;
+}

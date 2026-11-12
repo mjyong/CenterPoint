@@ -1,12 +1,5 @@
-/*
- * @Author: tian.zhao tian.zhao@seres.cn
- * @Date: 2024-03-05 17:31:33
- * @LastEditors: eryuan.liu eryuan.liu@seres.cn
- * @LastEditTime: 2025-09-12 17:51:15
- */
 #pragma once
 #include "rclcpp/rclcpp.hpp"
-#include <builtin_interfaces/msg/time.hpp>
 #include "src/runnable/communication/communication_base.h"
 #include "src/runnable/communication/ros_debug_bridge/visualization_util.h"
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
@@ -38,15 +31,13 @@ private:
   void PathTrackingDebug();
   void GoalPose(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
   void TEBDebug();
+  void FollowingDebug();
   void
   SetPubFlag(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
              std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   Eigen::Vector3d transformToGlobal(const Eigen::Vector3d &local_point,
                                     const Eigen::Vector3d &robot_pos,
                                     double robot_yaw);
-  // Stamp of the debug messages drawn in base_link: the odometry's, as the map -> base_link transform on /tf
-  // (node time until the first odometry). The wall clock went wrong in bag replays, weeks after the TF.
-  builtin_interfaces::msg::Time DebugStamp() const;
 
 private:
   PlanningEntry *planning_entry_{nullptr};
@@ -70,7 +61,9 @@ private:
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr local_occmap_pub_;
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr global_occmap_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
-      frenet_debug_pub_;
+      teb_debug_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+      following_debug_pub_;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr
       gradient_vec_pub_;
 

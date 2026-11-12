@@ -99,6 +99,13 @@ tmux send-keys "cd ${SERES_PERCEPTION_INSTALL_DIR}/pedestrian_code_conduct/lib/p
 tmux send-keys "source ${SERES_PERCEPTION_ROOT_DIR}/install/setup.bash" C-m
 tmux send-keys "./pedestrian_code_conduct_2d" C-m
 
+tmux select-pane -t 7
+tmux send-keys "export SERES_PERCEPTION_INSTALL_DIR=${SERES_PERCEPTION_ROOT_DIR}/install" C-m
+tmux send-keys "export SERES_PERCEPTION_ROOT_DIR=$script_abs_dir_path" C-m
+tmux send-keys "cd ${SERES_PERCEPTION_INSTALL_DIR}/perception_recharge/lib/perception_recharge" C-m
+tmux send-keys "source ${SERES_PERCEPTION_ROOT_DIR}/install/setup.bash" C-m
+tmux send-keys "./perception_recharge_node --params-file ${SERES_PERCEPTION_INSTALL_DIR}/perception_recharge/share/perception_recharge/config/perception_recharge_node.yaml" C-m
+
 # tmux select-pane -t 7
 # tmux send-keys "export SERES_PERCEPTION_INSTALL_DIR=${SERES_PERCEPTION_ROOT_DIR}/install" C-m
 # #tmux send-keys "export CYCLONEDDS_URI=file:///home/nvidia/cyclonedds_env.xml" C-m

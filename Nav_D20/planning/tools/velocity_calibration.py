@@ -145,7 +145,7 @@ class VelocityCalibrationNode(Node):
         axis = AXIS_NAMES[self.axis_index]
         msg = Motion()
         msg.mode = 2
-        msg.motion = 20
+        msg.motion = 22     # 20 walk; 22 run
         if axis == "VX":
             msg.para = [self.current_cmd, 0.0, 0.0]
         elif axis == "VY":
@@ -296,7 +296,7 @@ def main(args=None):
 
     # 解析命令行参数
     topic_cmd = "/cmd_vel"
-    topic_odom = "/robot/topic/mapm/odometry"
+    topic_odom = "/Odometry"
     remaining = sys.argv[1:] if len(sys.argv) > 1 else []
     i = 0
     while i < len(remaining):

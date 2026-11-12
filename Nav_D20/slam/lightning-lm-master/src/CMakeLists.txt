@@ -55,6 +55,7 @@ ament_target_dependencies(
         livox_ros_driver2
         basic
         nav2_interface
+        rhr_interface
 )
 
 add_dependencies(${PROJECT_NAME}.libs

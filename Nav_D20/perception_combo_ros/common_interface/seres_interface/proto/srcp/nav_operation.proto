@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package srcp;
+
+message Point 
+{
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+message Quaternion 
+{
+    double x = 1;
+    double y = 2;
+    double z = 3;
+    double w = 4;
+}
+
+message Pose 
+{
+    Point position = 1; //位置
+    Quaternion orientation = 2; //朝向
+}
+
+message Twist 
+{
+    message Linear
+    {
+        double x = 1; 
+        double y = 2;   
+        double z = 3;
+    }
+
+    message Angular
+    {
+        double x = 1; 
+        double y = 2;   
+        double z = 3;   
+    }
+
+    Linear linear = 1;
+    Angular angular = 2;
+}
+
+
+message MapBuildStatus
+{
+    enum MapBuildState
+    {
+        MAP_BUILD_UNKNOWN = 0; //未知
+        MAP_BUILD_DOING = 1;   //建图中
+        MAP_BUILD_DONE  = 2;   //建图完成
+        MAP_BUILD_FAILED = 3;  //建图失败
+    }
+
+    string uuid = 1;  //任务id
+    MapBuildState map_build_state = 2; //建图状态
+    uint32 map_progress = 3;   //建图进度
+    Pose pose = 4;  //实时位姿
+    bytes  map = 5; //实时2D地图
+    string map_uuid = 6; //地图UUID
+    string map_name = 7; //地图名称
+    float width = 8; //宽度
+    float hight = 9; //高度
+    float resolution = 10; //分辨率
+    Point map_origin_point = 11; //地图原点
+}
+
+message LocationStatus 
+{
+    enum LocaltionState
+    {
+        LOCATION_UNKNOWN = 0; //未知
+        LOCATION_DOING = 1;   //定位中
+        LOCATION_DONE  = 2;   //定位成功
+        LOCATION_FAILED = 3;  //定位失败
+    }
+
+    string uuid = 1; //任务id
+    LocaltionState state = 2;  //定位状态
+    string child_frame_id = 3; //机器人基座坐标系ID
+    Pose pose = 4; //位姿
+    Twist twist = 5; //速度
+}
+
+message PlanningStatus
+{
+    enum PlanningState
+    {
+        PLANNING_STATE_UNKNOWN = 0;
+        PLANNING_DOING = 1;
+        PLANNING_DONE = 2;
+        PLANNING_PAUSE = 3;
+        PLANNING_FAILED = 4;
+        PLANNING_NAV_DOING = 5;
+        PLANNING_NAV_DONE = 6;
+        PLANNING_NAV_PAUSE = 7;
+        PLANNING_NAV_FAILD = 8;
+    }
+
+    string uuid = 1; //任务id
+    PlanningState planning_state = 2;
+}
+
+
+message Trajectory
+{
+    uint32 id = 1;
+    repeated Point point_array = 2;
+}
+
+//Map Edit Task
+message NavOperation
+{
+    enum MapEditTaskType
+    {
+        MAP_EDIT_TASK_UNKNOWN = 0;     //未知
+        MAP_EDIT_TASK_UPLOAD = 1;      //上传
+        MAP_EDIT_TASK_DOWNLOAD  = 2;   //下载
+        MAP_EDIT_TASK_BROWSE = 3;      //浏览
+        MAP_EDIT_TASK_DELETE = 4;      //删除
+        MAP_EDIT_TASK_RENAME = 5;      //重命名
+        MAP_EDIT_TASK_SELECT = 6;      //选择
+        MAP_EDIT_TASK_DOWNLOAD_SUBMAP = 7; //下载虚拟地图
+    }
+
+    enum MapType
+    {
+        MAP_UNKNOWN = 0;
+        MAP_GLOBAL = 1;
+        MAP_UPDATE = 2;
+        MAP_LOCAL  = 3;
+        MAP_EXPLORE = 4;
+    }
+
+    string uuid = 1; //任务id
+    MapEditTaskType task_type = 2; //地图编辑任务类型
+    repeated string url = 3;      //地图文件https链接地址
+    string map_name = 4; //地图名称
+    string map_uuid = 5; //地图UUID
+    MapType map_type = 6; //地图类型
+}
+
+message NavOperationResult
+{
+    string uuid = 1; //任务id
+    bool task_result = 2;  //任务执行结果
+    repeated string map_list = 3; //地图文件名称列表
+}
+
+// D10 巡逻任务 点位上报
+message TaskMapPointReport
+{
+    Point point      = 1;  // 多个点位位置
+    string pointName = 2;  // 点位名称
+    int32 sort       = 3;  // 点位顺序
+    string taskUuid  = 4;  // 任务uuid
+}
+
+// D10 巡逻任务轨迹点位上报
+message TrackPointReport
+{
+  Point point      = 1; // 轨迹点位置
+  int32 sort       = 2; // 点位顺序
+  string taskUuid  = 3; // 任务uuid
+} 

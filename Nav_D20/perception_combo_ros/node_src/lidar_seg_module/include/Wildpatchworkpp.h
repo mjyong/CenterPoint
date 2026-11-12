@@ -6,11 +6,14 @@
 #include "sensor_msgs/point_cloud2_iterator.hpp"
 #include <Eigen/Dense>
 #include <boost/format.hpp>
+#include <atomic>
 #include <numeric>
 #include <queue>
 #include <mutex>
 #include <thread>
 
+#include "kygi665_msgs/msg/inspvax.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 
 #include <pcl/common/common.h>
@@ -113,6 +116,8 @@ struct LidarSegConfigType {
     double th_seeds = 0.25;  // 0.3  
     double th_dist = 0.25; // 离地点高度判断 非地面 0.2 
     double obstacle_height = 0.3;
+    // 相对邻接地面高出不超过该值、且整体贴地的面视为可通行台阶（覆盖约 15cm 台阶及测距/平面误差）
+    double step_height = 0.22;
     double th_seeds_v = 0.4; 
     double th_dist_v = 0.4;
     double max_range  = 100.0; 
@@ -251,6 +256,8 @@ private:
 
     std::vector<double> update_flatness_[8];
     std::vector<double> update_elevation_[8];
+    // 每个近处 ring 已确认地面的高程均值，用于判断低矮台阶
+    double elevation_mean_[8] = {};
 
     double d_;
 
@@ -329,6 +336,8 @@ private:
     void LidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
     void LidarFrontCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
     void LidarBackCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+    void InsPvaxCallback(const kygi665_msgs::msg::INSPVAX::SharedPtr msg);
+    void OdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
     void TransformPointCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr& input,
                              pcl::PointCloud<pcl::PointXYZI>::Ptr& output,
                              double x, double y, double z,
@@ -343,6 +352,10 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_subscribe_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_subscribe_front_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_subscribe_back_;
+    rclcpp::Subscription<kygi665_msgs::msg::INSPVAX>::SharedPtr inspvax_subscribe_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscribe_;
+    // 机体 pitch，弧度，抬头为正；0 表示尚未收到姿态
+    std::atomic<double> body_pitch_rad_{0.0};
     // rclcpp::Subscription<serespilot_msgs::msg::PointCloud2>::SharedPtr lidar_subscribe_,lidar_subscribe_left_,lidar_subscribe_front_,lidar_subscribe_right_,lidar_subscribe_back_;
     // rclcpp::Subscription<serespilot_msgs::msg::Hcinspvatzcb>::SharedPtr loc_subscribe_;
 

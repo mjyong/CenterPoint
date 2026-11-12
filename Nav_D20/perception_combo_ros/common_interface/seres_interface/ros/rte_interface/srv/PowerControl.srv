@@ -1,0 +1,8 @@
+# 请求
+uint8 target        # 控制对象，对应0x00~0x0F
+uint8 action        # 控制方式：0x00 下电，0x01 上电，0x02 重启（断电3s再上电）
+uint16 value        # 控制值，特别用于bit控制（如电机通道）
+
+---
+# 响应
+bool success

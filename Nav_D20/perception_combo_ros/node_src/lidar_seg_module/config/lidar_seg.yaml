@@ -1,12 +1,13 @@
 patchworkpp_wild:
   use_multi_lidar : false
-  use_filter : true
+  use_filter : false
   use_loc_trans : false
   use_loc_trans_remove: false
   use_lidar_detect: false
   ncr_thresh : 0.03
   detect_num: 200
   loc_subscribe: /seres/insmodule/devpvt
+  odom_subscribe: /lightning/odom
   lidar_subscribe: /robot/topic/rdap/top_point_cloud2 # AT128
   lidar_subscribe_left_front: /LeftBlindSpotLidar # RSE1
   lidar_subscribe_right_front: /RightBlindSpotLidar # RSE1
@@ -61,8 +62,8 @@ patchworkpp_wild:
   filter_ground_noise: -0.6
   car_front: 0.7
   car_back: -0.7
-  car_left: 0.371
-  car_right: -0.371
+  car_left: 0.45
+  car_right: -0.45
   top_lidar_x_offset: 3.90
   top_lidar_y_offset: 0.0
   top_lidar_yaw_offset: 0.5 # 顶雷达，前雷达角度融合阈值
@@ -73,7 +74,7 @@ patchworkpp_wild:
   back_lidar_y_offset: 0.047
   back_lidar_yaw_offset: 0.5 # 左，右雷达与后雷达角度融合阈值
 
-  verbose: false
+  verbose: true
   enable_RNR: false
   enable_RVPF: true
   enable_TGR: true
@@ -92,6 +93,8 @@ patchworkpp_wild:
   th_seeds: 0.15 #  // 0.3  
   th_dist: 0.2 #; // 离地点高度判断 非地面 0.25 
   obstacle_height: 0.15
+  # 相对邻接地面的可通行台阶高度。15cm 台阶叠加测距和平面拟合误差后仍应判为地面
+  step_height: 0.25
   th_seeds_v: 0.4 #; 
   th_dist_v: 0.4 #;
   max_range: 20.0 

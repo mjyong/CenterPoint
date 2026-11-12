@@ -21,11 +21,10 @@
 #define ROOT "./"
 #endif
 
-
 #include "core/lio/laser_mapping.h"
-#include "core/super_lio_frontend/laser_mapping_superlio.h"
 #include "core/loop_closing/loop_closing.h"
 #include "core/maps/tiled_map.h"
+#include "core/super_lio_frontend/laser_mapping_superlio.h"
 #include "ui/rviz_visualizer.h"
 #include "wrapper/ros_utils.h"
 
@@ -35,13 +34,12 @@
 #include <thread>
 
 namespace lightning {
-static Eigen::Vector3d lla_to_enu(const Eigen::Vector3d &lla,const GeographicLib::LocalCartesian &geo_converter_) {
+static Eigen::Vector3d lla_to_enu(const Eigen::Vector3d& lla, const GeographicLib::LocalCartesian& geo_converter_) {
     Eigen::Vector3d enu;
     double enu_x, enu_y, enu_z;
-    //lat、lon、alt为纬度、经度、高度
-    geo_converter_.Forward(lla.x(), lla.y(), lla.z(),
-                            enu_x, enu_y, enu_z);
-                            
+    // lat、lon、alt为纬度、经度、高度
+    geo_converter_.Forward(lla.x(), lla.y(), lla.z(), enu_x, enu_y, enu_z);
+
     enu.x() = enu_x;
     enu.y() = enu_y;
     enu.z() = enu_z;
@@ -105,7 +103,7 @@ bool SlamSystem::Init(const std::string& yaml_path) {
     //     LOG(ERROR) << "failed to init lio module";
     //     return false;
     // }
-    
+
     auto yaml = YAML::LoadFile(yaml_path);
     options_.use_super_lio_ = yaml["system"]["use_super_lio"].as<bool>();
     if (options_.use_super_lio_) {
@@ -145,7 +143,7 @@ bool SlamSystem::Init(const std::string& yaml_path) {
     }
     geo_converter_.Reset(ins_lat, ins_lon, ins_height);
     time_offset = yaml["fasterlio"]["time_offset"].as<double>();
-    
+
     if (options_.with_loop_closing_) {
         LOG(INFO) << "slam with loop closing";
         LoopClosing::Options options;
@@ -155,7 +153,7 @@ bool SlamSystem::Init(const std::string& yaml_path) {
         lc_ = std::make_shared<LoopClosing>(options);
         lc_->Init(yaml_path);
     }
-    
+
     // if (options_.with_visualization_) {
     //     LOG(INFO) << "slam with 3D UI (Rviz)";
     //     ui_ = std::make_shared<ui::RvizVisualizer>();
@@ -198,7 +196,7 @@ bool SlamSystem::Init(const std::string& yaml_path) {
             });
         }
     }
-    
+
     if (options_.online_mode_) {
         LOG(INFO) << "online mode, creating ros2 node ... ";
 
@@ -210,8 +208,7 @@ bool SlamSystem::Init(const std::string& yaml_path) {
         ins_cb_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
         // 创建多线程执行器（3线程），使 IMU、LiDAR、INS 回调组可并行处理
-        executor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>(
-            rclcpp::ExecutorOptions(), 3);
+        executor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>(rclcpp::ExecutorOptions(), 3);
         executor_->add_node(node_);
 
         imu_topic_ = yaml["common"]["imu_topic"].as<std::string>();
@@ -232,9 +229,10 @@ bool SlamSystem::Init(const std::string& yaml_path) {
 
         // IMU 订阅: 统一使用 sensor_msgs/Imu
         imu_sub_ = node_->create_subscription<sensor_msgs::msg::Imu>(
-            imu_topic_, qos, [this](sensor_msgs::msg::Imu::SharedPtr msg) {
+            imu_topic_, qos,
+            [this](sensor_msgs::msg::Imu::SharedPtr msg) {
                 IMUPtr imu = std::make_shared<IMU>();
-                imu->timestamp = ToSec(msg->header.stamp ) + time_offset;
+                imu->timestamp = ToSec(msg->header.stamp) + time_offset;
                 imu->linear_acceleration =
                     Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
                 // 角速度单位为 deg/s, 转换为 rad/s
@@ -245,13 +243,14 @@ bool SlamSystem::Init(const std::string& yaml_path) {
                 if (imu_diff > 0.04) {
                     LOG(ERROR) << "IMU 传感器时间戳与系统时间差值过大: " << imu_diff << " 秒";
                 }
-                //MonitorIMUFrameRate(imu->timestamp, current_time);
+                // MonitorIMUFrameRate(imu->timestamp, current_time);
                 ProcessIMU(imu);
-            }, imu_sub_opts);
+            },
+            imu_sub_opts);
         // huace ins imu 数据
         // imu_sub_ = node_->create_subscription<msg_interfaces::msg::Hcrawimub>(
         // imu_topic_, qos, [this](msg_interfaces::msg::Hcrawimub::SharedPtr msg) {
-        //     IMUPtr imu = std::make_shared<IMU>(); 
+        //     IMUPtr imu = std::make_shared<IMU>();
         //     imu->timestamp = ToSec(msg->header.stamp);
 
         //     imu -> linear_acceleration[0] = msg->angular_acceleration.x;
@@ -264,22 +263,24 @@ bool SlamSystem::Init(const std::string& yaml_path) {
 
         //     ProcessIMU(imu);
         // });
-        if(options_.with_ins_) {
+        if (options_.with_ins_) {
             if (ins_type_ == "kygi665") {
                 // kygi665 INSPVAX 接口
                 sub_kygi665_ins_ = node_->create_subscription<kygi665_msgs::msg::INSPVAX>(
-                    kygi665_ins_topic_, qos, [this](kygi665_msgs::msg::INSPVAX::SharedPtr msg) {
+                    kygi665_ins_topic_, qos,
+                    [this](kygi665_msgs::msg::INSPVAX::SharedPtr msg) {
                         Eigen::Vector3d lla(msg->latitude, msg->longitude, msg->height);
                         Eigen::Vector3d enu = lla_to_enu(lla, geo_converter_);
                         INSPtr ins = std::make_shared<Ins>();
                         ins->stamp = rclcpp::Time(msg->header.stamp).seconds();
-                        ins->pose.block<3,1>(0,3) = enu;
+                        ins->pose.block<3, 1>(0, 3) = enu;
                         double azimuth_rad = (180.0 - msg->azimuth) * M_PI / 180.0;
                         double roll = 0;
                         double pitch = 0;
-                        ins->pose.block<3,3>(0,0) = (Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) *
-                                            Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
-                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ())).toRotationMatrix();
+                        ins->pose.block<3, 3>(0, 0) = (Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) *
+                                                       Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
+                                                       Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ()))
+                                                          .toRotationMatrix();
                         // kygi665 pos_type.data 与 novatel 常量值一致: INS_RTKFIXED=56, INS_RTKFLOAT=55
                         // 要求 ins_status 为 INS_SOLUTION_GOOD(3) 才可用
                         bool ins_solution_good = (msg->ins_status.data == 3);
@@ -289,8 +290,10 @@ bool SlamSystem::Init(const std::string& yaml_path) {
                         } else {
                             ins->state = INS_INVALID;
                         }
-                        ins->position_covariance = Eigen::Vector3d(msg->latitude_stdev, msg->longitude_stdev, msg->height_stdev);
-                        ins->orientation_covariance = Eigen::Vector3d(msg->roll_stdev, msg->pitch_stdev, msg->azimuth_stdev);
+                        ins->position_covariance =
+                            Eigen::Vector3d(msg->latitude_stdev, msg->longitude_stdev, msg->height_stdev);
+                        ins->orientation_covariance =
+                            Eigen::Vector3d(msg->roll_stdev, msg->pitch_stdev, msg->azimuth_stdev);
                         {
                             std::lock_guard<std::mutex> lock(ins_buffer_mutex_);
                             ins_buffer_.push_back(ins);
@@ -303,7 +306,7 @@ bool SlamSystem::Init(const std::string& yaml_path) {
                             pose_msg.pose.position.x = enu.x();
                             pose_msg.pose.position.y = enu.y();
                             pose_msg.pose.position.z = enu.z();
-                            Eigen::Matrix3d rot = ins->pose.block<3,3>(0,0);
+                            Eigen::Matrix3d rot = ins->pose.block<3, 3>(0, 0);
                             Eigen::Quaterniond quat(rot);
                             pose_msg.pose.orientation.x = quat.x();
                             pose_msg.pose.orientation.y = quat.y();
@@ -319,49 +322,58 @@ bool SlamSystem::Init(const std::string& yaml_path) {
                         if (ins_diff > 0.1) {
                             LOG(ERROR) << "INS 传感器时间戳与系统时间差值过大: " << ins_diff << " 秒";
                         }
-                    }, ins_sub_opts);
+                    },
+                    ins_sub_opts);
             } else {
                 // novatel INSPVAX 接口
                 sub_ins_ = node_->create_subscription<novatel_oem7_msgs::msg::INSPVAX>(
-                    ins_topic_, qos, [this](novatel_oem7_msgs::msg::INSPVAX::SharedPtr msg) {
+                    ins_topic_, qos,
+                    [this](novatel_oem7_msgs::msg::INSPVAX::SharedPtr msg) {
                         Eigen::Vector3d lla(msg->latitude, msg->longitude, msg->height);
                         Eigen::Vector3d enu = lla_to_enu(lla, geo_converter_);
                         INSPtr ins = std::make_shared<Ins>();
                         ins->stamp = rclcpp::Time(msg->header.stamp).seconds();
-                        ins->pose.block<3,1>(0,3) = enu;
+                        ins->pose.block<3, 1>(0, 3) = enu;
                         // INS azimuth 是与正北（Y轴）的夹角，顺时针为正
                         // 转换为 ENU 坐标系下与东（X轴）的夹角，逆时针为正
                         // 转换公式：angle_from_east = 90° - azimuth
                         double azimuth_rad = (90.0 - msg->azimuth) * M_PI / 180.0;
-                        double roll = 0;//msg->roll * M_PI / 180.0;
-                        double pitch = 0;//msg->pitch * M_PI / 180.0;
+                        double roll = 0;   // msg->roll * M_PI / 180.0;
+                        double pitch = 0;  // msg->pitch * M_PI / 180.0;
                         // 调试输出
                         static int debug_count = 0;
                         if (debug_count++ < 10) {
-                            LOG(INFO) << "INS azimuth: " << msg->azimuth << "°, converted to: " << azimuth_rad * 180.0 / M_PI << "° from East";
+                            LOG(INFO) << "INS azimuth: " << msg->azimuth
+                                      << "°, converted to: " << azimuth_rad * 180.0 / M_PI << "° from East";
                             LOG(INFO) << "INS position: " << enu.transpose();
-                            
+
                             // 计算欧拉角
                             Eigen::Matrix3d rot = (Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) *
-                                                  Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
-                                                  Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ())).toRotationMatrix();
-                            Eigen::Vector3d euler = rot.eulerAngles(2, 1, 0); // ZYX顺序
+                                                   Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
+                                                   Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ()))
+                                                      .toRotationMatrix();
+                            Eigen::Vector3d euler = rot.eulerAngles(2, 1, 0);  // ZYX顺序
                             LOG(INFO) << "INS rotation (ZYX euler): " << euler.transpose() * 180.0 / M_PI << "°";
                         }
-                        
-                        ins->pose.block<3,3>(0,0) =  (Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) *
-                                            Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
-                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ())).toRotationMatrix();
-                        if(msg->pos_type.type == 56){ 
-                            ins->state = INS_VALID;     
+
+                        ins->pose.block<3, 3>(0, 0) = (Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) *
+                                                       Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
+                                                       Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ()))
+                                                          .toRotationMatrix();
+                        if (msg->pos_type.type == 56) {
+                            ins->state = INS_VALID;
                         } else {
                             ins->state = INS_INVALID;
                         }
-                        ins->position_covariance = Eigen::Vector3d(msg->latitude_stdev, msg->longitude_stdev, msg->height_stdev);
-                        ins->orientation_covariance = Eigen::Vector3d(msg->roll_stdev, msg->pitch_stdev, msg->azimuth_stdev);
+                        ins->position_covariance =
+                            Eigen::Vector3d(msg->latitude_stdev, msg->longitude_stdev, msg->height_stdev);
+                        ins->orientation_covariance =
+                            Eigen::Vector3d(msg->roll_stdev, msg->pitch_stdev, msg->azimuth_stdev);
                         {
                             std::lock_guard<std::mutex> lock(ins_buffer_mutex_);
-                            double sys_now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+                            double sys_now =
+                                std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch())
+                                    .count();
                             // LOG(INFO) << "[INS_RECV] stamp=" << std::fixed << std::setprecision(6) << ins->stamp
                             //           << " sys=" << sys_now << " buf_size=" << ins_buffer_.size()
                             //           << " state=" << (ins->state == INS_VALID ? "VALID" : "INVALID");
@@ -376,7 +388,7 @@ bool SlamSystem::Init(const std::string& yaml_path) {
                             pose_msg.pose.position.y = enu.y();
                             pose_msg.pose.position.z = enu.z();
                             // 从旋转矩阵提取四元数
-                            Eigen::Matrix3d rot = ins->pose.block<3,3>(0,0);
+                            Eigen::Matrix3d rot = ins->pose.block<3, 3>(0, 0);
                             Eigen::Quaterniond quat(rot);
                             pose_msg.pose.orientation.x = quat.x();
                             pose_msg.pose.orientation.y = quat.y();
@@ -394,13 +406,15 @@ bool SlamSystem::Init(const std::string& yaml_path) {
                         if (ins_diff > 0.1) {
                             LOG(ERROR) << "INS 传感器时间戳与系统时间差值过大: " << ins_diff << " 秒";
                         }
-                        //MonitorINSFrameRate(ins->stamp, current_time);
-                        // ProcessIMU(imu);
-                    }, ins_sub_opts);
+                        // MonitorINSFrameRate(ins->stamp, current_time);
+                        //  ProcessIMU(imu);
+                    },
+                    ins_sub_opts);
             }
         }
         cloud_sub_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
-            cloud_topic_, qos, [this](sensor_msgs::msg::PointCloud2::SharedPtr cloud) {
+            cloud_topic_, qos,
+            [this](sensor_msgs::msg::PointCloud2::SharedPtr cloud) {
                 double lidar_time = ToSec(cloud->header.stamp) + time_offset;
                 double sys_time = ToSec(node_->now());
                 double lidar_diff = sys_time - lidar_time;
@@ -408,7 +422,8 @@ bool SlamSystem::Init(const std::string& yaml_path) {
                     LOG(ERROR) << "LiDAR 传感器时间戳与系统时间差值过大: " << lidar_diff << " 秒";
                 }
                 Timer::Evaluate([&]() { ProcessLidar(cloud); }, "Proc Lidar", true);
-            }, lidar_sub_opts);
+            },
+            lidar_sub_opts);
 
         // livox_sub_ = node_->create_subscription<livox_ros_driver2::msg::CustomMsg>(
         //     livox_topic_, qos, [this](livox_ros_driver2::msg::CustomMsg ::SharedPtr cloud) {
@@ -425,7 +440,7 @@ bool SlamSystem::Init(const std::string& yaml_path) {
                                          SaveMapService::Response::SharedPtr res) { SaveMap(req, res); });
 
         LOG(INFO) << "online slam node has been created.";
-        //初始化 Rviz 可视化器
+        // 初始化 Rviz 可视化器
         if (ui_) {
             ui_->Init(node_);
         }
@@ -455,7 +470,7 @@ void SlamSystem::SaveMap(const SaveMapService::Request::SharedPtr request,
     map_name_ = request->map_id;
     std::string save_path = "./data/" + map_name_ + "/";
 
-    //SaveMap(save_path);
+    // SaveMap(save_path);
     SaveMapByTemplate(save_path);
     response->response = 0;
 }
@@ -478,7 +493,7 @@ void SlamSystem::SaveMap(const std::string& path) {
             LOG(WARNING) << "T_ins_lio not computed, skipping global optimization with INS";
         }
         lc_->GlobalOptimizationWithINS();
-        
+
         // 优化后重新绘制栅格地图
         if (options_.with_gridmap_ && g2p5_ != nullptr) {
             g2p5_->RedrawGlobalMap();
@@ -535,7 +550,6 @@ void SlamSystem::SaveMap(const std::string& path) {
 
     TiledMap tm(tm_options);
     tm.ConvertFromFullPCD(global_map, start_pose, save_path);
-
 
     pcl::io::savePCDFileBinaryCompressed(save_path + "/global.pcd", *global_map);
     // pcl::io::savePCDFileBinaryCompressed(save_path + "/global_no_loop.pcd", *global_map_no_loop);
@@ -628,7 +642,6 @@ void SlamSystem::ProcessLidar(const sensor_msgs::msg::PointCloud2::SharedPtr& cl
 
     // auto kf = lio_->GetKeyframe();
 
-
     if (options_.use_super_lio_) {
         super_lio_->ProcessPointCloud2(cloud);
         super_lio_->Run();
@@ -656,36 +669,36 @@ void SlamSystem::ProcessLidar(const sensor_msgs::msg::PointCloud2::SharedPtr& cl
     // 获取激光雷达时间戳
     double lidar_time = cur_kf_->GetState().timestamp_;
     // 找出最近的INS数据
-    if(options_.with_ins_) {
-    INSPtr nearest_ins = FindNearestINS(lidar_time);
-    if (nearest_ins) {
-        // LOG(INFO) << "Nearest INS found at stamp " << nearest_ins->stamp
-        //         << ", state " << nearest_ins->state
-        //         << ", time diff " << (nearest_ins->stamp - lidar_time);
-        SE3 ins_pose(nearest_ins->pose.block<3,3>(0,0), nearest_ins->pose.block<3,1>(0,3));
-        if (nearest_ins->state == INS_VALID) {
-            cur_kf_->SetInsPose(ins_pose);
-            // 设置 INS 协方差
-            cur_kf_->SetInsCovariance(nearest_ins->position_covariance, nearest_ins->orientation_covariance);
-            // 如果尚未计算 INS 到 LIO 的变换，使用第一帧有效INS计算外参
-            if (!T_ins_lio_computed_) {
-                SE3 lio_pose = cur_kf_->GetLIOPose();
-                T_ins_lio_ = ins_pose * lio_pose.inverse();
-                T_ins_lio_computed_ = true;
-                LOG(INFO) << "Computed T_ins_lio using first valid INS: " << T_ins_lio_.matrix();
+    if (options_.with_ins_) {
+        INSPtr nearest_ins = FindNearestINS(lidar_time);
+        if (nearest_ins) {
+            // LOG(INFO) << "Nearest INS found at stamp " << nearest_ins->stamp
+            //         << ", state " << nearest_ins->state
+            //         << ", time diff " << (nearest_ins->stamp - lidar_time);
+            SE3 ins_pose(nearest_ins->pose.block<3, 3>(0, 0), nearest_ins->pose.block<3, 1>(0, 3));
+            if (nearest_ins->state == INS_VALID) {
+                cur_kf_->SetInsPose(ins_pose);
+                // 设置 INS 协方差
+                cur_kf_->SetInsCovariance(nearest_ins->position_covariance, nearest_ins->orientation_covariance);
+                // 如果尚未计算 INS 到 LIO 的变换，使用第一帧有效INS计算外参
+                if (!T_ins_lio_computed_) {
+                    SE3 lio_pose = cur_kf_->GetLIOPose();
+                    T_ins_lio_ = ins_pose * lio_pose.inverse();
+                    T_ins_lio_computed_ = true;
+                    LOG(INFO) << "Computed T_ins_lio using first valid INS: " << T_ins_lio_.matrix();
+                }
+            } else {
+                LOG(INFO) << "INS invalid, using LIO pose as opt pose.";
             }
         } else {
-            LOG(INFO) << "INS invalid, using LIO pose as opt pose.";
+            LOG(WARNING) << "No INS data found in buffer for lidar time " << std::fixed << std::setprecision(15)
+                         << lidar_time;
         }
-    } else {
-        LOG(WARNING) << "No INS data found in buffer for lidar time "<<std::fixed<<std::setprecision(15)<< lidar_time;
-    }
-    // 清理旧数据
-    RemoveOldINS(lidar_time);
+        // 清理旧数据
+        RemoveOldINS(lidar_time);
     }
     if (options_.with_loop_closing_) {
         lc_->AddKF(cur_kf_);
-
     }
     if (options_.with_gridmap_) {
         g2p5_->PushKeyframe(cur_kf_);
@@ -710,9 +723,9 @@ void SlamSystem::ProcessLidar(const livox_ros_driver2::msg::CustomMsg::SharedPtr
     double lidar_time_f = ToSec(cloud->header.stamp);
     // 监测帧率与丢帧（丢帧检测使用传感器时间，帧率统计使用系统时间）
     double current_time = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    //MonitorLidarFrameRate(lidar_time_f, current_time);
-    // lio_->ProcessPointCloud2(cloud);
-    // lio_->Run();
+    // MonitorLidarFrameRate(lidar_time_f, current_time);
+    //  lio_->ProcessPointCloud2(cloud);
+    //  lio_->Run();
 
     // auto kf = lio_->GetKeyframe();
 
@@ -731,7 +744,6 @@ void SlamSystem::ProcessLidar(const livox_ros_driver2::msg::CustomMsg::SharedPtr
         kf = lio_->GetKeyframe();
     }
 
-
     if (kf != cur_kf_) {
         cur_kf_ = kf;
     } else {
@@ -744,35 +756,35 @@ void SlamSystem::ProcessLidar(const livox_ros_driver2::msg::CustomMsg::SharedPtr
     // 获取激光雷达时间戳
     double lidar_time = cur_kf_->GetState().timestamp_;
     // 找出最近的INS数据
-    if(options_.with_ins_) {
-    INSPtr nearest_ins = FindNearestINS(lidar_time);
-    if (nearest_ins) {
-        // LOG(INFO) << "Nearest INS found at stamp " << nearest_ins->stamp
-        //         << ", state " << nearest_ins->state
-        //         << ", time diff " << (nearest_ins->stamp - lidar_time);
-        SE3 ins_pose(nearest_ins->pose.block<3,3>(0,0), nearest_ins->pose.block<3,1>(0,3));
-        if (nearest_ins->state == INS_VALID) {
-            cur_kf_->SetInsPose(ins_pose);
-            // 设置 INS 协方差
-            cur_kf_->SetInsCovariance(nearest_ins->position_covariance, nearest_ins->orientation_covariance);
+    if (options_.with_ins_) {
+        INSPtr nearest_ins = FindNearestINS(lidar_time);
+        if (nearest_ins) {
+            // LOG(INFO) << "Nearest INS found at stamp " << nearest_ins->stamp
+            //         << ", state " << nearest_ins->state
+            //         << ", time diff " << (nearest_ins->stamp - lidar_time);
+            SE3 ins_pose(nearest_ins->pose.block<3, 3>(0, 0), nearest_ins->pose.block<3, 1>(0, 3));
+            if (nearest_ins->state == INS_VALID) {
+                cur_kf_->SetInsPose(ins_pose);
+                // 设置 INS 协方差
+                cur_kf_->SetInsCovariance(nearest_ins->position_covariance, nearest_ins->orientation_covariance);
 
-            // 如果尚未计算 INS 到 LIO 的变换，使用第一帧有效INS计算外参
-            if (!T_ins_lio_computed_) {
-                SE3 lio_pose = cur_kf_->GetLIOPose();
-                // 使用第一帧有效INS计算外参：T_ins_lio = ins_pose * lio_pose.inverse()
-                T_ins_lio_ = ins_pose * lio_pose.inverse();
-                T_ins_lio_computed_ = true;
-                LOG(INFO) << "Computed T_ins_lio using first valid INS: " << T_ins_lio_.matrix();
+                // 如果尚未计算 INS 到 LIO 的变换，使用第一帧有效INS计算外参
+                if (!T_ins_lio_computed_) {
+                    SE3 lio_pose = cur_kf_->GetLIOPose();
+                    // 使用第一帧有效INS计算外参：T_ins_lio = ins_pose * lio_pose.inverse()
+                    T_ins_lio_ = ins_pose * lio_pose.inverse();
+                    T_ins_lio_computed_ = true;
+                    LOG(INFO) << "Computed T_ins_lio using first valid INS: " << T_ins_lio_.matrix();
+                }
+            } else {
+                LOG(INFO) << "INS invalid, using LIO pose as opt pose.";
             }
         } else {
-            LOG(INFO) << "INS invalid, using LIO pose as opt pose.";
+            LOG(WARNING) << "No INS data found in buffer for lidar time " << lidar_time;
         }
-    } else {
-        LOG(WARNING) << "No INS data found in buffer for lidar time " << lidar_time;
-    }
-    
-    // 清理旧数据
-    RemoveOldINS(lidar_time);
+
+        // 清理旧数据
+        RemoveOldINS(lidar_time);
     }
     if (options_.with_loop_closing_) {
         lc_->AddKF(cur_kf_);
@@ -795,13 +807,11 @@ void SlamSystem::ProcessLidar(const livox_ros_driver2::msg::CustomMsg::SharedPtr
 INSPtr SlamSystem::FindNearestINS(double stamp) {
     std::lock_guard<std::mutex> lock(ins_buffer_mutex_);
     if (ins_buffer_.empty()) {
-        LOG(WARNING) << "[INS_FIND] lidar_time=" << std::fixed << std::setprecision(6) << stamp
-                     << " buffer EMPTY";
+        LOG(WARNING) << "[INS_FIND] lidar_time=" << std::fixed << std::setprecision(6) << stamp << " buffer EMPTY";
         return nullptr;
     }
     LOG(INFO) << "[INS_FIND] lidar_time=" << std::fixed << std::setprecision(6) << stamp
-              << " buf_size=" << ins_buffer_.size()
-              << " front=" << ins_buffer_.front()->stamp
+              << " buf_size=" << ins_buffer_.size() << " front=" << ins_buffer_.front()->stamp
               << " back=" << ins_buffer_.back()->stamp;
     auto it = std::lower_bound(ins_buffer_.begin(), ins_buffer_.end(), stamp,
                                [](const INSPtr& ins, double t) { return ins->stamp < t; });
@@ -817,12 +827,11 @@ INSPtr SlamSystem::FindNearestINS(double stamp) {
         double diff2 = std::abs((*(it - 1))->stamp - stamp);
         nearest = diff1 < diff2 ? *it : *(it - 1);
     }
-    
+
     // 检查时间差是否在允许范围内
-    const double MAX_TIME_DIFF = 0.1; // 100ms
+    const double MAX_TIME_DIFF = 0.1;  // 100ms
     if (nearest && std::abs(nearest->stamp - stamp) > MAX_TIME_DIFF) {
-        LOG(WARNING) << "INS time diff too large: " << std::abs(nearest->stamp - stamp)
-                     << "s, ignoring this INS data.";
+        LOG(WARNING) << "INS time diff too large: " << std::abs(nearest->stamp - stamp) << "s, ignoring this INS data.";
         return nullptr;
     }
     return nearest;
@@ -830,7 +839,7 @@ INSPtr SlamSystem::FindNearestINS(double stamp) {
 
 void SlamSystem::RemoveOldINS(double stamp) {
     std::lock_guard<std::mutex> lock(ins_buffer_mutex_);
-    const double keep_window = 5; // 保留最近0.5秒的数据
+    const double keep_window = 5;  // 保留最近0.5秒的数据
     double threshold = stamp - keep_window;
     while (!ins_buffer_.empty() && ins_buffer_.front()->stamp < threshold) {
         ins_buffer_.pop_front();
@@ -855,9 +864,8 @@ void SlamSystem::MonitorLidarFrameRate(double sensor_time, double sys_time) {
             int dropped = static_cast<int>(interval / expected_interval_) - 1;
             if (dropped > 0) {
                 dropped_frames_ += dropped;
-                LOG(WARNING) << "Lidar frame drop detected: interval " << interval
-                             << " s, expected " << expected_interval_
-                             << " s, estimated " << dropped << " frames dropped.";
+                LOG(WARNING) << "Lidar frame drop detected: interval " << interval << " s, expected "
+                             << expected_interval_ << " s, estimated " << dropped << " frames dropped.";
             }
         }
         // 检测零间隔（卡帧）
@@ -870,9 +878,8 @@ void SlamSystem::MonitorLidarFrameRate(double sensor_time, double sys_time) {
         }
         // 检测粘包：间隔小于预期间隔的0.5倍（异常快速）
         if (interval < expected_interval_ * 0.5) {
-            LOG(WARNING) << "Lidar frame sticking detected: interval " << interval
-                         << " s, expected " << expected_interval_
-                         << " s, possible packet sticking.";
+            LOG(WARNING) << "Lidar frame sticking detected: interval " << interval << " s, expected "
+                         << expected_interval_ << " s, possible packet sticking.";
         }
     }
     last_lidar_time_ = sensor_time;
@@ -890,8 +897,7 @@ void SlamSystem::MonitorLidarFrameRate(double sensor_time, double sys_time) {
         if (total_sys_time > 0.0) {
             frame_rate_ = frame_count_ / total_sys_time;
             LOG(INFO) << "Lidar frame rate (sys): " << frame_rate_ << " Hz, frames: " << frame_count_
-                      << ", dropped: " << dropped_frames_
-                      << ", max interval: " << max_interval_
+                      << ", dropped: " << dropped_frames_ << ", max interval: " << max_interval_
                       << ", min interval: " << min_interval_;
         }
     }
@@ -915,9 +921,8 @@ void SlamSystem::MonitorIMUFrameRate(double sensor_time, double sys_time) {
             int dropped = static_cast<int>(interval / imu_expected_interval_) - 1;
             if (dropped > 0) {
                 imu_dropped_ += dropped;
-                LOG(WARNING) << "IMU frame drop detected: interval " << interval
-                             << " s, expected " << imu_expected_interval_
-                             << " s, estimated " << dropped << " frames dropped.";
+                LOG(WARNING) << "IMU frame drop detected: interval " << interval << " s, expected "
+                             << imu_expected_interval_ << " s, estimated " << dropped << " frames dropped.";
             }
         }
         // 检测零间隔（卡帧）
@@ -930,9 +935,8 @@ void SlamSystem::MonitorIMUFrameRate(double sensor_time, double sys_time) {
         }
         // 检测粘包：间隔小于预期间隔的0.5倍（异常快速）
         if (interval < imu_expected_interval_ * 0.5) {
-            LOG(WARNING) << "IMU frame sticking detected: interval " << interval
-                         << " s, expected " << imu_expected_interval_
-                         << " s, possible packet sticking.";
+            LOG(WARNING) << "IMU frame sticking detected: interval " << interval << " s, expected "
+                         << imu_expected_interval_ << " s, possible packet sticking.";
         }
     }
     last_imu_time_ = sensor_time;
@@ -950,8 +954,7 @@ void SlamSystem::MonitorIMUFrameRate(double sensor_time, double sys_time) {
         if (total_sys_time > 0.0) {
             imu_rate_ = imu_count_ / total_sys_time;
             LOG(INFO) << "IMU frame rate (sys): " << imu_rate_ << " Hz, frames: " << imu_count_
-                      << ", dropped: " << imu_dropped_
-                      << ", max interval: " << imu_max_interval_
+                      << ", dropped: " << imu_dropped_ << ", max interval: " << imu_max_interval_
                       << ", min interval: " << imu_min_interval_;
         }
     }
@@ -975,9 +978,8 @@ void SlamSystem::MonitorINSFrameRate(double sensor_time, double sys_time) {
             int dropped = static_cast<int>(interval / ins_expected_interval_) - 1;
             if (dropped > 0) {
                 ins_dropped_ += dropped;
-                LOG(WARNING) << "INS frame drop detected: interval " << interval
-                             << " s, expected " << ins_expected_interval_
-                             << " s, estimated " << dropped << " frames dropped.";
+                LOG(WARNING) << "INS frame drop detected: interval " << interval << " s, expected "
+                             << ins_expected_interval_ << " s, estimated " << dropped << " frames dropped.";
             }
         }
         // 检测零间隔（卡帧）
@@ -990,9 +992,8 @@ void SlamSystem::MonitorINSFrameRate(double sensor_time, double sys_time) {
         }
         // 检测粘包：间隔小于预期间隔的0.5倍（异常快速）
         if (interval < ins_expected_interval_ * 0.5) {
-            LOG(WARNING) << "INS frame sticking detected: interval " << interval
-                         << " s, expected " << ins_expected_interval_
-                         << " s, possible packet sticking.";
+            LOG(WARNING) << "INS frame sticking detected: interval " << interval << " s, expected "
+                         << ins_expected_interval_ << " s, possible packet sticking.";
         }
     }
     last_ins_time_ = sensor_time;
@@ -1010,8 +1011,7 @@ void SlamSystem::MonitorINSFrameRate(double sensor_time, double sys_time) {
         if (total_sys_time > 0.0) {
             ins_rate_ = ins_count_ / total_sys_time;
             LOG(INFO) << "INS frame rate (sys): " << ins_rate_ << " Hz, frames: " << ins_count_
-                      << ", dropped: " << ins_dropped_
-                      << ", max interval: " << ins_max_interval_
+                      << ", dropped: " << ins_dropped_ << ", max interval: " << ins_max_interval_
                       << ", min interval: " << ins_min_interval_;
         }
     }
@@ -1034,14 +1034,16 @@ void SlamSystem::CancelSpin() {
     }
 }
 
-void SlamSystem::StartMapMonitor(float translation_threshold_m, float rotation_threshold_deg, MapDataCallback callback) {
+void SlamSystem::StartMapMonitor(float translation_threshold_m, float rotation_threshold_deg,
+                                 MapDataCallback callback) {
     std::lock_guard<std::mutex> lock(monitor_mutex_);
     monitor_enabled_ = true;
     trans_threshold_ = translation_threshold_m;
-    rot_threshold_ = rotation_threshold_deg * M_PI / 180.0; // 转换为弧度
+    rot_threshold_ = rotation_threshold_deg * M_PI / 180.0;  // 转换为弧度
     map_callback_ = callback;
     trigger_initialized_ = false;
-    LOG(INFO) << "Map monitor started with translation threshold " << trans_threshold_ << " m, rotation threshold " << rot_threshold_ << " rad.";
+    LOG(INFO) << "Map monitor started with translation threshold " << trans_threshold_ << " m, rotation threshold "
+              << rot_threshold_ << " rad.";
 }
 
 void SlamSystem::StopMapMonitor() {
@@ -1074,7 +1076,7 @@ void SlamSystem::CheckMotionAndTrigger(const SE3& current_pose) {
     // 计算相对运动（不需要锁）
     SE3 delta = last_trigger_pose_.inverse() * current_pose;
     double translation = delta.translation().norm();
-    double rotation = delta.so3().log().norm(); // 旋转向量模长（弧度）
+    double rotation = delta.so3().log().norm();  // 旋转向量模长（弧度）
     auto now = std::chrono::steady_clock::now();
     double elapsed_sec = std::chrono::duration<double>(now - last_trigger_time_).count();
     if ((translation >= trans_thresh || rotation >= rot_thresh) && elapsed_sec >= 5.0) {
@@ -1088,7 +1090,8 @@ void SlamSystem::CheckMotionAndTrigger(const SE3& current_pose) {
                     last_trigger_pose_ = current_pose;
                     last_trigger_time_ = now;
                 }
-                LOG(INFO) << "********Map monitor triggered: translation " << translation << " m, rotation " << rotation << " rad.";
+                LOG(INFO) << "********Map monitor triggered: translation " << translation << " m, rotation " << rotation
+                          << " rad.";
                 // 在单独线程中执行耗时操作（地图转换和回调）
                 std::thread([map, callback, current_pose, this]() {
                     auto data = ConvertMapToUint8Array(map);
@@ -1096,8 +1099,9 @@ void SlamSystem::CheckMotionAndTrigger(const SE3& current_pose) {
                     int height = map->ToROS().info.height;
                     float resolution = map->GetGridResolution();
                     float min_x, min_y, max_x, max_y;
-                    callback(data, width, height, resolution, map->ToROS().info.origin.position.x, map->ToROS().info.origin.position.y);
-                }).detach(); // 分离线程，让它在后台运行
+                    callback(data, width, height, resolution, map->ToROS().info.origin.position.x,
+                             map->ToROS().info.origin.position.y);
+                }).detach();  // 分离线程，让它在后台运行
             }
         }
     }
@@ -1258,8 +1262,8 @@ void SlamSystem::SaveMapByTemplate(const std::string& path) {
         e << YAML::Key << "width" << YAML::Value << width;
         e << YAML::Key << "height" << YAML::Value << height;
         e << YAML::Key << "resolution" << YAML::Value << map.info.resolution;
-        e << YAML::Key << "origin" << YAML::Value << std::vector<double>{
-            map.info.origin.position.x, map.info.origin.position.y, 0};
+        e << YAML::Key << "origin" << YAML::Value
+          << std::vector<double>{map.info.origin.position.x, map.info.origin.position.y, 0};
         e << YAML::Key << "negate" << YAML::Value << 0;
         e << YAML::Key << "occupied_thresh" << YAML::Value << 0.65;
         e << YAML::Key << "free_thresh" << YAML::Value << 0.25;
@@ -1285,7 +1289,8 @@ void SlamSystem::SaveMapByTemplate(const std::string& path) {
             e << YAML::Key << "from_global_id" << YAML::Value << (int)all_kfs[i - 1]->GetID();
             e << YAML::Key << "to_global_id" << YAML::Value << (int)all_kfs[i]->GetID();
             e << YAML::Key << "measurement" << YAML::Value << SE3ToVec7(motion);
-            e << YAML::Key << "information_diagonal" << YAML::Value << std::vector<int>{10000, 10000, 10000, 100, 100, 100};
+            e << YAML::Key << "information_diagonal" << YAML::Value
+              << std::vector<int>{10000, 10000, 10000, 100, 100, 100};
             e << YAML::EndMap;
         }
         e << YAML::EndSeq;

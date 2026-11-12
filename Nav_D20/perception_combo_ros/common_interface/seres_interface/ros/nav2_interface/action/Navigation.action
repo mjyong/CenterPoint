@@ -1,0 +1,21 @@
+# Goal
+uint8 PLAN_MODE_BEST_TIME = 0     #用时最短规划模式
+uint8 PLAN_MODE_BEST_DISTANCE = 1 #距离最短规划模式
+
+uint8 plan_mode              #规划方式，默认用时最短
+string map_uuid
+geometry_msgs/Point[] points #点导航模式下，只有一个点；
+
+bool end_orient_enable                 #true: 终点姿态方向约束，true：有效；
+geometry_msgs/Quaternion end_orient    #终点方向
+
+uint8 max_speed              #导航最大速度  
+
+---
+# Result
+string message               # 结果描述
+
+---
+# Feedback
+uint32 state               # 详见 nav2_interface/msg/NavState.msg
+geometry_msgs/Point[] path  #规划完成状态，反馈规划路径；其他状态不关注

@@ -1,0 +1,232 @@
+syntax = "proto3";
+
+import "result.proto";
+
+import "google/protobuf/wrappers.proto";
+
+package srcp;
+
+// 告警
+message Alarm
+{
+    enum State
+    {
+        START   = 0;    // 产生告警
+        END     = 1;    // 消除告警
+    }
+
+    enum Level
+    {
+        NOWARN  = 0;    //  无告警
+        WARNING = 1;    //  警告
+        MAJOR   = 2;    //  重要
+        SERIOUS = 3;    //　严重
+    }
+}
+
+message RobotAlarm
+{
+    uint32 id           = 1;    // 详见告警 ID 列表
+    uint32 para         = 2;    // 告警参数
+    uint64 time         = 3;    // 告警状态变化时间，产生或消除 系统时间
+    Alarm.State state   = 4;    // 告警产生、告警消除
+    Alarm.Level level   = 5;    //  WARNING
+    string comment      = 6;    //  告警描述
+}
+
+// 部件日志节点
+message LogComponent
+{
+  string component = 1; // 部件
+  repeated string node = 2; // 日志节点
+}
+
+message EmptyLogComponents
+{
+  repeated LogComponent logComponent = 1;
+}
+
+// 日志获取
+message GetRhrLog
+{
+    uint64 logStartTime = 1; // 日志开始时间
+    uint64 logEndTime = 2;   // 日志结束时间
+    repeated LogComponent logComponent = 3; // 部件日志节点
+}
+
+// 初始化日志上传任务(本体日志主动上报)
+message RobotLogUploadTaskInit
+{
+  uint64 logStartTime = 1; // 日志开始时间
+  uint64 logEndTime = 2; // 日志结束时间
+  repeated LogComponent logComponent = 3; // 部件日志节点
+}
+
+// 日志上传任务响应
+message RobotLogUploadTaskInitResponse
+{
+  uint64 uploadTaskSeq = 1;
+}
+
+// 状态上报消息体
+message RobotState
+{
+
+  //电池包信息
+  message BmsPackInfo
+  {
+     google.protobuf.StringValue id = 1;                                        // 电池包唯一序列号
+     google.protobuf.BoolValue is_primary = 2;                                  // 是否是主电池，true表示主电池false表示备用电池
+     google.protobuf.Int32Value bms_state = 3;                                  // 充电状态，0表示放电， 1表示交流充电中，2表示直流充电中
+     google.protobuf.FloatValue bms_i_pack = 4;                                 // 电池电流，正值表示放电，负值表示充电
+     google.protobuf.Int32Value charge_end_no = 5;                              // 充电结束原因，1表示正常满充终止充电，2表示用户主动终止充电，其他待厂商补充
+     google.protobuf.Int32Value bms_cell_cnt = 6;                               // 电池单体个数
+     repeated google.protobuf.FloatValue bms_module_x_cell_block = 7;           // 电池电压，单位V
+     google.protobuf.Int32Value bms_cell_thremistor_cnt = 8;                    // 电池温度传感器个数
+     repeated google.protobuf.FloatValue bms_module_x_temp_sensor = 9;          // 电池温度传感器数值，单位℃
+     google.protobuf.FloatValue bms_cell_volt_max = 10;                         // 电池单体电压最高值，单位V
+     google.protobuf.FloatValue bms_cell_volt_min = 11;                         // 电池单体电压最低值，单位V
+     google.protobuf.FloatValue bms_cell_volt_avg = 12;                         // 电池单体电压平均值，单位V
+     google.protobuf.Int32Value bms_cell_volt_max_index = 13;                   // 最高电压电池单体代号
+     google.protobuf.Int32Value bms_cell_volt_min_index = 14;                   // 最低电压电池单体代号
+     google.protobuf.FloatValue bms_pack_temp_min = 15;                         // 电池温度传感器最低温，单位℃
+     google.protobuf.FloatValue bms_pack_temp_max = 16;                         // 电池温度传感器最高温，单位℃
+     google.protobuf.Int32Value bms_pack_temp_min_idx = 17;                     // 电池温度传感器最低温传感器序号
+     google.protobuf.Int32Value bms_pack_temp_max_idx = 18;                     // 电池温度传感器最高温传感器序号
+     google.protobuf.FloatValue bms_pack_temp_avg = 19;                         // 电池温度传感器平均温度，单位℃
+     google.protobuf.FloatValue bms_p_pack = 20;                                // 电池实时功率，单位w
+     google.protobuf.FloatValue bms_soh = 21;                                   // 电池健康状态
+     google.protobuf.FloatValue bms_chg_amount = 22;                            // 单次已充电电量，单位wh，充电过程每秒采集上传本次累计充电电量
+     google.protobuf.Int32Value bms_isolation_resistance = 23;                  // 绝缘阻值，单位Ω
+     google.protobuf.FloatValue bms_v_pack_bmu = 24;                            // 电池包总电压
+     repeated google.protobuf.Int32Value bms_balance_sw_cell_block = 25;        // 电池电芯均衡状态，0：均衡通路断开，无均衡电流；1：均衡通路接通，有均衡电流
+     google.protobuf.Int32Value bms_cycle_cnt = 26;                             // 电池循环次数
+     google.protobuf.FloatValue rated_current = 27;                             // 电池额定电流，单位A
+     google.protobuf.FloatValue peak_current = 28;                              // 电池峰值电流，单位A
+     google.protobuf.FloatValue rated_volt = 29;                                // 电池额定电压，单位V
+     google.protobuf.FloatValue rated_capacity = 30;                            // 电池额定容量，单位Ah
+     google.protobuf.FloatValue current_capacity = 31;                          // 电池当前容量，单位Ah
+     google.protobuf.FloatValue bms_soc = 32;                                   // 电池当前电量
+     
+  }
+  
+  //电池信息
+  message BmsInfo {
+    google.protobuf.Int32Value bms_major_version_number = 1;                    // 端侧bms软件主版本号
+    google.protobuf.Int32Value bms_minor_version_number = 2;                    // 端侧bms软件子版本号
+    google.protobuf.Int32Value bms_pack_cnt = 3;                                // 电池包个数
+    repeated BmsPackInfo bms_pack_info = 4;                                     // 电池包信息
+  }
+
+  // rhr状态信息
+  message RhrInfo {
+
+    // 任务模式
+    enum SystemMode {
+      SYSTEM_MODE_IDLE = 0;   // 空闲
+      SYSTEM_MODE_BUSY = 1;   // 任务中
+    }
+
+    // 姿态
+    enum Posture {
+      POSTURE_UNSPECIFIED = 0; // 未指定
+      POSTURE_STANDING    = 1; // 站立
+      POSTURE_WALKING     = 2; // 行走
+      POSTURE_LYING       = 3; // 趴下
+    }
+
+    // 扬声器播报状态
+    enum SpeakerState {
+      SPEAKER_STATE_IDLE        = 0; // 未播报
+      SPEAKER_STATE_PLAYING     = 1; // 播报中
+    }
+
+    // 电机位置
+    enum MotorLocation {
+      MOTOR_LOCATION_UPPER_LIMB  = 0; // 上肢
+      MOTOR_LOCATION_LOWER_LIMB  = 1; // 下肢
+    }
+
+    message ElectricMotorInfo {
+      google.protobuf.FloatValue electric_motor_position = 1;             // 电机位置（弧度）
+      google.protobuf.FloatValue electric_motor_rotational_speed_rpm = 2; // 电机转速，单位rpm
+      google.protobuf.FloatValue electric_motor_torque_nm = 3;            // 力矩，单位N·m
+      google.protobuf.FloatValue electric_motor_temp = 4;                 // 电机温度，单位℃
+      google.protobuf.StringValue id = 5;                                 // 电机唯一序列号
+      MotorLocation motor_location = 6; 
+    }
+
+    repeated ElectricMotorInfo electric_motor_infos = 1;
+
+    SystemMode system_mode = 5;                                             // 系统模式
+    google.protobuf.StringValue current_task = 6;                           // 当前任务
+    google.protobuf.FloatValue position_latitude = 7;                       // 纬度
+    google.protobuf.FloatValue position_longitude = 8;                      // 经度
+    google.protobuf.FloatValue eastward_velocity = 9;                       // 经向速度，单位 m/s
+    google.protobuf.FloatValue northward_velocity = 10;                     // 纬向速度 (m/s)
+    Posture posture = 11;                                                   // 姿态
+    google.protobuf.FloatValue cpu_load = 12;                               // CPU 负荷，单位 %
+    google.protobuf.FloatValue memory_free = 13;                            // 剩余内存，单位 %
+    google.protobuf.BoolValue wireless_connection_bluetooth_connected = 14; // 蓝牙是否连接
+    google.protobuf.BoolValue wireless_connection_wifi_connected      = 15; // WiFi是否连接
+    google.protobuf.BoolValue wireless_connection_cellular_connected  = 16; // 4/5G是否连接
+    google.protobuf.BoolValue led_is_on = 17;                               // LED 是否开启
+    google.protobuf.FloatValue led_brightness_percent = 18;                 // LED 亮度百分比，单位 %
+    SpeakerState speaker_state = 19;                                        // 扬声器播报状态
+    google.protobuf.FloatValue load_weight = 20;                            // 负重，单位 kg
+    google.protobuf.FloatValue temperature = 21;                            // 环境温度，单位 ℃
+    google.protobuf.FloatValue humidity = 22;                               // 环境湿度，单位 g/m³
+
+  }
+  
+
+  BmsInfo bmsInfo = 1; 
+  RhrInfo rhrInfo = 2;
+  google.protobuf.UInt64Value sampling_time = 3; // 采样时间
+}
+
+message RobotStates {
+  repeated RobotState robotState = 1;
+  google.protobuf.UInt32Value sampling_interval = 2; // 采样周期
+}
+
+// RHR机器人配置
+message RhrConfigs {
+  message EventConfigItem {
+    repeated string eventIds  = 1;// 事件ID
+    bool uploadVideo          = 2;//是否上传音视频数据
+    bool uploadControlData    = 3;//是否上传运控数据
+    bool uploadNavigationData = 4;//是否上传导航数据
+    bool uploadDecisionData   = 5;//是否上传决策模块数据
+  }
+
+  message EventConfigs {
+    string version                       = 1; // 版本号
+    repeated EventConfigItem configItems = 2;
+  }
+
+  oneof data {
+    EventConfigs eventConfigs = 1; // 事件配置
+  };
+}
+
+// 事件上报
+message EventRecord {
+  // 枚举：事件触发状态
+  enum EventTriggerStatus {
+    EVENT_TRIGGERED_START = 0;              // 产生
+    EVENT_TRIGGERED_END = 1;                // 消除
+  }
+
+  // 枚举：事件消除源
+  enum EventClearSource {
+    EVENT_TRIGGERED_END_BY_SYSTEM = 0;      // 系统自动消除
+    EVENT_TRIGGERED_END_BY_HUMAN = 1;       // 人为确认消除
+  }
+  int32 sequence = 1;                       // 序列号
+  string eventId = 2;                       // 事件id
+  int64 eventTime = 3;                      // 事件发生时间
+  EventTriggerStatus triggerStatus = 4;     // 事件触发状态
+  EventClearSource clearSource = 5;         // 事件消除源
+  google.protobuf.StringValue extData = 6;  // 扩展字段
+}

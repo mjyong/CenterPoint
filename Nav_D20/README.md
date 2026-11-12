@@ -11,4 +11,4 @@ D20 的感知、定位和规划。感知用 `lidar_seg` 加 `grid_map_memory_nod
 bash Nav_D20/planning/script/run_planning_stack_debug.sh
 ```
 
-规划怎么接话题、怎么看结果，写在 `planning/docs/ONBOARDING.md`。
+规划怎么接话题、怎么看结果，写在 `planning/docs/ONBOARDING.md`。定位做了什么，写在 `slam/docs/OVERVIEW.md`。

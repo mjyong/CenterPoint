@@ -1066,22 +1066,80 @@ void PtzDataDetection::HandlePerceptionDetect(
                   << " num=" << num << " time_interval_ms=" << interval;
     };
 
+    // 云台同时只处理一条拍照请求，上一条还没结束时后一条会被丢掉。
+    // 一次只发一个通道，回图后再发下一个；超时则隔开重发。
+    constexpr int kMaxSendAttempts = 3;
+    constexpr int kResendGapMs = 300;
+    constexpr int kChannelGapMs = 200;
+
+    auto sleep_ms = [](int ms) {
+        if (ms > 0 && rclcpp::ok()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+        }
+    };
+
+    auto wait_until = [&](const auto& ready, int polls, int attempt, const char* name) {
+        if (ready()) {
+            return true;
+        }
+        for (int poll_count = 1; poll_count <= polls && rclcpp::ok(); ++poll_count) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(poll_interval_ms));
+            const int rgb_cache_size = DP->main_data_.grab_rgb_cache.GetDataSize();
+            const int infrared_cache_size = DP->main_data_.grab_infrared_cache.GetDataSize();
+            const int matrix_cache_size = DP->main_data_.matrix_cache.GetDataSize();
+            LOG(INFO) << "[PerceptionDetectWait] " << name
+                      << " send_attempt=" << attempt << "/" << kMaxSendAttempts
+                      << " poll=" << poll_count << "/" << polls
+                      << " rgb_cache=" << rgb_cache_size
+                      << " infrared_cache=" << infrared_cache_size
+                      << " matrix_cache=" << matrix_cache_size;
+            if (ready()) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    auto request_with_retry = [&](uint32_t channel, uint32_t num, uint32_t interval,
+                                  const auto& ready, const char* name) {
+        for (int attempt = 1; attempt <= kMaxSendAttempts && rclcpp::ok(); ++attempt) {
+            if (attempt > 1) {
+                if (ready()) {
+                    return true;
+                }
+                LOG(WARNING) << "Resend take photo " << name
+                             << " channel=" << channel
+                             << " attempt=" << attempt << "/" << kMaxSendAttempts
+                             << " (previous request was likely dropped)";
+                sleep_ms(kResendGapMs);
+                if (ready()) {
+                    return true;
+                }
+            }
+            publish_take_photo(channel, num, interval);
+            if (wait_until(ready, max_poll, attempt, name)) {
+                return true;
+            }
+            LOG(WARNING) << "Take photo " << name << " channel=" << channel
+                         << " got no data on attempt " << attempt << "/" << kMaxSendAttempts;
+        }
+        return ready();
+    };
+
     if (is_truck_parking) {
         const int photo_num = param.multi_photo_num > 0 ? param.multi_photo_num : 5;
 
         DP->main_data_.grab_rgb_cache.Clear();
-        publish_take_photo(kTakePhotoColorChannel, static_cast<uint32_t>(photo_num),
-                           static_cast<uint32_t>(interval_ms));
-
-        int poll_count = 0;
-        while (poll_count < max_poll && rclcpp::ok() &&
-               DP->main_data_.grab_rgb_cache.GetDataSize() < photo_num) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(poll_interval_ms));
-            poll_count++;
-        }
+        const bool photos_ready = request_with_retry(
+            kTakePhotoColorChannel, static_cast<uint32_t>(photo_num),
+            static_cast<uint32_t>(interval_ms),
+            [&] {
+                return DP->main_data_.grab_rgb_cache.GetDataSize() >= photo_num;
+            },
+            "truck_parking");
 
         const int got = DP->main_data_.grab_rgb_cache.GetDataSize();
-        if (got < photo_num) {
+        if (!photos_ready) {
             LOG(WARNING) << "HandlePerceptionDetect: truck parking photos " << got
                          << "/" << photo_num;
         }
@@ -1133,54 +1191,33 @@ void PtzDataDetection::HandlePerceptionDetect(
         DP->main_data_.grab_infrared_cache.Clear();
         DP->main_data_.matrix_cache.Clear();
 
-        publish_take_photo(kTakePhotoColorChannel, 1, static_cast<uint32_t>(interval_ms));
-        if (is_infrared_task) {
-            publish_take_photo(kTakePhotoInfraredChannel, 1, static_cast<uint32_t>(interval_ms));
-        }
         LOG(INFO) << "Take photo request attempt=" << total_occlusion_count;
-
-        bool data_ready = false;
-        int poll_count = 0;
-        while (poll_count < max_poll && rclcpp::ok()) {
-            // IMPORTANT:
-            // This function is already running inside Process()->rclcpp::spin_some(node_).
-            // Calling rclcpp::spin_some(node_) again here causes nested executor usage and
-            // throws: "Node '/ptz_data_detection' has already been added to an executor."
-            std::this_thread::sleep_for(std::chrono::milliseconds(poll_interval_ms));
-            poll_count++;
-
-            const int rgb_cache_size = DP->main_data_.grab_rgb_cache.GetDataSize();
-            const int infrared_cache_size = DP->main_data_.grab_infrared_cache.GetDataSize();
-            const int matrix_cache_size = DP->main_data_.matrix_cache.GetDataSize();
-            LOG(INFO) << "[PerceptionDetectWait] outer_attempt=" << total_occlusion_count
-                      << " inner_poll=" << poll_count << "/" << max_poll
-                      << " rgb_cache=" << rgb_cache_size
-                      << " infrared_cache=" << infrared_cache_size
-                      << " matrix_cache=" << matrix_cache_size;
-
-            if (is_rgb_task) {
-                if (rgb_cache_size > 0) {
-                    LOG(INFO) << "[PerceptionDetectWait] RGB data ready at poll "
-                              << poll_count << ", attempt " << total_occlusion_count;
-                    data_ready = true;
-                    break;
-                }
-            } else {
-                bool has_rgb = rgb_cache_size > 0;
-                bool has_infrared = infrared_cache_size > 0;
-                bool has_matrix = matrix_cache_size > 0;
-                if (has_rgb && has_infrared && has_matrix) {
-                    LOG(INFO) << "[PerceptionDetectWait] Infrared task data ready at poll "
-                              << poll_count << ", attempt " << total_occlusion_count;
-                    data_ready = true;
-                    break;
-                }
-            }
+        // IMPORTANT:
+        // This function runs inside the node executor. Do not call spin_some here,
+        // or the node is added twice and throws.
+        const bool rgb_ok = request_with_retry(
+            kTakePhotoColorChannel, 1, static_cast<uint32_t>(interval_ms),
+            [&] { return DP->main_data_.grab_rgb_cache.GetDataSize() > 0; },
+            "color");
+        if (!rgb_ok) {
+            LOG(ERROR) << "HandlePerceptionDetect: timeout waiting for color photo";
+            break;
         }
 
-        if (!data_ready) {
-            LOG(ERROR) << "HandlePerceptionDetect: timeout waiting for take photo data";
-            break;
+        if (is_infrared_task) {
+            // 彩色回图说明上一条已经处理完，再留一点间隔后发红外，避免被丢掉。
+            sleep_ms(kChannelGapMs);
+            const bool infrared_ok = request_with_retry(
+                kTakePhotoInfraredChannel, 1, static_cast<uint32_t>(interval_ms),
+                [&] {
+                    return DP->main_data_.grab_infrared_cache.GetDataSize() > 0 &&
+                           DP->main_data_.matrix_cache.GetDataSize() > 0;
+                },
+                "infrared");
+            if (!infrared_ok) {
+                LOG(ERROR) << "HandlePerceptionDetect: timeout waiting for infrared photo";
+                break;
+            }
         }
 
         DP->main_data_.grab_rgb_cache.PopNewest(rgb_data);

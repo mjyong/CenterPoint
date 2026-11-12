@@ -1,0 +1,6 @@
+# 请求部分：
+uint8 wifi_mode
+
+---
+# 响应部分：
+bool result

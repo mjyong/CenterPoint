@@ -66,19 +66,16 @@ start_node() {
 # 1. lidar_seg
 start_node "lidar_seg" "lidar_seg"
 
-# 1b. lidar_3d_detection（点云 3D 检测跟踪；model 在包内 lidar_3d_detection/model）
-start_node "lidar_3d_detection" "lidar_3d_detection"
-
 # 2. grid_map_memory_node
 start_node "grid_map_memory_node" "grid_map_memory_node"
 
 # 3. visual_perception
-(
-    node_dir="${PERCEPTION_INSTALL_DIR}/visual_perception/lib/visual_perception"
-    cd "${node_dir}"
-    export LD_LIBRARY_PATH="${node_dir}:${LD_LIBRARY_PATH}"
-    exec "./visual_perception_2d"
-) &
+# (
+#     node_dir="${PERCEPTION_INSTALL_DIR}/visual_perception/lib/visual_perception"
+#     cd "${node_dir}"
+#     export LD_LIBRARY_PATH="${node_dir}:${LD_LIBRARY_PATH}"
+#     exec "./visual_perception_2d"
+# ) &
 
 # 4. ptz_data_detection
 (
@@ -89,11 +86,19 @@ start_node "grid_map_memory_node" "grid_map_memory_node"
 ) &
 
 # 5. pedestrian_code_conduct
+# (
+#     node_dir="${PERCEPTION_INSTALL_DIR}/pedestrian_code_conduct/lib/pedestrian_code_conduct"
+#     cd "${node_dir}"
+#     export LD_LIBRARY_PATH="${node_dir}:${LD_LIBRARY_PATH}"
+#     exec "./pedestrian_code_conduct_2d"
+# ) &
+
+# 6. perception_recharge（回充对接位姿检测）
 (
-    node_dir="${PERCEPTION_INSTALL_DIR}/pedestrian_code_conduct/lib/pedestrian_code_conduct"
+    node_dir="${PERCEPTION_INSTALL_DIR}/perception_recharge/lib/perception_recharge"
     cd "${node_dir}"
-    export LD_LIBRARY_PATH="${node_dir}:${LD_LIBRARY_PATH}"
-    exec "./pedestrian_code_conduct_2d"
+    exec "./perception_recharge_node" \
+        --params-file "${PERCEPTION_INSTALL_DIR}/perception_recharge/share/perception_recharge/config/perception_recharge_node.yaml"
 ) &
 
 echo "[nav_perception] 所有节点已在后台启动，PID 组: $$"

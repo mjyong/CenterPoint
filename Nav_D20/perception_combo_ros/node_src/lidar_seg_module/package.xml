@@ -13,8 +13,10 @@
   <depend>std_msgs</depend>
   <depend>rosbag2_cpp</depend>
   <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>visualization_msgs</depend>
+  <depend>kygi665_msgs</depend>
   <!-- <depend>serespilot_msgs</depend> -->
   
   <!-- <depend>custom_msgs</depend> -->

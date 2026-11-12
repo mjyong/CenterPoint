@@ -11,15 +11,16 @@ confs{
         sub_occupancy_grid          { name: "/map/occupancy_grid"  queue_size: 3  timeout: 0.5 }
         sub_global_occupancy_grid   { name: "/map" }
         sub_map_switch              { name: "/map/switch" }
+        sub_map_update              { name: "/map/file_update" }
         sub_init_pose               { name: "/initialpose"         queue_size: 10 }
         sub_goal_pose               { name: "/goal_pose"           queue_size: 10 }
         pub_cmd_vel                 { name: "/cmd_vel"             queue_size: 10 }
         pub_motion                  { name: "/mc/motion_control"   queue_size: 10 }
         action_navigation           { name: "/nav/navigation" }
-        sub_charging_goal           { name: "/reflector_position"  queue_size: 10  timeout: 0.5 }
+        sub_charging_goal           { name: "/reflector_position"  queue_size: 10  }
         sub_battery_states          { name: "/robot/topic/rdap/battery_states"  queue_size: 10  timeout: 1.0 }
-        sub_motion_state            { name: "/mc/state"            queue_size: 10  timeout: 1.0 }
-        action_backcharge           { name: "/nav/back_charge" }
+        sub_motion_state            { name: "/mc/state"            queue_size: 10  }
+        action_backcharge           { name: "/nav/backcharge" }
         enable_timeout_check: true
         timeout_pause_duration: 1.0
         timeout_resume_duration: 3.0

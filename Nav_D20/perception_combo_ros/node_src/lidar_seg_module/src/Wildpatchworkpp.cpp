@@ -74,6 +74,7 @@ int WildPatchWorkpp::Init(YAML::Node &config) {
     std::string lidar_subscribe_front_topic = config["patchworkpp_wild"]["lidar_subscribe_front"].as<std::string>() ;
 
     std::string lidar_subscribe_back_topic = config["patchworkpp_wild"]["lidar_subscribe_back"].as<std::string>() ;
+    std::string odom_subscribe_topic = config["patchworkpp_wild"]["odom_subscribe"].as<std::string>() ;
 
     std::string pub_ground_topic = config["patchworkpp_wild"]["pub_ground"].as<std::string>() ;
     std::string pub_ground_revert_topic = config["patchworkpp_wild"]["pub_ground_revert"].as<std::string>() ;
@@ -170,7 +171,8 @@ int WildPatchWorkpp::Init(YAML::Node &config) {
     config_.sensor_height = config["patchworkpp_wild"]["sensor_height"].as<double>() ; 
     config_.th_seeds = config["patchworkpp_wild"]["th_seeds"].as<double>() ; 
     config_.th_dist = config["patchworkpp_wild"]["th_dist"].as<double>() ; 
-    config_.obstacle_height = config["patchworkpp_wild"]["obstacle_height"].as<double>() ; 
+    config_.obstacle_height = config["patchworkpp_wild"]["obstacle_height"].as<double>() ;
+    config_.step_height = config["patchworkpp_wild"]["step_height"].as<double>() ; 
     config_.th_seeds_v = config["patchworkpp_wild"]["th_seeds_v"].as<double>() ; 
     config_.th_dist_v = config["patchworkpp_wild"]["th_dist_v"].as<double>() ; 
     config_.max_range = config["patchworkpp_wild"]["max_range"].as<double>() ; 
@@ -196,6 +198,9 @@ int WildPatchWorkpp::Init(YAML::Node &config) {
     config_.flatness_thr = config["patchworkpp_wild"]["flatness_thr"].as<std::vector<double>>() ;
 
     params_ = config_;
+    for (int i = 0; i < 8; ++i) {
+        elevation_mean_[i] = -params_.sensor_height;
+    }
     double min_range_z2_ = (7 * params_.min_range + params_.max_range) / 8.0;
     double min_range_z3_ = (3 * params_.min_range + params_.max_range) / 4.0;
     double min_range_z4_ = (params_.min_range + params_.max_range) / 2.0;
@@ -637,6 +642,8 @@ int WildPatchWorkpp::Init(YAML::Node &config) {
     lidar_subscribe_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(lidar_subscribe_topic, 10, std::bind(&WildPatchWorkpp::LidarCallback, this, std::placeholders::_1));
     lidar_subscribe_front_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(lidar_subscribe_front_topic, 10, std::bind(&WildPatchWorkpp::LidarFrontCallback, this, std::placeholders::_1));
     lidar_subscribe_back_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(lidar_subscribe_back_topic, 10, std::bind(&WildPatchWorkpp::LidarBackCallback, this, std::placeholders::_1));
+    odom_subscribe_ = node_->create_subscription<nav_msgs::msg::Odometry>(odom_subscribe_topic, 10, std::bind(&WildPatchWorkpp::OdomCallback, this, std::placeholders::_1));
+    std::cout << "Subscribed odom: " << odom_subscribe_topic << std::endl;
     // lidar_subscribe_ = node_->create_subscription<serespilot_msgs::msg::PointCloud2>(lidar_subscribe_topic, 10, std::bind(&WildPatchWorkpp::LidarCallback, this, std::placeholders::_1));
 
     // loc_subscribe_ = node_->create_subscription<serespilot_msgs::msg::Hcinspvatzcb>(loc_subscribe_topic, 10, std::bind(&WildPatchWorkpp::HcLocalizationCallback, this, std::placeholders::_1));
@@ -942,6 +949,7 @@ void WildPatchWorkpp::update_elevation_thr(void)
 
         double update_mean = 0.0, update_stdev = 0.0;
         calc_mean_stdev(update_elevation_[i], update_mean, update_stdev);
+        elevation_mean_[i] = update_mean;
         if (i==0) {
             params_.elevation_thr[i] = update_mean + 3*update_stdev;
             params_.sensor_height = -update_mean;
@@ -1422,6 +1430,7 @@ void WildPatchWorkpp::LidarCallback(const sensor_msgs::msg::PointCloud2::SharedP
               << " pts_out=" << cloud_transformed->points.size()
               << " offset(x,y,z)=(" << top_x_offset_ << "," << top_y_offset_ << "," << top_z_offset_ << ")"
               << " rpy(yaw,pitch,roll)=(" << top_yaw_ << "," << top_pitch_ << "," << top_roll_ << ")"
+              << " body_pitch_deg=" << std::setprecision(3) << (body_pitch_rad_.load() * 57.29577951308232)
               << " cost=" << std::fixed << std::setprecision(3) << trans_ms << "ms" << std::endl;
     incloud.point_cloud_ptr = cloud_transformed;
 
@@ -1431,19 +1440,52 @@ void WildPatchWorkpp::LidarCallback(const sensor_msgs::msg::PointCloud2::SharedP
 // -----------------------------------------------------------------------
 // 通用 6DoF 点云刚体变换 (ZYX 欧拉角: yaw->Z, pitch->Y, roll->X)
 // -----------------------------------------------------------------------
+void WildPatchWorkpp::InsPvaxCallback(const kygi665_msgs::msg::INSPVAX::SharedPtr msg)
+{
+    if (!msg) {
+        return;
+    }
+    // INSPVAX pitch 单位是度，抬头为正
+    constexpr double kDegToRad = 0.017453292519943295;
+    body_pitch_rad_.store(msg->pitch * kDegToRad, std::memory_order_relaxed);
+}
+
+// /lightning/odom (nav_msgs/Odometry) 回调：从姿态四元数解算机体俯仰角用于点云调平
+void WildPatchWorkpp::OdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
+{
+    if (!msg) {
+        return;
+    }
+    const auto &q = msg->pose.pose.orientation;
+    // 四元数 -> pitch (绕机体 Y 轴)。标准 ROS(X前,Y左,Z上) 下该 pitch 低头为正。
+    double sinp = 2.0 * (q.w * q.y - q.z * q.x);
+    if (sinp > 1.0) sinp = 1.0;
+    if (sinp < -1.0) sinp = -1.0;
+    const double ros_pitch = std::asin(sinp);
+    // body_pitch_rad_ 沿用 INSPVAX 约定：抬头为正，因此取反，调平逻辑保持不变。
+    body_pitch_rad_.store(-ros_pitch, std::memory_order_relaxed);
+}
+
 void WildPatchWorkpp::TransformPointCloud(
     const pcl::PointCloud<pcl::PointXYZI>::Ptr& input,
     pcl::PointCloud<pcl::PointXYZI>::Ptr& output,
     double x, double y, double z,
     double yaw, double pitch, double roll)
 {
-    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+    // 安装外参保持不变：雷达坐标系 -> 机体坐标系
+    Eigen::Affine3f mount = Eigen::Affine3f::Identity();
     Eigen::AngleAxisf yaw_rot  (static_cast<float>(yaw),   Eigen::Vector3f::UnitZ());
     Eigen::AngleAxisf pitch_rot(static_cast<float>(pitch), Eigen::Vector3f::UnitY());
     Eigen::AngleAxisf roll_rot (static_cast<float>(roll),  Eigen::Vector3f::UnitX());
-    transform.rotate(yaw_rot * pitch_rot * roll_rot);
-    transform.translation() << static_cast<float>(x), static_cast<float>(y), static_cast<float>(z);
-    pcl::transformPointCloud(*input, *output, transform);
+    mount.rotate(yaw_rot * pitch_rot * roll_rot);
+    mount.translation() << static_cast<float>(x), static_cast<float>(y), static_cast<float>(z);
+
+    // 机体俯仰左乘到安装外参上。机体 X 朝前、Z 朝上时，Eigen 的正 Ry 是低头；
+    // INSPVAX pitch 抬头为正，因此用 Ry(-pitch) 把点云扳回重力水平。
+    const float level_pitch = static_cast<float>(-body_pitch_rad_.load(std::memory_order_relaxed));
+    Eigen::Affine3f level = Eigen::Affine3f::Identity();
+    level.rotate(Eigen::AngleAxisf(level_pitch, Eigen::Vector3f::UnitY()));
+    pcl::transformPointCloud(*input, *output, level * mount);
 }
 
 // -----------------------------------------------------------------------
@@ -2244,6 +2286,7 @@ int WildPatchWorkpp::LidarProcess(const LocData loc_data,
 
                 bool is_not_elevated = false;
                 bool is_flat         = false;
+                bool is_low_step     = false;
 
                 // visualization_msgs::msg::Marker txt_marker;
                 // txt_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
@@ -2280,6 +2323,8 @@ int WildPatchWorkpp::LidarProcess(const LocData loc_data,
                 {
                     is_not_elevated = ground_elevation < params_.elevation_thr[concentric_idx];//初始值为 0 0 0 0 即雷达原点高度
                     is_flat         = ground_flatness < params_.flatness_thr[concentric_idx];
+                    // 水平台阶面相对该环地面均值高出不超过 step_height，仍视为地面
+                    is_low_step     = ground_elevation < elevation_mean_[concentric_idx] + params_.step_height;
                 }
                 
                 /*
@@ -2312,7 +2357,7 @@ int WildPatchWorkpp::LidarProcess(const LocData loc_data,
                     addCloud(cloud_nonground_, regionwise_ground_);
                     addCloud(ConcentricZoneModel_nonground_[zone_idx][ring_idx][sector_idx],regionwise_ground_);  
                 }
-                else if (is_not_elevated || is_flat) // 倾斜程度不剧烈 且 是近处的patch 且 heading正常， 平坦度或者均值高度其中一样满足要求则 patch加入地面
+                else if (is_not_elevated || is_flat || is_low_step) // 倾斜程度不剧烈 且 是近处的patch 且 heading正常， 平坦度、均值高度或低矮台阶满足要求则 patch加入地面
                 {
                     addCloud(cloud_ground_, regionwise_ground_);
                     addCloud(ConcentricZoneModel_ground_[zone_idx][ring_idx][sector_idx],regionwise_ground_); 
@@ -2427,9 +2472,9 @@ int WildPatchWorkpp::LidarProcess(const LocData loc_data,
 
                         
                         std::vector<double> closet_dist_vec;
-                        if (params_.verbose) {
-                            std::cout << " CURRENT NON GROUND IDX" << zone_idx << " / " << ring_idx << " / " << sector_idx << std::endl;
-                        }
+                        // if (params_.verbose) {
+                        //     std::cout << " CURRENT NON GROUND IDX" << zone_idx << " / " << ring_idx << " / " << sector_idx << std::endl;
+                        // }
                         // CNOTICE_LOG(" CURRENT NON GROUND IDX : %d  / %d  / %d ", zone_idx,ring_idx,sector_idx );
                         int neighbour_cal_count = 0;
                         for(auto nb:ConcentricZoneModel_neighbour_[zone_idx][ring_idx][sector_idx]){
@@ -2507,74 +2552,63 @@ int WildPatchWorkpp::LidarProcess(const LocData loc_data,
                             // 判断当前patch非地面点能否恢复成地面点
                             std::vector<PointXYZ> tmp_ground;
                             std::vector<PointXYZ> tmp_nonground;
+                            auto &patch_pts = zone_nonground[ring_idx][sector_idx];
+                            if (cal_patch_ground_in_range.size() < 3) {
+                                addCloud(cloud_nonground_, patch_pts);
+                            } else {
                             estimate_plane(cal_patch_ground_in_range); //
-                            // 添加一个属性，记录当前patch的最高点距离拟合平面的距离
+                            // 记录相对邻接地面的高度。用 90% 分位代替最高点，避免个别噪点否决整块台阶
+                            std::vector<double> distances;
+                            distances.reserve(patch_pts.size());
                             double max_distance = 0.0;
-                            for(auto p:zone_nonground[ring_idx][sector_idx]){
-                                double distance = calc_point_to_plane_d(p, normal_, d_);// 拟合平面比较
-                                if(distance > max_distance){
+                            for (const auto &p : patch_pts) {
+                                double distance = calc_point_to_plane_d(p, normal_, d_);
+                                distances.push_back(distance);
+                                if (distance > max_distance) {
                                     max_distance = distance;
                                 }
                             }
-                            // CNOTICE_LOG("zone_idx %d ring_idx %d sector_idx %d max_distance %f  ",zone_idx,ring_idx,sector_idx,max_distance);
-                            // std::cout<< zone_idx  << " | " << ring_idx<< " | " << sector_idx << std::endl;
-                            // std::cout << " max_distance " << max_distance << std::endl;
-                            if(max_distance < params_.obstacle_height){
-                                // 对于存在最高点低于obstacle_height阈值的patch，直接认定为地面
-                                // std::cout << " REVERT CURRENT PATCH " << std::endl;
-                                addCloud(cloud_ground_,zone_nonground[ring_idx][sector_idx]);
-                                addCloud(tmp_ground,zone_nonground[ring_idx][sector_idx]);
-                                addCloud(my_revert_cloud,tmp_ground);
-                            }else{
-                                // 对于存在最高点超过obstacle_height阈值的patch，仍旧只恢复一小部分
-                                for(auto p:zone_nonground[ring_idx][sector_idx]){
+                            double robust_height = max_distance;
+                            if (distances.size() >= 2) {
+                                std::vector<double> sorted_dist = distances;
+                                const size_t p90_idx = static_cast<size_t>(0.9 * (sorted_dist.size() - 1));
+                                std::nth_element(sorted_dist.begin(), sorted_dist.begin() + p90_idx, sorted_dist.end());
+                                robust_height = sorted_dist[p90_idx];
+                            }
+                            const double step_height = std::max(params_.step_height, params_.obstacle_height);
+                            // 绝大多数点都贴在台阶高度以内，说明这是低矮台阶而不是竖立障碍
+                            const bool low_step_patch = robust_height < step_height;
 
-                                    double distance = calc_point_to_plane_d(p, normal_, d_);// 拟合平面比较
-                                    // double distance = p.z - closet_patch_point_[2]; // 和最近点高度比
-                                    // 分区判断,较远的点比较稀疏，可能不够准，阈值可以放大一点 近处 0 - 15米（0-6ring） ，中距离 15 -50米（6-11） ，远距离50-100米（11-14）
-                                    if(abs_ring_idx <=6 && abs_ring_idx >= 0){
-                                        if(abs(distance) < params_.near_revert_thresh){
-                                            cloud_ground_.push_back(p);
-                                            tmp_ground.push_back(p);
-                                            // std::cout<< abs_ring_idx<< "\033[1;32m" <<  "MY REVERT" << "\033[0m "  
-                                            //         << " | " << p.x << " " << p.y << " " << p.z << " dis " << distance <<std::endl;
+                            double ring_revert_thresh = params_.far_revert_thresh;
+                            if (abs_ring_idx <= 6 && abs_ring_idx >= 0) {
+                                ring_revert_thresh = params_.near_revert_thresh;
+                            } else if (abs_ring_idx <= 11) {
+                                ring_revert_thresh = params_.middle_revert_thresh;
+                            }
 
-                                        }else{
-                                            cloud_nonground_.push_back(p);
-                                            tmp_nonground.push_back(p);
-                                            // std::cout<< abs_ring_idx << "\033[1;31m" << "FAILED REVERT" << "\033[0m "  
-                                            //         << " | " << p.x << " " << p.y << " " << p.z << " dis " << distance <<std::endl;
-                                        }
-                                    }else if(abs_ring_idx <= 11 && abs_ring_idx > 6){
-                                        if(abs(distance) < params_.middle_revert_thresh){
-                                            cloud_ground_.push_back(p);
-                                            tmp_ground.push_back(p);
-                                            // std::cout<< abs_ring_idx<< "\033[1;32m" <<  "MY REVERT" << "\033[0m "  
-                                            //         << " | " << p.x << " " << p.y << " " << p.z << " dis " << distance <<std::endl;
-
-                                        }else{
-                                            cloud_nonground_.push_back(p);
-                                            tmp_nonground.push_back(p);
-                                            // std::cout<< abs_ring_idx<< "\033[1;31m" << "FAILED REVERT" << "\033[0m "  
-                                            //         << " | " << p.x << " " << p.y << " " << p.z << " dis " << distance <<std::endl;
-                                        }
-                                    }else if( abs_ring_idx > 11){
-                                        if(abs(distance) < params_.far_revert_thresh){
-                                            cloud_ground_.push_back(p);
-                                            tmp_ground.push_back(p);
-                                            // std::cout<< abs_ring_idx<< "\033[1;32m" <<  "MY REVERT" << "\033[0m "  
-                                            //         << " | " << p.x << " " << p.y << " " << p.z << " dis " << distance <<std::endl;
-
-                                        }else{
-                                            cloud_nonground_.push_back(p);
-                                            tmp_nonground.push_back(p);
-                                            // std::cout<< abs_ring_idx<< "\033[1;31m" << "FAILED REVERT" << "\033[0m "  
-                                            //         << " | " << p.x << " " << p.y << " " << p.z << " dis " << distance <<std::endl;
-                                        }
+                            if (max_distance < params_.obstacle_height) {
+                                // 最高点低于 obstacle_height，整块认定为地面
+                                addCloud(cloud_ground_, patch_pts);
+                                addCloud(tmp_ground, patch_pts);
+                                addCloud(ConcentricZoneModel_ground_[zone_idx][ring_idx][sector_idx], patch_pts);
+                                addCloud(my_revert_cloud, tmp_ground);
+                            } else {
+                                for (size_t pi = 0; pi < patch_pts.size(); ++pi) {
+                                    const double distance = distances[pi];
+                                    // 低矮台阶收回台阶面；更高的尖峰仍保留为障碍。其余 patch 沿用原距离阈值
+                                    const bool revert_as_step = low_step_patch && distance < step_height;
+                                    const bool revert_as_near = std::abs(distance) < ring_revert_thresh;
+                                    if (revert_as_step || revert_as_near) {
+                                        cloud_ground_.push_back(patch_pts[pi]);
+                                        tmp_ground.push_back(patch_pts[pi]);
+                                        ConcentricZoneModel_ground_[zone_idx][ring_idx][sector_idx].push_back(patch_pts[pi]);
+                                    } else {
+                                        cloud_nonground_.push_back(patch_pts[pi]);
+                                        tmp_nonground.push_back(patch_pts[pi]);
                                     }
-
                                 }
-                                addCloud(my_revert_cloud,tmp_ground);
+                                addCloud(my_revert_cloud, tmp_ground);
+                            }
                             }
 
 
@@ -2697,11 +2731,11 @@ int WildPatchWorkpp::LidarProcess(const LocData loc_data,
                             }
                         }else{
                             mrt_no_nb_cnt++;
-                            if (params_.verbose) {
-                                std::cout << " NO CLOSE NB GOUNRD "
-                                          << zone_idx << "/" << ring_idx << "/" << sector_idx
-                                          << std::endl;
-                            }
+                            // if (params_.verbose) {
+                            //     std::cout << " NO CLOSE NB GOUNRD "
+                            //               << zone_idx << "/" << ring_idx << "/" << sector_idx
+                            //               << std::endl;
+                            // }
                             addCloud(cloud_nonground_,ConcentricZoneModel_nonground_[zone_idx][ring_idx][sector_idx]);
                             
                         }

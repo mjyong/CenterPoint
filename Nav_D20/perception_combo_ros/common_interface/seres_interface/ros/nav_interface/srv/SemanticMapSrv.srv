@@ -1,0 +1,5 @@
+int32[] query_type
+---
+string gridmap_path
+KeyPoint[] key_points
+Area[] areas

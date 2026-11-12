@@ -2,6 +2,8 @@ syntax = "proto2";
 
 package planning.config;
 
+import "grid_path_planner_conf.proto";
+
 message PreprocessConf {
   enum Type {
     CostMapProduction = 1;
@@ -33,12 +35,15 @@ message PreprocessConf {
     required double max_obstacle_dist = 8;
     optional double max_reference_offset = 9 [default = 1.0];
     optional bool enable_cuda = 10 [default = false];
-    optional double reference_path_length = 11 [default = 10.0];
+    optional bool enable_overlay_global_map = 12 [default = true];
+    optional bool enable_obstacle_scan = 13 [default = false];
+    optional double scan_angle_resolution_deg = 14 [default = 2.0];
   }
   message GlobalMapManagerConf {
     required string input_dir = 1;
     required string input_name = 2;
     required bool enable_overlay = 3;
     required double cell_timeout_seconds = 4;
+    optional GridPathPlannerConf grid_path_planner_conf = 5;
   }
 }

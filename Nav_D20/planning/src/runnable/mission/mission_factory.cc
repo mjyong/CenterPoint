@@ -9,6 +9,7 @@
 #include "src/runnable/mission/following/following.h"
 #include "src/runnable/mission/tracking/tracking.h"
 #include "src/runnable/mission/recharging/recharging.h"
+#include "src/runnable/mission/skill/skill.h"
 
 namespace planning {
 Factory<MissionConf::Type, MissionBase,
@@ -32,6 +33,10 @@ MissionFactory::MissionFactory() {
   mission_factory_.Register(MissionConf::Recharging,
                             [](const MissionConf::Conf &conf) -> MissionBase * {
                               return new Recharging(conf);
+                            });
+  mission_factory_.Register(MissionConf::Skill,
+                            [](const MissionConf::Conf &conf) -> MissionBase * {
+                              return new Skill(conf);
                             });
 }
 

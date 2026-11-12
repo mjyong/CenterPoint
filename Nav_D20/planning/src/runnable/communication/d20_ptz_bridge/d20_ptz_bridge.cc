@@ -230,12 +230,12 @@ void D20PtzBridge::UpdateCameraTF() {
   Transform3d ptz_visible_to_map = tf * ptz_visible_to_base;
   TransformStamped ptz_visible_to_map_tf(ptz_state_timestamp_, "map",
                                          "ptz_visible", ptz_visible_to_map);
-  TfBuffer::Instance()->add(ptz_visible_to_map_tf, /*publish=*/false);   // lookup shortcut: /tf has it via base_link
+  TfBuffer::Instance()->add(ptz_visible_to_map_tf);
   // ptz infrared to map
   Transform3d ptz_infrared_to_map = tf * ptz_infrared_to_base;
   TransformStamped ptz_infrared_to_map_tf(ptz_state_timestamp_, "map",
                                           "ptz_infrared", ptz_infrared_to_map);
-  TfBuffer::Instance()->add(ptz_infrared_to_map_tf, /*publish=*/false);
+  TfBuffer::Instance()->add(ptz_infrared_to_map_tf);
 }
 
 rclcpp_action::GoalResponse D20PtzBridge::handle_ptz_camera_goal(

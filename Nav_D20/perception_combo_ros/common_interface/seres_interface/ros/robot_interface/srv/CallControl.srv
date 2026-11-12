@@ -1,0 +1,8 @@
+#name:call_control
+#Request
+uint8 command       #控制指令   0:默认值，空闲;1:挂断电话;2:接听来电;3:呼叫;4.监控
+uint8 audio_onoff    #上行音频开关   0：off；1:on,在非挂断状态时才有意义
+uint8 vido_onoff    #上行视频开关   0：off；1:on,在非挂断状态时才有意义
+---
+int32 err_code      #过程中遇到错误,返回错误码
+string msg          #告警信息

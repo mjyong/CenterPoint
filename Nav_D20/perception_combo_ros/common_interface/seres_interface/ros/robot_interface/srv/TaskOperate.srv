@@ -1,0 +1,6 @@
+# 任务操作
+
+string task     # 任务操作，protobuf协议消息的序列化流数据，详见task.proto中TaskOperate
+---
+int32 err_code
+string msg

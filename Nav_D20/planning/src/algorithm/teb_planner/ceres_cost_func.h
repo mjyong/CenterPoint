@@ -14,7 +14,7 @@ template <typename T> T normalize_angle(T angle) {
   return angle - two_pi * ceres::floor((angle + T(M_PI)) / two_pi);
 }
 
-#if CERES_VERSION_MAJOR > 2 || (CERES_VERSION_MAJOR == 2 && CERES_VERSION_MINOR >= 2)
+#ifdef ROS2_JAZZY
 class AngleLocalParameterization : public ceres::Manifold {
 public:
   virtual ~AngleLocalParameterization() {}
@@ -375,6 +375,28 @@ private:
   double weight_;
 };
 
+struct InitialAccelLimitCost {
+  InitialAccelLimitCost(double v0, double a_max, double weight)
+      : v0_(v0), a_max_(a_max), weight_(weight) {}
+
+  template <typename T>
+  bool operator()(const T *const x1, const T *const y1, const T *const x2,
+                  const T *const y2, const T *const dt, T *residual) const {
+    T dx = x2[0] - x1[0];
+    T dy = y2[0] - y1[0];
+    T velocity =
+        ceres::sqrt(dx * dx + dy * dy + T(1e-6)) / ceres::fmax(dt[0], T(1e-3));
+    T excess = velocity - T(v0_) - T(a_max_) * dt[0];
+    residual[0] = T(weight_) * ceres::fmax(excess, T(0.0));
+    return true;
+  }
+
+private:
+  double v0_;
+  double a_max_;
+  double weight_;
+};
+
 struct ReferenceVelocityCost {
   ReferenceVelocityCost(double reference_velocity, double weight)
       : reference_velocity_(reference_velocity), weight_(weight) {}
@@ -535,17 +557,15 @@ private:
   double weight_;
 };
 
-class ObstacleCost : public ceres::SizedCostFunction<2, 1, 1, 1> {
+class ObstacleCost : public ceres::SizedCostFunction<1, 1, 1, 1> {
 public:
   ObstacleCost(
       std::function<double(const double, const double)> obstacle_distance_func,
-      std::function<bool(const double, const double, const double)>
-          is_collision_func,
       double weight_warning, double weight_danger, double d1, double d2,
-      double steepness = 20.0)
+      double steepness = 20.0, double lse_beta = 10.0)
       : obstacle_distance_func_(obstacle_distance_func),
-        is_collision_func_(is_collision_func), weight_warning_(weight_warning),
-        weight_danger_(weight_danger), d1_(d1), d2_(d2), steepness_(steepness) {
+        weight_warning_(weight_warning), weight_danger_(weight_danger),
+        d1_(d1), d2_(d2), steepness_(steepness), lse_beta_(lse_beta) {
     auto circles =
         planning::common::util::ConfigHelper::Instance()->GetBoundingCircles(
             0, 0, 0);
@@ -563,20 +583,34 @@ public:
     const double cos_t = std::cos(theta);
     const double sin_t = std::sin(theta);
 
-    double min_clearance = std::numeric_limits<double>::max();
-    size_t j_star = 0;
-    for (size_t i = 0; i < circle_offsets_.size(); ++i) {
+    // Per-circle clearance and obstacle-field gradient (finite difference at
+    // each circle center).
+    const size_t n = circle_offsets_.size();
+    std::vector<double> clearance(n);
+    std::vector<double> gx(n), gy(n);
+    double c_min = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < n; ++i) {
       const double ox = circle_offsets_[i].x();
       const double oy = circle_offsets_[i].y();
       const double cx = x + ox * cos_t - oy * sin_t;
       const double cy = y + ox * sin_t + oy * cos_t;
-      const double dist = obstacle_distance_func_(cx, cy);
-      const double clearance = dist - circle_radii_[i];
-      if (clearance < min_clearance) {
-        min_clearance = clearance;
-        j_star = i;
-      }
+      const double dist0 = obstacle_distance_func_(cx, cy);
+      gx[i] = (obstacle_distance_func_(cx + kGradEps, cy) - dist0) / kGradEps;
+      gy[i] = (obstacle_distance_func_(cx, cy + kGradEps) - dist0) / kGradEps;
+      clearance[i] = dist0 - circle_radii_[i];
+      c_min = std::min(c_min, clearance[i]);
     }
+
+    std::vector<double> w_lse(n);
+    double sum = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+      w_lse[i] = std::exp(-lse_beta_ * (clearance[i] - c_min));
+      sum += w_lse[i];
+    }
+    for (size_t i = 0; i < n; ++i) {
+      w_lse[i] /= sum;
+    }
+    const double min_clearance = c_min - std::log(sum) / lse_beta_;
 
     const double k = steepness_;
     const double arg1 = k * (d1_ - min_clearance);
@@ -587,60 +621,44 @@ public:
     residuals[0] =
         (weight_warning_ * softplus(arg1) + weight_danger_ * softplus(arg2)) /
         k;
-    residuals[1] = is_collision_func_(x, y, theta) ? 1e3 : 0.0;
 
     if (jacobians == nullptr) {
       return true;
-    }
-
-    for (int b = 0; b < 3; ++b) {
-      if (jacobians[b] != nullptr) {
-        jacobians[b][0] = 0.0;
-        jacobians[b][1] = 0.0;
-      }
     }
 
     const double sig1 = 1.0 / (1.0 + std::exp(-arg1));
     const double sig2 = 1.0 / (1.0 + std::exp(-arg2));
     const double dres0_dd = -weight_warning_ * sig1 - weight_danger_ * sig2;
 
-    const double ox = circle_offsets_[j_star].x();
-    const double oy = circle_offsets_[j_star].y();
-    const double cx_star = x + ox * cos_t - oy * sin_t;
-    const double cy_star = y + ox * sin_t + oy * cos_t;
-    const double dist0 = obstacle_distance_func_(cx_star, cy_star);
-    const double gx =
-        (obstacle_distance_func_(cx_star + kGradEps, cy_star) - dist0) /
-        kGradEps;
-    const double gy =
-        (obstacle_distance_func_(cx_star, cy_star + kGradEps) - dist0) /
-        kGradEps;
-
-    const double ddist_dx = gx;
-    const double ddist_dy = gy;
-    const double ddist_dtheta =
-        gx * (-ox * sin_t - oy * cos_t) + gy * (ox * cos_t - oy * sin_t);
-
+    double jx = 0.0, jy = 0.0, jt = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+      const double ox = circle_offsets_[i].x();
+      const double oy = circle_offsets_[i].y();
+      jx += w_lse[i] * gx[i];
+      jy += w_lse[i] * gy[i];
+      jt += w_lse[i] * (gx[i] * (-ox * sin_t - oy * cos_t) +
+                        gy[i] * (ox * cos_t - oy * sin_t));
+    }
     if (jacobians[0] != nullptr) {
-      jacobians[0][0] = dres0_dd * ddist_dx;
+      jacobians[0][0] = dres0_dd * jx;
     }
     if (jacobians[1] != nullptr) {
-      jacobians[1][0] = dres0_dd * ddist_dy;
+      jacobians[1][0] = dres0_dd * jy;
     }
     if (jacobians[2] != nullptr) {
-      jacobians[2][0] = dres0_dd * ddist_dtheta;
+      jacobians[2][0] = dres0_dd * jt;
     }
     return true;
   }
 
 private:
   std::function<double(double, double)> obstacle_distance_func_;
-  std::function<bool(double, double, double)> is_collision_func_;
   double weight_warning_;
   double weight_danger_;
   double d1_;
   double d2_;
   double steepness_;
+  double lse_beta_;
   std::vector<Eigen::Vector2d> circle_offsets_;
   std::vector<double> circle_radii_;
 
@@ -660,14 +678,19 @@ private:
 };
 
 struct PathSmoothnessCost {
-  PathSmoothnessCost(double weight) : weight_(weight) {}
+  PathSmoothnessCost(double weight, double rest_length)
+      : weight_(weight), rest_(rest_length) {}
 
   template <typename T>
   bool operator()(const T *const x1, const T *const y1, const T *const theta1,
                   const T *const x2, const T *const y2, const T *const theta2,
                   T *residual) const {
-    residual[0] = T(weight_) * ceres::pow(x2[0] - x1[0], T(2.0));
-    residual[1] = T(weight_) * ceres::pow(y2[0] - y1[0], T(2.0));
+    const T dx = x2[0] - x1[0];
+    const T dy = y2[0] - y1[0];
+    const T dist = ceres::sqrt(dx * dx + dy * dy + T(1e-10));
+    const T stretch = dist - T(rest_);
+    residual[0] = T(weight_) * stretch * dx / dist;
+    residual[1] = T(weight_) * stretch * dy / dist;
 
     T angle_diff = normalize_angle(theta2[0] - theta1[0]);
     residual[2] = T(weight_) * ceres::pow(angle_diff, T(2.0));
@@ -677,6 +700,7 @@ struct PathSmoothnessCost {
 
 private:
   double weight_;
+  double rest_;
 };
 
 } // namespace teb_planner

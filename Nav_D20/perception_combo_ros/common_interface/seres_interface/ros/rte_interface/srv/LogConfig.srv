@@ -1,0 +1,9 @@
+# 请求部分：
+# 日志配置（查询）数据
+uint8 log_source            # 日志源:1：CCU-MCU,2：PMU
+uint8 log_level             # 日志级别:0：DEBUG,1：INFO,2：WARN,3：ERROR,4：FATAL
+uint8 collection_method     # 采集方法（默认底软采用请求响应机制）1：周期上报（即周期性同步日志数据）2：查询日志（立即查询当前日志）3：事件触发（产生相关日志主动上报）
+uint16 cycle_time           # 周期触发时间（单位：秒）   
+---
+# 响应部分：
+uint8 result                # 响应码：0：成功，1：失败

@@ -37,6 +37,13 @@ bool GlobalMapManager::Init(PlanningEntry *planning_entry) {
     AERROR << "GlobalMapManager: Failed to load PGM map from " << map_file_path;
     return false;
   }
+  if (!config_.has_grid_path_planner_conf()) {
+    AWARN << "GlobalMapManager: grid_path_planner_conf not configured, "
+             "PlanGlobalPath() will fail";
+  } else {
+    grid_path_planner_ =
+        std::make_shared<GridPathPlanner>(config_.grid_path_planner_conf());
+  }
   return true;
 }
 
@@ -65,7 +72,47 @@ bool GlobalMapManager::UpdateMap(const grid_map::GridMap &map) {
   }
   global_map_ = map;
   global_map_.add("pgm_obstacle", map["obstacle"]);
+  map_dirty_ = true;
   return true;
+}
+
+bool GlobalMapManager::PlanGlobalPath(const Eigen::Vector2d &start,
+                                      const Eigen::Vector2d &end,
+                                      std::optional<double> end_theta) {
+  if (grid_path_planner_ == nullptr) {
+    AERROR << "GlobalMapManager: grid_path_planner_ is not initialized";
+    global_plan_flag_ = false;
+    return false;
+  }
+  if (map_dirty_) {
+    grid_path_planner_->SetGridMap(global_map_);
+    map_dirty_ = false;
+  }
+
+  std::vector<Eigen::Vector2d> path_pts;
+  global_plan_flag_ = grid_path_planner_->plan(start, end, path_pts);
+  if (global_plan_flag_) {
+    while (path_pts.size() < 2) {
+      path_pts.emplace_back(end);
+    }
+    global_path_ =
+        Path2d(std::vector<Point2d>(path_pts.begin(), path_pts.end()));
+    if (end_theta.has_value()) {
+      global_path_.poses_ptr()->back().theta = *end_theta;
+    }
+  }
+  return global_plan_flag_;
+}
+
+void GlobalMapManager::ClearGlobalPath() {
+  global_path_.clear();
+  global_plan_flag_ = false;
+}
+
+std::vector<Pose2d>
+GlobalMapManager::ExtractLocalPath(const Eigen::Vector2d &robot_pos,
+                                   double ahead_s) const {
+  return global_path_.pose_subset(robot_pos, ahead_s);
 }
 
 void GlobalMapManager::AddObstacleFromPerception() {
@@ -110,6 +157,7 @@ void GlobalMapManager::AddObstacleFromPerception() {
           std::to_string(global_idx(0)) + "_" + std::to_string(global_idx(1));
       updated_cells_[key] = {time_now, global_idx};
       global_map_.atPosition("obstacle", global_cell_position) = 0;
+      map_dirty_ = true;
     }
   }
 }
@@ -123,6 +171,7 @@ void GlobalMapManager::ResetStaleCells() {
         cell_timeout_seconds_) {
       grid_map::Index idx = cell_pair.second.index;
       global_map_.at("obstacle", idx) = global_map_.at("pgm_obstacle", idx);
+      map_dirty_ = true;
       keys_to_remove.push_back(cell_pair.first);
     }
   }
@@ -225,9 +274,11 @@ bool GlobalMapManager::ReloadMap(const std::string &map_dir) {
   if (!AddObstacleFromOSM(map_osm_file)) {
     return false;
   }
+  map_dirty_ = true;
   return true;
 }
 
+#if 0
 bool GlobalMapManager::AddObstacleFromOSM(const std::string &osm_file_path) {
   if (!std::filesystem::exists(osm_file_path)) {
     AERROR << "OSM file not exist: " << osm_file_path;
@@ -289,6 +340,100 @@ bool GlobalMapManager::AddObstacleFromOSM(const std::string &osm_file_path) {
   }
   return true;
 }
+#else
+bool GlobalMapManager::AddObstacleFromOSM(const std::string &osm_file_path) {
+  if (!std::filesystem::exists(osm_file_path)) {
+    AERROR << "OSM file not exist: " << osm_file_path;
+    return false;
+  }
+  if (!osm_parser_.parse(osm_file_path)) {
+    AERROR << "Failed to parse OSM file: " << osm_file_path;
+    return false;
+  }
+  bool has_fence = std::any_of(
+      osm_parser_.getMap().keyPoints.begin(),
+      osm_parser_.getMap().keyPoints.end(), [](const auto &semantic) {
+        return semantic.type == lanelet::SemanticType::Fence;
+      });
+  if (has_fence) {
+    global_map_["pgm_obstacle"].setConstant(0.0);
+    global_map_["obstacle"].setConstant(0.0);
+  }
+
+  for (const auto &semantic : osm_parser_.getMap().keyPoints) {
+    if (semantic.type == lanelet::SemanticType::ProhibitedArea) {
+      grid_map::Polygon polygon;
+      if (semantic.points.size() < 3) {
+        continue;
+      }
+      bool polygon_inside = true;
+      for (const auto &point : semantic.points) {
+        grid_map::Position p(point.x, point.y);
+        if (!global_map_.isInside(p)) {
+          AWARN << " point out of map: " << p.x() << ", " << p.y();
+          polygon_inside = false;
+          break;
+        }
+        polygon.addVertex(p);
+      }
+      if (!polygon_inside) {
+        continue;
+      }
+      for (grid_map::PolygonIterator iterator(global_map_, polygon);
+           !iterator.isPastEnd(); ++iterator) {
+        global_map_.at("pgm_obstacle", *iterator) = 0.0;
+        global_map_.at("obstacle", *iterator) = 0.0;
+      }
+    } else if (semantic.type == lanelet::SemanticType::VirtualLine) {
+      if (semantic.points.size() < 2) {
+        continue;
+      }
+      for (int i = 1; i < semantic.points.size(); ++i) {
+        grid_map::Position p1(semantic.points[i - 1].x,
+                              semantic.points[i - 1].y);
+        grid_map::Position p2(semantic.points[i].x, semantic.points[i].y);
+        if (!global_map_.isInside(p1)) {
+          AWARN << " point out of map: " << p1.x() << ", " << p1.y();
+          continue;
+        }
+        if (!global_map_.isInside(p2)) {
+          AWARN << " point out of map: " << p2.x() << ", " << p2.y();
+          continue;
+        }
+        for (grid_map::LineIterator iterator(global_map_, p1, p2);
+             !iterator.isPastEnd(); ++iterator) {
+          global_map_.at("pgm_obstacle", *iterator) = 0.0;
+          global_map_.at("obstacle", *iterator) = 0.0;
+        }
+      }
+    } else if (semantic.type == lanelet::SemanticType::Fence) {
+      grid_map::Polygon polygon;
+      if (semantic.points.size() < 3) {
+        continue;
+      }
+      bool polygon_inside = true;
+      for (const auto &point : semantic.points) {
+        grid_map::Position p(point.x, point.y);
+        if (!global_map_.isInside(p)) {
+          AWARN << " point out of map: " << p.x() << ", " << p.y();
+          polygon_inside = false;
+          break;
+        }
+        polygon.addVertex(p);
+      }
+      if (!polygon_inside) {
+        continue;
+      }
+      for (grid_map::PolygonIterator iterator(global_map_, polygon);
+           !iterator.isPastEnd(); ++iterator) {
+        global_map_.at("pgm_obstacle", *iterator) = 255.0;
+        global_map_.at("obstacle", *iterator) = 255.0;
+      }
+    }
+  }
+  return true;
+}
+#endif
 
 } // namespace preprocess
 } // namespace planning

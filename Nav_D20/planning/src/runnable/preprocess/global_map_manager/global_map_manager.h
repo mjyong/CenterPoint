@@ -1,13 +1,19 @@
 #pragma once
 #include "grid_map_core/grid_map_core.hpp"
+#include "src/algorithm/grid_path_planner/grid_path_planner.h"
+#include "src/common/path2d.h"
 #include "src/runnable/preprocess/preprocess_base.h"
 #include "third_party/osm_map/osm_parser.h"
 #include <opencv2/core.hpp>
+#include <memory>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
 namespace planning {
 namespace preprocess {
+
+using planning::algorithm::GridPathPlanner;
 
 struct TrackedCell {
   double last_update_time;
@@ -27,6 +33,15 @@ public:
   bool UpdateMap(const grid_map::GridMap &map);
   bool ReloadMap(const std::string &map_dir);
 
+  bool PlanGlobalPath(const Eigen::Vector2d &start, const Eigen::Vector2d &end,
+                      std::optional<double> end_theta = std::nullopt);
+  void ClearGlobalPath();
+  const Path2d &global_path() const { return global_path_; }
+  bool global_plan_flag() const { return global_plan_flag_; }
+
+  std::vector<Pose2d> ExtractLocalPath(const Eigen::Vector2d &robot_pos,
+                                       double ahead_s) const;
+
 private:
   bool LoadPGMMap(const std::string &pgm_file_path,
                   const std::string &yaml_file_path);
@@ -39,8 +54,13 @@ private:
   PreprocessConf::GlobalMapManagerConf config_;
   grid_map::GridMap global_map_;
   bool map_loaded_{false};
+  bool map_dirty_{true};
   std::unordered_map<std::string, TrackedCell> updated_cells_;
   double cell_timeout_seconds_;
+
+  std::shared_ptr<GridPathPlanner> grid_path_planner_;
+  Path2d global_path_;
+  bool global_plan_flag_{false};
 
   lanelet::osm::OsmParser osm_parser_;
 };

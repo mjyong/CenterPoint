@@ -1,0 +1,21 @@
+# perception_recharge_node 参数配置文件
+# 修改后无需重新编译，重启节点即可生效
+perception_recharge_node:
+  ros__parameters:
+    # 话题配置
+    input_topic: /robot/topic/rdap/top_point_cloud2   # 输入点云话题
+    output_topic: /reflector_position                 # 输出对接目标位姿话题
+
+    # 反光板点筛选
+    intensity_threshold: 250.0    # 反射强度阈值，高于该值的点视为反光板候选点
+
+    # DBSCAN 聚类参数
+    dbscan_eps: 0.1               # 邻域搜索半径 (m)
+    dbscan_min_samples: 20        # 核心点最小邻域点数，同时作为有效簇的最小点数
+
+    # 双反光板间距校验 (m)
+    min_reflector_distance: 0.5   # 两反光板质心最小间距
+    max_reflector_distance: 1.5   # 两反光板质心最大间距
+
+    # 对接位姿修正
+    position_x_offset: -0.4962103 # 中点到对接接触点的 x 向偏置 (m)，对应 (323.7897 - 820.0) * 0.001

@@ -1,0 +1,24 @@
+robot_param {
+  robot_id {
+      appellation: "d30"
+      vin: "001"
+  }
+  length: 0.6
+  width: 0.3
+  height: 0.6
+  footprint_model: MULTI
+}
+bag_record_conf{
+  enable: true
+  bag_dir: "/tmp/"
+  duration: 60
+  max_bag_num: 10
+}
+process_conf{
+    enable_cpu_affinity: true
+    cpu_affinity: 2
+    cpu_affinity: 3
+    enable_mlockall: true
+    enable_realtime: true
+    realtime_priority: 60
+}

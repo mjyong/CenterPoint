@@ -1,10 +1,10 @@
 #pragma once
 #include "src/algorithm/teb_planner/ceres_cost_func.h"
 #include "src/algorithm/teb_planner/coarse_path_search.h"
+#include "src/common/structures.h"
 #include "src/common/util/log.h"
 #include "src/common/util/lowpass_filter.h"
 #include "src/common/util/math.h"
-#include "src/common/structures.h"
 #include "teb_planner_conf.pb.h"
 #include <ceres/ceres.h>
 #include <eigen3/Eigen/Dense>
@@ -32,7 +32,8 @@ public:
               const Eigen::Vector3d &initial_pose,
               const Eigen::Vector3d &initial_velocity,
               Eigen::Vector3d final_pose, bool constant_final_theta,
-              const planning::Transform3d &global_pose);
+              const planning::Transform3d &global_pose,
+              const bool &stop_at_end = false);
   void set_target_speed(double target_speed) {
     conf_.mutable_dynamic_constraints()->set_reference_velocity(target_speed);
   }
@@ -57,7 +58,7 @@ public:
   Eigen::Vector3d getVelocityCmd(double t);
 
 private:
-  void buildProblem(const Eigen::Vector3d &initial_velocity);
+  void buildProblem(const Eigen::Vector3d &initial_velocity, bool stop_at_end);
   void computeRobotVelocity(const double &x1, const double &y1,
                             const double &theta1, const double &x2,
                             const double &y2, const double &theta2,
@@ -75,7 +76,8 @@ private:
     vy_robot = -vx_global * sin_theta + vy_global * cos_theta;
   }
 
-  void computeReferenceVelocities(const Eigen::Vector3d &initial_velocity);
+  void computeReferenceVelocities(const Eigen::Vector3d &initial_velocity,
+                                  bool stop_at_end);
 
 private:
   planning::config::TebPlannerConf conf_;

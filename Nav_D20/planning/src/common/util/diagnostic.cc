@@ -5,11 +5,12 @@
  * @LastEditTime: 2025-01-13 10:05:06
  */
 #include "src/common/util/diagnostic.h"
+#include <chrono>
 namespace planning {
 namespace common {
 namespace util {
 std::string Diagnostic::name_;
-std::unordered_map<std::string, Diagnostic::FaultInfo> Diagnostic::fault_map_;
+std::unordered_map<std::string, Diagnostic::DiagnosticInfo> Diagnostic::diagnostic_map_;
 
 bool Diagnostic::Init(const std::string name, const std::string &filename) {
   name_ = name;
@@ -28,24 +29,62 @@ bool Diagnostic::Init(const std::string name, const std::string &filename) {
     while (std::getline(ss, cell, '\t')) {
       row.push_back(cell);
     }
-    if (row.size() != 7) {
+    if (row.size() != 6) {
       AERROR << "Error: Invalid row size: " << row.size();
       return false;
     }
-    FaultInfo info;
-    info.index = row[0];
-    info.code = row[1];
-    info.module = row[2];
-    info.fault_type = row[3];
-    info.fault_level = row[4];
-    info.fault_index = row[5];
-    info.fault_describe = row[6];
-    fault_map_[info.code] = info;
+    DiagnosticInfo info;
+    info.code = row[0];
+    info.module = row[1];
+    info.type = row[2];
+    info.level = row[3];
+    info.name = row[4];
+    info.describe = row[5];
+    diagnostic_map_[info.code] = info;
   }
 
   file.close();
   return true;
 }
+
+void Diagnostic::clear() {
+  // Edge detection at the cycle boundary: diff the active set against the
+  // previous cycle. Raising = in current but not in previous; clearing = in
+  // previous but not in current. Timestamp granularity is the cycle period.
+  const uint64_t now_ms = static_cast<uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count());
+
+  for (const auto &code : *this) {
+    if (prev_active_codes_.count(code) == 0) {
+      auto itr = diagnostic_map_.find(code);
+      if (itr == diagnostic_map_.end()) {
+        AWARN << "Unknown diagnostic code raised: " << code;
+        continue;
+      }
+      pending_events_.push_back(FaultEvent{itr->second, true, now_ms});
+    }
+  }
+  for (const auto &code : prev_active_codes_) {
+    if (count(code) == 0) {
+      auto itr = diagnostic_map_.find(code);
+      if (itr == diagnostic_map_.end()) {
+        continue;
+      }
+      pending_events_.push_back(FaultEvent{itr->second, false, now_ms});
+    }
+  }
+  prev_active_codes_ = *this;
+  std::set<std::string>::clear();
+}
+
+std::vector<Diagnostic::FaultEvent> Diagnostic::DrainPendingEvents() {
+  std::vector<FaultEvent> events;
+  pending_events_.swap(events);
+  return events;
+}
+
 #ifdef ENABLE_ROS
 void Diagnostic::ConvertToRosMsg(diagnostic_msgs::msg::DiagnosticArray &msg) {
   msg.header.stamp = rclcpp::Clock().now();
@@ -63,7 +102,7 @@ void Diagnostic::ConvertToRosMsg(diagnostic_msgs::msg::DiagnosticArray &msg) {
     for (auto itr = this->begin(); itr != this->end(); itr++) {
       diagnostic_msgs::msg::KeyValue kv;
       kv.key = *itr;
-      kv.value = fault_map_[*itr].fault_describe;
+      kv.value = diagnostic_map_[*itr].describe;
       msg.status[0].values.push_back(kv);
     }
   }

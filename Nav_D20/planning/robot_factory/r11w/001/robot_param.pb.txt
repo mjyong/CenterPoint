@@ -7,3 +7,11 @@ robot_param {
   width: 0.7
   height: 1.75
 }
+process_conf{
+    enable_cpu_affinity: true
+    cpu_affinity: 2
+    cpu_affinity: 3
+    enable_mlockall: true
+    enable_realtime: true
+    realtime_priority: 60
+}

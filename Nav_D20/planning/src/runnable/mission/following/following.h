@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+
+#include "src/algorithm/target_follow_planner/target_follow_planner.h"
 #include "src/runnable/mission/mission_base.h"
 #include "src/runnable/mission/mission_state_machine/mission_fsm_base.h"
 #include "src/runnable/mission/mission_state_machine/mission_fsm_base_ctx.h"
@@ -18,7 +21,19 @@ public:
   void set_target_position(const double x, const double y) {
     target_position_.x() = x;
     target_position_.y() = y;
+    target_position_valid_ = true;
   }
+  void set_target_velocity(const double vx, const double vy) {
+    target_velocity_.x() = vx;
+    target_velocity_.y() = vy;
+  }
+  // 目标跟随规划器(轨迹提取 + TEB 局部规划)
+  algorithm::TargetFollowPlanner *target_follow_planner() const {
+    return target_follow_planner_.get();
+  }
+  // 当前目标位置(全局系，来自通信桥最新观测)
+  const Eigen::Vector2d &target_position() const { return target_position_; }
+  bool target_position_valid() const { return target_position_valid_; }
 
 private:
   // friend class MissionFSMBaseCtx;
@@ -50,6 +65,7 @@ private:
   void transition_e_active_standstill() override;
   void transition_e_active_standby() override;
   void transition_e_active_fault() override;
+  void transition_e_active_off() override;
   void transition_e_standstill_active() override;
   void transition_e_standstill_standby() override;
   void transition_e_standstill_fault() override;
@@ -75,10 +91,18 @@ private:
   void on_exit_s_fault() override;
 
 private:
+  // 目标跟随规划：轨迹提取 + 跟随锚点 + TEB，输出速度指令
+  void FollowPlan();
+
+private:
   bool init_flag_{false};
   MissionFSMBaseCtx mission_fsm_ctx_;
   MissionFSMBase::StateType mission_state_;
-  Eigen::Vector2d target_position_;
+  Eigen::Vector2d target_position_{Eigen::Vector2d::Zero()}; // 全局系
+  Eigen::Vector2d target_velocity_{Eigen::Vector2d::Zero()};
+  bool target_position_valid_{false}; // 收到首条目标位置前不规划
+  std::unique_ptr<algorithm::TargetFollowPlanner> target_follow_planner_;
+  std::optional<Eigen::Vector3d> follow_cmd_; // 最近一次跟随速度指令
 };
 } // namespace mission
 } // namespace planning

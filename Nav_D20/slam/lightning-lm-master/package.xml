@@ -28,6 +28,7 @@
     <depend>visualization_msgs</depend>
     <depend>novatel_oem7_msgs</depend>
     <depend>kygi665_msgs</depend>
+    <depend>rhr_interface</depend>
     <depend>livox_ros_driver2</depend>
     
     <member_of_group>rosidl_interface_packages</member_of_group>

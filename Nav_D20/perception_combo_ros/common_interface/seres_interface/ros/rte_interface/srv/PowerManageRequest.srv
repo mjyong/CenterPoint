@@ -1,0 +1,6 @@
+# Request
+PowerControl power_manage_request        # ROS msg，对应整个PowerControl.msg
+---
+# Response
+bool success                # true: 请求成功，false: 请求失败
+

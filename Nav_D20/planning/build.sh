@@ -15,23 +15,31 @@ remote_pwd="nvidia"
 function build_arm() {
     basepath=$(pwd)
     echo $basepath
+    # Optional DISABLE_CUDA=1 env var: build for CPU-only targets by
+    # forwarding -DENABLE_CUDA=OFF to the planning package.
+    local cuda_args=""
+    if [[ -n "$DISABLE_CUDA" && "$DISABLE_CUDA" != "0" ]]; then
+        cuda_args="-DENABLE_CUDA=OFF"
+        echo "DISABLE_CUDA set: building planning without CUDA"
+    fi
     unset AMENT_PREFIX_PATH
     source /l4t/jetson_arm64_sysroot/opt/ros/humble/setup.bash
     colcon build \
         --base-paths ../seres_interface/ \
         --packages-select nav2_interface common_interface \
             mc_interface perception_interface rte_interface \
+            rhr_interface \
         --cmake-force-configure \
         --cmake-args \
             -DCMAKE_TOOLCHAIN_FILE=$basepath/toolchain-aarch64.cmake
-    echo "build seres_interface done! building woosh_robot_msgs..."
+    echo "build seres_interface done! building nav_interface..."
     sleep 1
     colcon build --base-paths third_party/ \
-        --packages-select woosh_robot_msgs \
+        --packages-select nav_interface \
         --cmake-force-configure \
         --cmake-args \
             -DCMAKE_TOOLCHAIN_FILE=$basepath/toolchain-aarch64.cmake
-    echo "build woosh_robot_msgs done! building planning..."
+    echo "build nav_interface done! building planning..."
     sleep 1
     source install/setup.bash
 
@@ -47,7 +55,8 @@ function build_arm() {
         --cmake-force-configure \
         --cmake-args \
             -DProtobuf_PROTOC_EXECUTABLE=${HOST_PROTOC} \
-            -DCMAKE_TOOLCHAIN_FILE=$basepath/toolchain-aarch64.cmake        
+            -DCMAKE_TOOLCHAIN_FILE=$basepath/toolchain-aarch64.cmake \
+            ${cuda_args}
     echo "build planning done!"
     echo "arm64" > $basepath/.build_arch
     unset AMENT_PREFIX_PATH
@@ -59,11 +68,11 @@ function build_x86() {
     source /opt/ros/humble/setup.bash
     colcon build --base-paths ../seres_interface/ \
         --packages-select nav2_interface common_interface \
-            mc_interface perception_interface rte_interface
-    echo "build seres_interface done! building woosh_robot_msgs..."
+            mc_interface perception_interface rte_interface rhr_interface
+    echo "build seres_interface done! building nav_interface..."
     sleep 1
-    colcon build --base-paths third_party/  --packages-select woosh_robot_msgs
-    echo "build woosh_robot_msgs done! building planning..."
+    colcon build --base-paths third_party/  --packages-select nav_interface
+    echo "build nav_interface done! building planning..."
     sleep 1
     source install/setup.bash
     export PATH=/usr/local/cuda/bin/:$PATH
@@ -126,9 +135,31 @@ function package() {
     mkdir -p "${DEB_DIR}/opt/seres/nav/${PACKAGE_NAME}"
 
     if [[ -d "install" ]]; then
-        cp -r install/* ${DEB_DIR}/opt/seres/nav/${PACKAGE_NAME}
+        cp -r install/planning/* ${DEB_DIR}/opt/seres/nav/${PACKAGE_NAME}
 
-        local vin_file="${DEB_DIR}/opt/seres/nav/${PACKAGE_NAME}/planning/lib/planning/robot_factory/default_robot_vin"
+        planning_exec_file=${DEB_DIR}/opt/seres/nav/${PACKAGE_NAME}/lib/planning/planning
+        planning_exec_lib_dir=${DEB_DIR}/opt/seres/nav/${PACKAGE_NAME}/lib/planning/lib
+        mkdir -p $planning_exec_lib_dir
+        export LD_LIBRARY_PATH=/l4t/jetson_arm64_sysroot/opt/ros/humble/lib:/l4t/jetson_arm64_sysroot/lib/:/l4t/jetson_arm64_sysroot/usr/lib/:/l4t/jetson_arm64_sysroot/usr/local/lib/:/l4t/jetson_arm64_sysroot/usr/lib/aarch64-linux-gnu/:/l4t/jetson_arm64_sysroot/usr/local/cuda-12.6/targets/aarch64-linux/lib
+        source install/setup.bash
+        NOT_FOUND=$(/usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1 --list $planning_exec_file | grep "not found")
+        if [ -n "$NOT_FOUND" ]; then echo "ERROR: unresolved deps:"; echo "$NOT_FOUND"; exit 1; fi
+
+        DEP_LIST=$( /usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1 --list $planning_exec_file | awk '{if (match($3,"/")){ print $3}}' )
+        # echo "planning_exec_lib: ${DEP_LIST}"
+        cp -L -n ${DEP_LIST} $planning_exec_lib_dir
+ 
+        for dep in ${DEP_LIST}; do
+            base=$(basename "$dep")
+            if [[ "$base" =~ ^(lib.+__)rosidl_typesupport_cpp\.so$ ]]; then
+                pkg_prefix="${BASH_REMATCH[1]}"
+                for sibling in "$(dirname "$dep")"/${pkg_prefix}*.so; do
+                    cp -L -n "$sibling" $planning_exec_lib_dir
+                done
+            fi
+        done
+
+        local vin_file="${DEB_DIR}/opt/seres/nav/${PACKAGE_NAME}/lib/planning/robot_factory/default_robot_vin"
         if [ -f "${vin_file}" ]; then
             echo "${vin_path}" > "${vin_file}"
             echo "Set default_robot_vin to: ${vin_path}"
@@ -184,7 +215,7 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=/opt/seres/nav/${PACKAGE_NAME}
-ExecStart=/bin/bash -c 'source /opt/seres/nav/${PACKAGE_NAME}/setup.bash; ros2 run planning planning'
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash; source /opt/seres/nav/${PACKAGE_NAME}/share/planning/local_setup.bash; ros2 run planning planning'
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
@@ -268,7 +299,7 @@ function download_and_install() {
 
 function print_usage() {
     echo "build.sh -d  <addr>         download and install to 192.168.<addr>
-           -arm                       build arm
+           -arm                       build arm (set DISABLE_CUDA=1 to build without CUDA)
            -x86                       build x86
            -p <project>               package project (e.g., d10, d20, r11)"
 }

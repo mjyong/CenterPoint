@@ -37,7 +37,7 @@ ENV_SETUP="source ${ROS_SETUP} && source ${PERCEPTION_INSTALL_DIR}/setup.bash &&
 # ============================================================
 tmux new-session -d -s ${SESSION} -n "nav_perception"
 
-# 创建 3 行 × 2 列 = 6 个 pane（对应 5 个节点 + 1 个监控 pane）
+# 创建 7 个 pane（对应 6 个节点 + 1 个监控 pane）
 # pane 0 已自动创建，依次切分
 tmux split-window -v -t ${SESSION}:0.0     # pane 1
 tmux split-window -v -t ${SESSION}:0.1     # pane 2（在 pane1 下方）
@@ -45,6 +45,7 @@ tmux split-window -v -t ${SESSION}:0.1     # pane 2（在 pane1 下方）
 tmux split-window -h -t ${SESSION}:0.0     # pane 0 → 0 | 3
 tmux split-window -h -t ${SESSION}:0.1     # pane 1 → 1 | 4
 tmux split-window -h -t ${SESSION}:0.2     # pane 2 → 2 | 5
+tmux split-window -h -t ${SESSION}:0.3     # pane 3 → 3 | 6
 # 使用 tiled 布局均分
 tmux select-layout -t ${SESSION} tiled
 
@@ -104,6 +105,14 @@ tmux send-keys "echo '  tmux kill-session -t ${SESSION}  -- 停止所有节点'"
 tmux send-keys "${ENV_SETUP}" C-m
 
 # ============================================================
+# Pane 6: perception_recharge
+# ============================================================
+tmux select-pane -t ${SESSION}:0.6
+tmux send-keys "${ENV_SETUP}" C-m
+tmux send-keys "cd ${PERCEPTION_INSTALL_DIR}/perception_recharge/lib/perception_recharge" C-m
+tmux send-keys "./perception_recharge_node --params-file ${PERCEPTION_INSTALL_DIR}/perception_recharge/share/perception_recharge/config/perception_recharge_node.yaml" C-m
+
+# ============================================================
 # 设置 pane 标题（便于识别）
 # ============================================================
 tmux select-pane -t ${SESSION}:0.0 -T "lidar_seg"
@@ -112,6 +121,7 @@ tmux select-pane -t ${SESSION}:0.2 -T "pedestrian"
 tmux select-pane -t ${SESSION}:0.3 -T "visual_perception"
 tmux select-pane -t ${SESSION}:0.4 -T "ptz_detection"
 tmux select-pane -t ${SESSION}:0.5 -T "monitor"
+tmux select-pane -t ${SESSION}:0.6 -T "recharge"
 
 # 激活监控 pane
 tmux select-pane -t ${SESSION}:0.5

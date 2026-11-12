@@ -1,0 +1,6 @@
+# CalibrationState.msg
+uint8 state
+uint8 CALIBRATION_STATE_UNKNOWN = 0
+uint8 CALIBRATION_DOING = 1
+uint8 CALIBRATION_SUCCEED = 2
+uint8 CALIBRATION_FAILED = 3

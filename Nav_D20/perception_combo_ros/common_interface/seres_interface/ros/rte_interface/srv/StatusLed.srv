@@ -1,0 +1,20 @@
+# 请求部分：
+uint8 led_index    # 灯光序号 0：表示所有状态灯,1-n：表示相关状态灯序号
+uint8 on_off       # 灯光亮灭：0：关闭， 1： 打开
+uint8 color_mode   # 调色模式 1：rgb 3色调节,2：固定红黄绿
+#当调色模式为1 - 使用RGB进行灯光颜色控制
+#colorCtrl表示如下，
+#将其拆解为4个独立的1字节从高到低：
+#[High1][High2][Low2][Low1]
+#[Low1]：BLUE - 表示蓝色编码号
+#[Low2]：GREEN - 表示绿色编码号
+#[High2]：RED - 表示红色编码号
+#[High1]: 保留
+#当调色模式为2 - 使用固定红黄绿颜色控制
+#colorCtrl表示：
+#0:灯灭，1：仅绿灯常亮, 2:仅黄灯常亮,3:仅黄灯闪烁(默认频率1s), 4:仅红灯常亮，5:仅红灯闪烁(默认频率500ms), 0xff:全亮
+uint32 color_ctrl    #颜色控制
+uint16 frequency   #闪烁频率：0 - 常亮（调色模式为2时默认频率），1- n表示闪烁间隔，单位：1ms
+---
+# 响应部分：
+bool success        # "true(success)" 或 "false(failure)"

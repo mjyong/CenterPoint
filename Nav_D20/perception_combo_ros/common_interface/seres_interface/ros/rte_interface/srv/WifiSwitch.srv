@@ -1,0 +1,6 @@
+# 请求部分：
+bool action
+
+---
+# 响应部分：
+bool result

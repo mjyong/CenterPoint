@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package srcp;
+
+message communication
+{
+    // OUT_*: send to server or other; IN_*: receive
+    enum DATATYPE
+    {
+        // upstream (robot -> cloud)
+        OUT_LOGIN_REQ  = 0;    // 设备登录请求
+        OUT_LOGOUT_REQ = 1;    // 设备登出请求
+        OUT_PUSH_RESP  = 2;    // 指令/配置结果响应
+        OUT_REPORT     = 3;    // 设备上报状态、告警等【通用】
+
+        // downstream (cloud -> robot)
+        IN_LOGIN_RESP  = 100;    // 设备登录响应
+        IN_LOGOUT_RESP = 101;    // 设备登出响应
+        IN_PUSH_REQ    = 102;    // 云端下发指令、配置
+        IN_REPORT_RESP = 103;    // 云端回复端侧请求的响应
+    }
+} 
+

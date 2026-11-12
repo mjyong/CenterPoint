@@ -1,0 +1,7 @@
+# 请求部分：
+uint8 adapter_mode    # 0:主模式，1:从模式
+
+---
+# 响应部分：
+bool status         # "true(success)" 或 "false(failure)"
+uint8 cur_mode

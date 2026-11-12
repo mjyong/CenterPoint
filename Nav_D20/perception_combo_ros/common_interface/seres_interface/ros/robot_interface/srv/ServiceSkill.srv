@@ -1,0 +1,8 @@
+# Goal
+string skill_name       # 技能名称，例如 move, playTTS
+string parameters_json  # 参数 JSON 格式，例如 {"vx":1.0,"vy":0.0}
+
+---
+# Result
+bool success            # 是否成功
+string result_message    # 成功或失败原因

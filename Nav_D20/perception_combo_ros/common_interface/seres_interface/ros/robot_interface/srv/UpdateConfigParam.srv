@@ -1,0 +1,7 @@
+# request
+string jsonstr  #更新参数值，统一成json数组格式，参考云端下发的更新参数
+
+---
+# response
+bool result      # true: success; false: failure
+string message   # extra message

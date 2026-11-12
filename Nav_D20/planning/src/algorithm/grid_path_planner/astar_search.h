@@ -1,6 +1,8 @@
 #pragma once
 #include "src/algorithm/grid_path_planner/planner_base.h"
 #include <limits>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace planning {
 namespace algorithm {
@@ -60,22 +62,21 @@ public:
     start_node.id = xy_to_id(start_node);
     goal_node.id = xy_to_id(goal_node);
     path.clear();
-    std::priority_queue<Node, std::vector<Node>, Node::compare_cost> open_list;
-    // std::unordered_map<int, Node> closed_list;
     const int map_width = map.getSize()(0);
     const int map_height = map.getSize()(1);
-    std::vector<Node> closed_list(map_width * map_height, Node());
-    std::vector<bool> visited(map_width * map_height, false);
+    std::priority_queue<Node, std::vector<Node>, Node::compare_cost> open_list;
+    std::unordered_map<int, Node> closed_list;
+    std::unordered_set<int> visited;
 
     open_list.push(start_node);
 
     while (!open_list.empty()) {
       Node current = open_list.top();
       open_list.pop();
-      if (visited[current.id]) {
+      if (visited.count(current.id)) {
         continue;
       }
-      visited[current.id] = true;
+      visited.insert(current.id);
       closed_list[current.id] = current;
 
       if (current.id == goal_node.id) {
@@ -85,7 +86,7 @@ public:
           if (map.getPosition(grid_map::Index(temp.x, temp.y), position)) {
             path.emplace_back(position.x(), position.y());
           }
-          temp = closed_list[temp.parent_id];
+          temp = closed_list.at(temp.parent_id);
         }
         path.push_back(start);
         if (path.size() > 1) {
@@ -102,29 +103,25 @@ public:
         }
 
         int next_id = xy_to_id(Node(next_x, next_y));
-        if (visited[next_id]) {
+        if (visited.count(next_id)) {
           continue;
         }
 
-        grid_map::Position point;
-        map.getPosition(grid_map::Index(next_x, next_y), point);
-        if (map.atPosition("distance_cost", point) > 0.9) {
+        const grid_map::Index next_index(next_x, next_y);
+        if (map.at("distance_cost", next_index) > 0.9) {
           continue;
         }
 
-        double new_g = current.g + m.g +
-                       std::exp(far_away_obstacle_dist -
-                                map.atPosition("distance", point));
-        Node &neighbor = closed_list[next_id];
-        if (new_g < neighbor.g || neighbor.g == 0.0) {
-          neighbor.g = new_g;
-          neighbor.h = heuristic(Eigen::Vector2d(next_x, next_y),
-                                 Eigen::Vector2d(goal_node.x, goal_node.y),
-                                 heuristic_type);
-          neighbor.x = next_x;
-          neighbor.y = next_y;
-          neighbor.id = next_id;
-          neighbor.parent_id = current.id;
+        double new_g = current.g + m.g + std::exp(far_away_obstacle_dist -
+                                                 map.at("distance", next_index));
+        auto it = closed_list.find(next_id);
+        if (it == closed_list.end() || new_g < it->second.g) {
+          Node neighbor(next_x, next_y, new_g,
+                        heuristic(Eigen::Vector2d(next_x, next_y),
+                                  Eigen::Vector2d(goal_node.x, goal_node.y),
+                                  heuristic_type),
+                        next_id, current.id);
+          closed_list[next_id] = neighbor;
           open_list.push(neighbor);
         }
       }

@@ -1,0 +1,6 @@
+float32 cpu_usage_percent              # CPU使用率百分比 (0.0-100.0)
+float32 cpu_temperature                # CPU温度 (摄氏度)
+float32 disk_usage_percent             # 磁盘使用率百分比 (0.0-100.0)
+float32 memory_usage_percent           # 内存使用率百分比 (0.0-100.0)
+float32 gpu_temperature                # GPU温度 (摄氏度，无GPU时为-1.0)
+float32 gpu_usage_percent              # GPU使用率百分比 (0.0-100.0，无GPU时为-1.0)

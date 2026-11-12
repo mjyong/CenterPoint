@@ -35,6 +35,7 @@ struct CudaResources {
   float *cuda_grad_x = nullptr;
   float *cuda_grad_y = nullptr;
   float *cuda_composite_cost = nullptr;
+  float *cuda_composite_dist = nullptr;
   unsigned char *cuda_composite_obstacle = nullptr;
   float *cuda_ref_offset_dist = nullptr;
   float *cuda_ref_offset_cost = nullptr;
@@ -45,6 +46,8 @@ struct CudaResources {
   CostMapQueryContext query_context;
   bool initialized = false;
 };
+
+#ifdef PLANNING_ENABLE_CUDA
 
 class CostMapProductionCuda {
 public:
@@ -80,6 +83,7 @@ public:
   void DownloadRefOffsetDistField(float *host_ref_offset_dist, int size);
   void DownloadRefOffsetCostField(float *host_ref_offset_cost, int size);
   void DownloadCompositeCostField(float *host_composite_cost, int size);
+  void DownloadCompositeDistField(float *host_composite_dist, int size);
 
   const CostMapQueryContext &GetQueryContext() const {
     return resources_.query_context;
@@ -93,6 +97,60 @@ public:
 private:
   CudaResources resources_;
 };
+
+#else // PLANNING_ENABLE_CUDA
+
+// CPU-only build: no-op stub. Init() returns false so that
+// CostMapProduction falls back to the CPU pipeline, even if
+// enable_cuda is mistakenly left on in the config.
+class CostMapProductionCuda {
+public:
+  CostMapProductionCuda() = default;
+  ~CostMapProductionCuda() = default;
+
+  bool Init(int, int, double, double, double, double, double) {
+    return false;
+  }
+  void Release() {}
+
+  bool ProcObstacle(const unsigned char *, int, int, double, double, double,
+                    double) {
+    return false;
+  }
+
+  bool ProcReference(const unsigned char *, int, int, double, double) {
+    return false;
+  }
+
+  bool ProcComposite(unsigned char *, int, int) { return false; }
+
+  bool ProcCompositeObstacle(const unsigned char *, const float *,
+                             const float *, unsigned char *, int, int,
+                             double, double, bool) {
+    return false;
+  }
+
+  void DownloadDistanceField(float *, int) {}
+  void DownloadCostField(float *, int) {}
+  void DownloadGradientXField(float *, int) {}
+  void DownloadGradientYField(float *, int) {}
+  void DownloadRefOffsetDistField(float *, int) {}
+  void DownloadRefOffsetCostField(float *, int) {}
+  void DownloadCompositeCostField(float *, int) {}
+  void DownloadCompositeDistField(float *, int) {}
+
+  const CostMapQueryContext &GetQueryContext() const {
+    return resources_.query_context;
+  }
+  const FootprintCircles *GetDeviceFootprint() const { return nullptr; }
+  CudaResources &resources() { return resources_; }
+  bool initialized() const { return resources_.initialized; }
+
+private:
+  CudaResources resources_;
+};
+
+#endif // PLANNING_ENABLE_CUDA
 
 } // namespace preprocess
 } // namespace planning

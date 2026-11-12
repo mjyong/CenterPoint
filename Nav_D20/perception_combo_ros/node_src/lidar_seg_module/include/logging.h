@@ -52,7 +52,7 @@ public:
     }
     
     static void SetLogDestination(int severity, const std::string& path) {
-        google::SetLogDestination(static_cast<google::LogSeverity>(severity), path.c_str());
+        google::SetLogDestination(severity, path.c_str());
     }
     
     static void Flush() {

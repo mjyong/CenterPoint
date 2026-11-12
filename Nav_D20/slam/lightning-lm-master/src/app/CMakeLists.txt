@@ -79,5 +79,16 @@ target_link_libraries(mode_switch_node
         ${third_party_libs}
 )
 
-install(TARGETS run_slam_offline run_slam_online run_loc_offline run_loc_online mode_switch_node split_map
+# 揽沃雷达/超声波传感器健康监测节点(独立, 不依赖定位库)
+add_executable(rdap_sensor_monitor_node
+        rdap_sensor_monitor_node.cc
+)
+
+ament_target_dependencies(rdap_sensor_monitor_node
+        "rclcpp"
+        "sensor_msgs"
+        rhr_interface
+)
+
+install(TARGETS run_slam_offline run_slam_online run_loc_offline run_loc_online mode_switch_node split_map rdap_sensor_monitor_node
         DESTINATION lib/${PROJECT_NAME})

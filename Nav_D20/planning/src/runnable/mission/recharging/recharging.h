@@ -43,6 +43,15 @@ public:
   double charging_station_offset_x() const {
     return conf_.recharging_conf().charging_station_offset_x();
   }
+  double charging_station_offset_y() const {
+    return conf_.recharging_conf().charging_station_offset_y();
+  }
+  double charging_station_offset_yaw() const {
+    return conf_.recharging_conf().charging_station_offset_yaw();
+  }
+  double sitting_height() const {
+    return conf_.recharging_conf().sitting_height();
+  }
 
   void UpdateBatteryState(const BatteryState &state);
   void UpdateMotionStates(const std::vector<MotionState> &states);
@@ -187,6 +196,7 @@ private:
   uint8_t pending_motion_{0};
   std::vector<float> pending_para_;
   bool lie_cmd_sent_{false};
+  bool squat_cmd_sent_{false};
 
   int retry_count_{0};
   int max_retry_count_{3};
@@ -205,6 +215,7 @@ private:
 
   static constexpr double kChargeWaitTimeout = 30.0;
   static constexpr double kDataLostPauseTime = 2.0;
+  bool searching_timeout_{false};
 };
 
 } // namespace mission

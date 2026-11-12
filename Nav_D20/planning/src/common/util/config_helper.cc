@@ -73,53 +73,61 @@ ConfigHelper::GetBoundingCircles(const double &x, const double &y,
 }
 
 void ConfigHelper::InitBoundingCircles() {
-  Eigen::Vector2d fl(robot_config_.robot_param().length() / 2.0,
-                     robot_config_.robot_param().width() / 2.0);
-  Eigen::Vector2d fr(robot_config_.robot_param().length() / 2.0,
-                     -robot_config_.robot_param().width() / 2.0);
-  Eigen::Vector2d rl(-robot_config_.robot_param().length() / 2.0,
-                     robot_config_.robot_param().width() / 2.0);
-  Eigen::Vector2d rr(-robot_config_.robot_param().length() / 2.0,
-                     -robot_config_.robot_param().width() / 2.0);
-
-  double small_circle_shift = robot_config_.robot_param().width() / 4.0;
-  double small_circle_radius = sqrt(2.0 * pow(small_circle_shift, 2));
-  double large_circle_radius =
-      sqrt(pow(robot_config_.robot_param().width(), 2) +
-           pow((robot_config_.robot_param().length() -
-                robot_config_.robot_param().width()) /
-                   2.0,
-               2)) /
-      2.0;
   bounding_circles_.clear();
-  // rr
-  bounding_circles_.emplace_back(Circle2d{rr.x() + small_circle_shift,
-                                          rr.y() + small_circle_shift,
-                                          small_circle_radius});
-  // rl
-  bounding_circles_.emplace_back(Circle2d{rl.x() + small_circle_shift,
-                                          rl.y() - small_circle_shift,
-                                          small_circle_radius});
-  // fr
-  bounding_circles_.emplace_back(Circle2d{fr.x() - small_circle_shift,
-                                          fr.y() + small_circle_shift,
-                                          small_circle_radius});
-  // fl
-  bounding_circles_.emplace_back(Circle2d{fl.x() - small_circle_shift,
-                                          fl.y() - small_circle_shift,
-                                          small_circle_radius});
-  // fm
-  bounding_circles_.emplace_back(
-      Circle2d{(robot_config_.robot_param().length() -
-                robot_config_.robot_param().width()) /
-                   4,
-               0, large_circle_radius});
-  // rm
-  bounding_circles_.emplace_back(
-      Circle2d{(robot_config_.robot_param().width() -
-                robot_config_.robot_param().length()) /
-                   4,
-               0, large_circle_radius});
+  const auto &rp = robot_config_.robot_param();
+  const double L = rp.length();
+  const double W = rp.width();
+
+  switch (rp.footprint_model()) {
+  case RobotParam::SINGLE: {
+    // 单大圆: 外接矩形对角线一半, 与 GetBoundingCircle 保持一致
+    bounding_circles_.emplace_back(
+        Circle2d{0.0, 0.0, std::hypot(L / 2.0, W / 2.0)});
+    break;
+  }
+  case RobotParam::DOUBLE: {
+    const double offset = L / 4.0;
+    const double r = std::hypot(offset, W / 2.0);
+    bounding_circles_.emplace_back(Circle2d{offset, 0.0, r});
+    bounding_circles_.emplace_back(Circle2d{-offset, 0.0, r});
+    break;
+  }
+  case RobotParam::MULTI:
+  default: {
+    Eigen::Vector2d fl(L / 2.0, W / 2.0);
+    Eigen::Vector2d fr(L / 2.0, -W / 2.0);
+    Eigen::Vector2d rl(-L / 2.0, W / 2.0);
+    Eigen::Vector2d rr(-L / 2.0, -W / 2.0);
+
+    double small_circle_shift = W / 4.0;
+    double small_circle_radius = sqrt(2.0 * pow(small_circle_shift, 2));
+    double large_circle_radius =
+        sqrt(pow(W, 2) + pow((L - W) / 2.0, 2)) / 2.0;
+    // rr
+    bounding_circles_.emplace_back(Circle2d{rr.x() + small_circle_shift,
+                                            rr.y() + small_circle_shift,
+                                            small_circle_radius});
+    // rl
+    bounding_circles_.emplace_back(Circle2d{rl.x() + small_circle_shift,
+                                            rl.y() - small_circle_shift,
+                                            small_circle_radius});
+    // fr
+    bounding_circles_.emplace_back(Circle2d{fr.x() - small_circle_shift,
+                                            fr.y() + small_circle_shift,
+                                            small_circle_radius});
+    // fl
+    bounding_circles_.emplace_back(Circle2d{fl.x() - small_circle_shift,
+                                            fl.y() - small_circle_shift,
+                                            small_circle_radius});
+    // fm
+    bounding_circles_.emplace_back(Circle2d{(L - W) / 4, 0,
+                                            large_circle_radius});
+    // rm
+    bounding_circles_.emplace_back(Circle2d{(W - L) / 4, 0,
+                                            large_circle_radius});
+    break;
+  }
+  }
 }
 
 } // namespace util

@@ -1,0 +1,5 @@
+# 请求部分：
+uint8 work_mode   # 电机工作模式 0：失能模式,1：使能模式(默认模式),2：僵停模式 
+---
+# 响应部分：
+bool status        # "true(success)" 或 "false(failure)"

@@ -52,14 +52,9 @@
 #define AWARN_IF(cond) ALOG_IF(WARN, cond, MODULE_NAME)
 #define AERROR_IF(cond) ALOG_IF(ERROR, cond, MODULE_NAME)
 #define AFATAL_IF(cond) ALOG_IF(FATAL, cond, MODULE_NAME)
-// glog 0.7 dropped google::LogMessageVoidify. The & trick still evaluates the
-// stream only when cond is true.
-struct PlanningLogMessageVoidify {
-  void operator&(std::ostream &) {}
-};
 #define ALOG_IF(severity, cond, module) \
   !(cond) ? (void)0                     \
-          : PlanningLogMessageVoidify() & ALOG_MODULE(module, severity)
+          : google::LogMessageVoidify() & ALOG_MODULE(module, severity)
 
 #define ACHECK(cond) CHECK(cond) << LEFT_BRACKET << MODULE_NAME << RIGHT_BRACKET
 

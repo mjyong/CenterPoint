@@ -157,6 +157,13 @@ bool CostMapProductionCuda::Init(int map_rows, int map_cols, double resolution,
            << cudaGetErrorString(cudaError);
     return false;
   }
+  cudaError = cudaMalloc((void **)&resources_.cuda_composite_dist,
+                         block_size * sizeof(Npp32f));
+  if (cudaError != cudaSuccess) {
+    AERROR << "CUDA error: cudaMalloc cuda_composite_dist failed: "
+           << cudaGetErrorString(cudaError);
+    return false;
+  }
   cudaError = cudaMalloc((void **)&resources_.cuda_composite_obstacle,
                          block_size * sizeof(Npp8u));
   if (cudaError != cudaSuccess) {
@@ -268,6 +275,10 @@ void CostMapProductionCuda::Release() {
   if (resources_.cuda_composite_cost != nullptr) {
     cudaFree(resources_.cuda_composite_cost);
     resources_.cuda_composite_cost = nullptr;
+  }
+  if (resources_.cuda_composite_dist != nullptr) {
+    cudaFree(resources_.cuda_composite_dist);
+    resources_.cuda_composite_dist = nullptr;
   }
   if (resources_.cuda_composite_obstacle != nullptr) {
     cudaFree(resources_.cuda_composite_obstacle);
@@ -518,6 +529,13 @@ bool CostMapProductionCuda::ProcComposite(
       resources_.cuda_composite_cost, resources_.block_size,
       resources_.query_context.resolution);
 
+  // Keep the metric distance field (meters) before the cost normalization
+  // below overwrites it, so it can be downloaded into the
+  // COMPOSITE_OBSTACLE_DIST layer.
+  cudaMemcpy(resources_.cuda_composite_dist, resources_.cuda_composite_cost,
+             resources_.block_size * sizeof(Npp32f),
+             cudaMemcpyDeviceToDevice);
+
   std::vector<float> host_temp(resources_.block_size);
   cudaMemcpy(host_temp.data(), resources_.cuda_composite_cost,
              resources_.block_size * sizeof(float), cudaMemcpyDeviceToHost);
@@ -525,6 +543,8 @@ bool CostMapProductionCuda::ProcComposite(
 
   if (max_dist <= 0.0f) {
     cudaMemset(resources_.cuda_composite_cost, 0,
+               resources_.block_size * sizeof(float));
+    cudaMemset(resources_.cuda_composite_dist, 0,
                resources_.block_size * sizeof(float));
     cudaMemset(resources_.cuda_grad_x, 0,
                resources_.block_size * sizeof(float));
@@ -568,6 +588,12 @@ bool CostMapProductionCuda::ProcComposite(
 void CostMapProductionCuda::DownloadCompositeCostField(
     float *host_composite_cost, int size) {
   cudaMemcpy(host_composite_cost, resources_.cuda_composite_cost,
+             size * sizeof(float), cudaMemcpyDeviceToHost);
+}
+
+void CostMapProductionCuda::DownloadCompositeDistField(
+    float *host_composite_dist, int size) {
+  cudaMemcpy(host_composite_dist, resources_.cuda_composite_dist,
              size * sizeof(float), cudaMemcpyDeviceToHost);
 }
 

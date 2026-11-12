@@ -1,5 +1,6 @@
 #include "src/algorithm/teb_planner/teb_planner.h"
 #include "src/algorithm/teb_planner/coarse_path_search.h"
+#include <limits>
 
 namespace teb_planner {
 
@@ -26,7 +27,8 @@ bool TebPlanner::solver(std::vector<Eigen::Vector3d> waypoints,
                         const Eigen::Vector3d &initial_pose,
                         const Eigen::Vector3d &initial_velocity,
                         Eigen::Vector3d final_pose, bool constant_final_theta,
-                        const planning::Transform3d &global_pose) {
+                        const planning::Transform3d &global_pose,
+                        const bool &stop_at_end) {
   Eigen::Vector3d filtered_velocity(
       filter_input_vx_.filter(initial_velocity[0]),
       filter_input_vy_.filter(initial_velocity[1]),
@@ -45,18 +47,17 @@ bool TebPlanner::solver(std::vector<Eigen::Vector3d> waypoints,
   coarse_path_.clear();
   coarse_path_.emplace_back(initial_pose);
 
-  // Transform prev_optimize_path_ from previous frame's local frame
-  // to current frame's local frame
+  constexpr bool kUseWarmStart = true;
   std::vector<Eigen::Vector3d> transformed_prev_path;
-  if (has_prev_global_pose_ && !prev_optimize_path_.empty()) {
+  if (kUseWarmStart && has_prev_global_pose_ && !prev_optimize_path_.empty()) {
     // relative transform: prev_local -> current_local
     planning::Transform3d rel_tf = global_pose.inverse() * prev_global_pose_;
     double dyaw = std::atan2(rel_tf.rotation()(1, 0), rel_tf.rotation()(0, 0));
     for (const auto &pt : prev_optimize_path_) {
-      Eigen::Vector3d transformed = rel_tf * Eigen::Vector3d(pt.x(), pt.y(), 0.0);
-      transformed_prev_path.emplace_back(
-          Eigen::Vector3d(transformed.x(), transformed.y(),
-                          normalize_angle(pt.z() + dyaw)));
+      Eigen::Vector3d transformed =
+          rel_tf * Eigen::Vector3d(pt.x(), pt.y(), 0.0);
+      transformed_prev_path.emplace_back(Eigen::Vector3d(
+          transformed.x(), transformed.y(), normalize_angle(pt.z() + dyaw)));
     }
   }
   coarse_path_search_.setLastSuccessPath(transformed_prev_path);
@@ -107,6 +108,11 @@ bool TebPlanner::solver(std::vector<Eigen::Vector3d> waypoints,
   // }
   coarse_path_ = std::move(sampled_path);
   AINFO << "coarse_path resampled size: " << coarse_path_.size();
+  for (size_t i = 0; i < coarse_path_.size(); i++)
+  {
+    AINFO << "index: " << i << ", x: " << coarse_path_[i][0] << ", y: " << coarse_path_[i][1] << ", theta: " << coarse_path_[i][2];
+  }
+  
 
   int num_poses = coarse_path_.size();
   x_.resize(num_poses);
@@ -118,8 +124,68 @@ bool TebPlanner::solver(std::vector<Eigen::Vector3d> waypoints,
     y_[i] = coarse_path_[i][1];
     theta_[i] = coarse_path_[i][2];
   }
-  computeReferenceVelocities(filtered_velocity);
-  buildProblem(filtered_velocity);
+  // Warm start
+  if (transformed_prev_path.size() >= 2) {
+    auto cumulativeArc = [](const std::vector<Eigen::Vector3d> &path) {
+      std::vector<double> s(path.size(), 0.0);
+      for (size_t k = 1; k < path.size(); ++k) {
+        s[k] = s[k - 1] +
+               (path[k].head<2>() - path[k - 1].head<2>()).norm();
+      }
+      return s;
+    };
+    const std::vector<double> s_prev = cumulativeArc(transformed_prev_path);
+    const std::vector<double> s_new = cumulativeArc(coarse_path_);
+    const double end_drift = (transformed_prev_path.back().head<2>() -
+                              coarse_path_.back().head<2>())
+                                 .norm();
+    if (s_prev.back() > 1e-3 && s_new.back() > 1e-3 && end_drift < 2.0) {
+      size_t j0 = 0;
+      double d_min = std::numeric_limits<double>::max();
+      for (size_t k = 0; k < transformed_prev_path.size(); ++k) {
+        const double d = transformed_prev_path[k].head<2>().squaredNorm();
+        if (d < d_min) {
+          d_min = d;
+          j0 = k;
+        }
+      }
+      const double s_offset = s_prev[j0];
+      size_t prev_k = j0;
+      for (int i = 1; i < num_poses - 1; ++i) {
+        const double s_target = s_offset + s_new[i];
+        if (s_target >= s_prev.back()) {
+          break;
+        }
+        while (prev_k + 2 < s_prev.size() && s_prev[prev_k + 1] < s_target) {
+          ++prev_k;
+        }
+        const double seg = s_prev[prev_k + 1] - s_prev[prev_k];
+        const double ratio =
+            seg > 1e-9
+                ? std::max(0.0, std::min(1.0,
+                                         (s_target - s_prev[prev_k]) / seg))
+                : 0.0;
+        const Eigen::Vector3d &p0 = transformed_prev_path[prev_k];
+        const Eigen::Vector3d &p1 = transformed_prev_path[prev_k + 1];
+        const double warm_x = p0[0] + ratio * (p1[0] - p0[0]);
+        const double warm_y = p0[1] + ratio * (p1[1] - p0[1]);
+
+        const double anchor_theta = coarse_path_[i][2];
+        const double anchor_dev =
+            std::hypot(warm_x - coarse_path_[i][0],
+                       warm_y - coarse_path_[i][1]);
+        if (warm_x > 0.02 && anchor_dev < 0.3 &&
+            !is_collision_func_(warm_x, warm_y, anchor_theta)) {
+          x_[i] = warm_x;
+          y_[i] = warm_y;
+          theta_[i] = anchor_theta;
+          // theta_[i] intentionally NOT seeded: keeps anchor theta.
+        }
+      }
+    }
+  }
+  computeReferenceVelocities(filtered_velocity, stop_at_end);
+  buildProblem(filtered_velocity, stop_at_end);
 
   const auto &oc = conf_.optimizer_conf();
   ceres::Solver::Options options;
@@ -140,6 +206,8 @@ bool TebPlanner::solver(std::vector<Eigen::Vector3d> waypoints,
     optimize_path_.emplace_back(Eigen::Vector3d(x_[0], y_[0], theta_[0]));
     velocity_output_.clear();
     velocity_output_.emplace_back(std::make_pair(0.0, filtered_velocity));
+    AINFO << "t: 0, x: " << x_[0] << ", y: " << y_[0] << ", theta: " << theta_[0]
+          << ", vx: " << filtered_velocity[0] << ", vy: " << filtered_velocity[1] << ", omega: " << filtered_velocity[2];
     for (int i = 1; i < static_cast<int>(x_.size()); ++i) {
       optimize_path_.emplace_back(Eigen::Vector3d(x_[i], y_[i], theta_[i]));
       double vx = 0.0;
@@ -151,6 +219,8 @@ bool TebPlanner::solver(std::vector<Eigen::Vector3d> waypoints,
       double time = velocity_output_.back().first + time_deltas_[i - 1];
       velocity_output_.emplace_back(
           std::make_pair(time, Eigen::Vector3d(vx, vy, omega)));
+      AINFO << "t: " << time << ", x: " << x_[i] << ", y: " << y_[i] << ", theta: " << theta_[i]
+            << ", vx: " << vx << ", vy: " << vy << ", omega: " << omega;
     }
     prev_optimize_path_ = optimize_path_;
     prev_global_pose_ = global_pose;
@@ -188,7 +258,8 @@ Eigen::Vector3d TebPlanner::getVelocityCmd(double t) {
   return cmd;
 }
 
-void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity) {
+void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity,
+                              bool stop_at_end) {
   const auto &wc = conf_.weight_conf();
   const auto &dc = conf_.dynamic_constraints();
   const auto &tc = conf_.time_conf();
@@ -199,7 +270,7 @@ void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity) {
     problem_->AddParameterBlock(&x_[i], 1);
     problem_->AddParameterBlock(&y_[i], 1);
     problem_->AddParameterBlock(&theta_[i], 1);
-#if CERES_VERSION_MAJOR > 2 || (CERES_VERSION_MAJOR == 2 && CERES_VERSION_MINOR >= 2)
+#ifdef ROS2_JAZZY
     problem_->SetManifold(&theta_[i],
                           new AngleLocalParameterization()); // ceres 2.2
 #else
@@ -244,9 +315,17 @@ void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity) {
     problem_->AddResidualBlock(initial_vel_cost, nullptr, &x_[0], &y_[0],
                                &theta_[0], &x_[1], &y_[1], &theta_[1],
                                &time_deltas_[0]);
+
+    ceres::CostFunction *initial_accel_cost =
+        new ceres::AutoDiffCostFunction<InitialAccelLimitCost, 1, 1, 1, 1, 1,
+                                        1>(new InitialAccelLimitCost(
+            std::hypot(initial_velocity[0], initial_velocity[1]),
+            dc.max_accel_vx(), wc.weight_accel_limit()));
+    problem_->AddResidualBlock(initial_accel_cost, nullptr, &x_[0], &y_[0],
+                               &x_[1], &y_[1], &time_deltas_[0]);
   }
 
-  if (num_poses >= 2) {
+  if (stop_at_end && num_poses >= 2) {
     ceres::CostFunction *final_vel_cost =
         new ceres::AutoDiffCostFunction<FinalVelocityCost, 3, 1, 1, 1, 1, 1, 1,
                                         1>(
@@ -274,7 +353,7 @@ void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity) {
                                &theta_[i], &x_[i + 1], &y_[i + 1],
                                &theta_[i + 1], &time_deltas_[i]);
 
-    if (!ref_velocities_.empty() && ref_velocities_[i] > 0.0) {
+    if (!ref_velocities_.empty()) {
       ceres::CostFunction *ref_vel_cost =
           new ceres::AutoDiffCostFunction<ReferenceVelocityCost, 1, 1, 1, 1, 1,
                                           1, 1, 1>(new ReferenceVelocityCost(
@@ -284,9 +363,8 @@ void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity) {
                                  &theta_[i + 1], &time_deltas_[i]);
     }
 
-    double ref_vx_i = (!ref_velocities_.empty() && ref_velocities_[i] > 0.0)
-                          ? ref_velocities_[i]
-                          : dc.max_vx();
+    double ref_vx_i =
+        (!ref_velocities_.empty()) ? ref_velocities_[i] : dc.max_vx();
     if (ref_vx_i < wc.non_holonomic_min_speed()) {
       ceres::CostFunction *lateral_vel_cost = new LateralVelocityAnalyticCost(
           wc.weight_lateral_velocity(), ref_vx_i);
@@ -295,9 +373,6 @@ void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity) {
                                  &theta_[i + 1], &time_deltas_[i]);
     }
 
-    // double nh_weight = (ref_vx_i > wc.non_holonomic_min_speed())
-    //                        ? wc.weight_non_holonomic()
-    //                        : 0.0;
     if (ref_vx_i > wc.non_holonomic_min_speed()) {
       ceres::CostFunction *non_holonomic_cost =
           new NonHolonomicCost(wc.weight_non_holonomic());
@@ -305,17 +380,17 @@ void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity) {
                                  &theta_[i], &x_[i + 1], &y_[i + 1]);
     }
 
-    if (ref_vx_i > wc.non_holonomic_min_speed()) {
-      ceres::CostFunction *prefer_forward_cost =
-          new PreferForwardCost(wc.weight_prefer_forward());
-      problem_->AddResidualBlock(prefer_forward_cost, nullptr, &x_[i], &y_[i],
-                                 &theta_[i], &x_[i + 1], &y_[i + 1]);
-    }
+    ceres::CostFunction *prefer_forward_cost =
+        new PreferForwardCost(wc.weight_prefer_forward());
+    problem_->AddResidualBlock(prefer_forward_cost, nullptr, &x_[i], &y_[i],
+                               &theta_[i], &x_[i + 1], &y_[i + 1]);
 
+    const double rest_i =
+        (coarse_path_[i + 1].head<2>() - coarse_path_[i].head<2>()).norm();
     ceres::CostFunction *smoothness_cost =
         new ceres::AutoDiffCostFunction<PathSmoothnessCost, 3, 1, 1, 1, 1, 1,
                                         1>(
-            new PathSmoothnessCost(wc.weight_path_smoothness()));
+            new PathSmoothnessCost(wc.weight_path_smoothness(), rest_i));
     problem_->AddResidualBlock(smoothness_cost, nullptr, &x_[i], &y_[i],
                                &theta_[i], &x_[i + 1], &y_[i + 1],
                                &theta_[i + 1]);
@@ -328,68 +403,97 @@ void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity) {
 
   for (int i = 1; i < num_poses - 1; ++i) {
     ceres::CostFunction *obstacle_cost = new ObstacleCost(
-        obstacle_dist_func_, is_collision_func_,
-        wc.weight_obstacle_warning(), wc.weight_obstacle_danger(),
-        wc.obstacle_warning_distance(), wc.obstacle_danger_distance());
+        obstacle_dist_func_, wc.weight_obstacle_warning(),
+        wc.weight_obstacle_danger(), wc.obstacle_warning_distance(),
+        wc.obstacle_danger_distance());
     problem_->AddResidualBlock(obstacle_cost, nullptr, &x_[i], &y_[i],
                                &theta_[i]);
   }
 }
 
 void TebPlanner::computeReferenceVelocities(
-    const Eigen::Vector3d &initial_velocity) {
+    const Eigen::Vector3d &initial_velocity, bool stop_at_end) {
   const auto &dc = conf_.dynamic_constraints();
-  int num_poses = coarse_path_.size();
-  ref_velocities_.resize(num_poses - 1, 0.0);
+  const int num_poses = coarse_path_.size();
+  ref_velocities_.resize(num_poses > 0 ? num_poses - 1 : 0, 0.0);
 
   if (num_poses < 2) {
     return;
   }
 
-  double max_v = dc.max_vx();
-  double max_a = dc.max_accel_vx() * 0.2;
-  double v0 = std::abs(initial_velocity[0]);
+  const double max_v = dc.max_vx();
+  const double max_a = dc.max_accel_vx();
+  const double v0 = std::hypot(initial_velocity[0], initial_velocity[1]);
+  const double v_cruise = std::clamp(dc.reference_velocity(), 0.0, max_v);
 
   std::vector<double> arc_length(num_poses, 0.0);
   for (int i = 1; i < num_poses; ++i) {
-    double dx = coarse_path_[i][0] - coarse_path_[i - 1][0];
-    double dy = coarse_path_[i][1] - coarse_path_[i - 1][1];
+    const double dx = coarse_path_[i][0] - coarse_path_[i - 1][0];
+    const double dy = coarse_path_[i][1] - coarse_path_[i - 1][1];
     arc_length[i] = arc_length[i - 1] + std::sqrt(dx * dx + dy * dy);
   }
-  double total_length = arc_length.back();
-  double v_end = total_length < 2.0 ? 0.0 : dc.reference_velocity();
+  const double total_length = arc_length.back();
+  const double v_end = stop_at_end ? 0.0 : v_cruise;
   if (total_length < 1e-6 || max_a < 1e-6) {
-    for (int i = 0; i < num_poses - 1; ++i) {
-      ref_velocities_[i] =
-          dc.reference_velocity() > 0.0 ? dc.reference_velocity() : max_v;
-    }
+    std::fill(ref_velocities_.begin(), ref_velocities_.end(), v_cruise);
     return;
   }
 
+  std::vector<double> v_curve(num_poses, max_v);
+  if (dc.max_omega() > 1e-6 && num_poses >= 3) {
+    auto norm_angle = [](double a) {
+      return std::atan2(std::sin(a), std::cos(a));
+    };
+    const int w = 3;
+    for (int i = 1; i < num_poses - 1; ++i) {
+      const int a = std::max(0, i - w);
+      const int b = std::min(num_poses - 1, i + w);
+      const double baseline = arc_length[b] - arc_length[a];
+      if (b - a < 2 || baseline < 0.2) {
+        continue;
+      }
+      const double dir_a =
+          std::atan2(coarse_path_[i][1] - coarse_path_[a][1],
+                     coarse_path_[i][0] - coarse_path_[a][0]);
+      const double dir_b =
+          std::atan2(coarse_path_[b][1] - coarse_path_[i][1],
+                     coarse_path_[b][0] - coarse_path_[i][0]);
+      const double dphi = norm_angle(dir_b - dir_a);
+      const double kappa = std::abs(dphi) / baseline;
+      if (kappa > 1e-6) {
+        v_curve[i] = std::min(max_v, dc.max_omega() / kappa);
+      }
+    }
+    v_curve.front() = v_curve[1];
+    v_curve.back() = v_curve[num_poses - 2];
+  }
+
   std::vector<double> fwd_vel(num_poses, 0.0);
-  fwd_vel[0] = v0;
+  fwd_vel[0] = std::min(v0, v_curve[0]);
   for (int i = 1; i < num_poses; ++i) {
-    double ds = arc_length[i] - arc_length[i - 1];
-    double v_reach =
+    const double ds = arc_length[i] - arc_length[i - 1];
+    const double v_reach =
         std::sqrt(fwd_vel[i - 1] * fwd_vel[i - 1] + 2.0 * max_a * ds);
-    fwd_vel[i] = std::min(v_reach, dc.reference_velocity());
+    fwd_vel[i] = std::min(std::min(v_reach, v_cruise), v_curve[i]);
   }
 
   std::vector<double> bwd_vel(num_poses, 0.0);
-  bwd_vel[num_poses - 1] = v_end;
+  bwd_vel[num_poses - 1] = std::min(v_end, v_curve[num_poses - 1]);
   for (int i = num_poses - 2; i >= 0; --i) {
-    double ds = arc_length[i + 1] - arc_length[i];
-    double v_reach =
+    const double ds = arc_length[i + 1] - arc_length[i];
+    const double v_reach =
         std::sqrt(bwd_vel[i + 1] * bwd_vel[i + 1] + 2.0 * max_a * ds);
-    bwd_vel[i] = std::min(v_reach, dc.reference_velocity());
+    bwd_vel[i] = std::min(std::min(v_reach, v_cruise), v_curve[i]);
   }
 
-  for (int i = 0; i < num_poses; ++i) {
-    double v = std::min(fwd_vel[i], bwd_vel[i]);
-    if (i < num_poses - 1) {
-      ref_velocities_[i] = v;
-    }
+  for (int i = 0; i < num_poses - 1; ++i) {
+    ref_velocities_[i] = std::min(fwd_vel[i], bwd_vel[i]);
   }
+  AINFO << "ref_velocities: n=" << ref_velocities_.size()
+        << ", head=" << ref_velocities_.front()
+        << ", peak=" << *std::max_element(ref_velocities_.begin(),
+                                           ref_velocities_.end())
+        << ", tail=" << ref_velocities_.back();
 
   const auto &tc = conf_.time_conf();
   double dt_lower = tc.time_delta_lower_bound();

@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package srcp;
+
+message MsgType
+{
+    enum ID
+    {
+        reserve             = 0;
+
+        Login               = 0x0001;
+        Logout              = 0x0002;
+        Status              = 0x0003;
+
+        // 通用消息回复
+        GeneralResult       = 0x0010;
+        RemoteResponse      = 0x0011;
+        RobotResponse       = 0x0012;
+
+        // 分片消息
+        ChunkInfo           = 0x0013;
+        Chunk               = 0x0014;
+        ChunkAck            = 0x0015;
+
+        // 任务相关
+        TaskOperate         = 0x0100;
+        TaskSkillsQuery     = 0x0101;
+        TaskSkills          = 0x0102;
+        TaskStateQuery      = 0x0103;
+        TaskState           = 0x0104;
+        TaskStateResponse   = 0x0105;
+
+        // 机器人模式
+        RobotModeQuery      = 0x0110;
+        RobotMode           = 0x0111;
+
+        // RHR
+        GetRhrLog           = 0x0120;
+        RobotAlarm          = 0x0121;
+        RobotStates         = 0x0122;
+        RobotLogUploadTaskInit         = 0x0123;
+        EmptyLogComponents             = 0x0124;
+        RobotLogUploadTaskInitResponse = 0x0125;
+        RhrConfigs                     = 0x0126;
+        EventRecord                    = 0x012A;
+        //RMS
+        RemoteConfig        = 0x0130;
+        ReportConfig        = 0x0131;
+
+        // 导航
+        MapBuildStatus       = 0x0140;
+        LocationStatus       = 0x0141;
+        NavOperation         = 0x0142;
+        NavOperationResult   = 0x0143;
+        TaskMapPointReport   = 0x0144;
+
+        TrackPointReport     = 0x2006;
+        // reserve to 0x014F for navigation
+    }
+}

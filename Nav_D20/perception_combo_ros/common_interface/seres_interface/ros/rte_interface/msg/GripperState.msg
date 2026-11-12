@@ -1,0 +1,5 @@
+uint8 mode
+uint8 init_direction
+uint8 init_status
+uint8 clamping_state
+uint16 position_feedback

@@ -1,0 +1,231 @@
+syntax = "proto3";
+
+import "google/protobuf/wrappers.proto"; 
+
+package srcp.args;
+
+/*
+* 一个指令参数对应一个技能
+* 技能名称规则为技能参数名称首字母小写
+* 例如：
+* SitDown对应技能sitDown技能名称
+* Stand对应技能stand技能名称
+* 其余类推      
+*/
+
+//运控指令参数，坐下，无具体参数，仅占位，表示支持坐下功能
+message SitDown {
+}
+
+//运控指令参数，站立，含各种姿态下的起立，
+//如：蹲姿起立、躺姿起立、坐姿起立等
+message Stand {
+}
+
+//运控指令参数，调整移动速度
+message MoveLevel {
+    enum Level {
+        LOW_SPEED = 0; //低速
+        MIDDLE_SPEED = 1; //中速
+        HIGH_SPEED = 2; //高速
+    }
+    Level level = 1; //运控速度等级控制
+}
+
+//运控指令参数，行走
+message Move {
+    float vx = 1; //vx: 前进速度百分比
+    float vy = 2; //vy: 水平速度百分比
+    float vyaw = 3; //vyaw: 旋转速度百分比
+    float duration = 4; //持续移动时间，单位秒(目前仅R11涉及)
+}
+
+//运控指令参数，原地踏步，无具体参数，仅占位，表示支持该功能
+message StepStill {
+}
+
+//运控指令参数，停止移动，无具体参数，仅占位，表示支持该功能
+message StopMove {
+}
+
+//运控指令参数，蹲下，无具体参数，仅占位，表示支持该功能
+message Squat {
+}
+
+//运控指令参数，躺下，无具体参数，仅占startPosstartPos位，表示支持该功能
+message LieDown {
+}
+
+//运控指令参数，阻尼，无具体参数，仅占位，表示支持该功能
+message Damp {
+}
+
+//运控指令参数，挥手，无具体参数，仅占位，表示支持该功能
+message Wave {
+}
+
+//运控指令参数，关节失能，无具体参数，仅占位，表示支持该功能
+message JointDisable {
+}
+
+//运控指令参数，僵停，无具体参数，仅占位，表示支持该功能
+message LockJoint {
+}
+
+//运控指令参数，解除僵停，无具体参数，仅占位，表示支持该功能
+message UnlockJoint {
+}
+
+//电源指令参数，关机，无具体参数，仅占位，表示支持该功能
+message PowerOff {
+}
+
+//语音指令参数，播放文本以及表情
+message PlayTTS {
+    string text = 1; //待播放的文本
+    string emo = 2; //播放时表情
+    int32 num_cycles = 3; //文本播放次数
+    int32 interval = 4; //任意两次播放中间等待时间
+}
+
+//音视频指令参数，监控机器人本体音视频
+message MonitorAVStream {
+    bool av_enabled          = 1; //true本体开始向云端推音视频流，false本体停止向云端推音视频流
+    repeated uint32 cameraId = 2; //表示摄像头id 摄像头编号，0为左路摄像头，1为右路摄像头,
+                                  //2为前路摄像头，3为后路摄像头，4为拼接环视视频，5为可见光视频，6为红外视频 (cameraId目前仅D10涉及)
+}
+
+//音视频指令参数，本体向云端推音视频流，云端向本体推音视频流
+message Call {
+    bool audio_enabled = 1; //本体和云端双向推音视流
+    bool video_enabled = 2; //本体和云端双向推视频流
+                            //音频和视频开关都打开即为音视频通话
+}
+
+//导航指令参数，建图
+message Mapping
+{
+    enum Mode {
+        START   = 0; //开始建图
+        STOP    = 1; //结束建图
+        PAUSE   = 2; //暂停建图
+        RECOVER = 3; //恢复建图
+    }
+
+    Mode mode       = 1; //建图方式
+    string map_name = 2; //地图名称，创建地图时必须
+};
+
+//导航指令参数，导航
+message Navigate
+{
+    enum Mode {
+        POINT   = 0;         //点导航
+        PATH    = 1;         //路径导航
+    }
+
+    enum Control {
+        START   = 0;         //开始导航
+        STOP    = 1;         //结束导航
+    }
+
+    message Point {
+        float x = 1;         // 坐标X
+        float y = 2;         // 坐标Y
+        float z = 3;         // 坐标Z
+
+        float roll  = 4;     // 旋转角度 - 横滚
+        float pitch = 5;     // 旋转角度 - 俯仰
+        float yaw   = 6;     // 旋转角度 - 航向
+    }
+
+    Control ctrl        = 1; //导航控制
+    string map_name     = 2; //地图名称
+    Mode nav_mode       = 3; //导航模式
+    repeated Point point = 4;//目标点或者路径
+}
+
+//灵巧抓取指令，抓取目标
+message Grab {
+    string start_pos = 1;
+    string end_pos = 2;
+    string good = 3;
+}
+
+// 远程拍照(目前仅D10涉及)
+message TakePhoto
+{
+  int32 cameraId = 1; //相机id
+}
+
+// 云台控制(目前仅D10涉及)
+message PanTiltAngle
+{
+  uint32 angle = 1;   // 1: 表示水平左移，2：表示水平右移，3：表示俯仰上移， 4：表示俯仰下移
+}
+
+// 云台控制 云台相机(目前仅D10涉及)
+message VisibleLightFocalLength
+{
+  uint32 focusMode = 1;    // focusMode: 可见光聚焦模式1， 自动聚焦， 2 手动聚焦
+  uint32 focal = 2;        // focal: 1:放大，2：缩小
+  int32 cameraId = 3;      // cameraId: 相机id 摄像头编号，5为可见光视频，6为红外视频
+}
+
+// 步态切换命令
+message GaitCtrl
+{
+    // 步态类型枚举
+    enum GaitType {
+        GAIT_UNKNOWN        = 0;    // 默认
+        GAIT_WALK           = 1;    // 行走
+        GAIT_RUNNING        = 2;    // 跑步
+        GAIT_STAIR_ASCEND   = 3;    // 上楼梯
+        GAIT_STAIR_DESCEND  = 4;    // 下楼梯
+    }
+
+    GaitType gaitType       = 1;     // 步态类型
+}
+
+//巡逻任务(目前仅D10涉及)
+message PatrolMissions
+{
+  string mapUuid = 1; //地图uuid
+  google.protobuf.UInt64Value startTime = 2; // 任务开始时间
+  google.protobuf.UInt64Value endTime = 3; // 任务结束时间
+  google.protobuf.Int32Value patrolCycle = 4; // 巡逻周期，单位小时
+}
+
+// 重定位
+message Relocation {
+    message Pose {
+        float x = 1; // 坐标x
+        float y = 2; // 坐标y
+        float z = 3; // 坐标z
+
+        float roll  = 4; // 旋转角度
+        float pitch = 5; // 旋转角度
+        float yaw   = 6; // 旋转角度
+    }
+
+  string map_uuid = 1; // 地图id
+  Pose pose       = 2; // 位姿 0:默认无效
+}
+
+// 灯控指令参数
+message LightCtrl
+{
+    enum BrightnessLevel {
+        LOW     = 0; // 低
+        MEDIUM  = 1; // 中
+        HIGH    = 2; // 高
+    }
+
+    enum LightCtrlState {
+        LIGHT_OFF     = 0; // 关闭
+        LIGHT_ON      = 1; // 开启
+    }
+
+    BrightnessLevel level = 1; // 灯亮度等级
+    LightCtrlState state = 2; // 是否开启
+}

@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package srcp;
+
+message Errcode
+{
+    enum ID
+    {
+        SUCCESS     = 0;
+        FAILURE     = 1;
+        NOT_SUPPORT = 2;
+        TIME_OUT    = 3;
+
+        PARA_LENGTH_MISMATCH = 10;          // 参数字段长度不匹配
+
+        ERR_ACTION_GOAL_REJECTED    = 100;
+
+        ERR_SERVER_UNAVAILABLE      = 150;  // 服务不可用
+        ERR_SERVER_ALREADY_STARED   = 151;  // 非可重入服务执行过程中，不支持再次启动
+    }
+}

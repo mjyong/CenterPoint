@@ -11,109 +11,107 @@
 
 #include <geometry_msgs/msg/pose.hpp>
 
-#include <chrono>
-#include <algorithm>
-#include <filesystem>
-#include <thread>
-#include <opencv2/opencv.hpp>
 #include <yaml-cpp/yaml.h>
+#include <algorithm>
+#include <chrono>
+#include <filesystem>
+#include <opencv2/opencv.hpp>
+#include <thread>
 namespace {
-    // INS 位置类型常量定义(以 novatel_oem7_msgs/PositionOrVelocityType 的常量值为标准)
-    // novatel: INS_RTKFLOAT=55, INS_RTKFIXED=56, INS_PSRSP=53, PROPAGATED=19
-    // kygi665: INS_RTKFLOAT=55, INS_RTKFIXED=56, INS_PSRSP=53, INS=51
-    // kygi665 的 pos_type.data 需先归一化为 novatel 值再存储/比较
-    constexpr int INS_POS_TYPE_RTK_FIXED = 56;      // RTK 固定解
-    constexpr int INS_POS_TYPE_RTK_FLOAT = 55;      // RTK 浮点解
-    constexpr int INS_POS_TYPE_RTK_DR = 19;         // RTK 航位推算
-    constexpr int INS_POS_TYPE_SINGLE = 53;         // 单点定位
-    constexpr int INS_POS_TYPE_INVALID = 3;         // 无效解
-    constexpr int INS_INIT_TIMEOUT_SECONDS = 30;    // INS 初始化超时回退到 YAML 位姿的时间（秒）
+// INS 位置类型常量定义(以 novatel_oem7_msgs/PositionOrVelocityType 的常量值为标准)
+// novatel: INS_RTKFLOAT=55, INS_RTKFIXED=56, INS_PSRSP=53, PROPAGATED=19
+// kygi665: INS_RTKFLOAT=55, INS_RTKFIXED=56, INS_PSRSP=53, INS=51
+// kygi665 的 pos_type.data 需先归一化为 novatel 值再存储/比较
+constexpr int INS_POS_TYPE_RTK_FIXED = 56;    // RTK 固定解
+constexpr int INS_POS_TYPE_RTK_FLOAT = 55;    // RTK 浮点解
+constexpr int INS_POS_TYPE_RTK_DR = 19;       // RTK 航位推算
+constexpr int INS_POS_TYPE_SINGLE = 53;       // 单点定位
+constexpr int INS_POS_TYPE_INVALID = 3;       // 无效解
+constexpr int INS_INIT_TIMEOUT_SECONDS = 30;  // INS 初始化超时回退到 YAML 位姿的时间（秒）
 
-    /// 检测地图路径是否存在有效索引（支持旧格式 index.txt 和模板格式 3d/index.txt）
-    bool MapHasValidIndex(const std::string& map_path) {
-        if (map_path.empty()) return false;
-        std::string p = map_path;
-        while (!p.empty() && p.back() == '/') p.pop_back();
-        return std::filesystem::exists(p + "/index.txt") ||
-               std::filesystem::exists(p + "/3d/index.txt");
-    }
-
-    /// 解析模板格式下的 global.pcd 路径，兼容旧格式
-    std::string ResolveGlobalPcdPath(const std::string& map_path) {
-        std::string p = map_path;
-        while (!p.empty() && p.back() == '/') p.pop_back();
-        if (std::filesystem::exists(p + "/global.pcd")) {
-            return p + "/global.pcd";
-        }
-        return p + "/3d/global.pcd";
-    }
-
-    /// 解析模板格式下的 2d 栅格地图 (map.yaml + map.png) 路径
-    /// 返回 map.yaml 的完整路径；若未找到返回空字符串
-    std::string ResolveGridMapYamlPath(const std::string& map_path) {
-        std::string p = map_path;
-        while (!p.empty() && p.back() == '/') p.pop_back();
-        // 优先旧格式：根目录下的 map.yaml
-        if (std::filesystem::exists(p + "/map.yaml")) {
-            return p + "/map.yaml";
-        }
-        // 模板格式：扫描 2d/ 子目录，取第一个有效的时间戳目录
-        std::string dir_2d = p + "/2d";
-        if (!std::filesystem::is_directory(dir_2d)) return "";
-        for (const auto& entry : std::filesystem::directory_iterator(dir_2d)) {
-            if (entry.is_directory()) {
-                std::string yaml_path = entry.path().string() + "/map.yaml";
-                if (std::filesystem::exists(yaml_path)) {
-                    return yaml_path;
-                }
-            }
-        }
-        return "";
-    }
-
-    /// 解析模板格式下的栅格地图图片路径，与 ResolveGridMapYamlPath 配套使用
-    std::string ResolveGridMapImagePath(const std::string& map_path) {
-        std::string p = map_path;
-        while (!p.empty() && p.back() == '/') p.pop_back();
-        if (std::filesystem::exists(p + "/map.png")) {
-            return p + "/map.png";
-        }
-        if (std::filesystem::exists(p + "/map.pgm")) {
-            return p + "/map.pgm";
-        }
-        // 模板格式：扫描 2d/ 子目录
-        std::string dir_2d = p + "/2d";
-        if (!std::filesystem::is_directory(dir_2d)) return "";
-        for (const auto& entry : std::filesystem::directory_iterator(dir_2d)) {
-            if (entry.is_directory()) {
-                if (std::filesystem::exists(entry.path().string() + "/map.png")) {
-                    return entry.path().string() + "/map.png";
-                }
-                if (std::filesystem::exists(entry.path().string() + "/map.pgm")) {
-                    return entry.path().string() + "/map.pgm";
-                }
-            }
-        }
-        return "";
-    }
-
-    /// 将 kygi665 的 pos_type.data 归一化为 novatel 的 pos_type.type 值
-    uint32_t NormalizeKygi665PosType(uint32_t kygi665_type) {
-        if (kygi665_type == 56) return 56;  // INS_RTKFIXED → RTK 固定解
-        if (kygi665_type == 55) return 55;  // INS_RTKFLOAT → RTK 浮点解
-        if (kygi665_type == 53) return 53;  // INS_PSRSP → 单点定位
-        return 3;  // 其他值保持不变(常量值一致的如 PROPAGATED=19)
-    }
+/// 检测地图路径是否存在有效索引（支持旧格式 index.txt 和模板格式 3d/index.txt）
+bool MapHasValidIndex(const std::string& map_path) {
+    if (map_path.empty()) return false;
+    std::string p = map_path;
+    while (!p.empty() && p.back() == '/') p.pop_back();
+    return std::filesystem::exists(p + "/index.txt") || std::filesystem::exists(p + "/3d/index.txt");
 }
 
+/// 解析模板格式下的 global.pcd 路径，兼容旧格式
+std::string ResolveGlobalPcdPath(const std::string& map_path) {
+    std::string p = map_path;
+    while (!p.empty() && p.back() == '/') p.pop_back();
+    if (std::filesystem::exists(p + "/global.pcd")) {
+        return p + "/global.pcd";
+    }
+    return p + "/3d/global.pcd";
+}
+
+/// 解析模板格式下的 2d 栅格地图 (map.yaml + map.png) 路径
+/// 返回 map.yaml 的完整路径；若未找到返回空字符串
+std::string ResolveGridMapYamlPath(const std::string& map_path) {
+    std::string p = map_path;
+    while (!p.empty() && p.back() == '/') p.pop_back();
+    // 优先旧格式：根目录下的 map.yaml
+    if (std::filesystem::exists(p + "/map.yaml")) {
+        return p + "/map.yaml";
+    }
+    // 模板格式：扫描 2d/ 子目录，取第一个有效的时间戳目录
+    std::string dir_2d = p + "/2d";
+    if (!std::filesystem::is_directory(dir_2d)) return "";
+    for (const auto& entry : std::filesystem::directory_iterator(dir_2d)) {
+        if (entry.is_directory()) {
+            std::string yaml_path = entry.path().string() + "/map.yaml";
+            if (std::filesystem::exists(yaml_path)) {
+                return yaml_path;
+            }
+        }
+    }
+    return "";
+}
+
+/// 解析模板格式下的栅格地图图片路径，与 ResolveGridMapYamlPath 配套使用
+std::string ResolveGridMapImagePath(const std::string& map_path) {
+    std::string p = map_path;
+    while (!p.empty() && p.back() == '/') p.pop_back();
+    if (std::filesystem::exists(p + "/map.png")) {
+        return p + "/map.png";
+    }
+    if (std::filesystem::exists(p + "/map.pgm")) {
+        return p + "/map.pgm";
+    }
+    // 模板格式：扫描 2d/ 子目录
+    std::string dir_2d = p + "/2d";
+    if (!std::filesystem::is_directory(dir_2d)) return "";
+    for (const auto& entry : std::filesystem::directory_iterator(dir_2d)) {
+        if (entry.is_directory()) {
+            if (std::filesystem::exists(entry.path().string() + "/map.png")) {
+                return entry.path().string() + "/map.png";
+            }
+            if (std::filesystem::exists(entry.path().string() + "/map.pgm")) {
+                return entry.path().string() + "/map.pgm";
+            }
+        }
+    }
+    return "";
+}
+
+/// 将 kygi665 的 pos_type.data 归一化为 novatel 的 pos_type.type 值
+uint32_t NormalizeKygi665PosType(uint32_t kygi665_type) {
+    if (kygi665_type == 56) return 56;  // INS_RTKFIXED → RTK 固定解
+    if (kygi665_type == 55) return 55;  // INS_RTKFLOAT → RTK 浮点解
+    if (kygi665_type == 53) return 53;  // INS_PSRSP → 单点定位
+    return 3;                           // 其他值保持不变(常量值一致的如 PROPAGATED=19)
+}
+}  // namespace
+
 namespace lightning {
-static Eigen::Vector3d lla_to_enu(const Eigen::Vector3d &lla,const GeographicLib::LocalCartesian &geo_converter_) {
+static Eigen::Vector3d lla_to_enu(const Eigen::Vector3d& lla, const GeographicLib::LocalCartesian& geo_converter_) {
     Eigen::Vector3d enu;
     double enu_x, enu_y, enu_z;
-    //lat、lon、alt为纬度、经度、高度
-    geo_converter_.Forward(lla.x(), lla.y(), lla.z(),
-                            enu_x, enu_y, enu_z);
-                            
+    // lat、lon、alt为纬度、经度、高度
+    geo_converter_.Forward(lla.x(), lla.y(), lla.z(), enu_x, enu_y, enu_z);
+
     enu.x() = enu_x;
     enu.y() = enu_y;
     enu.z() = enu_z;
@@ -125,13 +123,10 @@ LocSystem::LocSystem(LocSystem::Options options) : options_(options) {
     signal(SIGINT, lightning::debug::SigHandle);
 }
 
-LocSystem::~LocSystem() { 
-    loc_->Finish();
-    
-    }
+LocSystem::~LocSystem() { loc_->Finish(); }
 
-bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
-                     bool publish_map_cloud, bool auto_set_init_pose) {
+bool LocSystem::Init(const std::string& yaml_path, bool publish_occ_grid, bool publish_map_cloud,
+                     bool auto_set_init_pose) {
     loc::Localization::Options opt;
     opt.online_mode_ = true;
     loc_ = std::make_shared<loc::Localization>(opt);
@@ -144,9 +139,9 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
     if (!MapHasValidIndex(map_path)) {
         // 回退到安装目录下的内置默认地图: <config所在目录>/../map/0c3f8a2d-...
         std::filesystem::path cfg_path(yaml_path);
-        std::string default_map_path =
-            (cfg_path.parent_path() / ".." / "map" /
-             "0c3f8a2d-41eb-416d-8fca-aaad500e2be9").lexically_normal().string();
+        std::string default_map_path = (cfg_path.parent_path() / ".." / "map" / "0c3f8a2d-41eb-416d-8fca-aaad500e2be9")
+                                           .lexically_normal()
+                                           .string();
         LOG(WARNING) << "配置的地图路径无效(无 index.txt): " << map_path
                      << "，回退到内置默认地图: " << default_map_path;
         map_path = default_map_path;
@@ -178,6 +173,15 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
     /// subscribers
     node_ = std::make_shared<rclcpp::Node>("lightning_slam");
 
+    // 健康上报: 告警/事件发布器
+    health_ = std::make_shared<HealthReporter>(node_);
+
+    // 地图无效回退默认地图时, 上报地图数据损坏告警
+    if (using_default_map_) {
+        health_->SetAlarm(HealthReporter::ALARM_MAP_CORRUPT, true, rhr_interface::msg::AlarmInfo::ALARM_SERIOUS,
+                          "地图数据损坏", "加载的地图文件格式错误或关键数据缺失");
+    }
+
     imu_topic_ = yaml.GetValue<std::string>("common", "imu_topic");
     cloud_topic_ = yaml.GetValue<std::string>("common", "lidar_topic");
     livox_topic_ = yaml.GetValue<std::string>("common", "livox_lidar_topic");
@@ -202,7 +206,7 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
     rclcpp::QoS qos(10);
 
     // 初始化地理坐标转换器
-    options_.with_ins_ =  yaml.GetValue<bool>("system", "with_ins");
+    options_.with_ins_ = yaml.GetValue<bool>("system", "with_ins");
     options_.ins_only_mode_ = yaml.GetValue<bool>("system", "ins_only_mode");
     double ins_lat = yaml.GetValue<double>("system", "ins_lat");
     double ins_lon = yaml.GetValue<double>("system", "ins_lon");
@@ -210,13 +214,11 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
     geo_converter_.Reset(ins_lat, ins_lon, ins_height);
     auto extrinsic_T = yaml.GetValue<std::vector<double>>("system", "init_t");
     auto extrinsic_R = yaml.GetValue<std::vector<double>>("system", "init_r");
-    yaml_init_pose_ = SE3(math::MatFromArray<double>(extrinsic_R),
-                                 math::VecFromArray<double>(extrinsic_T));
+    yaml_init_pose_ = SE3(math::MatFromArray<double>(extrinsic_R), math::VecFromArray<double>(extrinsic_T));
     // 读取 IMU-body 外参(yaml 中为 body->imu, 求逆得 imu->body)
     auto imu_ext_T = yaml.GetValue<std::vector<double>>("system", "extrinsic_T");
     auto imu_ext_R = yaml.GetValue<std::vector<double>>("system", "extrinsic_R");
-    T_imu_body_ = SE3(math::MatFromArray<double>(imu_ext_R),
-                      math::VecFromArray<double>(imu_ext_T)).inverse();
+    T_imu_body_ = SE3(math::MatFromArray<double>(imu_ext_R), math::VecFromArray<double>(imu_ext_T)).inverse();
     init_start_time_ = std::chrono::steady_clock::now();
     init_pose_set_ = false;
 
@@ -226,8 +228,7 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
     ins_cb_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
     // 创建多线程执行器（3线程），使 IMU、LiDAR、INS 回调组可并行处理
-    executor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>(
-        rclcpp::ExecutorOptions(), 3);
+    executor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>(rclcpp::ExecutorOptions(), 3);
     executor_->add_node(node_);
     LOG(INFO) << "使用 MultiThreadedExecutor (3线程)，IMU/LiDAR/INS 回调组并行处理";
 
@@ -237,8 +238,8 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
         odom_pub_ = node_->create_publisher<nav_msgs::msg::Odometry>("/lightning/odom", 10);
         pub_ins_path_ = node_->create_publisher<nav_msgs::msg::Path>("/lightning/ins_path", 10);
         pub_map_cloud_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("/lightning/map_cloud", 2);
-        occ_grid_pub_ = node_->create_publisher<nav_msgs::msg::OccupancyGrid>(
-            "/map", rclcpp::QoS(1).reliable().transient_local());
+        occ_grid_pub_ =
+            node_->create_publisher<nav_msgs::msg::OccupancyGrid>("/map", rclcpp::QoS(1).reliable().transient_local());
         ins_path_.header.frame_id = "map";
         if (options_.pub_tf_) {
             tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(node_);
@@ -265,12 +266,12 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
                         pub_map_cloud_->publish(map_msg);
                         sleep(1);
                     }
-                    LOG(INFO) << "[INS only] Published map cloud: " << map_cloud->size()
-                              << " -> " << sampled_cloud->size() << " points.";
+                    LOG(INFO) << "[INS only] Published map cloud: " << map_cloud->size() << " -> "
+                              << sampled_cloud->size() << " points.";
                 }
             }
             // 发布栅格地图
-            if (publish_occ_grid && !map_path.empty() ) {
+            if (publish_occ_grid && !map_path.empty()) {
                 PublishOccupancyGrid(map_path);
             }
         } else {
@@ -292,63 +293,76 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
     ins_sub_opts.callback_group = ins_cb_group_;
 
     imu_sub_ = node_->create_subscription<sensor_msgs::msg::Imu>(
-        imu_topic_, qos, [this](sensor_msgs::msg::Imu::SharedPtr msg) {
+        imu_topic_, qos,
+        [this](sensor_msgs::msg::Imu::SharedPtr msg) {
             LOG_EVERY_N(INFO, 500) << "IMU 回调线程ID: " << std::this_thread::get_id();
             IMUPtr imu = std::make_shared<IMU>();
             imu->timestamp = ToSec(msg->header.stamp) + time_offset;
-            {
-                // 用 steady_clock 检测回调到达间隔，判断是否被阻塞
-                double now_sec = std::chrono::duration<double>(
-                    std::chrono::steady_clock::now().time_since_epoch()).count();
-                if (last_imu_recv_time_ > 0) {
-                    double interval = now_sec - last_imu_recv_time_;
-                    if (interval > 0.04) {
-                        LOG(ERROR) << "IMU 回调间隔过大: " << interval << " 秒，可能被阻塞";
-                    }
+            // 用 steady_clock 检测回调到达间隔，判断是否被阻塞
+            double now_sec = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            if (last_imu_recv_time_ > 0) {
+                double interval = now_sec - last_imu_recv_time_;
+                if (interval > 0.04) {
+                    LOG(ERROR) << "IMU 回调间隔过大: " << interval << " 秒，可能被阻塞";
                 }
-                last_imu_recv_time_ = now_sec;
             }
+            last_imu_recv_time_ = now_sec;
+            // 帧率监测(含IMU帧率异常告警上报)
+            MonitorIMUFrameRate(imu->timestamp, now_sec);
             imu->linear_acceleration =
                 Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
             // 角速度单位为 deg/s, 转换为 rad/s
             imu->angular_velocity =
                 Vec3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z) * M_PI / 180.0;
             ProcessIMU(imu);
-        }, imu_sub_opts);
+        },
+        imu_sub_opts);
     cloud_sub_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
-        cloud_topic_, qos, [this](sensor_msgs::msg::PointCloud2::SharedPtr cloud) {
+        cloud_topic_, qos,
+        [this](sensor_msgs::msg::PointCloud2::SharedPtr cloud) {
             LOG_EVERY_N(INFO, 50) << "LiDAR 回调线程ID: " << std::this_thread::get_id();
             // 计算 LiDAR 时间戳
             double lidar_time = ToSec(cloud->header.stamp) + time_offset;
-            {
-                double now_sec = std::chrono::duration<double>(
-                    std::chrono::steady_clock::now().time_since_epoch()).count();
-                if (last_lidar_recv_time_ > 0) {
-                    double interval = now_sec - last_lidar_recv_time_;
-                    if (interval > 0.2) {
-                        LOG(ERROR) << "LiDAR 回调间隔过大: " << interval << " 秒，可能被阻塞";
-                    }
+            double now_sec = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            if (last_lidar_recv_time_ > 0) {
+                double interval = now_sec - last_lidar_recv_time_;
+                if (interval > 0.2) {
+                    LOG(ERROR) << "LiDAR 回调间隔过大: " << interval << " 秒，可能被阻塞";
                 }
-                last_lidar_recv_time_ = now_sec;
             }
-            //double current_time = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
-            //MonitorLidarFrameRate(lidar_time, current_time);
+            last_lidar_recv_time_ = now_sec;
+            // 帧率/点云监测(含帧间隔抖动、点云骤降告警上报)
+            MonitorLidarFrameRate(lidar_time, now_sec);
+            MonitorLidarCloudSize(cloud->width * cloud->height);
             Timer::Evaluate([&]() { ProcessLidar(cloud); }, "Proc Lidar", false);
-        }, lidar_sub_opts);
+        },
+        lidar_sub_opts);
 
     // livox_sub_ = node_->create_subscription<livox_ros_driver2::msg::CustomMsg>(
     //     livox_topic_, qos, [this](livox_ros_driver2::msg::CustomMsg ::SharedPtr cloud) {
     //         // 计算 LiDAR 时间戳（Livox 时间戳在第一个点中？使用消息时间戳）
     //         double lidar_time = ToSec(cloud->header.stamp) + time_offset;
-    //         double current_time = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    //         double current_time =
+    //         std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     //         MonitorLidarFrameRate(lidar_time, current_time);
     //         Timer::Evaluate([&]() { ProcessLidar(cloud); }, "Proc Lidar", true);
     //     });
     bool ret = loc_->Init(yaml_path, map_path);
+    if (!ret) {
+        LOG(ERROR) << "地图加载失败: " << map_path;
+        // 地图加载失败, 上报地图数据损坏告警
+        health_->SetAlarm(HealthReporter::ALARM_MAP_CORRUPT, true, rhr_interface::msg::AlarmInfo::ALARM_SERIOUS,
+                          "地图数据损坏", "加载的地图文件格式错误或关键数据缺失");
+    }
+
+    // 传感器断流检测复用 location_timer_(1Hz), 见 PublishLocationTimer 中的 SensorWatchdogTimer()
+    watchdog_start_sec_ = std::chrono::duration<double>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+
     // INS 订阅
-    if(options_.with_ins_) {
+    if (options_.with_ins_) {
         CreateINSSubscription(qos, ins_sub_opts);
-    }else {
+    } else {
         // 未使用 INS，直接使用 YAML 初始位姿
         if (auto_set_init_pose) {
             SetInitPose(yaml_init_pose_);
@@ -367,8 +381,8 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
     //                 auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - init_start_time_).count();
     //                 if (elapsed >= 10) {
     //                     // 超时，使用 YAML 位姿
-    //                     LOG(WARNING) << "INS initialization timeout after " << elapsed << " seconds, using YAML init pose.";
-    //                     SetInitPose(yaml_init_pose_);
+    //                     LOG(WARNING) << "INS initialization timeout after " << elapsed << " seconds, using YAML init
+    //                     pose."; SetInitPose(yaml_init_pose_);
     //                 } else if (msg->pos_type.type == 50 || msg->pos_type.type == 49 || msg->pos_type.type == 34) {
     //                     // INS 有效，使用 INS 位姿
     //                     LOG(INFO) << "Setting init pose from INS (valid).";
@@ -385,9 +399,8 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
     pub_lio_path_ = node_->create_publisher<nav_msgs::msg::Path>("/lightning/lio_path", 10);
     pub_ins_path_ = node_->create_publisher<nav_msgs::msg::Path>("/lightning/ins_path", 10);
     pub_location_ = node_->create_publisher<nav2_interface::msg::Location>("/nav/location", 10);
-    occ_grid_pub_ = node_->create_publisher<nav_msgs::msg::OccupancyGrid>(
-        "/map", rclcpp::QoS(1).reliable().transient_local());
-
+    occ_grid_pub_ =
+        node_->create_publisher<nav_msgs::msg::OccupancyGrid>("/map", rclcpp::QoS(1).reliable().transient_local());
 
     // 初始化路径
     lio_path_.header.frame_id = "map";
@@ -399,55 +412,49 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
     //     std::bind(&LocSystem::HandleLocCmd, this, std::placeholders::_1, std::placeholders::_2));
 
     if (options_.pub_tf_) {
-         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(node_);
+        tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(node_);
         // loc_->SetTFCallback(
         //     [this](const geometry_msgs::msg::TransformStamped &pose) { tf_broadcaster_->sendTransform(pose); });
     }
-    if (options_.pub_odom_){
+    if (options_.pub_odom_) {
         odom_pub_ = node_->create_publisher<nav_msgs::msg::Odometry>("/lightning/odom", 10);
-        loc_->SetOdometryCallback(
-            [this](nav_msgs::msg::Odometry odom){
-                double sys_time = ToSec(node_->now());
-                odom.pose.covariance[0] = sys_time;
-                // 定位状态通过 covariance[1] 传递: 0=正常, 1=故障
-                odom.pose.covariance[1] = loc_->IsLocFailed() ? 0.0 : 1.0;
-                {
-                    std::lock_guard<std::mutex> lock(nav_state_mutex_);
-                    latest_nav_state_valid_ = loc_->IsLocFailed() ? 0.0 : 1.0;
-                    latest_odom_ = odom;
+        loc_->SetOdometryCallback([this](nav_msgs::msg::Odometry odom) {
+            double sys_time = ToSec(node_->now());
+            odom.pose.covariance[0] = sys_time;
+            // 定位状态通过 covariance[1] 传递: 0=正常, 1=故障
+            odom.pose.covariance[1] = loc_->IsLocFailed() ? 0.0 : 1.0;
+            {
+                std::lock_guard<std::mutex> lock(nav_state_mutex_);
+                latest_nav_state_valid_ = loc_->IsLocFailed() ? 0.0 : 1.0;
+                latest_odom_ = odom;
+            }
+            odom_pub_->publish(odom);
+            if (tf_broadcaster_) {
+                geometry_msgs::msg::TransformStamped tf_msg;
+                tf_msg.header = odom.header;
+                tf_msg.child_frame_id = "base_link";
+                tf_msg.transform.translation.x = odom.pose.pose.position.x;
+                tf_msg.transform.translation.y = odom.pose.pose.position.y;
+                tf_msg.transform.translation.z = odom.pose.pose.position.z;
+                tf_msg.transform.rotation = odom.pose.pose.orientation;
+                tf_broadcaster_->sendTransform(tf_msg);
+            }
+            double now_sec = ToSec(node_->now());
+            if (now_sec - last_save_time_ >= 1.0) {
+                last_save_time_ = now_sec;
+                // 首次写入覆盖旧文件，之后追加
+                auto mode = traj_file_inited_ ? std::ios::app : std::ios::out;
+                std::ofstream fout("/tmp/lightning_trajectory.txt", mode);
+                traj_file_inited_ = true;
+                if (fout.is_open()) {
+                    fout << std::fixed << std::setprecision(6) << now_sec << " " << odom.pose.pose.position.x << " "
+                         << odom.pose.pose.position.y << " " << odom.pose.pose.position.z << " "
+                         << odom.pose.pose.orientation.x << " " << odom.pose.pose.orientation.y << " "
+                         << odom.pose.pose.orientation.z << " " << odom.pose.pose.orientation.w << "\n";
+                    fout.close();
                 }
-                odom_pub_->publish(odom);
-                if (tf_broadcaster_) {
-                    geometry_msgs::msg::TransformStamped tf_msg;
-                    tf_msg.header = odom.header;
-                    tf_msg.child_frame_id = "base_link";
-                    tf_msg.transform.translation.x = odom.pose.pose.position.x;
-                    tf_msg.transform.translation.y = odom.pose.pose.position.y;
-                    tf_msg.transform.translation.z = odom.pose.pose.position.z;
-                    tf_msg.transform.rotation = odom.pose.pose.orientation;
-                    tf_broadcaster_->sendTransform(tf_msg);
-                }
-                double now_sec = ToSec(node_->now());
-                if (now_sec - last_save_time_ >= 1.0) {
-                    last_save_time_ = now_sec;
-                    // 首次写入覆盖旧文件，之后追加
-                    auto mode = traj_file_inited_ ? std::ios::app : std::ios::out;
-                    std::ofstream fout("/tmp/lightning_trajectory.txt", mode);
-                    traj_file_inited_ = true;
-                    if (fout.is_open()) {
-                        fout << std::fixed << std::setprecision(6)
-                             << now_sec << " "
-                             << odom.pose.pose.position.x << " "
-                             << odom.pose.pose.position.y << " "
-                             << odom.pose.pose.position.z << " "
-                             << odom.pose.pose.orientation.x << " "
-                             << odom.pose.pose.orientation.y << " "
-                             << odom.pose.pose.orientation.z << " "
-                             << odom.pose.pose.orientation.w << "\n";
-                        fout.close();
-                    }
-                }
-            });
+            }
+        });
     }
 
     if (ret) {
@@ -466,7 +473,7 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
             }
         });
         // 设置 LIO 里程计轨迹回调
-        
+
         // loc_->SetLidarOdomCallback([this](const NavState& state) {
         //     geometry_msgs::msg::PoseStamped pose_stamped;
         //     pose_stamped.header.stamp = math::FromSec(state.timestamp_);
@@ -495,10 +502,8 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
         //     }
         // });
         // 创建定时器，每秒发布定位消息
-        location_timer_ = node_->create_wall_timer(
-            std::chrono::seconds(1),
-            std::bind(&LocSystem::PublishLocationTimer, this)
-        );
+        location_timer_ =
+            node_->create_wall_timer(std::chrono::seconds(1), std::bind(&LocSystem::PublishLocationTimer, this));
 
         // 发布地图点云（仅一次）
         if (publish_map_cloud) {
@@ -512,23 +517,22 @@ bool LocSystem::Init(const std::string &yaml_path, bool publish_occ_grid,
                 pcl::toROSMsg(*sampled_cloud, map_msg);
                 map_msg.header.stamp = node_->now();
                 map_msg.header.frame_id = "map";
-                for(int i=0;i<3;i++){
+                for (int i = 0; i < 3; i++) {
                     pub_map_cloud_->publish(map_msg);
                     sleep(1);
                 }
-                LOG(INFO) << "Published map cloud: " << map_cloud->size()
-                          << " -> " << sampled_cloud->size() << " points.";
+                LOG(INFO) << "Published map cloud: " << map_cloud->size() << " -> " << sampled_cloud->size()
+                          << " points.";
             }
         }
-            
     }
 
     // 发布栅格地图（自动启动定位时发布，重定位/建图后由 SwitchMapAndReinit 发布）
-    
+
     if (ret && publish_occ_grid && !map_path.empty()) {
         PublishOccupancyGrid(map_path);
     }
-        
+
     return ret;
 }
 
@@ -536,11 +540,12 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
     if (ins_type_ == "kygi665") {
         LOG(INFO) << "使用 kygi665 组合导航, INS topic: " << kygi665_ins_topic_;
         sub_kygi665_ins_ = node_->create_subscription<kygi665_msgs::msg::INSPVAX>(
-            kygi665_ins_topic_, qos, [this](kygi665_msgs::msg::INSPVAX::SharedPtr msg) {
+            kygi665_ins_topic_, qos,
+            [this](kygi665_msgs::msg::INSPVAX::SharedPtr msg) {
                 double ins_time = ToSec(msg->header.stamp) + time_offset;
                 {
-                    double now_sec = std::chrono::duration<double>(
-                        std::chrono::steady_clock::now().time_since_epoch()).count();
+                    double now_sec =
+                        std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
                     if (last_ins_recv_time_ > 0) {
                         double interval = now_sec - last_ins_recv_time_;
                         if (interval > 0.1) {
@@ -564,10 +569,11 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
                 // 转换为 ENU 坐标
                 Eigen::Vector3d lla(msg->latitude, msg->longitude, msg->height);
                 Eigen::Vector3d enu = lla_to_enu(lla, geo_converter_);
-                double azimuth_rad = (- msg->azimuth +180) * M_PI / 180.0;
+                double azimuth_rad = (-msg->azimuth) * M_PI / 180.0;
                 Eigen::Matrix3d rotation = (Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
                                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
-                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ())).toRotationMatrix();
+                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ()))
+                                               .toRotationMatrix();
                 SE3 pose = SE3(rotation, enu);
 
                 // 存储最新 INS 地理数据
@@ -575,12 +581,14 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
                     std::lock_guard<std::mutex> lock(lla_mutex_);
                     latest_ins_geo_ = {msg->latitude, msg->longitude, msg->height, pos_type};
                     latest_ins_pose_ = pose;
-                    ins_pose_valid_ = ins_solution_good && (pos_type == INS_POS_TYPE_RTK_FIXED || pos_type == INS_POS_TYPE_RTK_FLOAT);
+                    ins_pose_valid_ =
+                        ins_solution_good && (pos_type == INS_POS_TYPE_RTK_FIXED || pos_type == INS_POS_TYPE_RTK_FLOAT);
                 }
 
                 ins->stamp = ins_time;
                 ins->pose = pose.matrix();
-                ins->position_covariance = Eigen::Vector3d(msg->latitude_stdev, msg->longitude_stdev, msg->height_stdev);
+                ins->position_covariance =
+                    Eigen::Vector3d(msg->latitude_stdev, msg->longitude_stdev, msg->height_stdev);
                 ins->orientation_covariance = Eigen::Vector3d(msg->roll_stdev, msg->pitch_stdev, msg->azimuth_stdev);
 
                 // 检查是否已设置初始位姿
@@ -590,7 +598,8 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
                         auto now = std::chrono::steady_clock::now();
                         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - init_start_time_).count();
                         if (elapsed >= INS_INIT_TIMEOUT_SECONDS) {
-                            LOG(WARNING) << "INS initialization timeout after " << elapsed << " seconds, using YAML init pose.";
+                            LOG(WARNING) << "INS initialization timeout after " << elapsed
+                                         << " seconds, using YAML init pose.";
                             SetInitPose(yaml_init_pose_);
                         } else if (ins_solution_good && pos_type == INS_POS_TYPE_RTK_FIXED) {
                             // RTK_FIXED: 厘米级精度，跳过 NDT 配准，直接信任 INS 位姿
@@ -632,15 +641,17 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
                         pub_ins_path_->publish(ins_path_);
                     }
                 }
-            }, ins_sub_opts);
+            },
+            ins_sub_opts);
     } else {
         LOG(INFO) << "使用 novatel 组合导航, INS topic: " << ins_topic_;
         sub_ins_ = node_->create_subscription<novatel_oem7_msgs::msg::INSPVAX>(
-            ins_topic_, qos, [this](novatel_oem7_msgs::msg::INSPVAX::SharedPtr msg) {
+            ins_topic_, qos,
+            [this](novatel_oem7_msgs::msg::INSPVAX::SharedPtr msg) {
                 double ins_time = ToSec(msg->header.stamp) + time_offset;
                 {
-                    double now_sec = std::chrono::duration<double>(
-                        std::chrono::steady_clock::now().time_since_epoch()).count();
+                    double now_sec =
+                        std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
                     if (last_ins_recv_time_ > 0) {
                         double interval = now_sec - last_ins_recv_time_;
                         if (interval > 0.1) {
@@ -665,7 +676,8 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
                 double azimuth_rad = (90.0 - msg->azimuth) * M_PI / 180.0;
                 Eigen::Matrix3d rotation = (Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
                                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
-                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ())).toRotationMatrix();
+                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ()))
+                                               .toRotationMatrix();
                 SE3 pose = SE3(rotation, enu);
 
                 // 存储最新 INS 地理数据
@@ -679,7 +691,8 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
 
                 ins->stamp = ins_time;
                 ins->pose = pose.matrix();
-                ins->position_covariance = Eigen::Vector3d(msg->latitude_stdev, msg->longitude_stdev, msg->height_stdev);
+                ins->position_covariance =
+                    Eigen::Vector3d(msg->latitude_stdev, msg->longitude_stdev, msg->height_stdev);
                 ins->orientation_covariance = Eigen::Vector3d(msg->roll_stdev, msg->pitch_stdev, msg->azimuth_stdev);
 
                 // 检查是否已设置初始位姿
@@ -689,7 +702,8 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
                         auto now = std::chrono::steady_clock::now();
                         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - init_start_time_).count();
                         if (elapsed >= INS_INIT_TIMEOUT_SECONDS) {
-                            LOG(WARNING) << "INS initialization timeout after " << elapsed << " seconds, using YAML init pose.";
+                            LOG(WARNING) << "INS initialization timeout after " << elapsed
+                                         << " seconds, using YAML init pose.";
                             SetInitPose(yaml_init_pose_);
                         } else if (pos_type == INS_POS_TYPE_RTK_FIXED) {
                             // RTK_FIXED: 厘米级精度，跳过 NDT 配准，直接信任 INS 位姿
@@ -731,7 +745,8 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
                         pub_ins_path_->publish(ins_path_);
                     }
                 }
-            }, ins_sub_opts);
+            },
+            ins_sub_opts);
     }
 }
 
@@ -742,27 +757,30 @@ void LocSystem::CreateINSOnlySubscriptions(const rclcpp::QoS& qos) {
     imu_sub_opts.callback_group = imu_cb_group_;
 
     imu_sub_ = node_->create_subscription<sensor_msgs::msg::Imu>(
-        imu_topic_, qos, [this](sensor_msgs::msg::Imu::SharedPtr msg) {
+        imu_topic_, qos,
+        [this](sensor_msgs::msg::Imu::SharedPtr msg) {
             std::lock_guard<std::mutex> lock(imu_gyro_mutex_);
             // 角速度单位为 deg/s, 转换为 rad/s
             latest_imu_gyro_ =
                 Vec3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z) * M_PI / 180.0;
             latest_imu_stamp_ = ToSec(msg->header.stamp) + time_offset;
-        }, imu_sub_opts);
+        },
+        imu_sub_opts);
 
     rclcpp::SubscriptionOptions ins_sub_opts;
     ins_sub_opts.callback_group = ins_cb_group_;
     if (ins_type_ == "kygi665") {
         LOG(INFO) << "[INS only] 使用 kygi665 组合导航, INS topic: " << kygi665_ins_topic_;
         sub_kygi665_ins_ = node_->create_subscription<kygi665_msgs::msg::INSPVAX>(
-            kygi665_ins_topic_, qos, [this](kygi665_msgs::msg::INSPVAX::SharedPtr msg) {
+            kygi665_ins_topic_, qos,
+            [this](kygi665_msgs::msg::INSPVAX::SharedPtr msg) {
                 double ins_time = ToSec(msg->header.stamp) + time_offset;
 
                 // 要求 ins_status 为 INS_SOLUTION_GOOD(3) 才可用
                 bool ins_solution_good = (msg->ins_status.data == 3);
                 uint32_t pos_type = NormalizeKygi665PosType(msg->pos_type.data);
                 bool is_fixed = ins_solution_good && (pos_type == (uint32_t)INS_POS_TYPE_RTK_FIXED ||
-                                 pos_type == (uint32_t)INS_POS_TYPE_RTK_FLOAT);
+                                                      pos_type == (uint32_t)INS_POS_TYPE_RTK_FLOAT);
                 if (is_fixed) {
                     ins_fixed_once_ = true;
                     last_fixed_time_ = ins_time;
@@ -780,10 +798,11 @@ void LocSystem::CreateINSOnlySubscriptions(const rclcpp::QoS& qos) {
 
                 Eigen::Vector3d lla(msg->latitude, msg->longitude, msg->height);
                 Eigen::Vector3d enu = lla_to_enu(lla, geo_converter_);
-                double azimuth_rad = (- msg->azimuth+180) * M_PI / 180.0;
+                double azimuth_rad = (-msg->azimuth) * M_PI / 180.0;
                 Eigen::Matrix3d rotation = (Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
                                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
-                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ())).toRotationMatrix();
+                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ()))
+                                               .toRotationMatrix();
                 SE3 pose_imu = SE3(rotation, enu);
                 SE3 pose_body = pose_imu * T_imu_body_;
 
@@ -826,15 +845,9 @@ void LocSystem::CreateINSOnlySubscriptions(const rclcpp::QoS& qos) {
                     std::ofstream fout("/tmp/lightning_trajectory.txt", mode);
                     traj_file_inited_ = true;
                     if (fout.is_open()) {
-                        fout << std::fixed << std::setprecision(6)
-                             << now_sec << " "
-                             << pose_body.translation().x() << " "
-                             << pose_body.translation().y() << " "
-                             << pose_body.translation().z() << " "
-                             << q_body.x() << " "
-                             << q_body.y() << " "
-                             << q_body.z() << " "
-                             << q_body.w() << "\n";
+                        fout << std::fixed << std::setprecision(6) << now_sec << " " << pose_body.translation().x()
+                             << " " << pose_body.translation().y() << " " << pose_body.translation().z() << " "
+                             << q_body.x() << " " << q_body.y() << " " << q_body.z() << " " << q_body.w() << "\n";
                         fout.close();
                     }
                 }
@@ -857,15 +870,18 @@ void LocSystem::CreateINSOnlySubscriptions(const rclcpp::QoS& qos) {
                 if (ins_path_.poses.size() > 1000) ins_path_.poses.erase(ins_path_.poses.begin());
                 ins_path_.header.stamp = odom.header.stamp;
                 if (pub_ins_path_->get_subscription_count() > 0) pub_ins_path_->publish(ins_path_);
-            }, ins_sub_opts);
+            },
+            ins_sub_opts);
     } else {
         // novatel 组合导航
         LOG(INFO) << "[INS only] 使用 novatel 组合导航, INS topic: " << ins_topic_;
         sub_ins_ = node_->create_subscription<novatel_oem7_msgs::msg::INSPVAX>(
-            ins_topic_, qos, [this](novatel_oem7_msgs::msg::INSPVAX::SharedPtr msg) {
+            ins_topic_, qos,
+            [this](novatel_oem7_msgs::msg::INSPVAX::SharedPtr msg) {
                 double ins_time = ToSec(msg->header.stamp) + time_offset;
 
-                bool is_fixed = (msg->pos_type.type == INS_POS_TYPE_RTK_FIXED || msg->pos_type.type == INS_POS_TYPE_RTK_FLOAT);
+                bool is_fixed =
+                    (msg->pos_type.type == INS_POS_TYPE_RTK_FIXED || msg->pos_type.type == INS_POS_TYPE_RTK_FLOAT);
                 if (is_fixed) {
                     ins_fixed_once_ = true;
                     last_fixed_time_ = ins_time;
@@ -886,7 +902,8 @@ void LocSystem::CreateINSOnlySubscriptions(const rclcpp::QoS& qos) {
                 double azimuth_rad = (90.0 - msg->azimuth) * M_PI / 180.0;
                 Eigen::Matrix3d rotation = (Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
                                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
-                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ())).toRotationMatrix();
+                                            Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ()))
+                                               .toRotationMatrix();
                 SE3 pose_imu = SE3(rotation, enu);
                 SE3 pose_body = pose_imu * T_imu_body_;
 
@@ -929,15 +946,9 @@ void LocSystem::CreateINSOnlySubscriptions(const rclcpp::QoS& qos) {
                     std::ofstream fout("/tmp/lightning_trajectory.txt", mode);
                     traj_file_inited_ = true;
                     if (fout.is_open()) {
-                        fout << std::fixed << std::setprecision(6)
-                             << now_sec << " "
-                             << pose_body.translation().x() << " "
-                             << pose_body.translation().y() << " "
-                             << pose_body.translation().z() << " "
-                             << q_body.x() << " "
-                             << q_body.y() << " "
-                             << q_body.z() << " "
-                             << q_body.w() << "\n";
+                        fout << std::fixed << std::setprecision(6) << now_sec << " " << pose_body.translation().x()
+                             << " " << pose_body.translation().y() << " " << pose_body.translation().z() << " "
+                             << q_body.x() << " " << q_body.y() << " " << q_body.z() << " " << q_body.w() << "\n";
                         fout.close();
                     }
                 }
@@ -960,37 +971,37 @@ void LocSystem::CreateINSOnlySubscriptions(const rclcpp::QoS& qos) {
                 if (ins_path_.poses.size() > 1000) ins_path_.poses.erase(ins_path_.poses.begin());
                 ins_path_.header.stamp = odom.header.stamp;
                 if (pub_ins_path_->get_subscription_count() > 0) pub_ins_path_->publish(ins_path_);
-            }, ins_sub_opts);
+            },
+            ins_sub_opts);
     }
 }
 
-void LocSystem::SetInitPose(const SE3 &pose, bool skip_ndt) {
+void LocSystem::SetInitPose(const SE3& pose, bool skip_ndt) {
     std::lock_guard<std::recursive_mutex> lock(init_mutex_);
     if (init_pose_set_) {
         LOG(WARNING) << "Init pose already set, ignoring duplicate call.";
         return;
     }
-    LOG(INFO) << "set init pose" << (skip_ndt ? " (skip NDT)" : "")
-              << ": " << pose.translation().transpose() << ", "
+    LOG(INFO) << "set init pose" << (skip_ndt ? " (skip NDT)" : "") << ": " << pose.translation().transpose() << ", "
               << pose.unit_quaternion().coeffs().transpose();
     loc_->SetExternalPose(pose.unit_quaternion(), pose.translation(), skip_ndt);
     loc_started_ = true;
     init_pose_set_ = true;
 }
 
-void LocSystem::ProcessIMU(const IMUPtr &imu) {
+void LocSystem::ProcessIMU(const IMUPtr& imu) {
     if (loc_started_) {
         loc_->ProcessIMUMsg(imu);
     }
 }
 
-void LocSystem::ProcessLidar(const sensor_msgs::msg::PointCloud2::SharedPtr &cloud) {
+void LocSystem::ProcessLidar(const sensor_msgs::msg::PointCloud2::SharedPtr& cloud) {
     if (loc_started_) {
         loc_->ProcessLidarMsg(cloud);
     }
 }
 
-void LocSystem::ProcessLidar(const livox_ros_driver2::msg::CustomMsg::SharedPtr &cloud) {
+void LocSystem::ProcessLidar(const livox_ros_driver2::msg::CustomMsg::SharedPtr& cloud) {
     if (loc_started_) {
         loc_->ProcessLivoxLidarMsg(cloud);
     }
@@ -1014,8 +1025,8 @@ void LocSystem::CancelSpin() {
     }
 }
 
-rclcpp::TimerBase::SharedPtr LocSystem::CreateWallTimer(
-    std::chrono::nanoseconds period, std::function<void()> callback) {
+rclcpp::TimerBase::SharedPtr LocSystem::CreateWallTimer(std::chrono::nanoseconds period,
+                                                        std::function<void()> callback) {
     if (node_ != nullptr) {
         return node_->create_wall_timer(period, callback, imu_cb_group_);
     }
@@ -1032,6 +1043,41 @@ void LocSystem::CheckInitTimeout() {
         SetInitPose(yaml_init_pose_);
     }
 }
+void LocSystem::SensorWatchdogTimer() {
+    // 1Hz 看门狗: IMU/点云完全断流时由本定时器触发告警(数据回调不触发也能发布)
+    double now_sec = std::chrono::duration<double>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    double elapsed = now_sec - watchdog_start_sec_;
+
+    // IMU 断流 → 复用"上装IMU帧率异常"告警(帧率为0是帧率异常的极端情况)
+    bool imu_lost;
+    if (imu_cnt_ == 0) {
+        imu_lost = elapsed > SENSOR_STARTUP_GRACE_;  // 启动后从未收到数据
+    } else {
+        imu_lost = (now_sec - last_imu_recv_time_) > SENSOR_LOST_TIMEOUT_;
+    }
+    if (imu_lost) {
+        LOG(ERROR) << "IMU 数据中断超过 " << SENSOR_LOST_TIMEOUT_ << " 秒";
+    }
+    health_->SetAlarm(HealthReporter::ALARM_IMU_FRAME_RATE, imu_lost,
+                      rhr_interface::msg::AlarmInfo::ALARM_SERIOUS, "上装IMU帧率异常",
+                      imu_lost ? "检测到上装IMU帧率异常" : "IMU数据恢复正常");
+
+    // 点云断流 → 复用"激光雷达帧间隔抖动"告警(间隔无穷大)
+    bool lidar_lost;
+    if (lidar_cnt_ == 0) {
+        lidar_lost = elapsed > SENSOR_STARTUP_GRACE_;
+    } else {
+        lidar_lost = (now_sec - last_lidar_recv_time_) > SENSOR_LOST_TIMEOUT_;
+    }
+    if (lidar_lost) {
+        LOG(ERROR) << "点云数据中断超过 " << SENSOR_LOST_TIMEOUT_ << " 秒";
+    }
+    health_->SetAlarm(HealthReporter::ALARM_LIDAR_JITTER, lidar_lost,
+                      rhr_interface::msg::AlarmInfo::ALARM_GENERAL, "帧间隔抖动",
+                      lidar_lost ? "帧间隔大于理论值的150%" : "点云数据恢复正常");
+}
+
 void LocSystem::MonitorIMUFrameRate(double sensor_time, double sys_time) {
     const double expected_interval = 0.01;  // 100 Hz
     if (first_imu_time_ == 0.0) {
@@ -1071,6 +1117,22 @@ void LocSystem::MonitorIMUFrameRate(double sensor_time, double sys_time) {
             LOG(INFO) << "IMU 平均频率: " << avg_freq << " Hz";
         }
     }
+    // 帧率评估: 每5秒计算窗口平均帧率, 偏离[80,120]Hz时上报告警, 恢复后清除 (0x011ANN02)
+    if (imu_freq_check_time_ == 0.0) {
+        imu_freq_check_time_ = sys_time;
+        imu_win_cnt_ = imu_cnt_;
+    } else if (sys_time - imu_freq_check_time_ >= 5.0) {
+        double avg_freq = (imu_cnt_ - imu_win_cnt_) / (sys_time - imu_freq_check_time_);
+        imu_freq_check_time_ = sys_time;
+        imu_win_cnt_ = imu_cnt_;
+        bool abnormal = (avg_freq < 80.0);
+        if (abnormal) {
+            LOG(WARNING) << "IMU 帧率异常: " << avg_freq << " Hz";
+        }
+        health_->SetAlarm(HealthReporter::ALARM_IMU_FRAME_RATE, abnormal, rhr_interface::msg::AlarmInfo::ALARM_SERIOUS,
+                          "上装IMU帧率异常",
+                          abnormal ? "检测到上装IMU帧率异常": "IMU帧率恢复正常");
+    }
 }
 
 void LocSystem::MonitorLidarFrameRate(double sensor_time, double sys_time) {
@@ -1099,6 +1161,20 @@ void LocSystem::MonitorLidarFrameRate(double sensor_time, double sys_time) {
     if (interval > 0.0 && interval < expected_interval * 0.5) {
         LOG(WARNING) << "LiDAR 粘包！间隔 " << interval << " 秒，过短";
     }
+    // 帧间隔抖动检测: 间隔超出[0.5,1.5]倍期望值为抖动, 连续5帧抖动上报, 连续10帧正常恢复 (0x0103NN08)
+    bool jitter = (interval <= 0.0 || interval < expected_interval * 0.5 || interval > expected_interval * 1.5);
+    if (jitter) {
+        if (lidar_jitter_cnt_ < 5) {
+            ++lidar_jitter_cnt_;
+        }
+    } else if (lidar_jitter_cnt_ > 0) {
+        --lidar_jitter_cnt_;
+    }
+    bool jitter_alarm = (lidar_jitter_cnt_ >= 5);
+    health_->SetAlarm(
+        HealthReporter::ALARM_LIDAR_JITTER, jitter_alarm, rhr_interface::msg::AlarmInfo::ALARM_GENERAL,
+        "帧间隔抖动",
+        jitter_alarm ? "帧间隔大于理论值的150%" : "点云帧间隔恢复正常");
     if (lidar_cnt_ % 100 == 0) {
         double total_sys_time = sys_time - first_lidar_sys_time_;
         if (total_sys_time > 0.0) {
@@ -1106,6 +1182,33 @@ void LocSystem::MonitorLidarFrameRate(double sensor_time, double sys_time) {
             LOG(INFO) << "LiDAR 平均频率: " << avg_freq << " Hz";
         }
     }
+}
+
+void LocSystem::MonitorLidarCloudSize(size_t cloud_size) {
+    // 点云数目基线: 指数滑动平均, 异常帧不参与更新, 避免污染基线
+    if (lidar_cloud_baseline_ <= 0.0) {
+        lidar_cloud_baseline_ = static_cast<double>(cloud_size);
+        return;
+    }
+    bool dropped = (static_cast<double>(cloud_size) < lidar_cloud_baseline_ * 0.5);
+    if (dropped) {
+        if (lidar_cloud_drop_cnt_ < 3) {
+            ++lidar_cloud_drop_cnt_;
+        }
+        if (lidar_cloud_drop_cnt_ >= 3) {
+            LOG(WARNING) << "点云数据骤降: " << cloud_size << " (基线 " << lidar_cloud_baseline_ << ")";
+        }
+    } else {
+        if (lidar_cloud_drop_cnt_ > 0) {
+            --lidar_cloud_drop_cnt_;
+        }
+        lidar_cloud_baseline_ = 0.95 * lidar_cloud_baseline_ + 0.05 * static_cast<double>(cloud_size);
+    }
+    // 连续3帧骤降上报, 连续10帧正常恢复 (0x0103NN04)
+    bool drop_alarm = (lidar_cloud_drop_cnt_ >= 5);
+    health_->SetAlarm(HealthReporter::ALARM_LIDAR_CLOUD_DROP, drop_alarm, rhr_interface::msg::AlarmInfo::ALARM_GENERAL,
+                      "点云数据骤降",
+                      drop_alarm ? ("点云数目骤降至基线50%以下: " + std::to_string(cloud_size)) : "点云数据恢复正常");
 }
 
 void LocSystem::MonitorINSFrameRate(double sensor_time, double sys_time) {
@@ -1149,15 +1252,14 @@ void LocSystem::PublishLocationTimer() {
         std::lock_guard<std::mutex> lock(lla_mutex_);
         if (ins_pose_valid_ && latest_ins_geo_.pos_type == INS_POS_TYPE_RTK_FIXED) {
             LOG(INFO) << "PublishLocationTimer: reinit detected, using INS RTK_FIXED pose (skip NDT).";
-            loc_->SetExternalPose(latest_ins_pose_.unit_quaternion(),
-                                  latest_ins_pose_.translation(), true);
+            loc_->SetExternalPose(latest_ins_pose_.unit_quaternion(), latest_ins_pose_.translation(), true);
         }
     }
 
     // 创建 Location 消息
     nav2_interface::msg::Location location_msg;
     location_msg.header.frame_id = "map";
-    location_msg.pose_geometry.map_uuid = current_map_uuid_; // 当前加载的地图UUID
+    location_msg.pose_geometry.map_uuid = current_map_uuid_;  // 当前加载的地图UUID
     // 设置几何位姿 (geometry pose)
     // 地图加载失败和初始化失败均上报定位失败
     if (using_default_map_) {
@@ -1180,7 +1282,8 @@ void LocSystem::PublishLocationTimer() {
         // 地理位姿：使用最新的INS数据
         {
             std::lock_guard<std::mutex> lock(lla_mutex_);
-            if(latest_ins_geo_.pos_type == INS_POS_TYPE_RTK_FIXED || latest_ins_geo_.pos_type == INS_POS_TYPE_RTK_FLOAT){
+            if (latest_ins_geo_.pos_type == INS_POS_TYPE_RTK_FIXED ||
+                latest_ins_geo_.pos_type == INS_POS_TYPE_RTK_FLOAT) {
                 location_msg.pose_geograpic.status = 2;
                 location_msg.pose_geograpic.orient_enable = true;
             } else {
@@ -1191,9 +1294,9 @@ void LocSystem::PublishLocationTimer() {
             location_msg.pose_geograpic.longitude = latest_ins_geo_.longitude;
             location_msg.pose_geograpic.altitude = latest_ins_geo_.height;
         }
-        
+
         // 速度
-        //auto vel_b = state.rot_ * state.vel_;
+        // auto vel_b = state.rot_ * state.vel_;
         location_msg.twist.linear.x = latest_odom_.twist.twist.linear.x;
         location_msg.twist.linear.y = latest_odom_.twist.twist.linear.y;
         location_msg.twist.linear.z = latest_odom_.twist.twist.linear.z;
@@ -1205,6 +1308,55 @@ void LocSystem::PublishLocationTimer() {
     } else {
         location_msg.pose_geometry.status = common_interface::msg::GeometryPose::STATE_MAP_FAILED;
     }
+
+    // 健康上报: 传感器断流检测(IMU/点云完全断流时由本定时器兜底, 不依赖数据回调)
+    if (health_) {
+        SensorWatchdogTimer();
+    }
+
+    // 健康上报: 定位丢失/重定位成功/重定位失败/地图匹配失败事件
+    if (health_) {
+        bool localized = !using_default_map_ && loc_started_ && latest_nav_state_valid_;
+        double now_sec = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (localized) {
+            // 定位恢复正常: 此前上报过异常才发布重定位成功
+            if (loc_lost_reported_ || reloc_fail_reported_ || map_match_fail_reported_) {
+                health_->PublishEvent(HealthReporter::EVENT_RELOC_SUCCESS, rhr_interface::msg::EventInfo::EVENT_SERIOUS,
+                                      "重定位成功", "定位恢复正常");
+            }
+            loc_lost_reported_ = false;
+            reloc_fail_reported_ = false;
+            map_match_fail_reported_ = false;
+            loc_lost_since_ = 0.0;
+        } else if (loc_started_) {
+            if (loc_lost_since_ == 0.0) {
+                loc_lost_since_ = now_sec;               // 定位异常计时开始
+                lost_after_localized_ = was_localized_;  // 区分"丢失"与"从未匹配成功"
+            }
+            double lost_dur = now_sec - loc_lost_since_;
+            if (lost_after_localized_) {
+                // 定位后丢失: 去抖1s上报定位丢失, 持续10s上报重定位失败
+                if (!loc_lost_reported_ && lost_dur >= LOC_LOST_DEBOUNCE_) {
+                    health_->PublishEvent(HealthReporter::EVENT_LOC_LOST, rhr_interface::msg::EventInfo::EVENT_SERIOUS,
+                                          "定位丢失", "机器人定位丢失");
+                    loc_lost_reported_ = true;
+                } else if (loc_lost_reported_ && !reloc_fail_reported_ && lost_dur >= RELOC_FAIL_TIMEOUT_) {
+                    health_->PublishEvent(HealthReporter::EVENT_RELOC_FAIL,
+                                          rhr_interface::msg::EventInfo::EVENT_SERIOUS, "重定位失败",
+                                          "机器人重定位失败");
+                    reloc_fail_reported_ = true;
+                }
+            } else if (!map_match_fail_reported_ && lost_dur >= MAP_MATCH_FAIL_TIMEOUT_) {
+                // 定位启动后一直未能匹配成功
+                health_->PublishEvent(HealthReporter::EVENT_MAP_MATCH_FAIL,
+                                      rhr_interface::msg::EventInfo::EVENT_SERIOUS, "地图匹配失败",
+                                      "导航时未匹配到当前区域的地图");
+                map_match_fail_reported_ = true;
+            }
+        }
+        was_localized_ = localized;
+    }
+
     // 发布
     pub_location_->publish(location_msg);
 }
@@ -1258,25 +1410,24 @@ void LocSystem::PublishOccupancyGrid(const std::string& map_path) {
                 int pixel = img.at<uchar>(img_y, x);
                 int8_t occ;
                 if (pixel >= 255 * (1.0 - free_thresh)) {
-                    occ = 0;       // free
+                    occ = 0;  // free
                 } else if (pixel <= 255 * (1.0 - occupied_thresh)) {
-                    occ = 100;     // occupied
+                    occ = 100;  // occupied
                 } else {
-                    occ = -1;      // unknown
+                    occ = -1;  // unknown
                 }
                 grid_msg->data[y * width + x] = occ;
             }
         }
 
         occ_grid_pub_->publish(std::move(grid_msg));
-        LOG(INFO) << "已发布栅格地图: " << width << "x" << height
-                  << ", resolution=" << resolution
+        LOG(INFO) << "已发布栅格地图: " << width << "x" << height << ", resolution=" << resolution
                   << ", map_path=" << map_path;
     } catch (const std::exception& e) {
         LOG(ERROR) << "发布栅格地图失败: " << e.what();
     }
 }
-// void LocSystem::HandleLocCmd(const lightning::srv::LocCmd::Request::SharedPtr request, 
+// void LocSystem::HandleLocCmd(const lightning::srv::LocCmd::Request::SharedPtr request,
 //                       lightning::srv::LocCmd::Response::SharedPtr response) {
 //     LOG(INFO) << "Received loc cmd request: id=" << (int)request->id
 //               << ", map_id=" << request->map_id
@@ -1316,7 +1467,6 @@ void LocSystem::PublishOccupancyGrid(const std::string& map_path) {
 //             break;
 //     }
 // }
-
 
 void LocSystem::LockInitPose() {
     std::lock_guard<std::recursive_mutex> lock(init_mutex_);
@@ -1360,17 +1510,27 @@ bool LocSystem::SwitchMapAndReinit(const std::string& map_id, const SE3& init_po
             init_start_time_ = std::chrono::steady_clock::now();  // 重置超时计时基准
         }
         loc_started_ = true;
+        // 重置健康上报的定位事件状态(新地图重新开始匹配, 避免切换期误报定位丢失)
+        was_localized_ = false;
+        loc_lost_reported_ = false;
+        reloc_fail_reported_ = false;
+        map_match_fail_reported_ = false;
+        loc_lost_since_ = 0.0;
         // 发布栅格地图
         PublishOccupancyGrid(map_id);
+        // 新地图加载成功, 清除地图数据损坏告警
+        health_->SetAlarm(HealthReporter::ALARM_MAP_CORRUPT, false, rhr_interface::msg::AlarmInfo::ALARM_SERIOUS,
+                          "地图数据损坏", "加载的地图文件格式错误或关键数据缺失");
     } else {
         LOG(ERROR) << "Map switch and reinitialization failed";
+        // 地图切换失败, 上报地图数据损坏告警
+        health_->SetAlarm(HealthReporter::ALARM_MAP_CORRUPT, true, rhr_interface::msg::AlarmInfo::ALARM_SERIOUS,
+                          "地图数据损坏", "加载的地图文件格式错误或关键数据缺失");
     }
     return success;
 }
 
-bool LocSystem::IsLocalized() const {
-    return loc_started_ && latest_nav_state_valid_;
-}
+bool LocSystem::IsLocalized() const { return loc_started_ && latest_nav_state_valid_; }
 
 int LocSystem::GetLocStatus() const {
     if (loc_started_ && latest_nav_state_valid_) {
@@ -1394,7 +1554,5 @@ bool LocSystem::IsNDTInited() const {
     }
     return false;
 }
-
-
 
 }  // namespace lightning

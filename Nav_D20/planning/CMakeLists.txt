@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
-project(planning LANGUAGES CUDA C CXX)
+
+option(ENABLE_CUDA "Build with CUDA acceleration." ON)
+message(STATUS "ENABLE_CUDA: ${ENABLE_CUDA}")
+
+if(ENABLE_CUDA)
+    project(planning LANGUAGES CUDA C CXX)
+else()
+    project(planning LANGUAGES C CXX)
+endif()
 
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../install")
 
@@ -38,14 +46,17 @@ file(GLOB PROTO_FILES
 )
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
 
-include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
-link_directories(${CMAKE_CUDA_INCLUDE_DIRS})
-find_library(CUDART_LIBRARY cudart ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-find_library(NPPIF_LIBRARY nppif ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-find_library(NPPC_LIBRARY nppc ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-find_library(NPPISU_LIBRARY nppisu ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-find_library(NPPIST_LIBRARY nppist ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-find_library(CULIBOS culibos ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+if(ENABLE_CUDA)
+    add_definitions(-DPLANNING_ENABLE_CUDA)
+    include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+    link_directories(${CMAKE_CUDA_INCLUDE_DIRS})
+    find_library(CUDART_LIBRARY cudart ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+    find_library(NPPIF_LIBRARY nppif ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+    find_library(NPPC_LIBRARY nppc ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+    find_library(NPPISU_LIBRARY nppisu ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+    find_library(NPPIST_LIBRARY nppist ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+    find_library(CULIBOS culibos ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+endif()
 
 
 if(ENABLE_ROS2)
@@ -55,6 +66,7 @@ if(ENABLE_ROS2)
     find_package(rclcpp REQUIRED)
     find_package(diagnostic_msgs REQUIRED)
     find_package(plotjuggler_msgs REQUIRED)
+    find_package(rhr_interface REQUIRED)
     find_package(rcl_interfaces REQUIRED)
     find_package(rosbag2_storage REQUIRED)
     find_package(rosbag2_cpp REQUIRED)
@@ -67,9 +79,9 @@ if(ENABLE_ROS2)
     find_package(rclcpp_action REQUIRED)
     find_package(mc_interface REQUIRED)
     find_package(nav2_interface REQUIRED)
+    find_package(nav_interface REQUIRED)
     find_package(perception_interface REQUIRED)
     find_package(rte_interface REQUIRED)
-    find_package(woosh_robot_msgs REQUIRED)
     find_package(tf2_ros REQUIRED)
     find_package(tf2_eigen REQUIRED)
     find_package(urdfdom REQUIRED)
@@ -88,6 +100,7 @@ if(ENABLE_ROS2)
         ${rclcpp_INCLUDE_DIRS}
         ${diagnostic_msgs_INCLUDE_DIRS}
         ${plotjuggler_msgs_INCLUDE_DIRS}
+        ${rhr_interface_INCLUDE_DIRS}
         ${rcl_interfaces_INCLUDE_DIRS}
         ${rosbag2_storage_INCLUDE_DIRS}
         ${tf2_msgs_INCLUDE_DIRS}
@@ -99,9 +112,9 @@ if(ENABLE_ROS2)
         ${rclcpp_action_INCLUDE_DIRS}
         ${mc_interface_INCLUDE_DIRS}
         ${nav2_interface_INCLUDE_DIRS}
+        ${nav_interface_INCLUDE_DIRS}
         ${perception_interface_INCLUDE_DIRS}
         ${rte_interface_INCLUDE_DIRS}
-        ${woosh_robot_msgs_INCLUDE_DIRS}
         ${tf2_geometry_msgs_DIR}/../../../include/tf2_geometry_msgs
     )
     include_directories(
@@ -146,12 +159,14 @@ file(GLOB PROJETC_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runnable/entry/**.cc
 )
 
-file(GLOB CUDA_SRCS
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/runnable/preprocess/**.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/runnable/preprocess/**/**.cu
-)
-
-set_source_files_properties(${CUDA_SRCS} PROPERTIES LANGUAGE CUDA)
+if(ENABLE_CUDA)
+    file(GLOB CUDA_SRCS
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/runnable/preprocess/**.cu
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/runnable/preprocess/**/**.cu
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/algorithm/**/*.cu
+    )
+    set_source_files_properties(${CUDA_SRCS} PROPERTIES LANGUAGE CUDA)
+endif()
 
 file(GLOB EXTERNAL_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/**/*.cc
@@ -172,9 +187,10 @@ if(ENABLE_ROS2)
         "rclcpp_action"
         "mc_interface"
         "nav2_interface"
+        "nav_interface"
         "perception_interface"
         "rte_interface"
-        "woosh_robot_msgs"
+        "rhr_interface"
         "nav_msgs"
         "grid_map_core"
         "visualization_msgs"
@@ -206,8 +222,12 @@ target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
         ${PROJECT_SOURCE_DIR}/third_party/
-        ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 )
+if(ENABLE_CUDA)
+    target_include_directories(${PROJECT_NAME}
+            PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+    )
+endif()
 
 target_link_libraries(${PROJECT_NAME}  
     ${PROTOBUF_LIBRARIES}
@@ -223,8 +243,12 @@ target_link_libraries(${PROJECT_NAME}
     osqp::osqp
     OsqpEigen::OsqpEigen
     fcl
-    ${CUDART_LIBRARY} ${NPPIF_LIBRARY} ${NPPC_LIBRARY} ${NPPISU_LIBRARY} ${NPPIST_LIBRARY} ${CULIBOS}
 )
+if(ENABLE_CUDA)
+    target_link_libraries(${PROJECT_NAME}
+        ${CUDART_LIBRARY} ${NPPIF_LIBRARY} ${NPPC_LIBRARY} ${NPPISU_LIBRARY} ${NPPIST_LIBRARY} ${CULIBOS}
+    )
+endif()
 install(TARGETS ${PROJECT_NAME} DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/robot_factory
     DESTINATION lib/${PROJECT_NAME}
@@ -232,6 +256,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/robot_factory
 
 file(GLOB THIRD_PARTY_LIBS 
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/osqp/lib_arm/*.so
+    ${CMAKE_CURRENT_SOURCE_DIR}/libplotjuggler_msgs/*.so
 )
 install(FILES ${THIRD_PARTY_LIBS}
     DESTINATION lib/${PROJECT_NAME}/lib)

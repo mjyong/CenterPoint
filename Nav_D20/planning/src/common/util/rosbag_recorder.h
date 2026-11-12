@@ -4,17 +4,23 @@
 #include <fstream>
 #include <iostream>
 
+#include "config_helper.pb.h"
+#include "src/common/util/config_helper.h"
 #include <rclcpp/rclcpp.hpp>
 #include <rosbag2_cpp/writer.hpp>
 
 namespace planning {
 namespace common {
 namespace util {
+using config::BagRecordConf;
 class RosbagRecorder {
 public:
   template <typename MessageT>
   static void add(const MessageT &message, const std::string &name,
                   const std::string &type) {
+    if(!conf_.enable()){
+      return;
+    }
     rclcpp::SerializedMessage serialized_msg;
     rclcpp::Serialization<MessageT> serialization;
     serialization.serialize_message(&message, &serialized_msg);
@@ -55,6 +61,7 @@ private:
   static double prev_check_time_;
   static std::string bag_dir_;
   static std::string bag_file_name_;
+  static BagRecordConf conf_;
   BASE_DECLARE_SINGLETON(RosbagRecorder)
 };
 } // namespace util

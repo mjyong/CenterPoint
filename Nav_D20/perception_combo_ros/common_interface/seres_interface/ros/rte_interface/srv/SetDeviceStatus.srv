@@ -1,0 +1,5 @@
+uint32 device_type   # 设备类型
+uint8[] status       
+---
+bool success        # 操作是否成功
+
