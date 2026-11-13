@@ -8590,6 +8590,7 @@ t48_switch 里人行横道读进来没有；三份的"狗脚下是障碍"事件�
    - **"狗脚下是障碍"**：INS 直出那次在 107.4、110.2 s，和 T47 一样（CJGC 少了人行横道 6 往西那段）。现场地图、切图两次定位跑飞，事件时间没有意义。
    - **切图**：`Map switch` 1 次、5 条人行横道、`OSM file not exist` 0 次，是好的。
    - **查包工具误报** `/planning/debug/diagnostic: no single TF path from planning to map`：诊断消息的 `planning` 是个名字，不是坐标系。现在只对 Foxglove 会画的类型查 TF。
+   - **转换工具读不了新版 glog**：服务器的 glog 0.7 在行首多了年份（`I20261113 11:35:32…`），老正则只认 `I1113 …`，T48 的规划和定位日志一条事件都没进可视化（报告里也没有"lightning log"那行）。已修，lightning 在 stderr 上给警告加的颜色码也去掉了。
    - **点云贴图比例 11–27%**：不是指标的问题，是位姿真错了（上面第 2 条）。换成点到面以后同样是 13–18%。
      指标还是换成了点到面：和 LIO 一样，最近 5 个地图点拟合平面，< 0.1 m 算贴上。它不受地图稀疏影响：地图稀疏到 0.5 m 时，原来的判法（离最近点 < 0.2 m）只把一半贴着的点算成贴上。
 5. **为什么 T48 当时没看出来**：报告只把"输入超时，任务暂停"列成一条事件，没数恢复，也没写车型和朝向偏置。回放报告现在多了几行：
@@ -8598,7 +8599,7 @@ t48_switch 里人行横道读进来没有；三份的"狗脚下是障碍"事件�
    - `Data timeout exceeded`、`Data recovered, resuming`、`local planner solver failed` 的次数；
    - 指令中位 vx vy ω、vx > 0.05 的比例；
    - 可视化一段多一行 `heading: … median |.| N deg`，超过一半转反时写 `THE HEADING IS TURNED ROUND`，事件里报"朝向转反了"。定位布局的"定位减 INS"图里加了这条曲线。
-6. 文档：`Nav_D20/PATCHES.md`（三条新的；以前的"本次"换成了提交号）、规划 ONBOARDING（车型、超时）、定位 ONBOARDING（朝向偏置、点到面）。测试 44 个（新加：点到面不受地图稀疏影响、朝向转反、诊断话题不报 TF）。
+6. 文档：`Nav_D20/PATCHES.md`（三条新的；以前的"本次"换成了提交号）、规划 ONBOARDING（车型、超时）、定位 ONBOARDING（朝向偏置、点到面）。测试 45 个（新加：点到面不受地图稀疏影响、朝向转反、诊断话题不报 TF、新旧两种 glog 行）。
 
 
 ---
@@ -8615,7 +8616,7 @@ t48_switch 里人行横道读进来没有；三份的"狗脚下是障碍"事件�
 先按通用约定做。可以改的范围：Nav_D20/（编不过时只改我们的补丁，改了写进 PATCHES.md）。tools/、dog_perception/ 不改。
 仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42。mkdir -p data/reports/T49
 
-0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py -q | tail -1   （44 passed）
+0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py -q | tail -1   （45 passed）
    T48 手改过安装目录里的 default_robot_vin：cat $PLANNING_ROOT_DIR/robot_factory/default_robot_vin（source 过 install/setup.bash 以后），
    要和源码一样是 d30/001，不是就改回去；以后不要手改，脚本会处理。
    补丁都在（T48 第 0 步那几条，再加这几条，每个都要 ≥ 1）：
@@ -8646,6 +8647,7 @@ t48_switch 里人行横道读进来没有；三份的"狗脚下是障碍"事件�
        "heading: … median |.| N deg"：N 要小于 20（T48 是 180），不能有 "TURNED ROUND"；
        t49_map、t49_switch："/viz/loc/scan: … on the map (< 0.1 m) median P%"，抄 P（T48 位姿反了，13–18%）；
        三份的 "odom - INS median D m"，抄 D（T48：2.7、3.9 m；INS 直出 0.14 m）；
+       要有 "lightning log …loc.log: N lines, M events"，规划的 glog 事件也要在（T48 新版 glog 读不进来，已修）；
    - 107 s 前后"狗脚下是障碍"：t49_switch 应该没有，t49_map、t49_ins 有（新地图多了人行横道 6 往西那段路），抄时间；
    - 录包走 LFS（work_dirs/planning_io_t49_*），viz/ 是普通文件。
 3. 离线评测（只用 CPU，约 5 分钟）：
