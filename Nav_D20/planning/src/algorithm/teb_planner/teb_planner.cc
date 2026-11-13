@@ -270,7 +270,8 @@ void TebPlanner::buildProblem(const Eigen::Vector3d &initial_velocity,
     problem_->AddParameterBlock(&x_[i], 1);
     problem_->AddParameterBlock(&y_[i], 1);
     problem_->AddParameterBlock(&theta_[i], 1);
-#ifdef ROS2_JAZZY
+#if defined(ROS2_JAZZY) || (CERES_VERSION_MAJOR > 2) || \
+    (CERES_VERSION_MAJOR == 2 && CERES_VERSION_MINOR >= 2)
     problem_->SetManifold(&theta_[i],
                           new AngleLocalParameterization()); // ceres 2.2
 #else

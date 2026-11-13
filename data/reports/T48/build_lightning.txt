@@ -1,0 +1,40 @@
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h: In constructor ‘lightning::RosbagIO::RosbagIO(std::string, lightning::DatasetType)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h:38:57: warning: unused parameter ‘dataset_type’ [-Wunused-parameter]
+   38 |     explicit RosbagIO(std::string bag_file, DatasetType dataset_type = DatasetType::NCLT)
+      |                                             ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/app/run_slam_online.cc:10:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h: In constructor ‘lightning::RosbagIO::RosbagIO(std::string, lightning::DatasetType)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h:38:57: warning: unused parameter ‘dataset_type’ [-Wunused-parameter]
+   38 |     explicit RosbagIO(std::string bag_file, DatasetType dataset_type = DatasetType::NCLT)
+      |                                             ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/app/run_frontend_offline.cc:11:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h: In constructor ‘lightning::RosbagIO::RosbagIO(std::string, lightning::DatasetType)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h:38:57: warning: unused parameter ‘dataset_type’ [-Wunused-parameter]
+   38 |     explicit RosbagIO(std::string bag_file, DatasetType dataset_type = DatasetType::NCLT)
+      |                                             ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/app/run_slam_offline.cc:11:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h: In constructor ‘lightning::RosbagIO::RosbagIO(std::string, lightning::DatasetType)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h:38:57: warning: unused parameter ‘dataset_type’ [-Wunused-parameter]
+   38 |     explicit RosbagIO(std::string bag_file, DatasetType dataset_type = DatasetType::NCLT)
+      |                                             ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/app/run_loc_offline.cc:11:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h: In constructor ‘lightning::RosbagIO::RosbagIO(std::string, lightning::DatasetType)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/wrapper/bag_io.h:38:57: warning: unused parameter ‘dataset_type’ [-Wunused-parameter]
+   38 |     explicit RosbagIO(std::string bag_file, DatasetType dataset_type = DatasetType::NCLT)
+      |                                             ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/app/mode_switch_node.cc:25:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.h: At global scope:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.h:280:2: warning: extra ‘;’ [-Wpedantic]
+  280 | };  // namespace lightning
+      |  ^
+---
+Finished <<< lightning [1min 59s]
+
+Summary: 1 package finished [1min 59s]
+  1 package had stderr output: lightning
+
+---
+exit_code: 0
+elapsed_ms: 121196
+ended_at: 2026-11-13T03:15:29.236Z
+---

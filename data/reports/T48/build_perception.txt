@@ -1,0 +1,40 @@
+--- stderr: grid_map_memory_node
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:41:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/../include/logging.h:4: warning: "GLOG_USE_GLOG_EXPORT" redefined
+    4 | #define GLOG_USE_GLOG_EXPORT
+      | 
+<command-line>: note: this is the location of the previous definition
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:41:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/../include/logging.h: In static member function ‘static bool grid_map::Logger::Init(const string&, const string&, bool, int, int, int)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/../include/logging.h:18:26: warning: unused parameter ‘max_log_size’ [-Wunused-parameter]
+   18 |                      int max_log_size = 10,
+      |                      ~~~~^~~~~~~~~~~~~~~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/../include/logging.h:19:26: warning: unused parameter ‘max_num_logs’ [-Wunused-parameter]
+   19 |                      int max_num_logs = 10) {
+      |                      ~~~~^~~~~~~~~~~~~~~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp: In member function ‘void GridMapTask::processDepthForGrid(sensor_msgs::msg::Image_<std::allocator<void> >::SharedPtr, sensor_msgs::msg::PointCloud2_<std::allocator<void> >::SharedPtr, sensor_msgs::msg::PointCloud2_<std::allocator<void> >::SharedPtr)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:410:16: warning: unused variable ‘start_system_time’ [-Wunused-variable]
+  410 |         double start_system_time = this->now().seconds();
+      |                ^~~~~~~~~~~~~~~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp: In member function ‘bool GridMapTask::getSyncData(double, sensor_msgs::msg::Image_<std::allocator<void> >::SharedPtr&, sensor_msgs::msg::CompressedImage_<std::allocator<void> >::SharedPtr&)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:496:14: warning: variable ‘rgb_found’ set but not used [-Wunused-but-set-variable]
+  496 |         bool rgb_found = false;
+      |              ^~~~~~~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp: In member function ‘std::tuple<std::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >, std::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >, std::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >, nav_msgs::msg::OccupancyGrid_<std::allocator<void> > > GridMapTask::grid_generate_point_cloud_and_grid(const cv::Mat&, const cv::Mat&, const cv::Mat&, const Header&, bool, std::vector<cv::Point_<float> >&, std::vector<int>&)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:1490:83: warning: unused parameter ‘mask’ [-Wunused-parameter]
+ 1490 |     grid_generate_point_cloud_and_grid(const cv::Mat& depth_image, const cv::Mat& mask,
+      |                                                                    ~~~~~~~~~~~~~~~^~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:1492:95: warning: unused parameter ‘depth_only_mode’ [-Wunused-parameter]
+ 1492 |                                                     const std_msgs::msg::Header& header, bool depth_only_mode,
+      |                                                                                          ~~~~~^~~~~~~~~~~~~~~
+---
+Finished <<< grid_map_memory_node [52.6s]
+
+Summary: 2 packages finished [53.0s]
+  2 packages had stderr output: grid_map_memory_node lidar_seg
+
+---
+exit_code: 0
+elapsed_ms: 55461
+ended_at: 2026-11-13T03:18:29.132Z
+---

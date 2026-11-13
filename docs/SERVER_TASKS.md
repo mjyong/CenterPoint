@@ -156,7 +156,7 @@
 | T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 完成，已复核（2026-11-12）：新规则 230 → 207；盲区以外剩 12 次，6 次是停着的货车车头压在路线上、停 4 s 后开走，门控加了车身压在路线上要看满 15 s；狗当时不在线，第 1 步放进 T46 |
 | T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 完成，已复核（2026-11-12）：外参 A2；装包、锁频、室内外都做了；挡路车 15 s 后不安全 207 → 204 |
 | T47 | 规划回放第二次（起点挪到路上、bag 放完就收、新的回放脚本）；室外 bag 缺帧那一段的 INS；在线对离线扣掉原点差重比；狗在线时验 root 桥白名单 | Agent | T46 复核 | 1.5 小时 | 完成，已复核（2026-11-12）：两次回放都进了 active；之后的 Nav_D20 同步冲掉了我们的补丁，已重打（Nav_D20/PATCHES.md）；新地图的人行横道接进规划；T48 用新版重跑 |
-| T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 停下（2026-11-13）：新版 planning 编不过。Ceres 2.2 没有 LocalParameterization，glog 没有 LogMessageVoidify。没有回放 |
+| T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 完成（2026-11-13）：接口更新后重编通过。三次都进了 active 约 20 次后停在 standstill。切图读到 5 条人行横道 |
 | T49 | 推 T48；用最新代码重编（参考路径的调试补丁）、回放三次，录上定位的话题，转出规划和定位的可视化；1104 上评 wait 判据 | Agent | T48 | 2.5 小时 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -8598,15 +8598,17 @@ t48_switch 里人行横道读进来没有；三份的"狗脚下是障碍"事件�
 
 ### T48 结果
 
-2026-11-13。第 1 步停下：新版 planning 是机器人团队的代码，对本机的库编不过。没有改补丁，三次回放都没跑。已装的 planning 二进制仍是 2026-11-12 19:47 那份。
+2026-11-13。`seres_interface` 换成最新布局并重编之后，规划、定位、感知都编过了。三次回放目标都发出去了，各进了约 20 次 active，然后停在 standstill。切到新地图读进了 5 条人行横道。
 
-- 第 0 步：`pytest tests/dog/test_planning_mcap.py tests/dog/test_yield_gate.py` 30 passed。五处补丁的 grep 都 ≥ 1。`ad68517c` 的 `semantic.osm` 已经解开，没有重解。
-- 第 1 步：`--packages-up-to planning` 第一次停在 `find_package(rhr_interface)`，这个包在 `Nav_D20/slam/interface/rhr_interface`，不在 planning 目录里。先编了它，并把 `third_party/nav_interface` 重编进环境（新消息 `FollowTarget`；安装目录里原有的 `DetSegResults` 还在）。planning 再编，1 分 7 秒失败，`Summary: 0 packages finished`，`1 package failed: planning`。
-  错误不在 PATCHES.md 里的文件：
-  - Ceres 2.2.0 没有 `ceres::LocalParameterization`（`src/algorithm/teb_planner/ceres_cost_func.h:48`）。
-  - `google::LogMessageVoidify` 编不过（`src/common/util/log.h:57`）。
-  - 后面还有 `mc_interface::msg::MotionSkill` 没有 `MOTION_BODY_TARGET_POSE`（`src/runnable/mission/recharging/recharging.cc:455`）。
-  按停止条件没有改这些文件。lightning 和 `lidar_seg`、`grid_map_memory_node` 没有接着编。错误前 30 行在 `data/reports/T48/build_planning.txt`。
-- 第 2 步没跑，所以没有和 T47 的 active、CMD、起点挪动可比，也没有 `t48_switch` 的人行横道结果。
-- 没有改补丁。
+- 第 0 步：`pytest tests/dog/test_planning_mcap.py tests/dog/test_yield_gate.py` 30 passed。五处补丁的 grep 都 ≥ 1。`ad68517c` 的 `semantic.osm` 已经解开。
+- 第 1 步：先按新目录重编了 `common_interface`、`mc_interface`、`nav2_interface`、`perception_interface`、`rhr_interface`、`rte_interface`（`Summary: 6 packages finished`）。`mc_interface` 里有 `MOTION_BODY_TARGET_POSE`。
+  - planning：`Summary: 1 package finished`，1 分 4 秒。`data/reports/T48/build_planning.txt`。
+  - lightning：`Summary: 1 package finished`，1 分 59 秒。`build_lightning.txt`。
+  - `lidar_seg`、`grid_map_memory_node`：`Summary: 2 packages finished`。`build_perception.txt`。同步后的源比 11 月 9 日的二进制新，所以重编了；旧的 cmake 缓存指着已经不在的目录，删掉后从 `CenterPoint/Nav_D20` 重配。
+- 补丁（`Nav_D20/PATCHES.md`）：Ceres 2.2 走已有的 `Manifold`，不定义 `ROS2_JAZZY`；glog 的 `LogMessageVoidify` 改到 `google::logging::internal`；`following.cc`、`recharging.cc`、`tracking.cc` 不再参与编译（成员已经拆到 `*_bridge`）；感知两个包的 `SetLogDestination` 把 `int` 转成 `LogSeverity`。
+- 第 2 步：新树的 `default_robot_vin` 是 `d30/001`，第一次三次回放加载了 d30 的 788×497 地图，终点 (80, 126.9) 在图外，任务进了 fault、CMD 为 0。回放时改用安装目录里的 `d20/001`（`input_name: CJGC`，`allow_collision_start: true`），跑完把默认改回 `d30/001`。下面是 d20 的结果。PGM 是 10293×11412、0.1 m。
+  - 现场地图：目标已发。mission_state：active 20，passive 1，standby 1，standstill 3257。`CMD:` 20 次，头两条 `0.006 -0.113 0.002`、`-0.002 -0.137 -0.010`。`Start adjusted` 0，`Start point is in collision` 0。查包：odom 不是步行速度，p99 53.3 m/s，z −77.0..5.4 m，237 次超过 1 m 的跳变（最大 142.4 m，从 0.1 s 到 164.4 s，开头 1 s 的初始化跳变之外还有）。足迹被占 2008/3323。`/tf` 没有报成两棵树；`/planning/debug/diagnostic` 的坐标系 `planning` 到 `map` 没有路径。全文 `report_map.txt`。
+  - INS 直出：目标已发。mission_state：active 21，passive 1，standby 1，standstill 3239。`CMD:` 21 次，头两条 `0.013 -0.065 -0.009`、`0.013 -0.073 -0.022`。起点没挪，不在碰撞里。查包没有报 odom 跳变或超速。足迹被占 1317/3296。录包里没有 `/goal_pose`（规划收到了目标）。全文 `report_ins.txt`。
+  - 切图：目标已发。`Map switch` 1 次，`GlobalMapManager: 5 crosswalks in …/semantic.osm` 1 次，`OSM file not exist` 0 次。mission_state：active 21，passive 1，standby 1，standstill 3192。`CMD:` 21 次。起点没挪。odom 同样不是步行速度（p99 46.4 m/s，z −63.9..8.7 m，149 次跳变，最大 142.1 m）。全文 `report_switch.txt`。
+- 和 T47（老版 TEB）比：T47 现场地图 active 3218、CMD 62、起点挪了 0.50 m；INS 直出 active 3222、CMD 791、起点没挪。这次 MPPI 三次都只 active 了约 20 次（发出约 20 条速度）就进了 standstill，起点都没挪。现场地图和切图的定位 odom 仍在掉高度、跳变；INS 直出没有这个报错。
 

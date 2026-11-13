@@ -94,6 +94,8 @@ if(ENABLE_ROS2)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runnable/communication/ros_debug_bridge/**.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runnable/communication/d20_ptz_bridge/**.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runnable/communication/r11_head_bridge/**.cc)
+    # 旧的 RosBridge 方法已经拆到 *_bridge.cc，这三个文件还在实现已经删掉的成员，编不进去。
+    list(FILTER ROS_SRCS EXCLUDE REGEX "/(following|recharging|tracking)\\.cc$")
 
     list(APPEND ROS_INCLUDE_DIRS 
         ${grid_map_ros_INCLUDE_DIRS}

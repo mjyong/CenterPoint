@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <ceres/ceres.h>
+#include <ceres/version.h>
 #include <cmath>
 #include <cstdlib>
 #include <limits>
@@ -14,7 +15,8 @@ template <typename T> T normalize_angle(T angle) {
   return angle - two_pi * ceres::floor((angle + T(M_PI)) / two_pi);
 }
 
-#ifdef ROS2_JAZZY
+#if defined(ROS2_JAZZY) || (CERES_VERSION_MAJOR > 2) || \
+    (CERES_VERSION_MAJOR == 2 && CERES_VERSION_MINOR >= 2)
 class AngleLocalParameterization : public ceres::Manifold {
 public:
   virtual ~AngleLocalParameterization() {}

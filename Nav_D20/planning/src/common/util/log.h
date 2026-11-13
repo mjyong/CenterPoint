@@ -54,7 +54,12 @@
 #define AFATAL_IF(cond) ALOG_IF(FATAL, cond, MODULE_NAME)
 #define ALOG_IF(severity, cond, module) \
   !(cond) ? (void)0                     \
-          : google::LogMessageVoidify() & ALOG_MODULE(module, severity)
+          : GLOG_VOIDIFY() & ALOG_MODULE(module, severity)
+#ifdef GLOG_EXPORT
+#define GLOG_VOIDIFY() google::logging::internal::LogMessageVoidify()
+#else
+#define GLOG_VOIDIFY() google::LogMessageVoidify()
+#endif
 
 #define ACHECK(cond) CHECK(cond) << LEFT_BRACKET << MODULE_NAME << RIGHT_BRACKET
 
