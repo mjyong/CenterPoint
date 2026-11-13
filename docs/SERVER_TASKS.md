@@ -157,7 +157,8 @@
 | T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 完成，已复核（2026-11-12）：外参 A2；装包、锁频、室内外都做了；挡路车 15 s 后不安全 207 → 204 |
 | T47 | 规划回放第二次（起点挪到路上、bag 放完就收、新的回放脚本）；室外 bag 缺帧那一段的 INS；在线对离线扣掉原点差重比；狗在线时验 root 桥白名单 | Agent | T46 复核 | 1.5 小时 | 完成，已复核（2026-11-12）：两次回放都进了 active；之后的 Nav_D20 同步冲掉了我们的补丁，已重打（Nav_D20/PATCHES.md）；新地图的人行横道接进规划；T48 用新版重跑 |
 | T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 完成，已复核（2026-11-13）：编过了，切图读到 5 条人行横道；三次都只 active 约 20 个周期就停在 standstill，两次定位跑飞。原因都是同步带来的：回放超时的补丁丢了、新版 lightning 少了 0921 要的 INS 朝向 180°、默认车型 d30。三处都改了，T49 重跑 |
-| T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 完成（2026-11-13）：三处修复都生效（d20/001、朝向 180、超时 0）。INS 直出 active 3232、CMD 中位 vx 1.115；现场地图和切图全局规划失败，任务停在 fault。gap 与 T46 base 相同（unsafe 204） |
+| T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三处修复都生效。INS 直出一路 active、指令往前；现场地图和切图被 A* 起点的夹缝卡在 fault；狗一出路网 MPPI 就失败；LIO 落后时 odom 往回跳。A* 和 odom 已改；wait 不安全 204 → 187，剩下的是没看到的车 |
+| T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8690,3 +8691,92 @@ wait 的 all 一行：episodes 3396，unknown 3676，unsafe 187，risky 275，ti
 - detection：`1104_cp04_s000` fan000，到达 11.1 s 就走了。车在出发前 2.4 s 已被标上，9.4 m、方位 137°，没有形成跟踪。
 - prediction：`1104_cp01_s002` fan045，到达 3.1 s 就走了。车已被跟踪，46 m、方位 29°、14 km/h，门控没看出会冲突。
 - near、occluded：0 次。
+
+### T49 复核（2026-11-13）
+
+**结论：T48 的三处修复都生效了，INS 直出一路 active、指令往前（vx 中位 1.1 m/s）。现场地图和切图被一个新问题卡住：A* 起点落在两个门槛的夹缝里，任务一开始就 fault。另外查出两件事：狗一出路网 MPPI 就失败；LIO 落后时 odom 往回跳。A* 和 odom 已改，T50 重跑。**
+
+1. **现场地图、切图 fault：A* 起点的夹缝**。
+   - `AstarSearch::plan` 起点 `distance_cost > 0.99` 才算碰撞，扩展邻格却要 ≤ 0.9。我们挪起点的补丁（T47）也用 0.99。
+   - 起点代价在 0.9–0.99 之间时，既不报碰撞、不挪，又一步走不出去：只打一行 stdout `GridPathPlanner plan path failed`，任务进 fault。D20 配置（`safe_margin` 0.1、`inflation_margin` 0.05、`max_obstacle_dist` 2.0）下，这个夹缝是离路边 0.17–0.34 m。
+   - 用 CJGC 按 `LoadPGMMap` 和 `calcCostMap` 的算法离线重算：T49 起点 (78.35, 119.53) 离路边 0.22 m，代价 0.960；周围的格子都 > 0.9。T47 的起点 (78.31, 119.39) 是 0.973，同样在夹缝里，当时老版是挪了 0.50 m 才过的。
+   - 已改：挪起点的门槛和 A* 一致，0.9（`grid_path_planner.cc` 的 `kAstarStepCost`）。挪到的点代价 ≤ 0.8（`isCollision`），A* 走得出去。
+2. **狗脚下只要有一格障碍，MPPI 就失败，而且不会自己恢复**（INS 直出，3232 个 active 周期）。
+   - 脚印里有障碍格的 1335 个周期，**全部** `MPPI optimizer failed to compute a collision free path`，速度清零；没有障碍格的 1897 个周期只失败 36 次（离障碍 0.2–0.3 m 时，或 bag 放完）。报告里的 1370 次失败和"脚下是障碍 1370 帧"是同一批。
+   - 失败集中在 106–174 s：bag 里的狗走上了 CJGC 没有的那段路（人行横道 6 往西），路网外面全是障碍。这在回放里是预期的；切图那次用新地图应该没有，T50 验。
+   - **真狗上的风险**：定位偏、或者狗被挤到路边，只要脚印碰到路网边，MPPI 每周期都失败、速度为 0，也没有往回挪的恢复动作，狗就停在原地。要不要改（比如路网外一小圈只给高代价、不算碰撞，或者加恢复），是规划的设计，要人和机器人团队定，这次没改。
+3. **LIO 落后时 /lightning/odom 往回跳**（现场地图 40 次、切图 37 次，> 1 m / 10 ms）。
+   - 跳变都在狗走得快的那段（69–125 s，1.5–2 m/s），沿行进方向往回跳约 1.3 m（≈ 狗 0.9 s 走的路），常常 0.06 s 后又跳回来。
+   - 根子在 `LaserMapping::Run` 末尾：配准完 `kf_imu_ = kf_`，把高频预测重置成这一帧点云结束时的状态，比这一帧新的 IMU 本该补推一遍，那段代码被注释掉了。LIO 落后多少，odom 就往回跳多少；下一帧赶上来又跳回去。平时落后 0.1 s，就是每帧往回拉 0.15 m 的锯齿。
+   - 为什么落后 0.9 s：同一段时间 lightning 报了 11 次"LiDAR 回调间隔过大"（每次约 0.9 s，和跳变的时刻一一对上）和 9 次"检测到雷达断流"（0.5–0.8 s），IMU 回调也偶尔隔 50–100 ms。不是加载地图块（100 m 才换一次块）。是处理本身慢，还是回调没被调度、点云在上游丢了，现有日志分不出来。
+   - 已改：
+     - 补推（`laser_mapping.cc`）：重置以后把缓冲里比这一帧新的 IMU 再推一遍，加速度按重力归一化（和 `ProcessIMU` 一样）。lightning 用的是 MultiThreadedExecutor，IMU、LiDAR 回调在不同线程，所以加了锁。
+     - 诊断日志：`ProcessLidar` 超过 0.2 s 打一条 WARNING；退出时打印各步耗时（`Timer::PrintAll`，多打了最长一次）。回放报告多一行"定位：LiDAR 回调间隔过大…"和这张耗时表。
+4. **其他**：
+   - 朝向 1° / 0° / 1°，没有 TURNED ROUND；odom − INS 0.29、0.14、0.31 m（INS 直出的 0.14 m 是 INS 点到 `base_link` 的杠杆臂，恒定）。
+   - 贴图 44%、50%（T48 位姿反了时 13–18%）。
+   - glog 都读进来了：lightning 2003、2057 行，规划 3536–35010 行。
+   - INS 直出那 29 个 standstill 是 bag 放完时的超时，正常。
+5. **1104 上的 `wait`**（`docs/PLANNING_INTEGRATION.md` 第 4 节末尾有表）：
+   - 不安全 204 → 187，冒险 314 → 275；等的时间 p90 3.2 → 3.8 s，最长 15.1 → 15.5 s，没有超时。少错放了一些，几乎没多等。
+   - 剩下 187 次里 179 次是 blind：狗走的时候车还没被看到。165 次第一次出现在方位 130–140°（后方盲区边上），143 次在 10–30 m 处冒出来。1104 狗是背对来车坐着的；真过人行横道时先调朝向，这类大部分应该没有了。
+   - 那 179 辆车，55% 在狗走后 5 s 内出现，92% 在 8 s 内。所以加了一个可选项：**到路边先看几秒**（`YieldConfig.min_watch`，默认 0 不用；评测工具自动有 `--min-watch`）。合成场景（车从后方盲区开过来）里 0、3、5、8 s 对应不安全 6、3、1、0 次。T50 在 1104 上评，人定用不用。
+   - prediction 那 2 次（`1104_cp01_s002` fan045，车 46 m、14 km/h、跟上了）：门控没看出它会经过，T50 不单独查。
+6. 文档：`Nav_D20/PATCHES.md` 三条新的（上一轮的"本次"换成 fc21bf4）；规划 ONBOARDING（A* 两个门槛、MPPI 出路网就失败）；定位 ONBOARDING（补推 IMU、LiDAR 卡顿）；`docs/PLANNING_INTEGRATION.md`（T49 的表、`min_watch`）。测试 47 个（新加两个 `min_watch` 的）。
+
+
+---
+
+## T50 用 T49 复核的修复重编、回放三次；1104 上评"到路边先看几秒"
+
+```text
+任务 T50：T49 复核改了三处：
+  ① A* 起点在 0.9–0.99 的夹缝里不挪、又走不出去，任务进 fault → 挪起点的门槛改成 0.9（规划 grid_path_planner.cc）；
+  ② LIO 配准完把高频预测拉回这一帧的时刻，没补推后面的 IMU，LIO 落后时 /lightning/odom 往回跳 1.3 m
+     → 补推（定位 laser_mapping.cc）；
+  ③ 定位加了耗时日志：ProcessLidar 超过 0.2 s 打一条，退出时打印各步耗时（loc_system.cc、run_loc_online.cc、timer.cc）。
+这一轮：重编规划和定位，回放三次，看现场地图和切图进不进 active、odom 还跳不跳、LiDAR 回调为什么卡；在 1104 上评
+"到路边先看几秒"（min_watch）。
+先按通用约定做。可以改的范围：Nav_D20/（编不过时只改我们的补丁，改了写进 PATCHES.md）。tools/、dog_perception/ 不改。
+仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42。mkdir -p data/reports/T50
+
+0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py -q | tail -1   （47 passed）
+   补丁都在（T49 第 0 步那几条，再加这几条）：
+     grep -c "kAstarStepCost" Nav_D20/planning/src/algorithm/grid_path_planner/grid_path_planner.cc               （2）
+     grep -c "acc_scale" Nav_D20/slam/lightning-lm-master/src/core/lio/laser_mapping.cc                           （2）
+     grep -c "ProcessLidar 用了" Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.cc                   （1）
+     grep -c "Timer::PrintAll" Nav_D20/slam/lightning-lm-master/src/app/run_loc_online.cc                        （1）
+   新地图解开（同 T48）。
+1. 重编 planning 和 lightning（同 T49 第 1 步），存 data/reports/T50/build_{planning,lightning}.txt（tail -30）。
+2. 回放三次（同 T49 的三条命令，名字换成 t50_*），cp 成 data/reports/T50/report_{map,ins,switch}.txt。
+   先看（第一次回放 t50_map 有一条不对就停下，抄 report 前 60 行）：
+   - 车型 d20/001、INS 朝向偏置 180、Data timeout exceeded 0（同 T49）；
+   - "Start adjusted" ≥ 1，mission_state 里没有 fault，大部分是 active；抄 planning.INFO 里那行 "Start adjusted from … to …"
+     （挪了多远：T49 起点离路边 0.22 m，挪到代价 ≤ 0.8 的地方，应该 < 0.5 m）。
+   然后每份抄：
+   - mission_state、CMD 次数、"CMD 中位 vx vy ω"、vx > 0.05 的比例、local planner solver failed 次数；
+   - 查包：/lightning/odom 还报不报（开头 1 s 内初始化那一跳除外）；报的话抄那一行（速度 p99、跳变次数、最大）；
+   - "定位：LiDAR 回调间隔过大 N 次，ProcessLidar 超过 0.2 s M 次（最长 X），雷达断流 K 次"这一行，和下面的耗时表全文
+     （t50_ins 是 INS 直出，没有 LIO，这两项可以没有）；
+     · 有"回调间隔过大"、M 也差不多多：处理本身慢，耗时表里看哪一步的 max 大；
+     · 有"回调间隔过大"、M 是 0：回调没被调度或点云在上游丢了。这时在 t50_map 上再跑一次，同时在另一个终端
+       pidstat -u -p $(pgrep -d, -f "run_loc_online|planning|lidar_seg|grid_map_memory|ros2 bag") 1 > data/reports/T50/pidstat_map.txt
+       （没有 pidstat 就 top -b -d 1 -n 180 > data/reports/T50/top_map.txt），名字 t50_map_cpu，报告里写哪个进程在卡的时候占满；
+   - 可视化一段：heading、贴图、odom - INS、lightning log / glog 的行数（同 T49）；
+   - t50_switch：106 s 以后还有没有"狗脚下是障碍"和 MPPI 失败（新地图有那段路，应该没有）；
+     t50_map、t50_ins 有（CJGC 没那段路），抄第一次的时间。
+   - 录包走 LFS（work_dirs/planning_io_t50_*），viz/ 是普通文件。
+3. 离线评测：到路边先看几秒（只用 CPU，每组约 5 分钟，两组两组跑）：
+     S=$(for d in data/labels/1104_*/labels_sustech2.pkl; do basename $(dirname $d); done)
+     run() { n=$1; shift; s=$(date +%s); python tools/dog/yield_eval.py --scenes $S --fan 8 --length 8 --eval-max-wait 120 "$@" \
+         --details data/reports/T50/episodes_$n.csv > data/reports/T50/yield_$n.md 2>&1; echo "$n exit $? $(( $(date +%s) - s )) s"; }
+     { run watch0 --min-watch 0 & run watch3 --min-watch 3 & wait; run watch5 --min-watch 5 & run watch8 --min-watch 8 & wait; } \
+         2>&1 | tee data/reports/T50/runs.txt
+   - watch0 应和 T49 的 wait 一样（all 一行 unsafe 187、risky 275）；不一样就写明差多少，接着做；
+   - 四组各抄 all 一行：unsafe（和原因 blind、far、near、occluded、detection、prediction）、risky、等待中位 / p90 / 最长、timeouts。
+4. 提交：data/reports/T50/、录包和 viz/、本文档。不提交解开的地图。
+
+停止条件：第 1 步机器人团队的代码编不过；第 2 步 t50_map 还是 fault，或者开头三行有一条不对。
+报告（写进"T50 结果"）：编译最后几行；三份 report 全文；和 T49 比：mission_state、CMD、起点挪了多少、odom 跳变次数、
+LiDAR 卡顿的那一行和耗时表（以及 pidstat / top 看到的）；四组 min_watch 的表。
+```

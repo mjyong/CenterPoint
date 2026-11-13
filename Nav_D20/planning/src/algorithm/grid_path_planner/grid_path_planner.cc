@@ -146,9 +146,13 @@ bool GridPathPlanner::plan(Eigen::Vector2d start, Eigen::Vector2d end,
           << adjusted_end.transpose();
     end = adjusted_end;
   }
-  // the planners reject a start whose distance_cost is above 0.99 ("Start point is in collision")
+  // The planners reject a start whose distance_cost is above 0.99 ("Start point is in collision"), and A* does not
+  // step into a cell above 0.9 (AstarSearch::plan). A start between the two passes the first check and then has no
+  // neighbour to go to: "GridPathPlanner plan path failed", the mission goes to fault (T49: the dog 0.22 m from the
+  // edge of a 1.7 m CJGC road, distance_cost 0.96). So move the start whenever A* could not leave it.
+  constexpr double kAstarStepCost = 0.9;   // AstarSearch::plan's neighbour check
   if (config_.allow_collision_start() && grid_map_.isInside(start) &&
-      grid_map_.atPosition("distance_cost", start) > 0.99) {
+      grid_map_.atPosition("distance_cost", start) > kAstarStepCost) {
     Eigen::Vector2d adjusted_start =
         findNearestFreePoint(start, config_.collision_start_search_radius());
     if (adjusted_start == start) {

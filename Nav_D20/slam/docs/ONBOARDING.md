@@ -59,7 +59,7 @@ IMU、激光、INS 各一个回调组，三线程执行器并行。
 |---|---|---|---|
 | ① IMU 预测 | 每来一帧 IMU（角速度从度/秒换成弧度/秒）：`LaserMapping::ProcessIMU` 用 ESKF 往前推一步；`Localization::ProcessIMUMsg` 取预测状态（`GetIMUState`），用 `T_body_imu` 换到 `base_link`，**每帧 IMU 发一次** `/lightning/odom` 和 TF——所以是 100 Hz，两帧点云之间全靠 IMU 推；激光配准成功以后才开始发 | `loc_system.cc`、`localization.cpp`、`laser_mapping.cc`、`eskf.cc` | 流程面板 ①；高度、横滚、俯仰曲线 |
 | ② 点云预处理 | `ProcessLidarMsg` → `pointcloud_preprocess.cc`（`lidar_type: 4` 按 XT32 解析，盲区 0.5 m，每 6 个点取 1 个）→ 放进队列 | `localization.cpp`、`pointcloud_preprocess.cc` | |
-| ③ LIO 配准 | `LaserMapping::Run`：`SyncPackages`（一帧点云 + 这段时间的 IMU）→ `ImuProcess::Process`（去畸变）→ 0.5 m 体素降采样 → 离上次加载地图的地方超过 100 m 就按位姿加载地图块、异步重建 IVox → `kf_.Update(LIDAR)`：点到面的迭代 EKF，最多 4 次 | `laser_mapping.cc`、`imu_processing.hpp`、`tiled_map.cc`、`ivox3d/` | 当前帧点云按"离地图多远"着色 |
+| ③ LIO 配准 | `LaserMapping::Run`：`SyncPackages`（一帧点云 + 这段时间的 IMU）→ `ImuProcess::Process`（去畸变）→ 0.5 m 体素降采样 → 离上次加载地图的地方超过 100 m 就按位姿加载地图块、异步重建 IVox → `kf_.Update(LIDAR)`：点到面的迭代 EKF，最多 4 次；配准完把高频预测重置成这一帧的状态，再把比这一帧新的 IMU 补推一遍（我们加的，T49 复核：原来不补推，LIO 落后多少 odom 就往回跳多少） | `laser_mapping.cc`、`imu_processing.hpp`、`tiled_map.cc`、`ivox3d/` | 当前帧点云按"离地图多远"着色 |
 | ④ 健康 | 匹配上的点 `effect_num` < 100 或平均残差 > 0.15 m 算一帧失败（日志"定位质量下降"）；连续 100 帧（约 10 s）→"定位故障"，下一帧自动重初始化：缓冲里有 RTK 固定解就用最新 INS 位姿，否则退回上次好的位姿再做 NDT | `LaserMapping::Run` 末尾、`Localization::LidarOdomProcCloud` | 事件；"定位有效"状态条 |
 | ⑤ INS 融合 | 找时间最近的 INS，RTK 固定解（`ins_status` 3 且 `pos_type` 56）才当观测融进 ESKF（`ProcessINS`） | `Localization::LidarOdomProcCloud` | INS 轨迹（紫 = RTK 固定）、"定位减 INS"曲线 |
 | ⑥ 输出 | `/lightning/current_scan_world`（有订阅者才发）；`/lightning/odom` 的 `covariance[0]` 挪作发布时的系统时间、`covariance[1]` = 定位有效（1 有效、0 故障）；每秒一条 `/nav/location`、一行 `/tmp/lightning_trajectory.txt`；健康事件发 `/rhr/topic/event_info` | `loc_system.cc`、`health_reporter.h` | |
@@ -242,6 +242,8 @@ LOC_MAP_PATH=... bash Nav_D20/planning/script/replay_planning_check.sh <名字> 
 | 现象 | 原因 | 状态 |
 |---|---|---|
 | 高频 odom 一路往下掉 | kygi665 加速度单位 g | 已修（T42） |
+| 狗走得快时 odom 往回跳 1–1.7 m、又跳回来 | LIO 配准完把高频预测拉回这一帧点云的时刻（0921 回放时 LIO 偶尔落后 0.9 s），比这一帧新的 IMU 没补推 | 已补推（T49 复核），T50 验 |
+| 回放时 LiDAR 回调隔几秒卡 0.9 s、雷达断流 0.5–0.8 s | 还不知道：处理本身慢，还是回调没被调度 | 加了日志（`ProcessLidar 用了…`、退出时的耗时表），T50 查 |
 | 内置地图定位不上、每 10 s 重初始化 | 地图倾斜 51° | 用现场地图（T43 起） |
 | INS 直出时规划起点在路外 | INS 位置离 1.7 m 宽的路边只有几分米 | 规划起点挪动（T47） |
 | 开头一帧位姿在原点 | 初始化之前的输出 | 可视化里不画，事件里记一条 |

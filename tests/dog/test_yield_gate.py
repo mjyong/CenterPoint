@@ -397,3 +397,32 @@ def test_wait_rule_holds_a_lost_vehicle_for_lost_hold():
     ds = [(t, gate.update(yg.assess(PATH, [], t, t, WAIT), t)) for t in np.arange(0.1, 8.0, 0.1)]
     assert all(d.reason == "lost" and d.ids == [1] for t, d in ds if t < WAIT.lost_hold - 0.05)
     assert next(t for t, d in ds if d.go) == pytest.approx(WAIT.lost_hold, abs=0.11)
+
+
+def test_min_watch_holds_the_go_at_the_curb_only():
+    cfg = YieldConfig(min_watch=3.0)
+    gate = yg.YieldGate(cfg)
+    ds = [(t, gate.update(yg.assess(PATH, [], t, t, cfg), t)) for t in np.arange(0.0, 5.0, 0.1)]
+    assert all(d.reason == "watching" and not d.go for t, d in ds if t < 2.95)
+    assert next(t for t, d in ds if d.go) == pytest.approx(3.0, abs=0.11)
+    # off by default; never once moving or on the crosswalk
+    assert yg.YieldGate(WAIT).update(yg.assess(PATH, [], 0.0, 0.0, WAIT), 0.0).go
+    assert yg.YieldGate(cfg).update(yg.assess(PATH, [], 0.0, 0.0, cfg), 0.0, dog_moving=True).go
+    assert yg.YieldGate(cfg).update(yg.assess(PATH, [], 0.0, 0.0, cfg), 0.0, on_crosswalk=True).go
+    # a vehicle seen while watching is waited for as usual (wait rule), then the watch is already over
+    gate = yg.YieldGate(cfg)
+    assert gate.update(yg.assess(PATH, [], 0.0, 0.0, cfg), 0.0).reason == "watching"
+    d = gate.update(yg.assess(PATH, [car(-30.0, 4.0, KMH30)], 1.0, 1.0, cfg), 1.0)
+    assert not d.go and d.reason == "vehicle"
+
+
+def test_min_watch_sees_a_car_coming_out_of_the_rear_blind_sector():
+    """T49: most unsafe crossings left were vehicles first seen 10-30 m away at 130-140 deg, a few seconds after the
+    robot went. Watching the road first sees them coming."""
+    labels, results = _behind_scene()
+    left = np.array([[0.0, 0.0], [-8.0, 0.0]])
+    args = ("s", "left", left, track_objects(results), gt_tracks(labels), labels["frames"][-1]["stamp"])
+    base = summarize(evaluate_path(*args, cfg=WAIT)[0])
+    watched = summarize(evaluate_path(*args, cfg=YieldConfig(min_watch=8.0))[0])
+    assert base["unsafe"] > 0 and watched["unsafe"] < base["unsafe"], (base, watched)
+    assert watched["wait_med"] >= 8.0 - 0.15

@@ -522,7 +522,27 @@ bool LaserMapping::Run() {
     }
 
     /// 更新kf_for_imu
-    kf_imu_ = kf_;
+    // 2026-11-13（T49 复核）：kf_ 是这一帧点云结束时（lidar_end_time）的状态，LIO 处理落后的时候比最新的 IMU 晚
+    // 零点几秒。原来直接 kf_imu_ = kf_，下面补推的循环被注释掉了：/lightning/odom 就被拉回到那一刻，
+    // 狗 1.5 m/s 走的时候往回跳 1.3 m，下一帧赶上来又跳回去（T49 现场地图回放 40 次 > 1 m 的跳变）。
+    // 现在重置以后，把缓冲里比这一帧新的 IMU 再推一遍，加速度和 ProcessIMU 一样按重力归一化；
+    // 加锁，ProcessIMU 在另一个线程里改 kf_imu_ 和 imu_buffer_。
+    {
+        UL lock(mtx_buffer_);
+        kf_imu_ = kf_;
+        if (p_imu_->IsIMUInited()) {
+            const double acc_scale = G_m_s2 / p_imu_->GetMeanAccNorm();
+            double t = measures_.lidar_end_time_;
+            for (const auto &imu : imu_buffer_) {
+                if (imu->timestamp <= t) {
+                    continue;
+                }
+                kf_imu_.Predict(imu->timestamp - t, p_imu_->Q_, imu->angular_velocity,
+                                imu->linear_acceleration * acc_scale);
+                t = imu->timestamp;
+            }
+        }
+    }
     // if (!measures_.imu_.empty()) {
     //     double t = measures_.imu_.back()->timestamp;
     //     for (auto &imu : imu_buffer_) {

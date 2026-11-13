@@ -340,7 +340,16 @@ bool LocSystem::Init(const std::string& yaml_path, bool publish_occ_grid, bool p
             // 帧率/点云监测(含帧间隔抖动、点云骤降告警上报)
             MonitorLidarFrameRate(lidar_time, now_sec);
             MonitorLidarCloudSize(cloud->width * cloud->height);
+            // 2026-11-13（T49 复核）：回放时 LiDAR 回调隔几秒就卡 0.9 s，/lightning/odom 跟着跳。分清是处理本身慢
+            // （下面这条）还是回调没被调度、点云在上游丢了（只有上面"回调间隔过大"、没有这条）。只打日志。
+            const auto proc_start = std::chrono::steady_clock::now();
             Timer::Evaluate([&]() { ProcessLidar(cloud); }, "Proc Lidar", false);
+            const double proc_s =
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - proc_start).count();
+            if (proc_s > 0.2) {
+                LOG(WARNING) << "ProcessLidar 用了 " << proc_s << " 秒（点云时间 " << std::fixed
+                             << std::setprecision(3) << lidar_time << "）";
+            }
         },
         lidar_sub_opts);
 

@@ -122,6 +122,12 @@ fi
   else
     echo "没找到这次规划的 glog（/tmp/planning.*.log.INFO.*）"
   fi
+  # 定位：LiDAR 回调卡住几次、处理本身慢几次，退出时打印的各步耗时（T49：回调隔几秒卡 0.9 s，odom 跟着跳）
+  l="${out}/logs/loc.log"
+  if [[ -f "${l}" ]]; then
+    echo "定位：LiDAR 回调间隔过大 $(grep -c 'LiDAR 回调间隔过大' "${l}" || true) 次，ProcessLidar 超过 0.2 s $(grep -c 'ProcessLidar 用了' "${l}" || true) 次（最长 $(grep -o 'ProcessLidar 用了 [0-9.]*' "${l}" | awk '{print $3}' | sort -g | tail -1)），雷达断流 $(grep -c '检测到雷达断流' "${l}" || true) 次"
+    sed -n '/Printing run time =====/,/Printing run time end/p' "${l}" | sed 's/^[^]]*\] //' | sed 's/^/  /'
+  fi
   # 给人看的版本：摊平到地图平面、换成 bag 时间、代价地图方向翻正；地图用规划这次用的那张（切过图就是切的那张），
   # 人行横道从同一个地图目录的 semantic.osm 读
   viz_args=()

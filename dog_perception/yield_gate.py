@@ -75,6 +75,11 @@ class YieldConfig:
     wait_margin: float = 1.5        # [m] wait rule: each side of a vehicle, on top of vehicle_margin
     wait_clear: float = 3.0         # [s] wait rule: a vehicle waited for must stay clear of the path this long
     lost_hold: float = 5.0          # [s] wait rule: a vehicle waited for and then lost is waited for this much longer
+    # T49 (1104, wait rule): 179 of the 187 unsafe crossings were vehicles nobody had seen when the robot went, 165 of
+    # them first seen 10-30 m away at 130-140 deg (the edge of the rear blind sector), 55% within 5 s of the go,
+    # 92% within 8 s. Watching the road a while at the curb sees most of them coming.
+    min_watch: float = 0.0          # [s] at the curb the robot watches at least this long before it goes (0: off;
+                                    # from the first update after reset, i.e. arriving)
 
 
 @dataclass
@@ -95,7 +100,7 @@ class Assessment:
 class Decision:
     go: bool
     reason: str                     # clear / committed / on_crosswalk / vehicle / young / standing / blocked /
-                                    # clearing / not_passed / lost / stale
+                                    # clearing / not_passed / lost / stale / watching
     ids: list = field(default_factory=list)
     gap: float = float("inf")
 
@@ -348,10 +353,22 @@ class YieldGate:
         self.still_since = {}           # id -> first time seen standing (continuously)
         self.conflict_last = {}         # id -> last time it was a conflict (wait rule)
         self.seen_last = {}             # id -> last time it was seen (wait rule)
+        self.watch_since = None         # first update standing at the curb (min_watch)
 
     def update(self, a, now, dog_moving=False, on_crosswalk=False):
         """``on_crosswalk``: the robot's centre is on a crosswalk of the map. It does not stop there for vehicles,
-        stale perception included: vehicles have to give way, and stopping in a lane is worse (people, 2026-11-12)."""
+        stale perception included: vehicles have to give way, and stopping in a lane is worse (people, 2026-11-12).
+        ``min_watch``: a go is held ("watching") until the robot has stood at the curb that long; not once it is
+        moving or on the crosswalk."""
+        if self.watch_since is None and not dog_moving and not on_crosswalk:
+            self.watch_since = now
+        d = self._decide(a, now, dog_moving, on_crosswalk)
+        if (d.go and d.reason == "clear" and self.cfg.min_watch > 0 and not dog_moving and not on_crosswalk
+                and now - self.watch_since < self.cfg.min_watch):
+            return Decision(False, "watching", [], d.gap)
+        return d
+
+    def _decide(self, a, now, dog_moving, on_crosswalk):
         cfg = self.cfg
         if on_crosswalk:
             self.paused = False

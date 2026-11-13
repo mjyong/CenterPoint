@@ -21,6 +21,7 @@ void Timer::PrintAll() {
         LOG(INFO) << "> [" << r.first
                   << "] average time usage: " << std::accumulate(rec.begin(), rec.end(), 0.0) / double(rec.size())
                   << " ms, med: " << rec[rec.size() * 0.5] << " 95%: " << rec[rec.size() * 0.95]
+                  << " max: " << rec.back()   // T49 复核：偶尔卡一下的步骤在 95% 里看不出来
                   << ", called times : " << r.second.time_usage_in_ms_.size();
     }
     LOG(INFO) << ">>> ===== Printing run time end =====";

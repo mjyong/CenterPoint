@@ -6,6 +6,7 @@
 #include <glog/logging.h>
 
 #include "core/system/loc_system.h"
+#include "utils/timer.h"
 
 #include "wrapper/ros_utils.h"
 
@@ -36,6 +37,8 @@ int main(int argc, char** argv) {
     //loc.SetInitPose(math::XYZRPYToSE3(init_pose));
     loc.Spin();
 
+    // 退出时打印各步耗时（平均、中位、95%、最长）：回放时查 LIO 哪一步慢（T49 复核）
+    Timer::PrintAll();
     rclcpp::shutdown();
 
     return 0;
