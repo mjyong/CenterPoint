@@ -161,7 +161,7 @@
 | T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三次都一路 active，odom 不再跳。剩下：狗贴着路网边时 MPPI 一直失败（起步也会卡住）；回放时 LiDAR 点云在进定位之前断续。min_watch 没用，不开 |
 | T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 完成，已复核（2026-11-13）：现场地图、INS 直出贴边不再卡（1716/1716 → 24/1995、1330/1330 → 4/1342）；切图那次还卡，是 GPU 用了主机算的起点间隙（两份距离场不一样），已改成显卡上自己算；狗上的装法记下了 |
 | T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 完成，已复核（2026-11-13）：编过，门控 38787 帧 0 差；回放状态切换对。复核发现：没放行、狗的中心进了人行横道就直接过（回放里是录包的狗自己走上去的，狗上定位跳一下也会这样），已改成离入口 1.5 m 内还当在路口等；外参链加了检查工具 |
-| T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 任务已写好（T52 做完再做） |
+| T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 完成（2026-11-13）：1112 在 ad68517c 上路网 53%，不过人行横道；狗上的图只有 47 m，盖不住。回放一路 active。感知重算跳过（没有 TensorRT） |
 | T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 任务已写好（T53 做完再做） |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -9090,6 +9090,24 @@ C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 �
 crosswalk_vehicles 的最大值；b 做没做、为什么。
 ```
 
+### T53 结果
+
+2026-11-13。planning `Finished <<< planning [1min 14s]`，`Summary: 1 package finished [1min 15s]`（T51 复核的 GPU 起点间隙这次编进去了）。接口包没再编。pytest 50 passed，1 skipped（`tests/dog/test_yield_gate_cpp.py`：默认路径上没有 g++ 和 Eigen 3）。`obstacles_escape_tolerance` 1 处。全文在 `data/reports/T53/`。
+
+狗在线，只读。定位地图 `c1adbe7b-2e5e-4e83-ba30-e164914033c4` 从 `/userdata/config/robot_service/map/` 拷到 `/public/zjst/robot/loc_maps/`（5.8 MB，不提交）。定位配置和 `d20/001` 的规划配置拷到 `/public/zjst/robot/dog8_stack/`（原件不提交），diff 在 `dog_config_diff.txt`。`ins_lat` / `ins_lon` / `ins_height` 和仓库一样：29.731405029387507、106.78389112052452、217.1952074889191。不一样的是：
+
+- 定位：`map_path` 是狗上的 `c1adbe7b`（仓库写的是 `ad68517c`）；`with_ins` false（仓库 true）；没有 `ins_yaw_offset`；`publish_map_cloud` 和 `publish_occ_grid` 都是 false；`ins_trans_noise` / `ins_rot_noise` 是 1.0 / 0.052（仓库 0.5 / 0.0175）；`init_t` 是 `[68.47, 229.41, 0.0775522]`。其余大多是引号和注释。
+- 规划：没有 `sub_lidar_objects`，没有 `crosswalk_yield_conf`；`nav_blocked_enable` false；全局图 `input_name` 是 `CJGC_DD`，也没有 `allow_collision_goal` / `allow_collision_start`；`off_distance_threshold` 0.25（仓库 0.5）。
+
+1112（`/public/zjst/robot/cp_data/1112_t40`）：16765 条 INSPVAX，100% 有效、100% RTK 固定，168 s，轨迹 120 m，起点 (−414.4, 665.7)，终点 (−414.5, 665.7)。`/perception/lidar_3d/objects` 1669 条，每帧车最多 5 辆，51% 的帧有车，38% 有在动的车，最近的车中位 19.8 m、最近 2.1 m。
+
+- `ad68517c`：轨迹 100% 在图里，53% 在路网 0.5 m 内。15 m 内没有人行横道。回放目标 `−414.5 665.7`（轨迹末端）。
+- `a70c6db6`：0% 在图里，0% 在路网上。
+- `c1adbe7b`：`bag_on_map.py` 读不了这张图的 `origin`（写成了列表，解析器要 `origin: [x, y, z]`）。图是 234×231、0.2 m，原点 (−10.8, −9)，大约 47 m 见方。轨迹在 x −423..−377、y 651..667，整段在图外。
+
+回放用 `ad68517c`（路网比例最高，53%，高于 30%）。车型 `d20/001`，`INS 朝向偏置 0（bag 1112_t40）`。`Map switch` 1 次，5 条人行横道，但跑的这一带附近 0 条。`mission_state` 没有 fault：active 3010，passive 1，standby 1，standstill 31。`CMD:` 2931 次，中位 vx / vy / ω = 0.325 / 0.000 / 0.054，vx > 0.05 占 80%。`local planner solver failed` 79 次。`local planner: zero command in 80 of 3010 active cycles (3%); with costmap obstacles under the footprint 69 of 2192, without 11 of 818`。`Data timeout exceeded` 1 次，在 bag 放完时。起点、终点都没挪。odom 跳变 1 次，784.5 m，在 0.1 s（初始化：轨迹离原点大约这么远）。朝向中位 1°，贴图中位 90%，odom − INS 中位 0.31 m。`Crosswalk yield:` 没有状态行，只有启动时的 `Tracking: crosswalk yield on, rule wait`。`/viz/state` 的 `planning.crosswalk_vehicles` 最大是 5（3010 个周期里 1552 个大于 0），用的是包里录的目标。
+
+第 4 步 b 没做：规划环境里没有 TensorRT（没有 `libnvinfer`，`import tensorrt` 失败），包里的目标没有现场重算。
 
 ---
 
