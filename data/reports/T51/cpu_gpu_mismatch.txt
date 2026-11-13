@@ -1,0 +1,45 @@
+MPPI CUDA debug: 1939
+fail gpu=1 cpu=0: 0
+fail gpu=0 cpu=1: 11
+stopped: CPU and GPU fail flags disagree
+
+----- 1 line 13303 -----
+W20261113 16:08:59.279399 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=2.98023e-07 y=8.9407e-08 yaw=7.45058e-08 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=24.7321 (j=170) cpu=2.5e+07 (j=0) | fail gpu=0 cpu=1
+W20261113 16:08:59.279642 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+
+----- 2 line 13327 -----
+W20261113 16:08:59.325902 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=2.01166e-07 y=1.78814e-07 yaw=1.19209e-07 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=19.9197 (j=2303) cpu=2.5e+07 (j=135) | fail gpu=0 cpu=1
+W20261113 16:08:59.326115 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+
+----- 3 line 13351 -----
+W20261113 16:08:59.380192 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=2.98023e-07 y=2.08616e-07 yaw=1.78814e-07 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=19.7229 (j=2852) cpu=2.5e+07 (j=24) | fail gpu=0 cpu=1
+W20261113 16:08:59.380509 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+
+----- 4 line 13375 -----
+W20261113 16:08:59.431188 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=2.98023e-07 y=1.78814e-07 yaw=1.78814e-07 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=20.1018 (j=493) cpu=2.5e+07 (j=29) | fail gpu=0 cpu=1
+W20261113 16:08:59.431613 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+
+----- 5 line 13437 -----
+W20261113 16:08:59.536648 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=3.57628e-07 y=8.9407e-08 yaw=8.9407e-08 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=30.6874 (j=2587) cpu=2.5e+07 (j=1444) | fail gpu=0 cpu=1
+W20261113 16:08:59.536930 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+
+----- 6 line 13461 -----
+W20261113 16:08:59.575095 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=2.98023e-07 y=1.19209e-07 yaw=1.19209e-07 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=25.3366 (j=400) cpu=2.5e+07 (j=400) | fail gpu=0 cpu=1
+W20261113 16:08:59.575393 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+
+----- 7 line 13485 -----
+W20261113 16:08:59.628721 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=2.38419e-07 y=2.38419e-07 yaw=1.19209e-07 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=24.0118 (j=999) cpu=2.5e+07 (j=5) | fail gpu=0 cpu=1
+W20261113 16:08:59.628990 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+
+----- 8 line 13509 -----
+W20261113 16:08:59.678719 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=3.57628e-07 y=2.38419e-07 yaw=8.9407e-08 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=23.7325 (j=2571) cpu=2.5e+07 (j=501) | fail gpu=0 cpu=1
+W20261113 16:08:59.679045 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+
+----- 9 line 13533 -----
+W20261113 16:08:59.732503 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=3.57628e-07 y=2.38419e-07 yaw=1.19209e-07 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=24.1391 (j=2895) cpu=2.5e+07 (j=116) | fail gpu=0 cpu=1
+W20261113 16:08:59.732728 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+
+----- 10 line 13557 -----
+W20261113 16:08:59.781092 140253894950912 optimizer.cc:218] [PLANNING]MPPI CUDA debug: rollout maxdiff x=3.57628e-07 y=2.38419e-07 yaw=1.19209e-07 vx=0 wz=0 | costs maxdiff=2.5e+07 min gpu=23.6811 (j=2130) cpu=2.5e+07 (j=215) | fail gpu=0 cpu=1
+W20261113 16:08:59.781385 140253894950912 optimizer.cc:258] [PLANNING]  critic ObstaclesCritic: cpu_min=2.5e+07 (composite formula, see totals maxdiff)
+

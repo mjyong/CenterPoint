@@ -1,0 +1,112 @@
+T51 第 4 步，2026-11-13 16:19 +0800。ssh dog 通。只读：没有停服务，没有 apt，没有在域 0 上发东西。
+主机 journal 里是 tegra-ubuntu。进程启动时间 Fri Nov 13 15:51:49 2026。
+
+== 怎么起的
+systemctl list-units --type=service --all | grep -iE "plan|lightning|loc|nav" 里和导航有关的是这三个（另外命中 fstrim、netplan-ovs-cleanup、rc-local、snapd.autoimport，与规划定位无关）：
+
+nav_perception.service  active running
+  /etc/systemd/system/nav_perception.service
+  User 未写（默认 root），WorkingDirectory 未写
+  Environment=PERCEPTION_INSTALL_DIR=/opt/seres/nav_perception
+  ExecStart=/opt/seres/nav_perception/start/start_nav_perception_bg.sh
+  Restart=no
+
+planning.service  active running
+  /etc/systemd/system/planning.service
+  User=root Group=root
+  WorkingDirectory=/opt/seres/nav/planning
+  ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash; source /opt/seres/nav/planning/share/planning/local_setup.bash; ros2 run planning planning'
+  Restart=on-failure RestartSec=5s
+  进程：1685 python3 ros2 run planning planning；3391 /opt/seres/nav/planning/lib/planning/planning
+
+slam.service  active running（定位走这个，没有单独的 lightning.service）
+  /etc/systemd/system/slam.service
+  User=root Group=root
+  WorkingDirectory=/opt/seres/nav/slam
+  ExecStart=/bin/bash -c 'source /opt/seres/nav/slam/setup.bash; ros2 launch lightning model_switch_launch.py'
+  Restart=on-failure RestartSec=5s
+  进程：1751 python3 ros2 launch lightning model_switch_launch.py
+        3721 /opt/seres/nav/slam/lightning/lib/lightning/mode_switch_node --ros-args --params-file /tmp/launch_params_px9q50fy
+  这个 params 文件只有 use_sim_time: true。真正的配置由 launch 设的环境变量给出：
+    config_path=/opt/seres/nav/slam/lightning/share/lightning/config/default_d20.yaml
+  launch 文件：/opt/seres/nav/slam/lightning/share/lightning/launch/model_switch_launch.py
+    config_file 写死 default_d20.yaml；Node parameters 里 use_sim_time 写死 True。
+
+两个进程的环境（/proc/<pid>/environ）：
+  ROS_DISTRO=humble
+  RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+  CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+  ROS_LOCALHOST_ONLY=0
+  ROS_DOMAIN_ID 没有设（默认 0）
+  planning：PLANNING_ROOT_DIR=/opt/seres/nav/planning/share/planning/environment/../../../lib/planning
+            即 /opt/seres/nav/planning/lib/planning
+            PWD=/opt/seres/nav/planning
+  slam：PWD=/opt/seres/nav/slam
+
+== 二进制和安装目录
+/opt/seres/nav/planning/lib/planning/planning
+  -rwxr-xr-x root root 10300712  2026-10-29 13:51:12 +0800
+/opt/seres/nav/planning/version.txt
+  date: 2026-10-29 05:51:14
+  sha: unknow
+  branch: unknown
+同目录还有一份旧树 /opt/seres/nav/planning-1014/（本次服务没用它）。
+
+PLANNING_ROOT_DIR 见上。车型：
+  /opt/seres/nav/planning/lib/planning/robot_factory/default_robot_vin
+  内容：d20/001
+  planning-1014 里的同名文件也是 d20/001。
+
+定位配置 /opt/seres/nav/slam/lightning/share/lightning/config/default_d20.yaml
+  common.ins_type: kygi665
+  common.kygi665_ins_topic: /rte/rdap/rtk/inspvax
+  common.lidar_topic: /robot/topic/rdap/top_point_cloud2
+  common.imu_topic: /rte/rdap/rtk/imus/data_raw
+  common.ins_topic: /bynav/inspvax
+  system.map_path: /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4
+    目录在，mtime Oct 14 19:17；/opt/seres/nav/slam/data/ 下有同名一份，mtime 相同。
+  system.with_ins: false
+  system.ins_only_mode: false
+  ins_yaw_offset：这份 yaml 里没有这一项。
+定位二进制：
+  /opt/seres/nav/slam/lightning/lib/lightning/mode_switch_node
+  mtime 2026-10-10 16:13:23 +0800
+/opt/seres/nav/slam/version.txt
+  date: 2026-10-09 04:32:37
+  sha: e51dc0
+
+== 版本
+dpkg：
+  planning 1.0.1
+  slam 1.0.1
+  nav-perception-d20-02 0.00.01.26100901
+  seres-interface 1.0.1
+ldd /opt/seres/nav/planning/lib/planning/planning：
+  先 source /opt/ros/humble/setup.bash 和 planning 的 local_setup.bash（与 planning.service 相同）之后，not found 为 0。
+  不 source 时 ROS、osqp、qpOASES 都显示 not found，因为库在安装前缀里，不在默认搜索路径。
+
+== 能不能编
+which：colcon=/usr/bin/colcon  cmake=/usr/local/bin/cmake（3.27.7）  g++=/usr/bin/g++  gcc=/usr/bin/gcc
+nvcc 不在 PATH。文件在：/usr/local/cuda/bin/nvcc，CUDA 12.6，V12.6.68（2024-08-14）。/usr/local/cuda 指向 cuda-12.6。
+/opt/ros 只有 humble，另有 /opt/ros/cyclonedds.xml。
+dpkg：
+  libceres2 / libceres-dev 2.0.0+dfsg1-5
+  libgoogle-glog0v5 / libgoogle-glog-dev 0.5.0+really0.4.0-2
+  libopencv 4.8.0-1-g6371ee1（另有 Ubuntu 自带的 libopencv-*4.5d 4.5.4）
+  libosqp：没有这个 deb。source 之后 ldd 能找到 libosqp.so，库在规划安装前缀里。
+df：/dev/nvme0n1p1  937G，已用 90G，可用 800G，11%。
+nproc：12
+
+== 最近一天的日志（journald；安装目录下没有 glog 的 *.INFO）
+slam.service，--since "-1 day"，70232 行：
+  LiDAR 回调间隔过大：0
+  检测到雷达断流：1
+    Nov 13 15:52:12  laser_mapping.cc:385  检测到雷达断流，时长：0.600141
+    （服务 15:51:51 拉起，这是启动后约 20 秒的一次）
+  IMU 回调间隔过大：115
+    第一条 Nov 13 15:53:02  loc_system.cc:306  0.0425196 秒
+    最后一条 Nov 13 16:22:36  loc_system.cc:306  0.0402017 秒
+  含 "LiDAR" 的另外 394 行是 "LiDAR 回调线程ID"，2 行是启动时的线程数说明。
+planning.service，--since "-1 day"，227553 行：
+  failed to compute a collision free path：0
+  plan path failed：0

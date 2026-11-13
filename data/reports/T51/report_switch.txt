@@ -1,0 +1,80 @@
+== t51_switch: 目标 (80.0, 126.9) 已发；LOC_MAP_PATH=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 LOC_INS_ONLY=0 MAP_SWITCH=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t51_switch: 12 topics, 26681 transforms
+  /cmd_vel                                         geometry_msgs/msg/Twist                3149 msgs  frames -
+  /goal_pose                                       geometry_msgs/msg/PoseStamped             1 msgs  frames map
+  /lightning/odom                                  nav_msgs/msg/Odometry                 17063 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid             1577 msgs  frames base_link
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid             3206 msgs  frames base_link
+  /planning/debug/diagnostic                       diagnostic_msgs/msg/DiagnosticArray    3206 msgs  frames planning
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker          3150 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     3206 msgs  frames map
+  /planning/debug/plotjuggler/string               std_msgs/msg/String                    3206 msgs  frames -
+  /rhr/topic/event_info                            rhr_interface/msg/EventInfo               1 msgs  frames -
+  /rte/rdap/rtk/inspvax                            kygi665_msgs/msg/INSPVAX              17280 msgs  frames -
+  /tf                                              tf2_msgs/msg/TFMessage                20269 msgs  frames -
+PROBLEM /lightning/odom: not a walking robot: 1 jumps > 1 m (largest 142.3 m; from 0.1 s to 0.1 s); path 340 m, net 240 m over 170.6 s
+PROBLEM /planning/debug/cost_map_production/occmap: the robot stands on an obstacle (>= 10% of its footprint) in 1331 of 3206 grids; the local planner will not plan from there
+PROBLEM layout: /fused_point_cloud is not in the recording
+NOTE display: /map/occupancy_grid, /planning/debug/cost_map_production/occmap are all drawn in base_link: the planes tilt with the robot and cut through each other in Foxglove (blinking); open tools/planning_mcap_viz.py's output instead
+3 problems
+mission_state: active 354, passive 1, standby 1, standstill 2788, 
+CMD: 84 次；头两条：
+  I20261113 16:03:20.352304 140187181686784 tracking.cc:181] [PLANNING]CMD: 0.0226931  0.242219  0.132369
+  I20261113 16:03:20.400657 140187181686784 tracking.cc:181] [PLANNING]CMD: 0.0273527  0.343806  0.183073
+CMD 中位 vx vy ω：0.200 0.286 0.123 ；vx > 0.05 的比例 79%
+车型：规划车型 d20/001（PLANNING_ROOT_DIR=/tmp/nav_stack_debug/planning_root）；Load robot config:/tmp/nav_stack_debug/planning_root/robot_factory/d20/001
+定位：INS 朝向偏置 180（bag rosbag2_2026_09_21-16_41_27）；system.ins_yaw_offset = 180 deg
+Start adjusted: 1
+Goal adjusted: 0
+Start point is in collision: 0
+Initial pose is in collision: 0
+No free point found near start: 0
+Map switch: 1
+crosswalks in: 1
+OSM file not exist: 0
+Failed to parse OSM: 0
+Data timeout exceeded: 1
+Data recovered, resuming: 0
+local planner solver failed: 270
+定位：LiDAR 回调间隔过大 69 次，ProcessLidar 超过 0.2 s 0 次（最长 ），雷达断流 17 次
+  >>> ===== Printing run time =====
+  > [    Incremental Mapping] average time usage: 0.000332873 ms, med: 0.00032 95%: 0.000546 max: 0.005005, called times : 1451
+  > [    ObsModel (IEKF Build Jacobian)] average time usage: 0.0158275 ms, med: 0.014719 95%: 0.034308 max: 0.083364, called times : 2000
+  > [    ObsModel (Lidar Match)] average time usage: 4.1394 ms, med: 3.85936 95%: 9.39237 max: 34.8101, called times : 2000
+  > [IEKF Solve and Update] average time usage: 18.9234 ms, med: 17.7747 95%: 39.7613 max: 63.3736, called times : 1451
+  > [Preprocess (Standard)] average time usage: 0.000550566 ms, med: 0.000445 95%: 0.000905 max: 0.008479, called times : 1469
+  > [Proc Lidar] average time usage: 4.25071 ms, med: 2.70802 95%: 8.67985 max: 22.0265, called times : 1728
+  > [Undistort Pcl] average time usage: 4.69536 ms, med: 3.48004 95%: 9.6672 max: 18.6024, called times : 1451
+  >>> ===== Printing run time end =====
+== 可视化（tools/planning_mcap_viz.py）
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t51_switch -> /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t51_switch/viz/planning_viz.mcap (31.2 MB), 170.5 s of bag time from 1789980090.263
+  time base: the bag's stamps; the recorder's clock was 4576891.7 s (53.0 days) ahead
+  pose: /tf map -> base_link, 17050 samples, the first 13 dropped (before a start-up jump)
+  costmap values: 100 = obstacle (perception obstacles read 100 in 99.4% of 77583 costmap cells)
+  /planning/debug/cost_map_production/occmap -> /viz/cost_map: 3206 grids
+  /map/occupancy_grid -> /viz/perception_grid: 1577 grids
+  local planner: zero command in 270 of 354 active cycles (76%); with costmap obstacles under the footprint 270 of 354, without 0 of 0
+  route map: ad68517c-e845-42a4-b5dd-a6b7c6d2af13:2d/1780551612/map.png, 1129 x 1902 cells around the run, 51375 route cells
+  crosswalks: 5 in the map, 2 near the run
+  localization map: /lightning/map_cloud, 109818 points around the run
+  /lightning/current_scan_world -> /viz/loc/scan: 512 scans, on the map (< 0.1 m) median 54%
+  INS: 17280 messages, RTK fixed 100%, odom - INS median 0.35 m (origin 29.731405, 106.783891, 217.2)
+  heading: odom minus the INS direction of travel, median |.| 1 deg over 91 s moving; 1% of it more than 135 deg off
+  lightning log /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t51_switch/logs/loc.log: 2052 lines, 87 events
+  glog /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t51_switch/logs/planning.INFO: 6338 lines, 47 events (time zone +8.0 h)
+  overview: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t51_switch/viz/planning_viz.png
+  topics: /tf 17050, /viz/cost_map 3206, /viz/crosswalks 12, /viz/events 272, /viz/flow 3206, /viz/legend 12, /viz/loc/flow 853, /viz/loc/ins 341, /viz/loc/map_cloud 2, /viz/loc/scan 255, /viz/loc/state 853, /viz/perception_grid 1577, /viz/plan 3206, /viz/robot 1705, /viz/route_map 12, /viz/state 3206, /viz/trail 341
+  events: 272 (179 warnings or errors) on /viz/events
+      -1.86 s  loc_system.cc:1125] IMU 粘包！间隔 0.000130177 秒，过短
+      -1.86 s  loc_system.cc:1125] IMU 粘包！间隔 3.45707e-05 秒，过短
+      -1.74 s  loc_system.cc:312] IMU 回调间隔过大: 0.0812501 秒，可能被阻塞
+      -1.74 s  loc_system.cc:1113] IMU 丢帧！间隔 0.0196915 秒，超过 0.015 秒
+      -1.62 s  laser_mapping.cc:815] IVox rebuilt from TiledMap, raw: 1520096 downsampled: 194346 (res=0.5) cost: 145.424 ms
+      -1.61 s  laser_mapping.cc:320] No point, skip this scan!
+       0.00 s  点云只有 4% 贴在地图上：地图和现场对不上，或位姿偏了
+       0.00 s  位姿跳了 142.3 m（0.01 s 内）：定位初始化，之前的位姿不用
+       0.06 s  laser_mapping.cc:487] 定位质量下降: effect_num=429 avg_residual=0.274858 fail_count=1/100
+       0.20 s  定位和 INS 差了 1.10 m
+       5.58 s  代价地图里狗脚下是障碍（143 格）：狗在规划地图的路外面，局部规划会认为起点在碰撞里
+       6.68 s  代价地图里狗脚下是障碍（25 格）：狗在规划地图的路外面，局部规划会认为起点在碰撞里
+  open in Foxglove with the layout Nav_D20/planning/script/planning_viz.json

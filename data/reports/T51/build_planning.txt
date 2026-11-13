@@ -1,0 +1,31 @@
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+          detected during:
+            instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_divide_fast(const std::complex<T> &, const std::complex<T> &) [with T=float]" at line 107 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+            instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_divide(const std::complex<T> &, const std::complex<T> &) [with T=float]" at line 221 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+          detected during instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_multiply(const std::complex<T> &, const std::complex<T> &) [with T=double]" at line 222 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+          detected during:
+            instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_divide_fast(const std::complex<T> &, const std::complex<T> &) [with T=double]" at line 107 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+            instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_divide(const std::complex<T> &, const std::complex<T> &) [with T=double]" at line 222 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc: In member function ‘void planning::communication::RosBridge::joint_state_callback(sensor_msgs::msg::JointState_<std::allocator<void> >::SharedPtr)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc:409:57: warning: ‘Eigen::Matrix<typename Eigen::internal::traits<T>::Scalar, 3, 1> Eigen::MatrixBase<Derived>::eulerAngles(Eigen::Index, Eigen::Index, Eigen::Index) const [with Derived = Eigen::Block<const Eigen::Matrix<double, 4, 4>, 3, 3, false>; typename Eigen::internal::traits<T>::Scalar = double; Eigen::Index = long int]’ is deprecated: Use .canonicalEulerAngles() instead. [-Wdeprecated-declarations]
+  409 |              << transform.rotation().eulerAngles(0, 1, 2).transpose() << " "
+      |                                                         ^
+In file included from /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/Geometry:37,
+                 from /public/zjst/robot/planning_humble_env/env/include/grid_map_core/grid_map_core/GridMap.hpp:14,
+                 from /public/zjst/robot/planning_humble_env/env/include/grid_map_core/grid_map_core/grid_map_core.hpp:13,
+                 from /public/zjst/robot/planning_humble_env/env/include/grid_map_ros/GridMapRosConverter.hpp:12,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.h:3,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc:1:
+/public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Geometry/EulerAngles.h:136:77: note: declared here
+  136 | EIGEN_DEVICE_FUNC inline Matrix<typename MatrixBase<Derived>::Scalar, 3, 1> MatrixBase<Derived>::eulerAngles(
+      |                                                                             ^~~~~~~~~~~~~~~~~~~
+---
+Finished <<< planning [1min 55s]
+
+Summary: 1 package finished [1min 56s]
+  1 package had stderr output: planning

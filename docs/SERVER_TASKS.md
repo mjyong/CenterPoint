@@ -159,7 +159,7 @@
 | T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 完成，已复核（2026-11-13）：编过了，切图读到 5 条人行横道；三次都只 active 约 20 个周期就停在 standstill，两次定位跑飞。原因都是同步带来的：回放超时的补丁丢了、新版 lightning 少了 0921 要的 INS 朝向 180°、默认车型 d30。三处都改了，T49 重跑 |
 | T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三处修复都生效。INS 直出一路 active、指令往前；现场地图和切图被 A* 起点的夹缝卡在 fault；狗一出路网 MPPI 就失败；LIO 落后时 odom 往回跳。A* 和 odom 已改；wait 不安全 204 → 187，剩下的是没看到的车 |
 | T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三次都一路 active，odom 不再跳。剩下：狗贴着路网边时 MPPI 一直失败（起步也会卡住）；回放时 LiDAR 点云在进定位之前断续。min_watch 没用，不开 |
-| T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 任务已写好 |
+| T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 完成（2026-11-13）：现场地图和 INS 直出脚印碰边不再整段零速（24/1995、4/1342）；切图 16 s 后 nav_blocked 进 standstill；CPU/GPU 有 11 次 fail gpu=0 cpu=1。狗上规划和定位怎么装已只读记下 |
 | T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 任务已写好（T51 做完再做） |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -8897,6 +8897,20 @@ LiDAR 卡顿：回调间隔过大和 ProcessLidar 超过 0.2 s 对不上（70 �
 报告（写进"T51 结果"）：编译最后几行；三份 report 全文；和 T50 比 local planner 那一行和 solver failed；CPU、GPU 对比的计数和那几条；
 狗上的 dog_stack.txt 摘要（或"狗不在线"）。
 ```
+
+### T51 结果
+
+2026-11-13。planning `Finished <<< planning [1min 55s]`，`Summary: 1 package finished [1min 56s]`。定位、感知没重编。全文在 `data/reports/T51/report_{map,ins,switch}.txt`。现场地图的原始录包 `planning_io_t51_map_0.mcap`（355MB）留在本机，这次提交里是报告、三份可视化和 INS、切图两份录包。
+
+车型 `d20/001`，INS 朝向偏置 180°。三份 `Data timeout exceeded` 都是 1，都在 bag 放完时。
+
+- 现场地图：active 3215，passive 1，standby 1，standstill 39。`CMD:` 3180 次，中位 vx / vy / ω = 0.811 / 0.035 / 0.301，vx > 0.05 占 94%。`local planner solver failed` 35 次（T50 是 2039）。`local planner: zero command in 36 of 3215 active cycles (1%); with costmap obstacles under the footprint 24 of 1995, without 12 of 1220`。T50 是 1716/1716。`robot footprint in collision` 317 条（每 20 次打一条）。头两条 CMD 的 vx、vy 都为正：`0.168 0.168 0.071`，`0.288 0.271 0.184`。`Start adjusted from 78.3058 119.398 to 78.0509 119.706`。
+- INS 直出：active 3249，passive 1，standby 1，standstill 36。`CMD:` 3238 次，中位 0.843 / 0.038 / 0.141，vx > 0.05 占 92%。solver failed 11 次（T50 是 1369）。`zero command in 12 of 3249 active cycles (0%); with costmap obstacles under the footprint 4 of 1342, without 8 of 1907`。T50 是 1330/1330。碰撞日志 246 条。起点没挪。头两条：`−0.084 −0.065 0.046`，`0.162 0.088 0.079`。
+- 切图：`Map switch` 1 次，5 条人行横道。active 354，passive 1，standby 1，standstill 2788。`CMD:` 84 次，中位 0.200 / 0.286 / 0.123，vx > 0.05 占 79%。solver failed 270 次（T50 是 1635，那次 active 3168）。`zero command in 270 of 354 active cycles (76%); with costmap obstacles under the footprint 270 of 354, without 0 of 0`。这一次 A 仍等于 B。碰撞日志 23 条。`Start adjusted from 78.3428 119.369 to 78.0879 119.677`。头两条主要是 +vy：`0.023 0.242 0.132`，`0.027 0.344 0.183`。16:03:36 `nav_blocked raised, progress_rate: 0.030837, dist_to_end: 7.70974`，随后 standstill。
+
+CPU、GPU 对了一次（`t51_cmp`，录包和 viz 不提交）。`MPPI CUDA debug` 1939 条。`fail gpu=1 cpu=0` 是 0，`fail gpu=0 cpu=1` 是 11。11 次都在 16:08:59 约半秒内：轨迹差约 1e-7，`ObstaclesCritic` 的 `cpu_min` 是 2.5e7，GPU 最低代价约 20–30。10 条在 `data/reports/T51/cpu_gpu_mismatch.txt`。按停止条件停在第 3 步。
+
+狗在线，只读，`data/reports/T51/dog_stack.txt`。`planning.service` 和 `slam.service` 都在跑，root，`ROS_DOMAIN_ID` 未设（域 0），CycloneDDS。规划 `PLANNING_ROOT_DIR` 指向 `lib/planning`，`default_robot_vin` 是 `d20/001`，包 `planning 1.0.1`，二进制 2026-10-29；按服务同样的方式 source 之后 `ldd` 齐全。定位是 `slam.service` 里的 `mode_switch_node`，配置 `default_d20.yaml`：`ins_type` `kygi665`，话题 `/rte/rdap/rtk/inspvax`，没有 `ins_yaw_offset`，`map_path` 是 `c1adbe7b-2e5e-4e83-ba30-e164914033c4`，`with_ins` 和 `ins_only_mode` 都是 false。包 `slam 1.0.1`，二进制 2026-10-10，sha `e51dc0`。`colcon`、`cmake 3.27.7`、`g++` 都在；`nvcc` 不在 PATH，文件在 `/usr/local/cuda/bin/nvcc`（CUDA 12.6）。根分区剩 800G，12 核。最近一天的 journal：LiDAR 回调间隔过大 0 次，雷达断流 1 次（15:52:12，启动后约 20 秒，时长 0.60 秒），IMU 回调间隔过大 115 次。规划日志里 `failed to compute a collision free path` 和 `plan path failed` 都是 0。
 
 **2026-11-13，T51 之后（我们这边）**：人行横道让行接进了规划，还没编过（只在本机不带 ROS 编了门控和人行横道的逻辑）：
 - 门控：`Nav_D20/planning/src/algorithm/yield_gate/`，`dog_perception/yield_gate.py` 的逐行移植；和 Python 逐帧对，手工和随机场景 31605 帧一样（`Nav_D20/planning/tools/yield_gate_parity/run.sh`）。

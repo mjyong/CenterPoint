@@ -30,6 +30,9 @@ venv/
 !work_dirs/planning_io_t50_map/**/metadata.yaml
 !work_dirs/planning_io_t50_ins/**/metadata.yaml
 !work_dirs/planning_io_t50_switch/**/metadata.yaml
+!work_dirs/planning_io_t51_map/**/metadata.yaml
+!work_dirs/planning_io_t51_ins/**/metadata.yaml
+!work_dirs/planning_io_t51_switch/**/metadata.yaml
 *.sh
 !data/reports/**/*.sh
 *.pth
