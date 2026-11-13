@@ -220,7 +220,11 @@ LOC_MAP_PATH=$M bash Nav_D20/planning/script/replay_planning_check.sh <名字> 8
 #   LOC_INS_ONLY=1：定位用 INS 直出；MAP_SWITCH=$M：发终点前先切到这张图；RECORD_CLOUD=1：连感知点云一起录
 ```
 
-它播 `bags0921/rosbag2_2026_09_21-16_41_27`（约 173 s；只有顶激光、IMU、INSPVAX 三路），拉起地面分割、局部栅格、定位、规划（`run_planning_stack_debug.sh --once`），`ROS_DOMAIN_ID` 默认 42。**不要在狗的域上跑**：规划会发 `/cmd_vel` 和 `/mc/motion_control`。输出在 `work_dirs/planning_io_<名字>/`：录包、`logs/`（各进程日志、规划的 glog）、`report.txt`（查包结果、mission_state 次数、`CMD:` 次数、起点挪没挪）、`viz/`（第 9 节）。
+换一个包：`--bag <目录>`，先用 `tools/bag_on_map.py --bag <目录> --map <图> [--map ...]` 看它的 INS 轨迹落在哪张图上、过不过人行横道，它给一个终点。
+包里有狗上录的感知目标、想换成现场重算的：`BAG_PLAY_EXTRA="--remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects"`
+加 `PERCEPTION_CMD="<起感知节点的命令>"`（日志 `perception.log`）。
+
+默认播 `bags0921/rosbag2_2026_09_21-16_41_27`（约 173 s；只有顶激光、IMU、INSPVAX 三路），拉起地面分割、局部栅格、定位、规划（`run_planning_stack_debug.sh --once`），`ROS_DOMAIN_ID` 默认 42。**不要在狗的域上跑**：规划会发 `/cmd_vel` 和 `/mc/motion_control`。输出在 `work_dirs/planning_io_<名字>/`：录包、`logs/`（各进程日志、规划的 glog）、`report.txt`（查包结果、mission_state 次数、`CMD:` 次数、起点挪没挪）、`viz/`（第 9 节）。
 
 单独起某一个：`script/run_planning_debug.sh`（只起规划）、`script/run_planning_stack_debug.sh [--no-planning] [--bag 目录] [--once]`，日志在 `/tmp/nav_stack_debug/`。
 
@@ -298,7 +302,7 @@ python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap>
 | 录包一闪一闪、路显示成障碍 | 两张栅格挂 `base_link`；代价地图话题反了 | 可视化工具；调试桥改 (255, 0)（T47 复核） |
 | 107 s 起狗站在障碍里 | CJGC 没有人行横道 6 那段路 | 切到新地图（T48） |
 | 现场地图、切图一开始就 fault，CMD 0 | A* 起点在 0.9–0.99 的夹缝里，不挪也走不出去 | 挪起点的门槛和 A* 对齐（T49 复核） |
-| 路网边上 MPPI 一直失败、速度为 0，起步也不走 | 脚印里有障碍格，所有采样轨迹的第一个点都算碰撞 | 起步就碰着时只禁止"更近"，允许往外退（T50 复核，`obstacleCollisionThreshold`），T51 验 |
+| 路网边上 MPPI 一直失败、速度为 0，起步也不走 | 脚印里有障碍格，所有采样轨迹的第一个点都算碰撞 | 起步就碰着时只禁止"更近"，允许往外退（T50 复核，`obstacleCollisionThreshold`）。起点离障碍多远，CPU、GPU 各用自己打分的那份距离场量（两份不一样：CPU 是合成障碍距离，GPU 是 CUDA 管线的；T51 切图那次主机量的交给 GPU 用，还是全失败），T53 验 |
 
 ## 11. 我们的改动
 

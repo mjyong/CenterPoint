@@ -159,8 +159,9 @@
 | T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 完成，已复核（2026-11-13）：编过了，切图读到 5 条人行横道；三次都只 active 约 20 个周期就停在 standstill，两次定位跑飞。原因都是同步带来的：回放超时的补丁丢了、新版 lightning 少了 0921 要的 INS 朝向 180°、默认车型 d30。三处都改了，T49 重跑 |
 | T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三处修复都生效。INS 直出一路 active、指令往前；现场地图和切图被 A* 起点的夹缝卡在 fault；狗一出路网 MPPI 就失败；LIO 落后时 odom 往回跳。A* 和 odom 已改；wait 不安全 204 → 187，剩下的是没看到的车 |
 | T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三次都一路 active，odom 不再跳。剩下：狗贴着路网边时 MPPI 一直失败（起步也会卡住）；回放时 LiDAR 点云在进定位之前断续。min_watch 没用，不开 |
-| T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 完成（2026-11-13）：现场地图和 INS 直出脚印碰边不再整段零速（24/1995、4/1342）；切图 16 s 后 nav_blocked 进 standstill；CPU/GPU 有 11 次 fail gpu=0 cpu=1。狗上规划和定位怎么装已只读记下 |
+| T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 完成，已复核（2026-11-13）：现场地图、INS 直出贴边不再卡（1716/1716 → 24/1995、1330/1330 → 4/1342）；切图那次还卡，是 GPU 用了主机算的起点间隙（两份距离场不一样），已改成显卡上自己算；狗上的装法记下了 |
 | T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 任务已写好（T51 做完再做） |
+| T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 任务已写好（T52 做完再做） |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8967,4 +8968,93 @@ C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 �
 
 停止条件：第 1 步不是我们文件的编不过；第 2 步有 differ。
 报告（写进"T52 结果"）：编译最后几行；parity 的帧数和结果；report_cross 全文，"Crosswalk yield:" 那几行，等的时候的 CMD 统计。
+```
+
+### T51 复核（2026-11-13）
+
+1. **MPPI 往外退起作用了**：现场地图、INS 直出两次，脚印碰边的周期不再全失败（1716/1716 → 24/1995、1330/1330 → 4/1342），狗站在起点时也有往路里退的指令（头两条 vx、vy 都为正）。
+2. **切图那次还卡**（270/354 失败，16 s 后进 standstill）。两次回放狗站在几乎同一个位置、同一个目标：
+   - 两张路网图在起点附近完全一样（离路边 0.20 m，路半宽 0.81 m）；
+   - 录到的代价地图也一样（右边 0.2 m 是路边，左边 1 m 多空着）。
+   - 差别在算法：CPU 版的障碍项用的是"合成障碍距离"（`GetCompositeObstacleDistanceFunction`，离参考路径太远的格子也算障碍），GPU 版用 CUDA 管线的距离场，两份本来就不一样。我原来在主机上用 CPU 那份算"起步时离障碍多远"、交给 GPU 当阈值；切图以后两份差得多，阈值就错了，GPU 判所有轨迹都碰。CPU、GPU 对比时那 11 次 "fail gpu=0 cpu=1" 也是两份距离场不同。
+   - 已改：GPU 核函数里用它自己的距离场算起点间隙（`mppi_kernels.cu`），CPU 照旧用 CPU 那份；两边各自自洽。T53 重编验。
+3. **standstill 再也出不来**：`UpdateNavBlocked` 的窗口写法，只有在 MPPI 连续失败、调用变稀的时候才凑得满 1.5 s 的窗口，于是"被堵"只在 MPPI 一直失败时触发，触发以后要外部 resume 才回 active。机器人团队的逻辑，没改；狗上测的时候被堵住要人发恢复。人行横道前停着等不算被堵（98e9516：门控叫停的时候不更新 nav_blocked）。
+4. **狗上的装法**（`data/reports/T51/dog_stack.txt`，只读）：
+   - `planning.service`、`slam.service`，root，域 0，CycloneDDS；
+   - 规划 1.0.1（二进制 2026-10-29），`/opt/seres/nav/planning/lib/planning`，车型 d20/001；
+   - 定位是 `slam.service` 的 `mode_switch_node`（1.0.1，2026-10-10），配置里地图 `c1adbe7b-...`（仓库里没有），`with_ins`、`ins_only_mode` 都是 false（不用 INS，INS 朝向的约定对它没影响）；
+   - colcon、cmake 3.27、g++ 都在，CUDA 12.6，根分区剩 800 G，12 核。
+   - 狗上 lightning 一天里 LiDAR 回调间隔过大 0 次：服务器回放时的卡顿是回放环境的事。
+5. **替换时只换二进制、保留狗上的配置**：狗上定位用的地图、规划的配置都和仓库里的不完全一样。T53 先把狗上的配置只读拷回来和仓库比，替换时把我们新加的配置项（`crosswalk_yield_conf`、`sub_lidar_objects`）加进狗上的那份。
+
+**1112 能不能代替 0921 回放（人问，2026-11-13）**：能，而且更合适（11 月、天线已接正、8 号狗、车顶 XT32、RTK 固定解 100%）。但有三点：
+- 位置：T40 记的原点在 ad68517c 地图坐标 (−423, 713) 附近，那一带有路网，但离这张图标出的人行横道都在 650 m 以上。狗上现在用的定位地图是 c1adbe7b，可能更合适，要先拷回来看（T53 第 2、3 步，新工具 `Nav_D20/planning/tools/bag_on_map.py`）；
+- 包里录的 `/perception/lidar_3d/objects` 是 18:59 录的，狗上感知的天线配置 19:25 才从 180 改成 0：狗走动时这些目标的速度不可信（静止的车会被算成在动）。能在服务器上编出感知节点的话就现场重算（T53 第 4 步 b）；
+- 1112 只有 168 s、走了 122 m，可能不过人行横道。要测过马路，最好让狗在标出的人行横道录一批（站在入口、面朝对面、有车经过，再遥控过几次），见 `docs/PLANNING_INTEGRATION.md` 第 8 节。
+
+
+---
+
+## T53 用 1112 的包回放；狗上的定位地图和配置（只读）；重编规划
+
+```text
+任务 T53（T52 做完再做）：0921 太旧（天线接反、9 月），换成 1112 在 8 号狗上录的包 /public/zjst/robot/cp_data/1112_t40（168 s，
+车顶 XT32、IMU、INS 全程 RTK 固定，还有狗上我们感知节点实时发的 /perception/lidar_3d/objects）。这一轮：只读拷狗上的定位地图和
+配置；看 1112 落在哪张图上、沿途有没有人行横道；用 1112 回放整套；重编规划（MPPI 的 GPU 核函数改了）。
+先按通用约定做。可以改的范围：Nav_D20/（编不过时只改我们的补丁，改了写进 PATCHES.md）。tools/、dog_perception/ 不改。
+仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42。mkdir -p data/reports/T53
+
+0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py \
+       tests/dog/test_yield_gate_cpp.py tests/dog/test_bag_on_map.py -q | tail -1   （51 passed）
+   grep -c "obstacles_escape_tolerance" Nav_D20/planning/src/algorithm/mppi_cuda_planner/mppi_kernels.cu   （1）
+   ls Nav_D20/planning/tools/bag_on_map.py
+1. 重编 planning（同 T52 第 1 步，接口包不用再编），存 data/reports/T53/build_planning.txt（tail -30）。
+2. 狗在线才做（每步前 ssh dog true；不在线就跳到第 3 步，只用仓库里的两张图）。只读，规矩同 T46、T51：
+   D=/public/zjst/robot/dog8_stack；mkdir -p $D
+   - 定位地图：狗上配置里写的是 /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4（T51 看到
+     /opt/seres/nav/slam/data/ 下也有同名一份），同 T43 第 1 步的拷法（rsync，读不了用 sudo -n tar 只读打包，狗上不留东西）
+     拷到 /public/zjst/robot/loc_maps/（不提交）；两处都没有就 ls 这两个目录，抄进报告；
+   - 定位配置：/opt/seres/nav/slam/lightning/share/lightning/config/default_d20.yaml 拷到 $D/；
+   - 规划配置：/opt/seres/nav/planning/lib/planning/robot_factory/d20/001/planning_conf/ 整个目录拷到 $D/planning_conf/；
+   - 和仓库比（提交这个 diff）：
+       { diff -u Nav_D20/slam/lightning-lm-master/config/default_d20.yaml $D/default_d20.yaml;
+         diff -ru Nav_D20/planning/robot_factory/d20/001/planning_conf $D/planning_conf; } > data/reports/T53/dog_config_diff.txt
+   - 抄下狗上配置里 system 段的 ins_lat、ins_lon、ins_height（和仓库里的一样不一样）。
+3. 1112 在哪张图上（只用 CPU，几分钟）：
+     python Nav_D20/planning/tools/bag_on_map.py --bag /public/zjst/robot/cp_data/1112_t40 \
+         --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip --map Nav_D20/map/a70c6db6-de74-4337-ad1c-8bc491d9621a.zip \
+         [--map /public/zjst/robot/loc_maps/c1adbe7b-2e5e-4e83-ba30-e164914033c4] | tee data/reports/T53/bag_on_map.txt
+   狗上配置的 ins_lat/lon/height 和仓库的不一样时，再加 --loc-config $D/default_d20.yaml 跑一遍，追加进同一个文件。
+   抄：每张图"在图里的比例"和"在路网上的比例"，列出的人行横道（CROSSES 还是 passes by），给的目标点。
+4. 回放 1112（挑"在路网上"比例最高的那张图做 M；它没有 semantic.osm 或人行横道就照样回放，只是测不到过马路）：
+   a. 用包里录的目标：
+        LOC_INS_YAW_OFFSET=0 LOC_MAP_PATH=$M MAP_SWITCH=$M bash Nav_D20/planning/script/replay_planning_check.sh t53_1112 <第 3 步的目标 x y> \
+            --bag /public/zjst/robot/cp_data/1112_t40
+        cp work_dirs/planning_io_t53_1112/report.txt data/reports/T53/report_1112.txt
+      （1112 的目录名里没有日期，按日期自动选偏置要靠 metadata.yaml，所以明着给 0：1016 起天线接正了。）
+      看：车型、"INS 朝向偏置 0（bag 1112_t40）"、Data timeout、mission_state（有没有 fault）、local planner 那一行、
+      odom 有没有报、heading、贴图；"Crosswalk yield:" 那几行；planning.INFO 里 grep -c "crosswalk_vehicles" 不算，
+      看可视化 /viz/state 的 planning.crosswalk_vehicles 最大是几（门控收到车没有）。
+   b. 可选：在服务器上编我们的感知节点、现场重算目标（包里的是天线改正之前算的，狗走动时速度不可信）：
+      - 在规划的环境里（有 ROS 的那个）照 docs/DEPLOY_ORIN.md 第 8 节的 colcon 命令编 lidar_3d_detection，
+        -DCMAKE_CUDA_ARCHITECTURES=89（同 T32），--build-base $R/build/perc_x86 --install-base $R/install/perc_x86（R=仓库根目录的绝对路径），
+        不要动 deploy_deb 里的 build、install；要 TensorRT，环境里没有就跳过 b；
+      - 模型 data/deploy/nusc_pp_dyn（T27），本机引擎：
+          python tools/deploy/build_engines.py --model-dir data/deploy/nusc_pp_dyn --stage $(hostname) --stage-out data/deploy/T53/model_x86
+        （同 T32 第 1 步；没有本机的引擎就按 T28 第 2 步重建，报告里写）；model_dir 指 data/deploy/T53/model_x86；
+      - 编不过、没有 TensorRT 或没有引擎就跳过 b，写原因；
+      - 编过了：
+          BAG_PLAY_EXTRA="--remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects" \
+          PERCEPTION_CMD="source $PWD/install/perc_x86/setup.bash && ros2 launch lidar_3d_detection lidar_3d_detection.launch.py \
+              config:=$PWD/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/config/lidar_3d_detection.yaml \
+              model_dir:=$PWD/data/deploy/T53/model_x86" \
+          LOC_INS_YAW_OFFSET=0 LOC_MAP_PATH=$M MAP_SWITCH=$M bash Nav_D20/planning/script/replay_planning_check.sh t53_1112_live <目标> \
+              --bag /public/zjst/robot/cp_data/1112_t40
+        （配置是仓库里的，天线偏置 0）；logs/perception.log 里每秒一行统计，抄几行；其余同 a。
+   - 录包走 LFS（work_dirs/planning_io_t53_*，.gitattributes 加一行），viz/ 是普通文件。
+5. 提交：data/reports/T53/、录包和 viz/、本文档。不提交拷来的地图和狗上的配置原件（diff 提交）。
+
+停止条件：第 1 步编不过；第 3 步三张图都不在路网上（"在路网上"都低于 30%）就不回放，报告停在那。
+报告（写进"T53 结果"）：编译最后几行；狗上拷了什么、配置 diff 的摘要（哪些项不一样）；bag_on_map 全文；回放的 report 全文和
+crosswalk_vehicles 的最大值；b 做没做、为什么。
 ```

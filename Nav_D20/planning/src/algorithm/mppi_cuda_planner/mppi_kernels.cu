@@ -344,6 +344,21 @@ __global__ void costKernel(const MppiDeviceParams *p,
     float raw = 0.0f;
     float rep = 0.0f;
     bool collided = false;
+    // Robot already touching an obstacle (critic_data.h obstacleCollisionThreshold): only trajectory points
+    // closer than it is now collide. The start clearance comes from this same device field (T51 review: computed
+    // on the host it disagreed with the device field after a map switch, and most cycles still failed).
+    float start_clearance = FLT_MAX;
+    {
+      const float cos0 = cosf(c->pose_yaw), sin0 = sinf(c->pose_yaw);
+      for (int ci = 0; ci < p->fp_count; ++ci) {
+        const float cx = c->pose_x + cos0 * p->fp_x[ci] - sin0 * p->fp_y[ci];
+        const float cy = c->pose_y + sin0 * p->fp_x[ci] + cos0 * p->fp_y[ci];
+        const float cl = sampleObstacleDistance(c, static_cast<double>(cx), static_cast<double>(cy)) - p->fp_r[ci];
+        if (cl < start_clearance) start_clearance = cl;
+      }
+    }
+    const float collision_threshold =
+        start_clearance < 0.0f ? start_clearance - c->obstacles_escape_tolerance : 0.0f;
     for (int t = 0; t < T; ++t) {
       const float px = x[t * B + j];
       const float py = y[t * B + j];
@@ -362,7 +377,7 @@ __global__ void costKernel(const MppiDeviceParams *p,
           min_clearance = clearance;
         }
       }
-      if (min_clearance < c->obstacles_collision_threshold) {   // 0 unless the robot starts in collision
+      if (min_clearance < collision_threshold) {   // 0 unless the robot starts in collision
         collided = true;
         break;
       }

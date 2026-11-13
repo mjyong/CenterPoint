@@ -692,8 +692,9 @@ bool MppiCudaBackend::evalStep(
 
   cyc.critic_active = active;
   cyc.obstacles_near_goal = near_goal;
-  // Start in collision: same rule as ObstaclesCritic (critic_data.h), the footprint clearance at the robot's pose
-  // from the host distance field
+  // Start in collision: same rule as ObstaclesCritic (critic_data.h); the kernel measures the start clearance in
+  // the device field it scores with. Here only the tolerance, and the host field's view for the log.
+  cyc.obstacles_escape_tolerance = kStartEscapeTolerance;
   {
     float start_clearance = std::numeric_limits<float>::max();
     if (obstacles_on && ctx.obstacle_dist_func) {
@@ -708,7 +709,6 @@ bool MppiCudaBackend::evalStep(
         start_clearance = std::numeric_limits<float>::max();
       }
     }
-    cyc.obstacles_collision_threshold = obstacleCollisionThreshold(start_clearance);
     if (start_clearance < 0.0f) {
       AWARN_EVERY(20) << "MPPI CUDA: robot footprint in collision (clearance " << start_clearance
                       << " m), only trajectories moving away are allowed";

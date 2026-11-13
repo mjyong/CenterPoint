@@ -105,6 +105,18 @@ play_args=(--rate 1 --clock --read-ahead-queue-size 500 --delay 1)
 if [[ "${loop}" -eq 1 ]]; then
   play_args+=(--loop)
 fi
+# BAG_PLAY_EXTRA：多给 ros2 bag play 的参数，例如把狗上录的感知目标改名避开、换成现场重算的：
+#   BAG_PLAY_EXTRA="--remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects"
+# PERCEPTION_CMD：和整套一起起的感知节点（我们的 lidar_3d_detection，发 /perception/lidar_3d/objects），日志 perception.log
+if [[ -n "${BAG_PLAY_EXTRA:-}" ]]; then
+  read -r -a extra <<< "${BAG_PLAY_EXTRA}"
+  play_args+=("${extra[@]}")
+fi
+if [[ -n "${PERCEPTION_CMD:-}" ]]; then
+  bash -c "${PERCEPTION_CMD}" >"${log_dir}/perception.log" 2>&1 &
+  pids+=($!)
+  echo "感知节点：${PERCEPTION_CMD}"
+fi
 ros2 bag play "${play_args[@]}" "${bag}" >"${log_dir}/bag.log" 2>&1 &
 bag_pid=$!
 pids+=("${bag_pid}")
