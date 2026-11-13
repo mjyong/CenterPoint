@@ -85,6 +85,15 @@ Tracking 的状态（`src/runnable/mission/mission_state_machine/mission_fsm_bas
 - 切地图：`/map/switch`（`std_msgs/String`，地图目录）。`ReloadMap` 读那个目录 `global_map.yaml` 第一层的 `map_image_file`（ad68517c 是 `2d/<id>/map.png`）和 `map_yaml_file`，再读同目录的 `map.osm`，没有就读 `semantic.osm`（人行横道在这里面）。
 - **新地图 ad68517c 比 CJGC 多一段路**：人行横道 6 往西那段（x 66–106、y 207–231）。T47 的狗 107 s 以后走在这段上，用 CJGC 时局部代价地图认为狗站在障碍里。
 - 人行横道：`GlobalMapManager::crosswalks()`（`third_party/osm_map` 读，我们注册了 `crosswalk`），只存多边形，不改障碍层。
+- **过人行横道**（我们加的，`src/runnable/mission/tracking/crosswalk_yield.{h,cc}`，D20 的 `tracking_conf.crosswalk_yield_conf` 打开）。active 每周期，在 MPPI 前后：
+  1. 沿全局路线找前面 40 m 内第一个人行横道（路线从哪进、从哪出：`yield::CrosswalkSpan`）；
+  2. 离停车点（中心在入口线前半个身长 + 0.3 m）3 m 内开始减速，指令乘 0.2–1；
+  3. 到了停车点：指令换成原地转向，转到面朝对面（路线从入口到出口的方向，±10°）；
+  4. 然后每周期问门控（`src/algorithm/yield_gate/`，`dog_perception/yield_gate.py` 的逐行移植，`wait` 判据）：查的是从狗到出口再多 1 m 的路线，等的时候速度为 0、不算 nav_blocked；
+  5. 放行就走；狗的中心一进人行横道，就不再为车停。
+  - 车从 `/perception/lidar_3d/objects`（我们的感知节点，`perception_interface/LidarObjectArray`）来，在它自己的检测系（雷达正下方地面、x 右 y 前）：按固定外参（转 −90°，雷达在 `base_link` 的 (0.319, 0.043) m）换到 `base_link`，再按消息时刻的 odom 换到 `map`。**没有感知或超过 0.3 s 没更新，就停在路口等。**
+  - 日志 `Crosswalk yield: <状态> (<门控的理由>) …`，调试字段 `crosswalk_mode`（0 无、1 接近、2 转向、3 等、4 放行、5 在人行横道上）、`crosswalk_s_stop`、`crosswalk_vehicles`、`crosswalk_waiting_for` 等，回放报告里有。
+  - C++ 门控和 Python 的逐帧对比、闭环模拟：`bash tools/yield_gate_parity/run.sh`（只要 g++ 和 Eigen）。
 
 ## 4. 局部代价地图
 

@@ -44,6 +44,7 @@ message CommunicationConf {
     optional RosPipeConf sub_map_switch = 18;
     optional RosPipeConf sub_follow_target = 19;
     optional RosPipeConf sub_map_update = 20;
+    optional RosPipeConf sub_lidar_objects = 33;   // perception_interface/LidarObjectArray (ours, crosswalks)
 
     // -- Publishers --
     optional RosPipeConf pub_cmd_vel = 10;

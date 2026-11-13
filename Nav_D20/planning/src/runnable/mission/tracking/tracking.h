@@ -15,6 +15,8 @@
 
 #include "src/algorithm/mppi_planner/mppi_planner.h"
 #include "src/algorithm/teb_planner/teb_planner.h"
+#include "src/common/path2d.h"
+#include "src/runnable/mission/tracking/crosswalk_yield.h"
 
 namespace planning {
 namespace mission {
@@ -83,6 +85,8 @@ public:
   }
 
   bool nav_blocked() const { return nav_blocked_; }
+  // crossing at the map's crosswalks: what CrosswalkYield did this cycle (debug, T51 review)
+  const CrosswalkYieldOutput &crosswalk_yield() const { return crosswalk_out_; }
 
   teb_planner::TebPlanner *teb_planner() const { return teb_planner_.get(); }
   algorithm::MppiPlanner *mppi_planner() const { return mppi_planner_.get(); }
@@ -153,6 +157,11 @@ private:
   bool constraint_theta_{false};
   std::vector<Pose2d> local_path_2d_;
   std::vector<Pose2d> local_reference_2d_;
+  CrosswalkYield crosswalk_yield_;
+  CrosswalkYieldOutput crosswalk_out_;
+  uint64_t lidar_objects_seq_{0};
+  void StepCrosswalk(const Pose2d &pose, double speed, double stamp, const Path2d &global_path);
+  void ApplyCrosswalk(double *vx, double *vy, double *wz);
 
   bool update_fail_{false};
   double accumulate_s_{0.0};

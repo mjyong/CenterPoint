@@ -14,6 +14,12 @@ confs{
         nav_blocked_window: 1.5
         nav_blocked_enter_duration: 3.0
         local_reference_path_length: 5.0
+        # crosswalks (ours, T51 review): stop before the entry, face across, wait for the yield gate; no perception
+        # (/perception/lidar_3d/objects) means waiting at the curb
+        crosswalk_yield_conf{
+            enable: true
+            yield_rule: "wait"
+        }
         planner_type: MPPI
         teb_planner_conf{
             coarse_search_conf{

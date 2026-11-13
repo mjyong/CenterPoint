@@ -64,8 +64,88 @@ bool Tracking::Init(PlanningEntry *planning_entry) {
         cost_map_production->GetCompositeCostFunction(),
         cost_map_production->GetIsCollisionFunction());
   }
+  {
+    // crosswalks (T51 review): off unless configured
+    const auto &c = conf_.tracking_conf().crosswalk_yield_conf();
+    CrosswalkYieldConfig y;
+    y.enable = c.enable();
+    y.stop_margin = c.stop_margin();
+    y.slow_distance = c.slow_distance();
+    y.min_speed_scale = c.min_speed_scale();
+    y.hold_distance = c.hold_distance();
+    y.align_tolerance_deg = c.align_tolerance_deg();
+    y.align_gain = c.align_gain();
+    y.max_align_omega = c.max_align_omega();
+    y.check_beyond_exit = c.check_beyond_exit();
+    y.lookahead = c.lookahead();
+    y.moving_speed = c.moving_speed();
+    y.max_pose_gap = c.max_pose_gap();
+    y.det_to_base_x = c.det_to_base_x();
+    y.det_to_base_y = c.det_to_base_y();
+    y.det_to_base_yaw_deg = c.det_to_base_yaw_deg();
+    y.gate.yield_rule = c.yield_rule();
+    y.gate.stale_after = c.stale_after();
+    crosswalk_yield_.Configure(y);
+    AINFO << "Tracking: crosswalk yield " << (y.enable ? "on" : "off") << ", rule " << y.gate.yield_rule;
+  }
   init_flag_ = true;
   return true;
+}
+
+void Tracking::StepCrosswalk(const Pose2d &pose, double speed, double stamp, const Path2d &global_path) {
+  if (!crosswalk_yield_.config().enable) {
+    crosswalk_out_ = CrosswalkYieldOutput();
+    return;
+  }
+  auto *gmm = planning_entry_->preprocess_entry_ptr()->global_map_manager();
+  auto main_bridge = planning_entry_->communication_entry_ptr()->MainBridge();
+  crosswalk_yield_.AddOdom(stamp, pose.position, pose.theta);
+  double objects_stamp = 0.0;
+  uint64_t seq = 0;
+  std::vector<algorithm::yield::Object> objects;
+  if (main_bridge->lidar_objects(&objects_stamp, &seq, &objects) && seq != lidar_objects_seq_) {
+    lidar_objects_seq_ = seq;
+    crosswalk_yield_.SetObjects(objects_stamp, objects);
+  }
+  if (gmm != nullptr) crosswalk_yield_.SetCrosswalks(gmm->crosswalks());
+  std::vector<Eigen::Vector2d> path;
+  path.reserve(global_path.poses().size());
+  for (const auto &p : global_path.poses()) path.push_back(p.position);
+  const CrosswalkYieldOutput::Mode before = crosswalk_out_.mode;
+  const std::string reason_before = crosswalk_out_.decision.reason;
+  crosswalk_out_ = crosswalk_yield_.Step(stamp, pose.position, pose.theta, speed, path);
+  const auto &o = crosswalk_out_;
+  if (o.mode != before || o.decision.reason != reason_before) {
+    std::string ids;
+    for (int i : o.decision.ids) ids += std::to_string(i) + " ";
+    AINFO << "Crosswalk yield: " << ModeName(o.mode) << " (" << o.decision.reason << ") crosswalk " << o.crosswalk
+          << ", stop point in " << o.s_stop << " m, entry " << o.s_in << " m, exit " << o.s_out
+          << " m, heading error " << o.heading_error * 180.0 / M_PI << " deg, vehicles " << o.objects
+          << (o.stale ? ", perception stale" : "") << (ids.empty() ? "" : ", waiting for " + ids);
+  }
+  DebugDatas::Instance()->emplace("crosswalk_mode", static_cast<int>(o.mode));
+  DebugDatas::Instance()->emplace("crosswalk_index", o.crosswalk);
+  DebugDatas::Instance()->emplace("crosswalk_s_stop", o.s_stop);
+  DebugDatas::Instance()->emplace("crosswalk_hold", o.hold ? 1 : 0);
+  DebugDatas::Instance()->emplace("crosswalk_go", o.decision.go ? 1 : 0);
+  DebugDatas::Instance()->emplace("crosswalk_vehicles", o.objects);
+  DebugDatas::Instance()->emplace("crosswalk_waiting_for", static_cast<int>(o.decision.ids.size()));
+  DebugDatas::Instance()->emplace("crosswalk_stale", o.stale ? 1 : 0);
+  DebugDatas::Instance()->emplace("crosswalk_heading_error", o.heading_error);
+}
+
+void Tracking::ApplyCrosswalk(double *vx, double *vy, double *wz) {
+  const auto &o = crosswalk_out_;
+  if (!crosswalk_yield_.config().enable || o.mode == CrosswalkYieldOutput::kNone) return;
+  if (o.hold) {             // waiting at the curb, or turning to face across
+    *vx = 0.0;
+    *vy = 0.0;
+    *wz = o.hold_omega;
+    ResetNavBlocked();      // not "blocked": the robot is waiting on purpose
+  } else {
+    *vx *= o.speed_scale;   // slowing down towards the stop point
+    *vy *= o.speed_scale;
+  }
 }
 
 bool Tracking::Proc() {
@@ -104,6 +184,7 @@ void Tracking::spin_s_active() {
 
   auto end_pose2d = global_path_2d.poses().back();
   double dist_to_end = (start_pose.position - end_pose2d.position).norm();
+  StepCrosswalk(start_pose, odom->twist.linear.head(2).norm(), odom->timestamp, global_path_2d);
   bool constant_final_theta = (dist_to_end <= 2.0);
 
   auto local_poses = gmm->ExtractLocalPath(
@@ -146,9 +227,11 @@ void Tracking::spin_s_active() {
   if (!solver_ok) {
     AERROR << "local planner solver failed";
     twist_.timestamp = TimeKeeper::TimeNowSec();
-    twist_.twist.linear.x() = 0.0;
-    twist_.twist.linear.y() = 0.0;
-    twist_.twist.angular.z() = 0.0;
+    double vx = 0.0, vy = 0.0, wz = 0.0;
+    ApplyCrosswalk(&vx, &vy, &wz);   // still turn to face across at the curb
+    twist_.twist.linear.x() = vx;
+    twist_.twist.linear.y() = vy;
+    twist_.twist.angular.z() = wz;
     return;
   }
 
@@ -174,13 +257,15 @@ void Tracking::spin_s_active() {
     cmd = teb_planner_->getVelocityCmd(
         conf_.tracking_conf().teb_planner_conf().velocity_cmd_time());
   }
+  double vx = cmd.x(), vy = cmd.y(), wz = cmd.z();
+  ApplyCrosswalk(&vx, &vy, &wz);   // crosswalks: slow down, wait at the curb, turn to face across
   twist_.timestamp = TimeKeeper::TimeNowSec();
-  twist_.twist.linear.x() = cmd.x();
-  twist_.twist.linear.y() = cmd.y();
-  twist_.twist.angular.z() = cmd.z();
-  AINFO << "CMD: " << cmd.transpose();
+  twist_.twist.linear.x() = vx;
+  twist_.twist.linear.y() = vy;
+  twist_.twist.angular.z() = wz;
+  AINFO << "CMD: " << vx << " " << vy << " " << wz;
 
-  UpdateNavBlocked(twist_.timestamp, dist_to_end);
+  if (!crosswalk_out_.hold) UpdateNavBlocked(twist_.timestamp, dist_to_end);
 }
 
 void Tracking::UpdateNavBlocked(double time_now, double dist_to_end) {
@@ -390,7 +475,7 @@ void Tracking::on_entry_s_fault() {
 void Tracking::on_exit_s_off() { twist_.twist.reset(); }
 
 void Tracking::on_exit_s_passive() {}
-void Tracking::on_exit_s_standby() {}
+void Tracking::on_exit_s_standby() { crosswalk_yield_.Reset(); }   // a new path: no crosswalk crossed yet
 void Tracking::on_exit_s_active() {}
 void Tracking::on_exit_s_standstill() {}
 void Tracking::on_exit_s_fault() {}

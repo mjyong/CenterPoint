@@ -461,7 +461,8 @@ ros2 launch lidar_3d_detection lidar_3d_detection.launch.py model_dir:=$HOME/dog
 **一份代码**（2026-11-01 起）：算法仓库的 `deploy/` 已删掉，`deploy_deb` 不再是镜像，C++ 只有 `$L` 这一份（第 7 节）。和算法仓库的对齐靠：
 - 对 Python 的逐段测试和回放比较：在算法仓库里不带 ROS 编 `$L`、跑 CTest（第 7 节）；
 - `python tools/deploy/check_deploy_deb.py`，`test_deploy_deb_config_follows_python` 每次跑：
-  - 配置除了末尾 5 个部署键（`model_dir`、四个话题名），等于 `export_cpp_config.py --robot kygi` 的输出。改了 Python 的参数就用 `--write` 重写；
+  - 配置除了末尾 7 个部署键（`model_dir`、四个话题名、8 号狗的天线接法 `ins_azimuth_offset_deg` 0 和 `ins_lever_arm`），等于 `export_cpp_config.py --robot kygi` 的输出（`kygi` 预设是 0921 天线接反时的 180，给金标准数据和那批包的回放用；狗上 1016 起接正，T40 在狗上改过，2026-11-13 起仓库里的部署配置也是接正的）。改了 Python 的参数就用 `--write` 重写；
+  - Nav_D20 的 `perception_interface` 有同样的 `LidarObject*` 消息（规划订阅）；
   - `deploy_deb/slam/interface/kygi665_msgs` 的消息和仓库根目录的 `kygi665_msgs`（Python 读的）相同；
 - `objects_bag.py` 用 `perception_interface` 的消息文件读 `LidarObjectArray`（T29–T31 录的 `dog_perception_msgs/ObjectArray` 也还能读）。
 

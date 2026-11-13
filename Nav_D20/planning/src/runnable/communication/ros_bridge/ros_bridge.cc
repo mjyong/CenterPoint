@@ -86,6 +86,12 @@ bool RosBridge::Init(PlanningEntry *planning_entry) {
         std::bind(&RosBridge::map_switch_callback, this,
                   std::placeholders::_1));
   }
+  if (config_.has_sub_lidar_objects()) {
+    // perception's tracked vehicles for the crosswalks (Tracking, CrosswalkYield; T51 review)
+    sub_lidar_objects_ = node_->create_subscription<perception_interface::msg::LidarObjectArray>(
+        config_.sub_lidar_objects().name(), rclcpp::QoS(config_.sub_lidar_objects().queue_size()),
+        std::bind(&RosBridge::lidar_objects_callback, this, std::placeholders::_1));
+  }
   if (config_.has_sub_map_update()) {
     sub_map_update_ =
         node_->create_subscription<common_interface::msg::PathFile>(
@@ -496,6 +502,66 @@ void RosBridge::map_update_callback(
   if (global_map_manager) {
     global_map_manager->ReloadMap(msg->path);
   }
+}
+
+void RosBridge::lidar_objects_callback(const perception_interface::msg::LidarObjectArray::SharedPtr msg) {
+  using algorithm::yield::Mat2;
+  using algorithm::yield::Motion;
+  using algorithm::yield::Object;
+  using algorithm::yield::PredictionMode;
+  using algorithm::yield::Vec2;
+  std::vector<Object> objects;
+  objects.reserve(msg->objects.size());
+  for (const auto &m : msg->objects) {
+    Object o;
+    o.id = static_cast<int>(m.id);
+    if (!m.label_name.empty()) {
+      o.label = m.label_name;
+    } else {
+      o.label = m.label == m.LABEL_VEHICLE ? "vehicle" : m.label == m.LABEL_CYCLIST ? "cyclist" : "pedestrian";
+    }
+    o.motion = m.motion == m.MOTION_MOVING ? Motion::kMoving : m.motion == m.MOTION_STOPPED ? Motion::kStopped
+                                                                                           : Motion::kStatic;
+    o.position = Vec2(m.position.x, m.position.y);
+    o.velocity = Vec2(m.velocity.x, m.velocity.y);
+    o.yaw = m.yaw;
+    o.length = m.size.x;
+    o.width = m.size.y;
+    o.has_age = true;
+    o.age = m.age;
+    o.has_covariance = true;   // [x, y, vx, vy] row-major: the [x, y] block
+    o.covariance << m.covariance[0], m.covariance[1], m.covariance[4], m.covariance[5];
+    for (float t : m.prediction_times) o.pred_times.push_back(t);
+    for (const auto &p : m.predictions) {
+      if (p.positions.size() != o.pred_times.size()) continue;
+      PredictionMode pm;
+      pm.probability = p.probability;
+      for (const auto &q : p.positions) pm.positions.emplace_back(q.x, q.y);
+      if (p.covariance.size() == 4 * p.positions.size()) {
+        for (size_t i = 0; i < p.positions.size(); ++i) {
+          Mat2 c;
+          c << p.covariance[4 * i], p.covariance[4 * i + 1], p.covariance[4 * i + 2], p.covariance[4 * i + 3];
+          pm.covariances.push_back(c);
+        }
+      }
+      o.modes.push_back(pm);
+    }
+    if (o.modes.empty()) o.pred_times.clear();   // no usable prediction: constant velocity
+    objects.push_back(std::move(o));
+  }
+  std::lock_guard<std::mutex> lock(lidar_objects_mutex_);
+  lidar_objects_stamp_ = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+  lidar_objects_ = std::move(objects);
+  ++lidar_objects_seq_;
+}
+
+bool RosBridge::lidar_objects(double *stamp, uint64_t *seq, std::vector<algorithm::yield::Object> *objects) {
+  std::lock_guard<std::mutex> lock(lidar_objects_mutex_);
+  if (lidar_objects_seq_ == 0) return false;
+  *stamp = lidar_objects_stamp_;
+  *seq = lidar_objects_seq_;
+  *objects = lidar_objects_;
+  return true;
 }
 
 bool RosBridge::checkTimeout() {

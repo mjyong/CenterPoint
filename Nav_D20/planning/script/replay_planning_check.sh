@@ -44,7 +44,7 @@ ros2 bag record -s mcap -o "${out}" \
   /planning/debug/goal_pose /planning/debug/path_tracking /planning/debug/plotjuggler/string \
   /planning/debug/diagnostic /planning/debug/collision_checker /planning/debug/teb_planner /planning/debug/following \
   /goal_pose /cmd_vel /map/switch \
-  /rte/rdap/rtk/inspvax /rhr/topic/event_info /rhr/topic/alarm_info \
+  /rte/rdap/rtk/inspvax /rhr/topic/event_info /rhr/topic/alarm_info /perception/lidar_3d/objects \
   > "/tmp/replay_${name}_record.txt" 2>&1 &
 rec=$!
 heavy="/tmp/replay_${name}_heavy"
@@ -116,9 +116,11 @@ fi
     echo "定位：$(grep -m 1 'INS 朝向偏置' "/tmp/replay_${name}_stack.txt" || echo 没找到)；$(grep -m 1 -o 'system.ins_yaw_offset = .*' /tmp/nav_stack_debug/loc.log 2> /dev/null || echo 定位日志里没有，lightning 没重新编译？)"
     for k in "Start adjusted" "Goal adjusted" "Start point is in collision" "Initial pose is in collision" \
              "No free point found near start" "Map switch" "crosswalks in" "OSM file not exist" "Failed to parse OSM" \
-             "Data timeout exceeded" "Data recovered, resuming" "local planner solver failed"; do
+             "Data timeout exceeded" "Data recovered, resuming" "local planner solver failed" "Crosswalk yield:"; do
       echo "${k}: $(grep -c "${k}" "${p}" || true)"
     done
+    # 人行横道让行的每次状态切换（approach / align / wait / go / cross，括号里是门控的理由）
+    grep "Tracking: crosswalk yield\|Crosswalk yield:" "${p}" | head -40 | sed 's/^[^]]*\] //' | sed 's/^/  /' || true
   else
     echo "没找到这次规划的 glog（/tmp/planning.*.log.INFO.*）"
   fi

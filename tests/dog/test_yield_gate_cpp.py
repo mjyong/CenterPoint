@@ -1,5 +1,6 @@
 """The C++ yield gate in Nav_D20/planning (src/algorithm/yield_gate/) against the Python reference, frame by frame:
-hand-made and random scenarios (Nav_D20/planning/tools/yield_gate_parity/). Needs g++ and Eigen 3."""
+hand-made and random scenarios (Nav_D20/planning/tools/yield_gate_parity/); and the planner's crosswalk behaviour
+(CrosswalkYield) in a closed loop: wait for a passing car, go, never stop on the crosswalk. Needs g++ and Eigen 3."""
 import os
 import shutil
 import subprocess
@@ -20,3 +21,4 @@ def test_cpp_yield_gate_agrees_with_python(tmp_path):
                        env=dict(os.environ, YIELD_PARITY_DIR=str(tmp_path), PYTHON=sys.executable), timeout=600)
     assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-3000:]
     assert " 0 differ" in r.stdout, r.stdout[-3000:]
+    assert "crosswalk_sim: 0 failed" in r.stdout, r.stdout[-3000:]       # the planner's crosswalk behaviour

@@ -45,6 +45,28 @@ message MissionConf {
     optional double nav_blocked_window           = 13 [ default = 1.5 ];
     optional double nav_blocked_enter_duration   = 14 [ default = 1.5 ];
     optional double local_reference_path_length   = 15 [ default = 5.0 ];
+    optional CrosswalkYieldConf crosswalk_yield_conf  = 16;
+  }
+  // Crossing at the map's crosswalks (src/runnable/mission/tracking/crosswalk_yield.h; ours, T51 review)
+  message CrosswalkYieldConf {
+    optional bool   enable              = 1  [ default = false ];
+    optional double stop_margin         = 2  [ default = 0.3 ];    // [m] stop half a body + this before the entry
+    optional double slow_distance       = 3  [ default = 3.0 ];    // [m] slow down over this before the stop point
+    optional double min_speed_scale     = 4  [ default = 0.2 ];
+    optional double hold_distance       = 5  [ default = 0.1 ];    // [m] this close to the stop point: stop, turn
+    optional double align_tolerance_deg = 6  [ default = 10.0 ];
+    optional double align_gain          = 7  [ default = 1.0 ];
+    optional double max_align_omega     = 8  [ default = 0.5 ];    // [rad/s]
+    optional double check_beyond_exit   = 9  [ default = 1.0 ];    // [m] the gate checks to the exit plus this
+    optional double lookahead           = 10 [ default = 40.0 ];   // [m] crosswalks looked for this far ahead
+    optional double moving_speed        = 11 [ default = 0.1 ];    // [m/s]
+    optional double max_pose_gap        = 12 [ default = 0.3 ];    // [s] perception beyond the odometry: stale
+    // perception's frame (on the ground under the lidar, x right, y forward) in base_link; D20 A2 (T46)
+    optional double det_to_base_x       = 13 [ default = 0.319 ];
+    optional double det_to_base_y       = 14 [ default = 0.043 ];
+    optional double det_to_base_yaw_deg = 15 [ default = -90.0 ];
+    optional string yield_rule          = 16 [ default = "wait" ]; // wait (decided 2026-11-12) / gap / stop
+    optional double stale_after         = 17 [ default = 0.3 ];    // [s] perception older than this: wait
   }
   message FollowingConf {
     enum Type {

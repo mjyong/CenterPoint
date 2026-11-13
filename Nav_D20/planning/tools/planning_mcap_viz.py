@@ -1744,7 +1744,8 @@ class Converter:
 
 
 GLOG_KEYWORDS = ("Start adjusted", "Goal adjusted", "in collision", "No free point", "Map switch", "crosswalks in",
-                 "OSM", "SetPubFlag", "pausing", "resum", "Received goal", "goal", "A*", "replan", "fail", "Fail")
+                 "OSM", "SetPubFlag", "pausing", "resum", "Received goal", "goal", "A*", "replan", "fail", "Fail",
+                 "Crosswalk yield", "crosswalk yield")
 # I1113 11:35:32.023888 ... (old glog) or I20261113 11:35:32.023888 ... (glog 0.7, the server's since T48: the year
 # in front, which the old pattern did not read, so T48's logs gave no events)
 GLOG_LINE = re.compile(r"^([IWEF])(\d{4})?(\d\d)(\d\d) (\d\d):(\d\d):(\d\d)\.(\d+)\s+\S+\s+([^\]]+)\]\s?(.*)$")

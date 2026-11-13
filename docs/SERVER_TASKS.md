@@ -160,6 +160,7 @@
 | T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三处修复都生效。INS 直出一路 active、指令往前；现场地图和切图被 A* 起点的夹缝卡在 fault；狗一出路网 MPPI 就失败；LIO 落后时 odom 往回跳。A* 和 odom 已改；wait 不安全 204 → 187，剩下的是没看到的车 |
 | T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三次都一路 active，odom 不再跳。剩下：狗贴着路网边时 MPPI 一直失败（起步也会卡住）；回放时 LiDAR 点云在进定位之前断续。min_watch 没用，不开 |
 | T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 任务已写好 |
+| T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 任务已写好（T51 做完再做） |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8895,4 +8896,61 @@ LiDAR 卡顿：回调间隔过大和 ProcessLidar 超过 0.2 s 对不上（70 �
 停止条件：第 1 步 CUDA 文件编不过；第 3 步 CPU、GPU 的 fail 对不上（抄 10 条不一致的 "MPPI CUDA debug"，停下）。
 报告（写进"T51 结果"）：编译最后几行；三份 report 全文；和 T50 比 local planner 那一行和 solver failed；CPU、GPU 对比的计数和那几条；
 狗上的 dog_stack.txt 摘要（或"狗不在线"）。
+```
+
+**2026-11-13，T51 之后（我们这边）**：人行横道让行接进了规划，还没编过（只在本机不带 ROS 编了门控和人行横道的逻辑）：
+- 门控：`Nav_D20/planning/src/algorithm/yield_gate/`，`dog_perception/yield_gate.py` 的逐行移植；和 Python 逐帧对，手工和随机场景 31605 帧一样（`Nav_D20/planning/tools/yield_gate_parity/run.sh`）。
+- 人行横道的走法：`src/runnable/mission/tracking/crosswalk_yield.{h,cc}`。接近时减速，入口前停下，原地转向面朝对面，每周期问门控，放行就走，上了人行横道不停；没有感知就一直等。闭环模拟四种情况都对（有车等车、没车直接过、没感知不走、朝向偏了先转）。
+- Tracking 每周期调用它，等的时候不算 nav_blocked；RosBridge 订阅 `/perception/lidar_3d/objects`（`perception_interface/LidarObjectArray`，消息合进了 Nav_D20 的接口包）。D20 的配置打开了它（`crosswalk_yield_conf { enable: true }`）。
+- 感知节点的部署配置改成 8 号狗现在的天线接法（偏置 0，T40 在狗上已经改过）：以后重装 deb 不会被改回 180。
+
+
+---
+
+## T52 编人行横道让行；C++ 门控在 1104 上对 Python；回放过 6 号人行横道
+
+```text
+任务 T52（T51 做完再做）：人行横道让行接进了规划（门控 src/algorithm/yield_gate/、走法 src/runnable/mission/tracking/
+crosswalk_yield.{h,cc}、Tracking 和 RosBridge 的接线、接口包多了 LidarObject* 三条消息）。这一轮：编接口包和规划；
+C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图，目标放在 6 号人行横道对面，看状态切换。
+先按通用约定做。可以改的范围：Nav_D20/（编不过时只改我们的补丁，改了写进 PATCHES.md）。tools/、dog_perception/ 不改。
+仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42。mkdir -p data/reports/T52
+
+0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py \
+       tests/dog/test_yield_gate_cpp.py -q | tail -1   （48 passed；没有 g++ 或 Eigen 时 test_yield_gate_cpp 是 skipped，写明）
+   都在（每个 ≥ 1）：
+     ls Nav_D20/seres_interface/ros/perception_interface/msg/LidarObjectArray.msg
+     grep -c "crosswalk_yield_conf" Nav_D20/planning/robot_factory/d20/001/planning_conf/mission_conf.pb.txt
+     grep -c "sub_lidar_objects" Nav_D20/planning/robot_factory/d20/001/planning_conf/communication_conf.pb.txt
+     grep -c "StepCrosswalk" Nav_D20/planning/src/runnable/mission/tracking/tracking.cc
+   新地图解开（同 T48）。
+1. 编：先接口包 perception_interface（同 T48 第 1 步编接口的方式，只编这一个，多了三条消息），再 planning
+   （--packages-up-to planning）。各存 data/reports/T52/build_{interface,planning}.txt（tail -30）。
+   编不过：我们新加的文件（yield_gate、crosswalk_yield、tracking.cc、ros_bridge.cc、communication_base.h、两个 proto）就改，
+   改了什么写进报告；别的停下，抄错误前 30 行。
+   编完：ros2 interface show perception_interface/msg/LidarObjectArray | head -5（要能显示）。
+2. C++ 门控在 1104 的真实跟踪结果上对 Python（只用 CPU；g++ 和 Eigen：/usr/include/eigen3 没有就
+   EIGEN_DIR=/public/zjst/robot/planning_humble_env/env/include/eigen3；PYTHON 用跑 yield_eval.py 的那个）：
+     S=$(for d in data/labels/1104_*/labels_sustech2.pkl; do basename $(dirname $d); done)
+     YIELD_PARITY_DIR=/tmp/t52_parity PYTHON=python bash Nav_D20/planning/tools/yield_gate_parity/run.sh \
+         --random 300 --scenes $S --per-scene 2 2>&1 | tail -40 > data/reports/T52/parity.txt
+   - 要有 "N frames, 0 differ"（N 应该比 T50 复核时的 31605 小、但有几万帧）和 "crosswalk_sim: 0 failed"；
+   - 有 differ 就停下：抄 parity.txt 里前 30 条 DIFF。
+3. 回放 0921 切新地图，目标在 6 号人行横道对面（新地图上从起点走过去，路线从 (104.9, 206.6) 进 6 号人行横道、横穿 32 m）：
+     M=$PWD/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+     LOC_MAP_PATH=$M MAP_SWITCH=$M bash Nav_D20/planning/script/replay_planning_check.sh t52_cross 78.7 226.6
+     cp work_dirs/planning_io_t52_cross/report.txt data/reports/T52/report_cross.txt
+   - report 里："Tracking: crosswalk yield on, rule wait"；Map switch 1；5 crosswalks；没有 fault（A* 找到了路）；
+   - "Crosswalk yield:" 那几行（报告里列出来了）：应该依次有 approach → align 或 wait（理由 stale：回放里没有我们的感知，
+     按设计停在路口等）→ cross（bag 里的狗不听指令，自己走进了人行横道）→ none。抄全；每行的 stop point、entry、exit、
+     heading error；
+   - 回放里狗不听指令，所以"等"只表现在指令上：等的那段 CMD 应该是 0（或者只有转向的 ω）。在 planning.INFO 里看等的那段
+     （从 wait 那行的时间到 cross 那行的时间）CMD 的 vx、vy 是不是 0：
+       awk '/Crosswalk yield: wait/{w=1} /Crosswalk yield: cross/{w=0} w && /CMD: /{n++; if ($(NF-2)!=0 || $(NF-1)!=0) m++} END {print n, "CMD while waiting,", m+0, "not zero"}' work_dirs/planning_io_t52_cross/logs/planning.INFO
+   - 可视化一段照常（local planner 那一行、heading、贴图）；
+   - 录包走 LFS（work_dirs/planning_io_t52_cross），viz/ 是普通文件。
+4. 提交：data/reports/T52/、录包和 viz/、本文档。不提交解开的地图。
+
+停止条件：第 1 步不是我们文件的编不过；第 2 步有 differ。
+报告（写进"T52 结果"）：编译最后几行；parity 的帧数和结果；report_cross 全文，"Crosswalk yield:" 那几行，等的时候的 CMD 统计。
 ```

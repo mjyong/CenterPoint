@@ -8,7 +8,9 @@
 #include "communication_conf.pb.h"
 #include "src/common/structures.h"
 #include "src/common/util/log.h"
+#include "src/algorithm/yield_gate/yield_gate.h"
 #include "grid_map_core/grid_map_core.hpp"
+#include <cstdint>
 #include <mutex>
 #include <pcl/point_types.h>
 using planning::config::CommunicationConf;
@@ -30,6 +32,14 @@ public:
   virtual const grid_map::GridMap *occupied_map_2d() { return nullptr; };
   virtual const Gait *current_gait() { return nullptr; };
   virtual const Pose3dStamped *charging_pose() { return nullptr; };
+  // perception's latest tracked objects (in its own frame) with their stamp and a count of the messages so far;
+  // false before the first one (crosswalks, T51 review)
+  virtual bool lidar_objects(double *stamp, uint64_t *seq, std::vector<algorithm::yield::Object> *objects) {
+    (void)stamp;
+    (void)seq;
+    (void)objects;
+    return false;
+  }
 
   const std::string &GetName() const {
     return CommunicationConf::Type_Name(conf_.type());
