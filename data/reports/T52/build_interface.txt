@@ -1,0 +1,30 @@
+  CMakeLists.txt:43 (rosidl_generate_interfaces)
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) at /public/zjst/robot/planning_humble_env/env/share/python_cmake_module/cmake/Modules/FindPythonExtra.cmake:140 (find_package):
+  Policy CMP0148 is not set: The FindPythonInterp and FindPythonLibs modules
+  are removed.  Run "cmake --help-policy CMP0148" for policy details.  Use
+  the cmake_policy command to set the policy and suppress this warning.
+Call Stack (most recent call first):
+  /public/zjst/robot/planning_humble_env/env/share/rosidl_generator_py/cmake/rosidl_generator_py_generate_interfaces.cmake:33 (find_package)
+  /public/zjst/robot/planning_humble_env/env/share/ament_cmake_core/cmake/core/ament_execute_extensions.cmake:48 (include)
+  /public/zjst/robot/planning_humble_env/env/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:286 (ament_execute_extensions)
+  CMakeLists.txt:43 (rosidl_generate_interfaces)
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (unused-cli):
+  Manually-specified variables were not used by the project:
+
+    CMAKE_CUDA_COMPILER
+    Protobuf_PROTOC_EXECUTABLE
+
+
+---
+Finished <<< perception_interface [1min 43s]
+
+Summary: 1 package finished [1min 44s]
+  1 package had stderr output: perception_interface
+
+---

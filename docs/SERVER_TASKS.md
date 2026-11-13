@@ -160,7 +160,7 @@
 | T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三处修复都生效。INS 直出一路 active、指令往前；现场地图和切图被 A* 起点的夹缝卡在 fault；狗一出路网 MPPI 就失败；LIO 落后时 odom 往回跳。A* 和 odom 已改；wait 不安全 204 → 187，剩下的是没看到的车 |
 | T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三次都一路 active，odom 不再跳。剩下：狗贴着路网边时 MPPI 一直失败（起步也会卡住）；回放时 LiDAR 点云在进定位之前断续。min_watch 没用，不开 |
 | T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 完成，已复核（2026-11-13）：现场地图、INS 直出贴边不再卡（1716/1716 → 24/1995、1330/1330 → 4/1342）；切图那次还卡，是 GPU 用了主机算的起点间隙（两份距离场不一样），已改成显卡上自己算；狗上的装法记下了 |
-| T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 任务已写好（T51 做完再做） |
+| T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 完成（2026-11-13）：接口和规划编过；门控 38787 帧 0 differ；回放 approach → align（只转 ω）→ cross → none。目标在障碍上，挪了 0.5 m |
 | T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 任务已写好（T52 做完再做） |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -8969,6 +8969,25 @@ C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 �
 停止条件：第 1 步不是我们文件的编不过；第 2 步有 differ。
 报告（写进"T52 结果"）：编译最后几行；parity 的帧数和结果；report_cross 全文，"Crosswalk yield:" 那几行，等的时候的 CMD 统计。
 ```
+
+### T52 结果
+
+2026-11-13。`perception_interface` `Finished <<< perception_interface [1min 43s]`，`Summary: 1 package finished [1min 44s]`。planning `Finished <<< planning [13min 42s]`，`Summary: 1 package finished [13min 43s]`。定位、感知没重编。这次二进制是 T51 复核改 GPU 起点间隙（`48fbe15`）之前编的，那个改动留给 T53 重编再验。pytest 47 passed，1 skipped（`tests/dog/test_yield_gate_cpp.py`：默认路径上没有 g++ 和 Eigen 3；后面的对帧用了 `EIGEN_DIR=/public/zjst/robot/planning_humble_env/env/include/eigen3`）。全文在 `data/reports/T52/report_cross.txt`。
+
+门控对帧：38787 帧，0 differ，`crosswalk_sim: 0 failed`。比 T51 之后那次手工加随机的 31605 帧多，因为这次加上了 1104 的全部场景（`--per-scene 2`）。
+
+回放 0921，切到 `ad68517c`，目标 (78.7, 226.6)。车型 `d20/001`，INS 朝向偏置 180°。`Map switch` 1 次，5 条人行横道。`mission_state` 没有 fault：active 3097，passive 1，standby 1，standstill 35。`CMD:` 3021 次，中位 vx / vy / ω = 0.964 / 0.004 / 0.010，vx > 0.05 占 75%。`local planner solver failed` 76 次。`local planner: zero command in 77 of 3097 active cycles (2%); with costmap obstacles under the footprint 50 of 1505, without 27 of 1592`。`Data timeout exceeded` 1 次，在 bag 放完时。朝向中位 1°，贴图中位 45%，odom − INS 中位 0.34 m。
+
+目标点本身在障碍上（`distance_cost` > 0.99），A* 直接 `End point is in collision`。d20 的 `allow_collision_goal` 原来是关的，打开并设搜索半径 2 m 之后：`Goal adjusted from 78.7 226.6 to 79.2 226.6`（0.5 m）。起点 `Start adjusted from 78.3065 119.389 to 78.0516 119.697`。
+
+`Crosswalk yield:` 四行，依次是 approach → align（理由 stale）→ cross（狗自己走上人行横道）→ none。日志里的序号是 0（向量下标），align 时出口在 34.4 m：
+
+- approach：stop 39.2 m，entry 40 m，exit 40.1 m，heading error 11.4°，车 0
+- align (stale)：stop 0.1 m，entry 0.9 m，exit 34.4 m，heading error 78.6°，perception stale
+- cross (on_crosswalk)：stop / entry / exit 都是 0，perception stale
+- none
+
+没有 `wait` 这一态（朝向差 79°，先 align）。任务里的 awk（wait 到 cross）是 0 条。align 到 cross 约 0.5 s，10 条 CMD，vx、vy 都是 0，只有 ω。
 
 ### T51 复核（2026-11-13）
 

@@ -1,0 +1,30 @@
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+          detected during instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_multiply(const std::complex<T> &, const std::complex<T> &) [with T=float]" at line 221 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+          detected during:
+            instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_divide_fast(const std::complex<T> &, const std::complex<T> &) [with T=float]" at line 107 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+            instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_divide(const std::complex<T> &, const std::complex<T> &) [with T=float]" at line 221 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+          detected during instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_multiply(const std::complex<T> &, const std::complex<T> &) [with T=double]" at line 222 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+
+Warning #20015-D: calling a constexpr __host__ function from a __host__ __device__ function is not allowed. The experimental flag '--expt-relaxed-constexpr' can be used to allow this.
+          detected during:
+            instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_divide_fast(const std::complex<T> &, const std::complex<T> &) [with T=double]" at line 107 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+            instantiation of "std::complex<T> Eigen::complex_operator_detail::complex_divide(const std::complex<T> &, const std::complex<T> &) [with T=double]" at line 222 of /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/arch/GPU/Complex.h
+
+---
+Finished <<< planning [13min 42s]
+
+Summary: 1 package finished [13min 43s]
+  1 package had stderr output: planning
