@@ -28,6 +28,10 @@ struct CrosswalkYieldConfig {
   double lookahead = 40.0;           // [m] crosswalks are looked for this far along the path
   double moving_speed = 0.1;         // [m/s] the robot counts as moving above this
   double max_pose_gap = 0.3;         // [s] perception further than this from the odometry history: stale
+  // The robot on a crosswalk without the gate's go: a localization jump while waiting at the curb (the centre stops
+  // 0.9 m before the entry), or the robot started on the road. Up to this far past the entry line: hold, face
+  // across and ask the gate as at the curb. Deeper: cross (it is on the road; stopping there is worse).
+  double max_unreleased_depth = 1.5; // [m]
   // the perception frame (on the ground under the lidar, x right, y forward, heading with the body) in base_link
   // (x forward, y left): D20 A2, lidar at (0.319, 0.043) m (T46)
   double det_to_base_x = 0.319;
@@ -48,6 +52,8 @@ struct CrosswalkYieldOutput {
   algorithm::yield::Decision decision;
   int objects = 0;            // in the last perception message, in the classes the gate yields to
   bool stale = false;
+  bool unreleased = false;    // on the crosswalk without the gate's go
+  double depth = 0.0;         // [m] then: how far past the entry line (back along the crossing direction)
 };
 
 const char *ModeName(CrosswalkYieldOutput::Mode m);
@@ -64,7 +70,8 @@ class CrosswalkYield {
   void AddOdom(double stamp, const Vec2 &xy, double yaw);
   // the latest perception message: objects in the perception frame (det), at `stamp` (same clock as the odometry)
   void SetObjects(double stamp, const std::vector<algorithm::yield::Object> &objects_det);
-  // one planning cycle; `now` on the odometry's clock
+  // one planning cycle; `now` on the odometry's clock. On a crosswalk the robot does not stop once released (go);
+  // without a go it holds at most max_unreleased_depth past the entry (see the config)
   CrosswalkYieldOutput Step(double now, const Vec2 &robot_xy, double robot_yaw, double robot_speed,
                             const std::vector<Vec2> &global_path);
   // perception placed in the map at its stamp; false when the pose there is unknown

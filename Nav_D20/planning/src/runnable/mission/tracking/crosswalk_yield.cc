@@ -62,6 +62,21 @@ Vec2 PointAt(const std::vector<Vec2> &p, double s) {
   return p.back();
 }
 
+// distance from `o` along the unit direction `d` to the polygon's outline (0 when the ray meets no edge)
+double RayToOutline(const Vec2 &o, const Vec2 &d, const std::vector<Vec2> &poly) {
+  double best = std::numeric_limits<double>::infinity();
+  for (size_t i = 0; i < poly.size(); ++i) {
+    const Vec2 p = poly[i], e = poly[(i + 1) % poly.size()] - poly[i];
+    const double den = d.x() * e.y() - d.y() * e.x();
+    if (std::abs(den) < 1e-12) continue;
+    const Vec2 w = p - o;
+    const double t = (w.x() * e.y() - w.y() * e.x()) / den;   // along the ray
+    const double u = (w.x() * d.y() - w.y() * d.x()) / den;   // along the edge
+    if (t >= 0.0 && u >= 0.0 && u <= 1.0) best = std::min(best, t);
+  }
+  return std::isfinite(best) ? best : 0.0;
+}
+
 }  // namespace
 
 const char *ModeName(CrosswalkYieldOutput::Mode m) {
@@ -174,6 +189,26 @@ CrosswalkYieldOutput CrosswalkYield::Step(double now, const Vec2 &robot_xy, doub
     }
   }
   const bool moving = robot_speed > cfg_.moving_speed;
+  // on a crosswalk without the gate's go (T52 review: the replay's pose walked onto one while turning at the curb
+  // and the robot was let cross with no perception): how far past the entry line
+  bool unreleased = false;
+  double depth = 0.0;
+  if (inside >= 0 && !(current_ == inside && (mode_ == CrosswalkYieldOutput::kGo ||
+                                              mode_ == CrosswalkYieldOutput::kCross))) {
+    double a = 0.0, b = 0.0;
+    Vec2 dir(std::cos(robot_yaw), std::sin(robot_yaw));
+    if (algorithm::yield::CrosswalkSpan(ahead, crosswalks_[inside], &a, &b)) {
+      const Vec2 exit = PointAt(ahead, b);
+      if ((exit - robot_xy).norm() > 0.2) dir = (exit - robot_xy).normalized();
+    }
+    unreleased = true;
+    depth = RayToOutline(robot_xy, -dir, crosswalks_[inside]);
+    // shallow: as at the curb. The crosswalk is not passed, so below it is the next one, its entry 0 m ahead and
+    // the stop point behind: align / wait / go as usual, and once released the robot crosses
+    if (depth <= cfg_.max_unreleased_depth) inside = -1;
+  }
+  out.unreleased = unreleased;
+  out.depth = depth;
   if (inside >= 0) {
     if (mode_ != CrosswalkYieldOutput::kCross) passed_.insert(inside);
     mode_ = CrosswalkYieldOutput::kCross;

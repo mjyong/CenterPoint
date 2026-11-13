@@ -67,6 +67,9 @@ message MissionConf {
     optional double det_to_base_yaw_deg = 15 [ default = -90.0 ];
     optional string yield_rule          = 16 [ default = "wait" ]; // wait (decided 2026-11-12) / gap / stop
     optional double stale_after         = 17 [ default = 0.3 ];    // [s] perception older than this: wait
+    // on a crosswalk without the gate's go (a localization jump at the curb): up to this far past the entry, hold
+    // and ask the gate; deeper (started on the road): cross (T52 review)
+    optional double max_unreleased_depth = 18 [ default = 1.5 ];  // [m]
   }
   message FollowingConf {
     enum Type {

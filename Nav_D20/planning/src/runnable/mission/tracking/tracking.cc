@@ -80,6 +80,7 @@ bool Tracking::Init(PlanningEntry *planning_entry) {
     y.lookahead = c.lookahead();
     y.moving_speed = c.moving_speed();
     y.max_pose_gap = c.max_pose_gap();
+    y.max_unreleased_depth = c.max_unreleased_depth();
     y.det_to_base_x = c.det_to_base_x();
     y.det_to_base_y = c.det_to_base_y();
     y.det_to_base_yaw_deg = c.det_to_base_yaw_deg();
@@ -113,15 +114,17 @@ void Tracking::StepCrosswalk(const Pose2d &pose, double speed, double stamp, con
   for (const auto &p : global_path.poses()) path.push_back(p.position);
   const CrosswalkYieldOutput::Mode before = crosswalk_out_.mode;
   const std::string reason_before = crosswalk_out_.decision.reason;
+  const bool unreleased_before = crosswalk_out_.unreleased;
   crosswalk_out_ = crosswalk_yield_.Step(stamp, pose.position, pose.theta, speed, path);
   const auto &o = crosswalk_out_;
-  if (o.mode != before || o.decision.reason != reason_before) {
+  if (o.mode != before || o.decision.reason != reason_before || o.unreleased != unreleased_before) {
     std::string ids;
     for (int i : o.decision.ids) ids += std::to_string(i) + " ";
     AINFO << "Crosswalk yield: " << ModeName(o.mode) << " (" << o.decision.reason << ") crosswalk " << o.crosswalk
           << ", stop point in " << o.s_stop << " m, entry " << o.s_in << " m, exit " << o.s_out
           << " m, heading error " << o.heading_error * 180.0 / M_PI << " deg, vehicles " << o.objects
-          << (o.stale ? ", perception stale" : "") << (ids.empty() ? "" : ", waiting for " + ids);
+          << (o.stale ? ", perception stale" : "") << (ids.empty() ? "" : ", waiting for " + ids)
+          << (o.unreleased ? ", on the crosswalk without a go (" + std::to_string(o.depth) + " m past the entry)" : "");
   }
   DebugDatas::Instance()->emplace("crosswalk_mode", static_cast<int>(o.mode));
   DebugDatas::Instance()->emplace("crosswalk_index", o.crosswalk);
@@ -131,6 +134,7 @@ void Tracking::StepCrosswalk(const Pose2d &pose, double speed, double stamp, con
   DebugDatas::Instance()->emplace("crosswalk_vehicles", o.objects);
   DebugDatas::Instance()->emplace("crosswalk_waiting_for", static_cast<int>(o.decision.ids.size()));
   DebugDatas::Instance()->emplace("crosswalk_stale", o.stale ? 1 : 0);
+  DebugDatas::Instance()->emplace("crosswalk_unreleased", o.unreleased ? 1 : 0);
   DebugDatas::Instance()->emplace("crosswalk_heading_error", o.heading_error);
 }
 

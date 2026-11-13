@@ -90,10 +90,12 @@ Tracking 的状态（`src/runnable/mission/mission_state_machine/mission_fsm_bas
   2. 离停车点（中心在入口线前半个身长 + 0.3 m）3 m 内开始减速，指令乘 0.2–1；
   3. 到了停车点：指令换成原地转向，转到面朝对面（路线从入口到出口的方向，±10°）；
   4. 然后每周期问门控（`src/algorithm/yield_gate/`，`dog_perception/yield_gate.py` 的逐行移植，`wait` 判据）：查的是从狗到出口再多 1 m 的路线，等的时候速度为 0、不算 nav_blocked；
-  5. 放行就走；狗的中心一进人行横道，就不再为车停。
+  5. 放行就走；放行以后狗的中心一进人行横道，就不再为车停。
+  6. **没放行却在人行横道上**（等的时候定位跳了一下，或者狗是在路中间起步的）：离入口线（沿横穿方向往回量）不超过 1.5 m（`max_unreleased_depth`）就当还在路口，停下、转向、问门控；更深就当已经在路上，接着过。日志多一句 `on the crosswalk without a go (… m past the entry)`，调试字段 `crosswalk_unreleased`。（T52 复核：回放里录包的狗在原地转向时走上了人行横道，原来的写法直接放它过，没有感知也过。）
   - 车从 `/perception/lidar_3d/objects`（我们的感知节点，`perception_interface/LidarObjectArray`）来，在它自己的检测系（雷达正下方地面、x 右 y 前）：按固定外参（转 −90°，雷达在 `base_link` 的 (0.319, 0.043) m）换到 `base_link`，再按消息时刻的 odom 换到 `map`。**没有感知或超过 0.3 s 没更新，就停在路口等。**
   - 日志 `Crosswalk yield: <状态> (<门控的理由>) …`，调试字段 `crosswalk_mode`（0 无、1 接近、2 转向、3 等、4 放行、5 在人行横道上）、`crosswalk_s_stop`、`crosswalk_vehicles`、`crosswalk_waiting_for` 等，回放报告里有。
-  - C++ 门控和 Python 的逐帧对比、闭环模拟：`bash tools/yield_gate_parity/run.sh`（只要 g++ 和 Eigen）。
+  - C++ 门控和 Python 的逐帧对比、闭环模拟（七种情况，含等的时候定位跳上人行横道）：`bash tools/yield_gate_parity/run.sh`（只要 g++ 和 Eigen）。
+  - 外参对不对（感知 → `base_link` → `map` 这条链）：`python3 tools/objects_in_map.py <录包>`。停着的车在地图上应该不动；转错 90°、180° 的话，狗一走一转它就绕着狗晃。要录包里同时有 `/perception/lidar_3d/objects` 和 `/lightning/odom`，狗在这段里走过或转过。
 
 ## 4. 局部代价地图
 

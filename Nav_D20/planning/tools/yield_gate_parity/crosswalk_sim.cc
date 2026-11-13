@@ -1,6 +1,8 @@
 // Closed-loop check of CrosswalkYield (src/runnable/mission/tracking/crosswalk_yield.cc): a straight path north
 // through a crosswalk at y 10..18; the robot follows the path at 1 m/s times the speed scale, or holds and turns.
-// Cases: a car passing east on y = 14 while the robot waits; no car; no perception; arriving turned 60 deg away.
+// Cases: a car passing east on y = 14 while the robot waits; no car; no perception; arriving turned 60 deg away;
+// the pose jumping 1.2 m onto the crosswalk while the robot waits (with the car, and with no perception); starting
+// 3 m onto the crosswalk with no perception (T52 review).
 // Exit 1 when a case does not do what it should. Built and run by run.sh.
 #include <cstdio>
 #include <string>
@@ -18,24 +20,32 @@ struct Result {
   bool waited_for_car = false;  // a hold with reason vehicle
   bool held_on_crosswalk = false;
   bool aligned = false;         // an align hold
-  double go_time = -1, arrive_time = -1, reach_time = -1;
+  bool unreleased = false;       // an output with "on the crosswalk without a go"
+  double go_time = -1, arrive_time = -1, reach_time = -1, cross_time = -1;
 };
 
 Result Run(const std::string &mode) {
-  const bool car = mode == "car", stale = mode == "stale", turned = mode == "turned";
+  const bool jump = mode == "jump" || mode == "jumpstale", deep = mode == "deep";
+  const bool car = mode == "car" || mode == "jump", stale = mode == "stale" || mode == "jumpstale" || deep;
+  const bool turned = mode == "turned";
   CrosswalkYieldConfig cfg;
   cfg.enable = true;
   CrosswalkYield cy;
   cy.Configure(cfg);
   cy.SetCrosswalks({{Vec2(-3, 10), Vec2(3, 10), Vec2(3, 18), Vec2(-3, 18)}});
   const std::vector<Vec2> path{Vec2(0.3, 0), Vec2(0.3, 30)};
-  Vec2 xy(0.3, 0);
+  Vec2 xy(0.3, deep ? 13.0 : 0.0);
+  bool jumped = false;
   double yaw = turned ? M_PI / 2 + 1.05 : M_PI / 2 + 0.6;
   const double dt = 0.05, t0 = 1000.0;
   Result r;
   CrosswalkYieldOutput::Mode last = CrosswalkYieldOutput::kNone;
   for (int k = 0; k < 1500; ++k) {
     const double t = t0 + k * dt;
+    if (jump && !jumped && t - t0 > 14.0) {   // waiting at y 9.1: localization puts it 0.3 m past the entry
+      xy.y() += 1.2;
+      jumped = true;
+    }
     cy.AddOdom(t, xy, yaw);
     if (k % 2 == 0 && !stale) {   // perception: 10 Hz, 0.1 s old, in its own frame
       std::vector<Object> objs;
@@ -71,6 +81,8 @@ Result Run(const std::string &mode) {
     if (out.hold && out.decision.reason == "vehicle") r.waited_for_car = true;
     if (r.arrive_time < 0 && out.hold) r.arrive_time = t - t0;
     if (r.go_time < 0 && out.mode == CrosswalkYieldOutput::kGo) r.go_time = t - t0;
+    if (r.cross_time < 0 && out.mode == CrosswalkYieldOutput::kCross) r.cross_time = t - t0;
+    if (out.unreleased) r.unreleased = true;
     if (out.hold && xy.y() > 10 && xy.y() < 18) r.held_on_crosswalk = true;
     double v = out.speed_scale;
     if (out.hold) {
@@ -107,6 +119,15 @@ int main() {
   const Result t = Run("turned");
   check(t.aligned && t.go_time > 0 && t.reach_time > 0 && !t.held_on_crosswalk,
         "turned away: turns in place to face across, then goes");
+  const Result j = Run("jump");
+  check(j.unreleased && j.waited_for_car && j.go_time > 17.0 && j.cross_time > j.go_time && j.reach_time > 0,
+        "pose jumps onto the crosswalk while waiting for the car: keeps waiting, goes after it has passed");
+  const Result js = Run("jumpstale");
+  check(js.unreleased && js.go_time < 0 && js.cross_time < 0 && js.reach_time < 0,
+        "pose jumps onto the crosswalk with no perception: keeps waiting, never goes");
+  const Result d = Run("deep");
+  check(d.unreleased && d.cross_time >= 0 && d.cross_time < 0.1 && d.reach_time > 0,
+        "starts 3 m onto the crosswalk with no perception: crosses (it is on the road)");
   std::printf("crosswalk_sim: %d failed\n", bad);
   return bad == 0 ? 0 : 1;
 }
