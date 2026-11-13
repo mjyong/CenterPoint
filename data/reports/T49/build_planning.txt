@@ -1,0 +1,32 @@
+CMake Warning (policy) at /public/zjst/robot/planning_humble_env/env/share/filters/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package):
+  Policy CMP0167 is not set: The FindBoost module is removed.  Run "cmake
+  --help-policy CMP0167" for policy details.  Use the cmake_policy command to
+  set the policy and suppress this warning.
+Call Stack (most recent call first):
+  /public/zjst/robot/planning_humble_env/env/share/filters/cmake/filtersConfig.cmake:41 (include)
+  /public/zjst/robot/planning_humble_env/env/share/grid_map_cv/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+  /public/zjst/robot/planning_humble_env/env/share/grid_map_cv/cmake/grid_map_cvConfig.cmake:41 (include)
+  /public/zjst/robot/planning_humble_env/env/share/grid_map_ros/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+  /public/zjst/robot/planning_humble_env/env/share/grid_map_ros/cmake/grid_map_rosConfig.cmake:41 (include)
+  CMakeLists.txt:65 (find_package)
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc: In member function ‘void planning::communication::RosBridge::joint_state_callback(sensor_msgs::msg::JointState_<std::allocator<void> >::SharedPtr)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc:409:57: warning: ‘Eigen::Matrix<typename Eigen::internal::traits<T>::Scalar, 3, 1> Eigen::MatrixBase<Derived>::eulerAngles(Eigen::Index, Eigen::Index, Eigen::Index) const [with Derived = Eigen::Block<const Eigen::Matrix<double, 4, 4>, 3, 3, false>; typename Eigen::internal::traits<T>::Scalar = double; Eigen::Index = long int]’ is deprecated: Use .canonicalEulerAngles() instead. [-Wdeprecated-declarations]
+  409 |              << transform.rotation().eulerAngles(0, 1, 2).transpose() << " "
+      |                                                         ^
+In file included from /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/Geometry:37,
+                 from /public/zjst/robot/planning_humble_env/env/include/grid_map_core/grid_map_core/GridMap.hpp:14,
+                 from /public/zjst/robot/planning_humble_env/env/include/grid_map_core/grid_map_core/grid_map_core.hpp:13,
+                 from /public/zjst/robot/planning_humble_env/env/include/grid_map_ros/GridMapRosConverter.hpp:12,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.h:3,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc:1:
+/public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Geometry/EulerAngles.h:136:77: note: declared here
+  136 | EIGEN_DEVICE_FUNC inline Matrix<typename MatrixBase<Derived>::Scalar, 3, 1> MatrixBase<Derived>::eulerAngles(
+      |                                                                             ^~~~~~~~~~~~~~~~~~~
+---
+Finished <<< planning [2min 16s]
+
+Summary: 1 package finished [2min 17s]
+  1 package had stderr output: planning

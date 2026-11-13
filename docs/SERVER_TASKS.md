@@ -157,7 +157,7 @@
 | T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 完成，已复核（2026-11-12）：外参 A2；装包、锁频、室内外都做了；挡路车 15 s 后不安全 207 → 204 |
 | T47 | 规划回放第二次（起点挪到路上、bag 放完就收、新的回放脚本）；室外 bag 缺帧那一段的 INS；在线对离线扣掉原点差重比；狗在线时验 root 桥白名单 | Agent | T46 复核 | 1.5 小时 | 完成，已复核（2026-11-12）：两次回放都进了 active；之后的 Nav_D20 同步冲掉了我们的补丁，已重打（Nav_D20/PATCHES.md）；新地图的人行横道接进规划；T48 用新版重跑 |
 | T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 完成，已复核（2026-11-13）：编过了，切图读到 5 条人行横道；三次都只 active 约 20 个周期就停在 standstill，两次定位跑飞。原因都是同步带来的：回放超时的补丁丢了、新版 lightning 少了 0921 要的 INS 朝向 180°、默认车型 d30。三处都改了，T49 重跑 |
-| T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 任务已写好 |
+| T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 完成（2026-11-13）：三处修复都生效（d20/001、朝向 180、超时 0）。INS 直出 active 3232、CMD 中位 vx 1.115；现场地图和切图全局规划失败，任务停在 fault。gap 与 T46 base 相同（unsafe 204） |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8664,3 +8664,29 @@ t48_switch 里人行横道读进来没有；三份的"狗脚下是障碍"事件�
 报告（写进"T49 结果"）：编译最后几行；三份 report 全文；和 T47（老版 TEB）比：active 比例、CMD 次数和中位、起点挪多少；
 朝向、贴图比例、odom - INS 那几个数；wait 和 gap 的评测表。
 ```
+
+### T49 结果
+
+2026-11-13。源码和安装目录的 `default_robot_vin` 都保持 `d30/001`。回放脚本默认 `PLANNING_VIN=d20/001`，临时目录加载的是 d20（`Load robot config: …/d20/001`，PGM 10293×11412）。`pytest` 45 passed。planning、lightning 都 `Summary: 1 package finished`（2 分 17 秒、1 分 48 秒）。感知没重编。
+
+三处修复都进了这次二进制：车型行是 `规划车型 d20/001`；定位日志是 `system.ins_yaw_offset = 180 deg`（bag `rosbag2_2026_09_21-16_41_27`）；现场地图和切图的 `Data timeout exceeded` 是 0。狗头朝向中位绝对偏差 1°、0°、1°，没有 `TURNED ROUND`。
+
+全文在 `data/reports/T49/report_{map,ins,switch}.txt`。
+
+- 现场地图：目标已发。`mission_state`：fault 3242，passive 1，standby 1。`CMD:` 0 次。`Start adjusted` 0。进 standby 的同一毫秒里 `GridPathPlanner plan path failed`（stdout，不在 glog 里），没有 `out of map` / `in collision`。当时定位在约 78.35, 119.53；T47 在 78.31, 119.39 因为 `distance_cost > 0.99` 被挪了 0.50 m 到 77.93, 119.72。这次起点格过了 0.99 的门槛，A* 又拒绝踏进 `distance_cost > 0.9` 的邻格，搜索立刻结束，任务停在 fault。查包仍报 `/lightning/odom`：p99 6.9 m/s（最大 714.5，是 0.18 s 那次 142.8 m 的初始化跳变）；1 s 之后还有 40 次约 1.4–1.7 m / 10 ms 的跳变，odom 相对 INS 的中位是 0.29 m，不是 T48 那种跑飞。贴图中位 44%。`lightning log …loc.log: 2003 lines, 77 events`，规划 glog 3536 行、21 个事件。狗脚下是障碍：105.06 s（16 格）、105.56 s（30 格）；更早还有 32.61 s、38.36 s。
+- INS 直出：目标已发。`mission_state`：active 3232，passive 1，standby 1，standstill 29。`CMD:` 1862 次，中位 vx vy ω = 1.115、0.007、0.150，vx > 0.05 占 98%。`local planner solver failed` 1370 次。起点没挪。`Data timeout exceeded` 1 次，在 bag 放完时（`Data timeout exceeded, pausing mission`），没有 `Data recovered`；那 29 个 standstill 就是这一下。查包没有报 `/lightning/odom`。朝向中位 0°。odom − INS 中位 0.14 m。定位日志 19 行、9 个事件；规划 glog 35010 行、57 个事件。录包里没有 `/goal_pose`（规划收到了目标）。狗脚下是障碍：106.64 s（15 格）、110.34 s（15 格）。
+- 切图：目标已发。`Map switch` 1 次，`GlobalMapManager: 5 crosswalks in …/2d/1780551612/semantic.osm` 1 次，`OSM file not exist` 0。路线图换成了这张图（51154 个路格，现场地图那次是 CJGC 的 36688）。`mission_state`：fault 3157，passive 1，standby 1。`CMD:` 0。同样是 `GridPathPlanner plan path failed`，起点没挪。`Data timeout exceeded` 0。查包报 `/lightning/odom`：p99 6.9 m/s（最大 713.3，0.12 s 的 142.8 m 初始化跳变）；1 s 之后 37 次约 1.4–1.6 m / 10 ms。贴图中位 50%。odom − INS 中位 0.31 m。朝向中位 1°。`lightning log` 2057 行、88 个事件；规划 glog 3617 行、27 个事件。107 s 前后没有“狗脚下是障碍”；有的是 34.99 s、39.98 s、123.98 s、131.83 s、132.03 s。录包里没有 `/goal_pose`。
+
+和 T47（老版 TEB）比：T47 现场地图 active 3218/3280、CMD 62 次（头两条 vx 0.177、0.614）、起点挪了 0.50 m；INS 直出 active 3222、CMD 791 次（头两条 vx 0.024、0.084）、起点没挪。这次 INS 直出 active 3232、CMD 1862 次、中位 vx 1.115，起点没挪。现场地图和切图没有进 active，起点没挪，全局规划失败。
+
+朝向、贴图、odom − INS：1° / 0° / 1°；贴图 44% 和 50%（T48 位姿反了时是 13–18%）；odom − INS 0.29 m、0.14 m、0.31 m（T48 现场地图和切图是 2.7 m、3.9 m，INS 直出 0.14 m）。
+
+1104 让行评测（`yield_eval.py` 退出码 1 是因为还有 unsafe）。gap 的 all 一行和 T46 base 相同：unsafe 204、risky 314、unknown 3106、timeouts 0，等待 0.0 / 3.2 / 15.1 s；原因 blind 195、far 1、near 0、occluded 0、detection 5、prediction 3。
+
+wait 的 all 一行：episodes 3396，unknown 3676，unsafe 187，risky 275，timeouts 0，等待 0.0 / 3.8 / 15.5 s。原因：blind 179、far 1、near 0、occluded 0、detection 5、prediction 2。剩下的 unsafe，按原因各一次：
+
+- blind：`1104_cp01_s000` fan000，到达 11.1 s 就走了。车在出发前 0.9 s 才被标上，49 m、方位 130°，21 km/h，当时没被跟踪。
+- far：`1104_cp04_s004` fan090，到达 18.1 s 就走了。车在出发后 1.6 s 才被标上，48 m、方位 52°。
+- detection：`1104_cp04_s000` fan000，到达 11.1 s 就走了。车在出发前 2.4 s 已被标上，9.4 m、方位 137°，没有形成跟踪。
+- prediction：`1104_cp01_s002` fan045，到达 3.1 s 就走了。车已被跟踪，46 m、方位 29°、14 km/h，门控没看出会冲突。
+- near、occluded：0 次。

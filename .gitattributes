@@ -13,6 +13,7 @@ work_dirs/planning_io_t47_ins/**/*.mcap filter=lfs diff=lfs merge=lfs -text
 work_dirs/1112_t40/*.mcap filter=lfs diff=lfs merge=lfs -text
 Nav_D20/map/*.zip filter=lfs diff=lfs merge=lfs -text
 work_dirs/planning_io_t48_*/**/*.mcap filter=lfs diff=lfs merge=lfs -text
+work_dirs/planning_io_t49_*/**/*.mcap filter=lfs diff=lfs merge=lfs -text
 Nav_D20/seres_interface/third/protobuf/android/lib/*.a filter=lfs diff=lfs merge=lfs -text
 # planning_mcap_viz.py output: a few MB, kept as plain files so that a clone can open them without git lfs
 work_dirs/planning_io_*/viz/*.mcap !filter !diff !merge -text
