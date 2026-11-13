@@ -156,7 +156,7 @@
 | T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 完成，已复核（2026-11-12）：新规则 230 → 207；盲区以外剩 12 次，6 次是停着的货车车头压在路线上、停 4 s 后开走，门控加了车身压在路线上要看满 15 s；狗当时不在线，第 1 步放进 T46 |
 | T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 完成，已复核（2026-11-12）：外参 A2；装包、锁频、室内外都做了；挡路车 15 s 后不安全 207 → 204 |
 | T47 | 规划回放第二次（起点挪到路上、bag 放完就收、新的回放脚本）；室外 bag 缺帧那一段的 INS；在线对离线扣掉原点差重比；狗在线时验 root 桥白名单 | Agent | T46 复核 | 1.5 小时 | 完成，已复核（2026-11-12）：两次回放都进了 active；之后的 Nav_D20 同步冲掉了我们的补丁，已重打（Nav_D20/PATCHES.md）；新地图的人行横道接进规划；T48 用新版重跑 |
-| T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 任务已写好 |
+| T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 停下（2026-11-13）：新版 planning 编不过。Ceres 2.2 没有 LocalParameterization，glog 没有 LogMessageVoidify。没有回放 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8481,4 +8481,18 @@ T46 复核改了四处（都在仓库里）：规划的 `allow_collision_start`�
 报告（写进"T48 结果"）：三部分编译的最后几行；三份 report 全文；和 T47 比（T47 是老版 TEB）：active 的比例、CMD 次数、起点挪了多少；
 t48_switch 里人行横道读进来没有；有没有改补丁、改了什么。
 ```
+
+### T48 结果
+
+2026-11-13。第 1 步停下：新版 planning 是机器人团队的代码，对本机的库编不过。没有改补丁，三次回放都没跑。已装的 planning 二进制仍是 2026-11-12 19:47 那份。
+
+- 第 0 步：`pytest tests/dog/test_planning_mcap.py tests/dog/test_yield_gate.py` 30 passed。五处补丁的 grep 都 ≥ 1。`ad68517c` 的 `semantic.osm` 已经解开，没有重解。
+- 第 1 步：`--packages-up-to planning` 第一次停在 `find_package(rhr_interface)`，这个包在 `Nav_D20/slam/interface/rhr_interface`，不在 planning 目录里。先编了它，并把 `third_party/nav_interface` 重编进环境（新消息 `FollowTarget`；安装目录里原有的 `DetSegResults` 还在）。planning 再编，1 分 7 秒失败，`Summary: 0 packages finished`，`1 package failed: planning`。
+  错误不在 PATCHES.md 里的文件：
+  - Ceres 2.2.0 没有 `ceres::LocalParameterization`（`src/algorithm/teb_planner/ceres_cost_func.h:48`）。
+  - `google::LogMessageVoidify` 编不过（`src/common/util/log.h:57`）。
+  - 后面还有 `mc_interface::msg::MotionSkill` 没有 `MOTION_BODY_TARGET_POSE`（`src/runnable/mission/recharging/recharging.cc:455`）。
+  按停止条件没有改这些文件。lightning 和 `lidar_seg`、`grid_map_memory_node` 没有接着编。错误前 30 行在 `data/reports/T48/build_planning.txt`。
+- 第 2 步没跑，所以没有和 T47 的 active、CMD、起点挪动可比，也没有 `t48_switch` 的人行横道结果。
+- 没有改补丁。
 

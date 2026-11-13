@@ -1,0 +1,51 @@
+T48 planning rebuild stopped. Robot-team sources do not compile against this env.
+Ceres 2.2.0 has no ceres::LocalParameterization. log.h uses google::LogMessageVoidify.
+Installed planning binary was not replaced (mtime 2026-11-12 19:47).
+rhr_interface was installed; third_party/nav_interface was rebuilt (FollowTarget added, DetSegResults still present).
+lightning, lidar_seg, grid_map_memory_node were not built.
+
+== first 30 lines from the first compiler error ==
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/algorithm/teb_planner/teb_planner.h:2,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/algorithm/target_follow_planner/target_follow_planner.h:9,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/algorithm/target_follow_planner/target_follow_planner.cc:1:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/algorithm/teb_planner/ceres_cost_func.h:48:72: error: expected class-name before ‘{’ token
+   48 | class AngleLocalParameterization : public ceres::LocalParameterization {
+      |                                                                        ^
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/algorithm/teb_planner/teb_planner.h:2,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/algorithm/teb_planner/teb_planner.cc:1:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/algorithm/teb_planner/ceres_cost_func.h:48:72: error: expected class-name before ‘{’ token
+   48 | class AngleLocalParameterization : public ceres::LocalParameterization {
+      |                                                                        ^
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/common/util/factory.h:9,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/preprocess/preprocess_factory.h:8,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/preprocess/preprocess_factory.cc:7:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/common/util/factory.h: In member function ‘std::unique_ptr<AbstractProduct> planning::common::util::Factory<IdentifierType, AbstractProduct, ProductCreator, MapContainer>::CreateObject(const IdentifierType&, Args&& ...)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/common/util/log.h:57:21: error: ‘LogMessageVoidify’ is not a member of ‘google’; did you mean ‘LogMessageInfo’?
+   57 |           : google::LogMessageVoidify() & ALOG_MODULE(module, severity)
+      |                     ^~~~~~~~~~~~~~~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/common/util/log.h:57:21: note: in definition of macro ‘ALOG_IF’
+   57 |           : google::LogMessageVoidify() & ALOG_MODULE(module, severity)
+      |                     ^~~~~~~~~~~~~~~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/common/util/factory.h:96:5: note: in expansion of macro ‘AERROR_IF’
+   96 |     AERROR_IF(!result) << "Factory could not create Object of type : " << id;
+      |     ^~~~~~~~~
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/common/util/factory.h:9,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/communication_factory.h:8,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/communication_factory.cc:7:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/common/util/factory.h: In member function ‘std::unique_ptr<AbstractProduct> planning::common::util::Factory<IdentifierType, AbstractProduct, ProductCreator, MapContainer>::CreateObject(const IdentifierType&, Args&& ...)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/common/util/log.h:57:21: error: ‘LogMessageVoidify’ is not a member of ‘google’; did you mean ‘LogMessageInfo’?
+   57 |           : google::LogMessageVoidify() & ALOG_MODULE(module, severity)
+
+== tail ==
+---
+Failed   <<< planning [1min 7s, exited with code 2]
+
+Summary: 0 packages finished [1min 7s]
+  1 package failed: planning
+  1 package had stderr output: planning
+
+---
+exit_code: 2
+elapsed_ms: 104475
+ended_at: 2026-11-13T01:59:39.097Z
+---
