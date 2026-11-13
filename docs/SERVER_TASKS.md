@@ -161,7 +161,7 @@
 | T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三次都一路 active，odom 不再跳。剩下：狗贴着路网边时 MPPI 一直失败（起步也会卡住）；回放时 LiDAR 点云在进定位之前断续。min_watch 没用，不开 |
 | T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 完成，已复核（2026-11-13）：现场地图、INS 直出贴边不再卡（1716/1716 → 24/1995、1330/1330 → 4/1342）；切图那次还卡，是 GPU 用了主机算的起点间隙（两份距离场不一样），已改成显卡上自己算；狗上的装法记下了 |
 | T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 完成，已复核（2026-11-13）：编过，门控 38787 帧 0 差；回放状态切换对。复核发现：没放行、狗的中心进了人行横道就直接过（回放里是录包的狗自己走上去的，狗上定位跳一下也会这样），已改成离入口 1.5 m 内还当在路口等；外参链加了检查工具 |
-| T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 完成（2026-11-13）：1112 在 ad68517c 上路网 53%，不过人行横道；狗上的图只有 47 m，盖不住。回放一路 active。感知重算跳过（没有 TensorRT） |
+| T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 完成，已复核（2026-11-13）：GPU 版贴边也不卡了（切图回放 3%）；狗上录的真实目标进了门控（最多 5 辆）。1112 那一带没有人行横道；狗上的地图 c1adbe7b 只有 47 m 见方。复核发现：狗上的规划配置是旧版本的，我们的程序读不了（会起不来），上狗要用仓库的配置加狗上的取值 |
 | T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 任务已写好（T53 做完再做） |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -8990,6 +8990,32 @@ C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 �
 
 没有 `wait` 这一态（朝向差 79°，先 align）。任务里的 awk（wait 到 cross）是 0 条。align 到 cross 约 0.5 s，10 条 CMD，vx、vy 都是 0，只有 ω。
 
+### T53 复核（2026-11-13）
+
+1. **GPU 版 MPPI 贴边不再卡**：这次编进了 GPU 起点间隙的修复，用 GPU、切图。脚印下有障碍的 2192 个周期里只有 69 个零指令，全部 3010 个 active 周期里 80 个（3%）。T51 切图那次是 270/354。不是同一个包；T54 第 3b 步原样重放 T51 那次，正面对比。
+2. **真实的车进了门控**：`crosswalk_vehicles` 最多 5，3010 个周期里 1552 个大于 0，和包里 51% 的帧有车对得上。这说明三件事：狗上我们的节点发的 `LidarObjectArray` 和规划这边的接口是同一个类型；订阅通了；目标的时刻和 odom 对得上（没有被当成 stale）。这一带没有人行横道，所以没有过马路。
+3. **外参还没验成**：1112 的目标是天线改正之前算的。狗一走，停着的车看着像在动，motion 标成 moving。`objects_in_map.py` 加了 `--any-motion`（所有车的航迹都用，数几条在地图上不动），T54 第 4 步用；定论要用改正以后录的包。
+4. **狗上的地图**：
+   - 定位配置里的 `c1adbe7b` 只有 47 m 见方（234×231、0.2 m，原点 (−10.8, −9)），1112 的轨迹在 780 m 外；
+   - 狗上规划的全局图是 `CJGC_DD`（仓库里只有 CJGC、CJGC_ST）；
+   - App 跑任务时会发 `/map/switch` 换图，配置里写的不一定是那天用的。T54 第 5 步只读查：狗上装了哪些图、哪张有人行横道、最近一周切过哪些。
+   - `bag_on_map.py` 读不了 c1adbe7b 的 origin（写成了一行一个的列表），已改（`planning_mcap_viz.parse_map_yaml`）。
+5. **回放目标落在起点上**：1112 是一圈，"沿轨迹最远的路网点"就是终点，也就是起点。已改成离起点直线最远的路网点（`bag_on_map.py`，加了测试）。
+6. **上狗的配置：狗上那份我们的程序读不了**。
+   - 狗上跑的是 10-29 的规划，配置是 10-29 到 11-11 的；我们编的是机器人团队 11-12 的代码。
+   - 11-12 的代码把 `TrackingConf.grid_path_planner_conf`（A* 的配置）删了，挪到了预处理的 `global_map_manager_conf` 里；狗上的 `mission_conf.pb.txt` 还写着它。
+   - 我们的程序读到不认识的字段会解析失败，`main.cc` 里 `ACHECK` 直接退出，systemd 每 5 s 重启一次：**狗上就没有规划了**。
+   - 所以上狗的配置要用仓库这份（11-12 的格式），再把狗上自己的取值搬过来：
+     - 预处理：全局图 `CJGC_DD`；
+     - mission：`nav_blocked_enable: false`、`off_distance_threshold: 0.25`、`threshold_to_consider: 0.5`、`vx_gain: 0.5`、`ready_distance: 1.5`、`standby_pos_tolerance: 0.15`、充电桩偏移 0.25 / −0.05；
+     - communication：`enable_global_map_pub: true`、`pub_flag: true`；
+     - 不带回放用的 `allow_collision_goal`；
+     - 加我们的 `crosswalk_yield_conf`、`sub_lidar_objects`。
+   - 这要和机器人团队对一下：他们以后把狗升到 11-12 也会碰到同一件事，可能已经有对应的配置了。
+7. **狗上 `nav_blocked_enable` 是 false**：MPPI 一直失败进 standstill、要人恢复的那个问题，狗上按它自己的配置不会出现。
+8. 4b（现场重算目标）没做：规划的环境里没有 TensorRT。不追了，改用改正以后在狗上录的包（T54 第 4 步先找；没有就请人录一段）。
+9. 定位配置的不同（`with_ins` false、噪声参数、`init_t`）不影响：上狗只换规划，不换定位。
+
 ### T52 复核（2026-11-13）
 
 1. **编译、对帧都过了**：接口包和规划编过；门控在 1104 的真实跟踪结果上 38787 帧 0 差，闭环模拟 0 失败。这次的二进制在 48fbe15（GPU 起点间隙）之前，GPU 那条留给 T53。
@@ -9122,7 +9148,7 @@ crosswalk_vehicles 的最大值；b 做没做、为什么。
 
 0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py \
        tests/dog/test_yield_gate_cpp.py tests/dog/test_bag_on_map.py tests/dog/test_objects_in_map.py -q | tail -1
-   （54 passed；test_yield_gate_cpp 要 g++ 和 Eigen，同 T52 加 EIGEN_DIR）
+   （56 passed；test_yield_gate_cpp 要 g++ 和 Eigen，同 T52 加 EIGEN_DIR）
    grep -c "max_unreleased_depth" Nav_D20/planning/src/proto/mission_conf.proto Nav_D20/planning/src/runnable/mission/tracking/crosswalk_yield.cc
    （各 ≥ 1）
 1. 重编 planning（同 T52 第 1 步，接口包没改不用再编），存 data/reports/T54/build_planning.txt（tail -30）。
@@ -9138,13 +9164,25 @@ crosswalk_vehicles 的最大值；b 做没做、为什么。
      without a go (… m past the entry)" 的 align 或 wait（刚走上去、离入口 1.5 m 以内，还在等；这句一出现就记一行）→ 过了 1.5 m
      才 cross（同样带这一句，米数 > 1.5）→ none。抄全；
    - 从 align 到 cross 之间的 CMD：vx、vy 都应该是 0（awk 同 T52 第 3 步，把 wait 换成 align）；
-   - local planner 那一行和 T52 的（77 of 3097）比：这次二进制带了 GPU 起点间隙的修复；
+   - local planner 那一行和 T52 的（77 of 3097）比；
    - 录包走 LFS（work_dirs/planning_io_t54_cross），viz/ 是普通文件。
-4. 外参（只用 CPU）：对 T53 每个带 /perception/lidar_3d/objects 的录包（t53_1112，做了 b 的话还有 t53_1112_live）：
-     python Nav_D20/planning/tools/objects_in_map.py work_dirs/planning_io_t53_1112 | tee -a data/reports/T54/objects_in_map.txt
-   - 要 "extrinsic OK"，配置的 −90° 那行 "<- smallest"，抄四行的数；
-   - "nothing to check"（这一段没有狗走着时一直看到的停着的车）：写明，再试 --min-frames 10；
-   - "WRONG"：停下，抄全文，不要改配置里的外参。
+3b. GPU 起点间隙的修复正面对比：原样重放 T51 卡住的那次（目标 80.0 126.9，切图）：
+     LOC_MAP_PATH=$M MAP_SWITCH=$M bash Nav_D20/planning/script/replay_planning_check.sh t54_switch 80.0 126.9
+     cp work_dirs/planning_io_t54_switch/report.txt data/reports/T54/report_switch.txt
+   - T51 是 "zero command in 270 of 354 active cycles (76%)"，16 s 后进 standstill。这次应该和 T53（3%）一个量级，一路 active；
+     抄 local planner 那一行、mission_state、有没有 standstill。还是很多就停下：抄 planning.INFO 里 "MPPI CUDA: robot footprint
+     in collision" 那几行和前后 20 行（不用往下做第 4 步以后）；
+   - 录包走 LFS，viz/ 是普通文件。
+4. 外参（只用 CPU）。1112 的目标是天线改正之前算的（狗上 19:25 才改，包是 18:59 录的）：狗一走，停着的车在感知里看着像在动，
+   motion 标成 moving，默认的筛法会把它们都去掉，所以加 --any-motion（所有车的航迹都用，看几条在地图上不动）：
+     python Nav_D20/planning/tools/objects_in_map.py work_dirs/planning_io_t53_1112 | tee data/reports/T54/objects_in_map.txt
+     python Nav_D20/planning/tools/objects_in_map.py work_dirs/planning_io_t53_1112 --any-motion | tee -a data/reports/T54/objects_in_map.txt
+   - 要 "extrinsic OK"，配置的 −90° 那行 "<- best"，抄四行的数（median 和 "k of n still"）；
+   - 两次都 "nothing to check"：写明，再试 --min-frames 10；
+   - "WRONG"：不要改配置里的外参，抄全文，接着做（这批目标本身有问题，不算定论；定论要用改正以后录的包）。
+   改正以后录的包：ls -la /public/zjst/robot/cp_data/，看有没有 2026-11-12 19:25 以后录的、带 /perception/lidar_3d/objects 的
+   （ros2 bag info 看话题和开始时间）。有的话挑一个，同 T53 第 3、4a 步：bag_on_map.py 找图和目标，LOC_INS_YAW_OFFSET=0 回放
+   （名字 t54_fixed），再对它跑 objects_in_map.py（先不加 --any-motion）。这次是定论：WRONG 就停下报告。没有这样的包就写"没有"。
    /public/zjst/robot/bags1104 的包里同时录了 /perception/lidar_3d/objects 和 /lightning/odom 的话（ros2 bag info 看），挑两个也跑，
    追加进同一个文件；没有就写"1104 的包里没有 odom"。
 5. 狗在线才做（每步前 ssh dog true；不在线就跳过，写明）。只读，规矩同 T46、T51（不停服务、不 apt、不在域 0 上起节点）：
@@ -9159,9 +9197,17 @@ crosswalk_vehicles 的最大值；b 做没做、为什么。
      要看的：ins_azimuth_offset_deg 是 0.0，ins_lever_arm 是 [0.0213, -0.18, 0.0]，objects_topic 是 /perception/lidar_3d/objects
      （规划订阅的就是它），det_frame 那段一致。别的不一样的项也抄下（狗上可能是更早的版本）；
    - 日志里每秒一行的统计：帧率（应该 10 Hz 左右）、延迟、warn，抄 5 行。不要在狗上 ros2 topic echo / hz（会在域 0 上起节点）。
+   - 狗上实际用哪张图（T53：配置里定位是 c1adbe7b，只有 47 m 见方；规划的全局图是 CJGC_DD；App 跑任务时会发 /map/switch 换图）：
+       ssh dog 'ls -la /userdata/config/robot_service/map/ /opt/seres/nav/data/ /opt/seres/nav/planning/lib/planning/robot_factory/data/astar_pgm/'
+       ssh dog 'for d in /userdata/config/robot_service/map/* /opt/seres/nav/data/*; do for f in $(find $d -name semantic.osm -o -name map.osm); do echo "$f $(grep -c crosswalk $f)"; done; done'
+       ssh dog 'journalctl -u planning.service --since "-7 days" --no-pager | grep -E "Map switch|ReloadMap|crosswalks in|OSM file" | tail -20'
+       ssh dog 'journalctl -u slam.service --since "-7 days" --no-pager | grep -iE "map_path|load.*map|switch" | tail -20'
+     存 data/reports/T54/dog_maps.txt。CJGC_DD.yaml（和 .pgm 的大小）拷到 /public/zjst/robot/dog8_stack/astar_pgm/（只读拷，不提交），
+     yaml 全文抄进报告。
 6. 提交：data/reports/T54/、录包和 viz/、本文档。
 
-停止条件：第 1 步不是我们文件的编不过；第 2 步有 differ 或 FAIL；第 4 步 WRONG。
+停止条件：第 1 步不是我们文件的编不过；第 2 步有 differ 或 FAIL；第 3b 步 MPPI 还是大半失败；第 4 步改正以后录的包 WRONG。
 报告（写进"T54 结果"）：编译最后几行；parity 的帧数和七行模拟；report_cross 全文、"Crosswalk yield:" 那几行、align 到 cross 之间的
-CMD 统计；objects_in_map 全文；狗上感知配置的比对和日志几行（或者为什么没做）。
+CMD 统计；report_switch 的 local planner 那一行、mission_state；objects_in_map 全文（和改正以后的包，有的话）；狗上感知配置的比对和
+日志几行；狗上的地图（装了哪些、哪张有人行横道、最近一周切过哪些图）；没做的写为什么。
 ```

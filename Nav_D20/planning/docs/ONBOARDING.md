@@ -95,7 +95,8 @@ Tracking 的状态（`src/runnable/mission/mission_state_machine/mission_fsm_bas
   - 车从 `/perception/lidar_3d/objects`（我们的感知节点，`perception_interface/LidarObjectArray`）来，在它自己的检测系（雷达正下方地面、x 右 y 前）：按固定外参（转 −90°，雷达在 `base_link` 的 (0.319, 0.043) m）换到 `base_link`，再按消息时刻的 odom 换到 `map`。**没有感知或超过 0.3 s 没更新，就停在路口等。**
   - 日志 `Crosswalk yield: <状态> (<门控的理由>) …`，调试字段 `crosswalk_mode`（0 无、1 接近、2 转向、3 等、4 放行、5 在人行横道上）、`crosswalk_s_stop`、`crosswalk_vehicles`、`crosswalk_waiting_for` 等，回放报告里有。
   - C++ 门控和 Python 的逐帧对比、闭环模拟（七种情况，含等的时候定位跳上人行横道）：`bash tools/yield_gate_parity/run.sh`（只要 g++ 和 Eigen）。
-  - 外参对不对（感知 → `base_link` → `map` 这条链）：`python3 tools/objects_in_map.py <录包>`。停着的车在地图上应该不动；转错 90°、180° 的话，狗一走一转它就绕着狗晃。要录包里同时有 `/perception/lidar_3d/objects` 和 `/lightning/odom`，狗在这段里走过或转过。
+  - 外参对不对（感知 → `base_link` → `map` 这条链）：`python3 tools/objects_in_map.py <录包>`。停着的车在地图上应该不动；转错 90°、180° 的话，狗一走一转它就绕着狗晃。要录包里同时有 `/perception/lidar_3d/objects` 和 `/lightning/odom`，狗在这段里走过或转过。感知的 motion 标得不对时（天线改正前录的 1112：狗一走停着的车就像在动）加 `--any-motion`。
+  - **狗上的规划配置和我们编的不是一个版本**（T53 复核）：狗上是 10-29 的程序和配置，我们编的是 11-12 的代码，`tracking_conf.grid_path_planner_conf` 已经删了，狗上那份配置我们的程序解析失败、直接退出。上狗用仓库的配置，搬上狗上的取值。
 
 ## 4. 局部代价地图
 

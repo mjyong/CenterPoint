@@ -4,7 +4,11 @@ in base_link by a fixed extrinsic (crosswalk_yield_conf det_to_base_*) and in th
 message's stamp (/lightning/odom). A parked car has to stay where it is in the map while the dog walks and turns;
 with a wrong extrinsic yaw it swings around the dog. So, for every vehicle track perception calls static or
 stopped, this measures how far its map position wanders, for the configured extrinsic and for the yaw turned by
-90, 180 and 270 deg: the configured one should be clearly the smallest.
+90, 180 and 270 deg: the configured one should be clearly the smallest, and keep the most tracks still.
+
+--any-motion uses every vehicle track, whatever perception's motion flag says (a moving car is not still under any
+yaw, a parked one only under the right one): for objects computed with a wrong INS heading (1112, before the
+antenna fix at 19:25) parked cars look moving while the dog walks, and the flag drops them.
 
     python Nav_D20/planning/tools/objects_in_map.py work_dirs/planning_io_t53_1112 [--odom /lightning/odom]
 
@@ -71,16 +75,18 @@ def to_map(pose, det_xy, det_to_base):
     return x + c * bx - s * by, y + s * bx + c * by
 
 
-def check(odom, frames, det_to_base=DET_TO_BASE, max_gap=0.3, min_frames=20, max_range=40.0):
-    """-> dict: per candidate yaw (the configured one first) the median wander [m] of static vehicle tracks, the
-    tracks used and how much the dog moved and turned while they were seen."""
+def check(odom, frames, det_to_base=DET_TO_BASE, max_gap=0.3, min_frames=20, max_range=40.0, any_motion=False,
+          still=0.5):
+    """-> dict: per candidate yaw (the configured one first) the median wander [m] of the vehicle tracks (static or
+    stopped ones; all with any_motion) and how many of them wander less than `still`; the tracks used and how much
+    the dog moved and turned while they were seen."""
     yaws = [det_to_base[2] + k * 90.0 for k in range(4)]
     tracks = {}            # id -> [(t, pose, det_xy)]
     skipped = 0
     for t, objs in frames:
         pose = None
         for oid, label, motion, px, py in objs:
-            if label != 0 or motion == 1 or math.hypot(px, py) > max_range:
+            if label != 0 or (motion == 1 and not any_motion) or math.hypot(px, py) > max_range:
                 continue
             if pose is None:
                 pose = pose_at(odom, t, max_gap)
@@ -104,7 +110,9 @@ def check(odom, frames, det_to_base=DET_TO_BASE, max_gap=0.3, min_frames=20, max
         for y in yaws:
             pts = np.array([to_map(p, d, (det_to_base[0], det_to_base[1], y)) for _, p, d in obs])
             wander[y].append(float(np.median(np.hypot(*(pts - np.median(pts, axis=0)).T))))
+    best = max(yaws, key=lambda y: (sum(w < still for w in wander[y]), -np.median(wander[y]) if wander[y] else 0))
     return dict(yaws=yaws, wander={y: (float(np.median(v)) if v else float("nan")) for y, v in wander.items()},
+                still={y: int(sum(w < still for w in v)) for y, v in wander.items()}, best=best,
                 tracks=used, dog_move=dog_move, dog_turn=dog_turn, frames=len(frames), stale=skipped)
 
 
@@ -114,6 +122,8 @@ def main(argv=None):
     ap.add_argument("--odom", default="/lightning/odom")
     ap.add_argument("--det-to-base", type=float, nargs=3, default=DET_TO_BASE, metavar=("X", "Y", "YAW_DEG"))
     ap.add_argument("--min-frames", type=int, default=20)
+    ap.add_argument("--any-motion", action="store_true",
+                    help="every vehicle track, not only those perception calls static or stopped")
     args = ap.parse_args(argv)
     path = args.bag
     if os.path.isdir(path) and not os.path.isfile(os.path.join(path, "metadata.yaml")):
@@ -121,19 +131,22 @@ def main(argv=None):
         if subs:                              # a replay directory: the main recording in it
             path = os.path.join(path, subs[0])
     odom, frames = read(path, args.odom)
-    r = check(odom, frames, tuple(args.det_to_base), min_frames=args.min_frames)
+    r = check(odom, frames, tuple(args.det_to_base), min_frames=args.min_frames, any_motion=args.any_motion)
     print("%s: %d object messages, %d odometry; %d messages with no odometry within 0.3 s (the gate counts them "
           "stale)" % (path, r["frames"], len(odom), r["stale"]))
     if not r["tracks"]:
-        print("no static vehicle track seen for %d+ frames while the dog moved >= 1 m or turned >= 15 deg: "
-              "nothing to check" % args.min_frames)
+        print("no %svehicle track seen for %d+ frames while the dog moved >= 1 m or turned >= 15 deg: "
+              "nothing to check%s" % ("" if args.any_motion else "static ", args.min_frames,
+                                      "" if args.any_motion else " (try --any-motion)"))
         return 1
-    print("%d static vehicle tracks (the dog moved median %.1f m, turned median %.0f deg while each was seen)" % (
-        len(r["tracks"]), np.median(r["dog_move"]), np.median(r["dog_turn"])))
-    best = min(r["yaws"], key=lambda y: r["wander"][y])
+    kind = "vehicle tracks, any motion flag" if args.any_motion else "static vehicle tracks"
+    print("%d %s (the dog moved median %.1f m, turned median %.0f deg while each was seen)" % (
+        len(r["tracks"]), kind, np.median(r["dog_move"]), np.median(r["dog_turn"])))
+    best = r["best"]
     for y in r["yaws"]:
-        print("  det -> base_link yaw %6.1f deg: parked cars wander median %.2f m in the map%s%s" % (
-            y, r["wander"][y], "  (configured)" if y == r["yaws"][0] else "", "  <- smallest" if y == best else ""))
+        print("  det -> base_link yaw %6.1f deg: cars wander median %.2f m in the map, %d of %d still (< 0.5 m)%s%s" % (
+            y, r["wander"][y], r["still"][y], len(r["tracks"]), "  (configured)" if y == r["yaws"][0] else "",
+            "  <- best" if y == best else ""))
     ok = best == r["yaws"][0]
     print("extrinsic %s" % ("OK: the configured yaw keeps parked cars still" if ok else
                             "WRONG: another yaw keeps parked cars stiller than the configured one"))

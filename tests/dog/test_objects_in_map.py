@@ -45,7 +45,7 @@ def _det(pose, xy_map, det_yaw_deg):
     return cd * bx + sd * by, -sd * bx + cd * by
 
 
-def _bag(path, ts, det_yaw_deg=-90.0, gap=None):
+def _bag(path, ts, det_yaw_deg=-90.0, gap=None, parked_flag=0):
     from rosbags.rosbag2 import Writer
     parked = [(5.0, 6.0), (12.0, -4.0), (4.0, 12.0)]
 
@@ -77,7 +77,7 @@ def _bag(path, ts, det_yaw_deg=-90.0, gap=None):
             for i, p in enumerate(parked + [(-10.0 + 3.0 * t, 3.0)]):
                 px, py = _det(pose, p, det_yaw_deg)
                 objs.append(_make(ts, "perception_interface/msg/LidarObject", id=i + 1, label=0,
-                                  motion=1 if i == 3 else 0,
+                                  motion=1 if i == 3 else parked_flag,
                                   position=_make(ts, "geometry_msgs/msg/Point", x=px, y=py, z=0.0)))
             a = _make(ts, "perception_interface/msg/LidarObjectArray",
                       header=_make(ts, "std_msgs/msg/Header", stamp=stamp(t0 + t), frame_id="lidar_3d"), objects=objs)
@@ -90,7 +90,7 @@ def test_the_d20_extrinsic_keeps_parked_cars_still(tmp_path, capsys, tool):
     out = capsys.readouterr().out
     assert "3 static vehicle tracks" in out
     line = next(l for l in out.splitlines() if "(configured)" in l)
-    assert " -90.0 deg" in line and "<- smallest" in line and "median 0.00 m" in line
+    assert " -90.0 deg" in line and "<- best" in line and "median 0.00 m" in line and "3 of 3 still" in line
     assert "extrinsic OK" in out
 
 
@@ -99,7 +99,7 @@ def test_a_wrong_extrinsic_is_reported(tmp_path, capsys, tool):
     assert tool.main([str(tmp_path / "rec")]) == 2
     out = capsys.readouterr().out
     assert "extrinsic WRONG" in out
-    line = next(l for l in out.splitlines() if "<- smallest" in l)
+    line = next(l for l in out.splitlines() if "<- best" in l)
     assert "  90.0 deg" in line
 
 
@@ -116,3 +116,16 @@ def _ts():
     sys.path.insert(0, TOOLS)
     from bag_on_map import typestore
     return typestore()
+
+
+def test_parked_cars_flagged_moving_need_any_motion(tmp_path, capsys, tool):
+    """Objects computed with a wrong INS heading: parked cars look moving while the dog walks (1112)."""
+    _bag(tmp_path / "rec", _ts(), parked_flag=1)
+    assert tool.main([str(tmp_path / "rec")]) == 1
+    assert "nothing to check (try --any-motion)" in capsys.readouterr().out
+    assert tool.main([str(tmp_path / "rec"), "--any-motion"]) == 0
+    out = capsys.readouterr().out
+    assert "4 vehicle tracks, any motion flag" in out       # the moving car too: still under no yaw
+    line = next(l for l in out.splitlines() if "(configured)" in l)
+    assert "3 of 4 still" in line and "<- best" in line
+    assert "extrinsic OK" in out

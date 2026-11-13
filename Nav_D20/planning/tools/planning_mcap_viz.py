@@ -483,15 +483,23 @@ def read_image(name, raw):
 
 
 def parse_map_yaml(text):
-    """The few keys of a ROS map_server yaml (no yaml dependency)."""
-    out = {}
+    """The few keys of a ROS map_server yaml (no yaml dependency). The origin inline ([x, y, yaw]) or as a block
+    list (one "- value" per line; the dog's c1adbe7b, T53)."""
+    out, block = {}, None
     for line in text.splitlines():
         line = line.split("#")[0]
+        item = line.strip()
+        if block is not None and item.startswith("-"):
+            out[block] = (out[block] + "," if out[block] else "") + item[1:].strip()
+            continue
+        block = None
         if ":" not in line:
             continue
         k, v = line.split(":", 1)
         out[k.strip()] = v.strip().strip("'\"")
-    origin = [float(v) for v in out.get("origin", "[0, 0, 0]").strip("[]").split(",")]
+        if not out[k.strip()]:
+            block = k.strip()
+    origin = [float(v) for v in (out.get("origin") or "[0, 0, 0]").strip("[]").split(",") if v.strip()]
     return dict(image=out.get("image", ""), resolution=float(out.get("resolution", 0.05)), origin=origin,
                 negate=int(float(out.get("negate", 0))), free_thresh=float(out.get("free_thresh", 0.196)),
                 occupied_thresh=float(out.get("occupied_thresh", 0.65)))

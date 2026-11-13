@@ -151,7 +151,8 @@ def main(argv=None):
                 crossed.append((rid, s[ins_poly].max()))
         if not cws:
             print("  no crosswalks in this map (no semantic.osm)")
-        # a goal: on the route, past the last crosswalk crossed (else the farthest on-route point along the track)
+        # a goal: on the route, past the last crosswalk crossed; else the on-route point farthest from the start (a
+    # loop's end is its start: T53's 1112 goal was where the dog stood)
         cand = np.nonzero(on)[0]
         if len(cand):
             if crossed:
@@ -159,9 +160,10 @@ def main(argv=None):
                 after = [i for i in cand if s[i] > past + 3.0]
                 gi = after[min(len(after) - 1, 20)] if after else cand[-1]
             else:
-                gi = cand[np.argmax(s[cand])]
-            print("  goal for replay_planning_check.sh: %.1f %.1f (%.0f m along the track%s)" % (
-                xy[gi, 0], xy[gi, 1], s[gi], ", past crosswalk %s" % crossed[-1][0] if crossed else ""))
+                gi = cand[np.argmax(np.hypot(*(xy[cand] - xy[0]).T))]
+            print("  goal for replay_planning_check.sh: %.1f %.1f (%.0f m along the track, %.0f m from its start%s)" % (
+                xy[gi, 0], xy[gi, 1], s[gi], math.hypot(*(xy[gi] - xy[0])),
+                ", past crosswalk %s" % crossed[-1][0] if crossed else ""))
     return 0
 
 

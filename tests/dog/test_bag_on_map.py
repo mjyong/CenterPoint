@@ -53,12 +53,15 @@ def _map(tmp_path, with_crosswalk=True):
     return str(tmp_path / "site")
 
 
-def _bag(path, ts, objects=True):
+def _bag(path, ts, objects=True, loop=False):
     """The dog walks north along the road from y = 185 to y = 215 (1 m/s, INSPVAX at 100 Hz) and then 10 m off
     it; a moving vehicle in every third object message, 11.2 m away."""
     from rosbags.rosbag2 import Writer
     pts = np.vstack([np.column_stack([np.full(300, 100.0), np.linspace(185.0, 215.0, 300)]),
                      np.column_stack([np.linspace(100.0, 110.0, 100), np.full(100, 215.0)])])
+    if loop:            # up the road and back to where it started (1112: a loop)
+        pts = np.column_stack([np.full(400, 100.0), np.concatenate([np.linspace(185.0, 197.0, 200),
+                                                                     np.linspace(197.0, 185.0, 200)])])
     with Writer(path, version=8) as w:
         ins = w.add_connection("/rte/rdap/rtk/inspvax", "kygi665_msgs/msg/INSPVAX", typestore=ts)
         obj = w.add_connection("/perception/lidar_3d/objects", "perception_interface/msg/LidarObjectArray",
@@ -124,3 +127,14 @@ def test_bag_on_map_without_objects_or_crosswalks(tmp_path, capsys, tool):
     assert "no crosswalks in this map" in out
     goal = next(l for l in out.splitlines() if "goal for replay_planning_check.sh" in l)
     assert "past crosswalk" not in goal
+
+
+
+def test_bag_on_map_goal_of_a_loop_is_its_far_end(tmp_path, capsys, tool):
+    ts = tool.typestore()
+    _bag(tmp_path / "bag", ts, objects=False, loop=True)
+    assert tool.main(["--bag", str(tmp_path / "bag"), "--map", _map(tmp_path, with_crosswalk=False)]) == 0
+    goal = next(l for l in capsys.readouterr().out.splitlines() if "goal for replay_planning_check.sh" in l)
+    gx, gy = [float(v) for v in goal.split(": ")[1].split()[:2]]
+    assert abs(gx - 100.0) < 0.2 and abs(gy - 197.0) < 0.5, goal          # not back at the start (185)
+    assert "12 m from its start" in goal
