@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -691,6 +692,28 @@ bool MppiCudaBackend::evalStep(
 
   cyc.critic_active = active;
   cyc.obstacles_near_goal = near_goal;
+  // Start in collision: same rule as ObstaclesCritic (critic_data.h), the footprint clearance at the robot's pose
+  // from the host distance field
+  {
+    float start_clearance = std::numeric_limits<float>::max();
+    if (obstacles_on && ctx.obstacle_dist_func) {
+      try {
+        for (const auto &circle : planning::common::util::ConfigHelper::GetBoundingCircles(
+                 state.pose.x, state.pose.y, state.pose.yaw)) {
+          start_clearance = std::min(
+              start_clearance,
+              static_cast<float>(ctx.obstacle_dist_func(circle.center_x, circle.center_y) - circle.radius));
+        }
+      } catch (const std::exception &) {
+        start_clearance = std::numeric_limits<float>::max();
+      }
+    }
+    cyc.obstacles_collision_threshold = obstacleCollisionThreshold(start_clearance);
+    if (start_clearance < 0.0f) {
+      AWARN_EVERY(20) << "MPPI CUDA: robot footprint in collision (clearance " << start_clearance
+                      << " m), only trajectories moving away are allowed";
+    }
+  }
   cyc.v_ref = v_ref;
   cyc.goal_yaw_from_path = path.yaws(path_count - 1);
   cyc.path_angle_goal_x = angle_goal_x;

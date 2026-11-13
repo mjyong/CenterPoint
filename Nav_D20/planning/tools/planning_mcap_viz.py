@@ -956,6 +956,7 @@ class Converter:
         self.convert_grids()
         self.convert_other_markers()
         self.states = self.build_states()
+        self.note_mppi()
         self.write_robot()
         self.write_trail()
         self.write_static()
@@ -1316,6 +1317,22 @@ class Converter:
         return self.states[i] if i >= 0 else None
 
     # -- robot
+    def note_mppi(self):
+        """How often the local planner gave no command while active, and whether that was the robot standing on
+        costmap obstacles (T49 / T50: every such cycle failed, "failed to compute a collision free path")."""
+        act = [s for s in self.states if s["mission_status"] == "active" and s["cmd_vx"] is not None]
+        if not act:
+            return
+        zero = [abs(s["cmd_vx"]) < 1e-9 and abs(s["cmd_vy"] or 0.0) < 1e-9 and abs(s["cmd_omega"] or 0.0) < 1e-9
+                for s in act]
+        on = [(s["cost_map_footprint_cells"] or 0) > 0 for s in act]
+        n_on = sum(on)
+        self.notes.append("local planner: zero command in %d of %d active cycles (%.0f%%); with costmap obstacles "
+                          "under the footprint %d of %d, without %d of %d" % (
+                              sum(zero), len(act), 100.0 * sum(zero) / len(act),
+                              sum(z for z, o in zip(zero, on) if o), n_on,
+                              sum(z for z, o in zip(zero, on) if not o), len(act) - n_on))
+
     def write_robot(self):
         ros, (length, width) = self.ros, self.args.footprint
         self.limit = self.footprint_limit()

@@ -83,6 +83,15 @@ void ObstaclesCritic::score(CriticData &data) {
   const unsigned int batch_size = data.trajectories.x.rows();
   bool all_trajectories_collide = true;
 
+  // Robot already touching an obstacle: allow trajectories that do not get closer (obstacleCollisionThreshold)
+  const float start_clearance =
+      footprintClearance(data.state.pose.x, data.state.pose.y, data.state.pose.yaw);
+  const float collision_threshold = obstacleCollisionThreshold(start_clearance);
+  if (start_clearance < 0.0f) {
+    AWARN_EVERY(20) << "MPPI: robot footprint in collision (clearance " << start_clearance
+                    << " m), only trajectories moving away are allowed";
+  }
+
   for (unsigned int i = 0; i != batch_size; i++) {
     bool trajectory_collide = false;
     float traj_cost = 0.0f;
@@ -97,7 +106,7 @@ void ObstaclesCritic::score(CriticData &data) {
       // i.e. free space.
       const float clearance = footprintClearance(x, y, theta);
 
-      if (inCollision(clearance)) {
+      if (clearance < collision_threshold) {
         trajectory_collide = true;
         break;
       }

@@ -269,6 +269,7 @@ struct MppiCycleParams {
   // Bit k (DeviceCriticId) set = critic enabled and its gates passed.
   unsigned int critic_active;
   int obstacles_near_goal; // withinPositionGoalTolerance(near_goal_distance)
+  float obstacles_collision_threshold; // obstacleCollisionThreshold(start footprint clearance), 0 when clear
   float v_ref;             // effective reference velocity (>0), else 0
   float goal_yaw_from_path;            // path.yaws(path_count - 1)
   float path_angle_goal_x, path_angle_goal_y, path_angle_goal_yaw;

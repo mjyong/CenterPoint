@@ -106,7 +106,7 @@ Tracking 的状态（`src/runnable/mission/mission_state_machine/mission_fsm_bas
 2. `MppiPlanner::solver(参考路径, 当前位姿 = 0, 当前速度)`：在上一周期的控制序列上加噪声（`sampling_std`：vx 0.4、vy 0.2、ω 0.2）采样 `batch_size` 3000 条控制序列（当前速度做了均值滤波后当起点），每条 `time_steps` 50 步 x `model_dt` 0.1 s = 5 s，用全向模型（`motion_model: Omni`，vx、vy、ω）推出轨迹，各代价项打分，按 `temperature` 0.3 加权平均出新的控制序列（`src/algorithm/mppi_planner/optimizer.cc`；`enable_cuda` 时在 GPU 上算）；
 3. `getOptimizePath()`：优化后的轨迹，变回 `map` 存成 `local_path_2d`（绿色）；`getVelocityCmd(0.01)`：这一刻的速度。
 
-**狗脚下只要有一格障碍，MPPI 就失败**（T49 INS 直出：脚印里有障碍格的 1335 个周期全部 `MPPI optimizer failed to compute a collision free path`，速度清零；没有障碍格的 1897 个周期只失败 36 次，都是离障碍 0.2–0.3 m 的时候）。路网外面全是障碍（第 4 节），所以狗一出路网（定位偏、或者 CJGC 没有那段路）就原地停住，也没有往回挪的恢复动作。回放里 106 s 以后就是这样：bag 里的狗走上了 CJGC 没有的那段路。
+**狗脚下只要有一格障碍，MPPI 就失败**（T49 INS 直出：脚印里有障碍格的 1335 个周期全部 `MPPI optimizer failed to compute a collision free path`，速度清零；没有障碍格的 1897 个周期只失败 36 次，都是离障碍 0.2–0.3 m 的时候）。路网外面全是障碍（第 4 节），所以狗一出路网（定位偏、或者 CJGC 没有那段路）就原地停住，也没有往回挪的恢复动作。回放里 106 s 以后就是这样：bag 里的狗走上了 CJGC 没有的那段路。T50 复核改了：狗一开始就碰着时，轨迹点只要不比现在离障碍更近就不算碰撞（`critic_data.h` 的 `obstacleCollisionThreshold`，CPU 和 CUDA 一样），狗能退回路上；不碰着时和原来一样。
 
 速度限制（`dynamic_constraints`）：vx −1.0 ~ 3.0 m/s，vy ±0.5 m/s，ω ±1.5 rad/s，加速度 3 m/s²。
 
@@ -289,7 +289,7 @@ python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap>
 | 录包一闪一闪、路显示成障碍 | 两张栅格挂 `base_link`；代价地图话题反了 | 可视化工具；调试桥改 (255, 0)（T47 复核） |
 | 107 s 起狗站在障碍里 | CJGC 没有人行横道 6 那段路 | 切到新地图（T48） |
 | 现场地图、切图一开始就 fault，CMD 0 | A* 起点在 0.9–0.99 的夹缝里，不挪也走不出去 | 挪起点的门槛和 A* 对齐（T49 复核） |
-| 路网边上 MPPI 一直失败、速度为 0 | 脚印里有障碍格，所有采样轨迹都算碰撞 | 还没改，要定（T49 复核） |
+| 路网边上 MPPI 一直失败、速度为 0，起步也不走 | 脚印里有障碍格，所有采样轨迹的第一个点都算碰撞 | 起步就碰着时只禁止"更近"，允许往外退（T50 复核，`obstacleCollisionThreshold`），T51 验 |
 
 ## 11. 我们的改动
 

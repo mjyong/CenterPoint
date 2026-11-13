@@ -20,6 +20,17 @@
 
 namespace mppi {
 
+// Starting in collision (T50 review): the costmap marks everything off the route network as an obstacle, so a
+// robot whose footprint already touches it (localization 0.2 m off on a 1.7 m CJGC road, or a robot started at the
+// edge) had every sampled trajectory in collision from its first point: "failed to compute a collision free path"
+// on every cycle, zero speed, no way back (T50: 1716 of 1716 such cycles; the robot stood at the start for 37 s).
+// So a trajectory point only counts as a collision when it is closer than the robot is now: moving away from the
+// obstacle is allowed, moving further in is not. With the robot clear (start clearance >= 0) nothing changes.
+constexpr float kStartEscapeTolerance = 0.01f;   // [m] interpolation noise of the distance field
+inline float obstacleCollisionThreshold(float start_clearance) {
+  return start_clearance < 0.0f ? start_clearance - kStartEscapeTolerance : 0.0f;
+}
+
 /**
  * @struct mppi::CriticContext
  * @brief Shared context handed to every critic: planner configuration plus

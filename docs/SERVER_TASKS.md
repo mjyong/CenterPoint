@@ -159,6 +159,7 @@
 | T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 完成，已复核（2026-11-13）：编过了，切图读到 5 条人行横道；三次都只 active 约 20 个周期就停在 standstill，两次定位跑飞。原因都是同步带来的：回放超时的补丁丢了、新版 lightning 少了 0921 要的 INS 朝向 180°、默认车型 d30。三处都改了，T49 重跑 |
 | T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三处修复都生效。INS 直出一路 active、指令往前；现场地图和切图被 A* 起点的夹缝卡在 fault；狗一出路网 MPPI 就失败；LIO 落后时 odom 往回跳。A* 和 odom 已改；wait 不安全 204 → 187，剩下的是没看到的车 |
 | T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三次都一路 active，odom 不再跳。剩下：狗贴着路网边时 MPPI 一直失败（起步也会卡住）；回放时 LiDAR 点云在进定位之前断续。min_watch 没用，不开 |
+| T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8833,3 +8834,65 @@ LiDAR 卡顿：回调间隔过大和 ProcessLidar 超过 0.2 s 对不上（70 �
    - 按比例是 5.5%、5.8%、6.5%、7.6%。和同一时刻出发、不先看的比：133 对 130、119 对 115、92 对 86。
    - 先看只是把出发时间往后挪，出发那一刻盲区里的车照样看不到。保持默认 0；盲区靠调朝向。T49 复核时的判断错了。
 5. 文档：`docs/PLANNING_INTEGRATION.md`（`min_watch` 的结论）、`dog_perception/yield_gate.py` 的注释。
+
+**人定（2026-11-13，T50 复核之后）**：第一次上狗就直接自主过马路；我们改过的规划和定位，人先和机器人团队说好，再由我们在 8 号狗上替换（能一键换回原版）；MPPI 贴边卡死由我们改。
+改了 MPPI（`critic_data.h` 的 `obstacleCollisionThreshold`，CPU 和 CUDA 同一条规则）：狗一开始就碰着障碍时，轨迹点只要不比现在离障碍更近就不算碰撞，往外退可以、往里不行；不碰着时和原来一样。
+可视化转换的报告多了一行 `local planner: zero command in …; with costmap obstacles under the footprint A of B, without C of D`（T50 复核时的统计）。
+剩下要做的（`docs/PLANNING_INTEGRATION.md` 第 8 节）：感知消息合进 Nav_D20 的接口、门控写成 C++ 接进规划、人行横道前停下调朝向等车、狗上编译替换和换回。
+
+
+---
+
+## T51 重编规划（MPPI 贴边往外退），回放三次；狗上的规划和定位怎么装（只读）
+
+```text
+任务 T51：T50 里狗脚印一碰到路网边，MPPI 每周期都失败、速度 0，起步时也走不了。T50 复核改了 MPPI：狗一开始就碰着时，
+轨迹点只要不比现在更近就不算碰撞（往外退可以，往里不行），CPU 和 CUDA 两条路径都改了。这一轮：重编规划，回放三次看它
+还卡不卡；CPU、GPU 对一次；狗在线的话，只读摸清狗上的规划和定位怎么装、怎么起、配置在哪（下一步要在狗上替换）。
+先按通用约定做。可以改的范围：Nav_D20/（编不过时只改我们的补丁，改了写进 PATCHES.md）。tools/、dog_perception/ 不改。
+仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42。mkdir -p data/reports/T51
+
+0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py -q | tail -1   （47 passed）
+   补丁都在（T50 第 0 步那几条，再加这几条）：
+     grep -c "obstacleCollisionThreshold" Nav_D20/planning/src/algorithm/mppi_planner/critic_data.h              （≥ 2）
+     grep -c "obstacleCollisionThreshold" Nav_D20/planning/src/algorithm/mppi_planner/critics/obstacles_critic.cc （1）
+     grep -c "obstacles_collision_threshold" Nav_D20/planning/src/algorithm/mppi_cuda_planner/mppi_kernels.cu    （1）
+     grep -c "obstacles_collision_threshold" Nav_D20/planning/src/algorithm/mppi_cuda_planner/mppi_cuda_backend.cu（1）
+   新地图解开（同 T48）。
+1. 重编 planning（同 T50 第 1 步；定位、感知这次没改，跳过），存 data/reports/T51/build_planning.txt（tail -30）。
+   CUDA 的文件（mppi_kernels.cu、mppi_cuda_backend.cu、device_params.cuh）编不过就抄错误前 30 行，停下。
+2. 回放三次（同 T50 的三条命令，名字换成 t51_*），cp 成 data/reports/T51/report_{map,ins,switch}.txt。每份抄：
+   - mission_state、CMD 次数、"CMD 中位 vx vy ω"、vx > 0.05 的比例、local planner solver failed 次数；
+   - 可视化一段新加的一行 "local planner: zero command in N of M active cycles (P%); with costmap obstacles under the
+     footprint A of B, without C of D"。T50 是 A = B（全失败）：现场地图 1716/1716、切图 1343/1343、INS 直出 1330/1330。
+     这次 A 应该远小于 B；
+   - grep -c "robot footprint in collision" work_dirs/planning_io_t51_<名字>/logs/planning.INFO（改过的 MPPI 在往外退的周期数；
+     每 20 次打一条，所以乘 20 大约是周期数）；
+   - 现场地图那次狗站在起点的那段（T50 是 7.7–44.5 s 一直失败）：这次的 CMD 头几条（报告里有），vx、vy 朝哪；
+   - 回放里狗不听指令（位置是 bag 里的），所以脚印碰边的帧数不会变，变的是 MPPI 失败不失败、给不给往回的指令。
+3. CPU、GPU 对一次（MPPI 默认在 GPU 上算，改了两份代码，要对一下）：
+     MPPI_CUDA_DEBUG_COMPARE=1 LOC_MAP_PATH=$M bash Nav_D20/planning/script/replay_planning_check.sh t51_cmp 80.0 126.9
+   - grep -c "MPPI CUDA debug" work_dirs/planning_io_t51_cmp/logs/planning.INFO；
+   - 其中 "fail gpu=1 cpu=0" 和 "fail gpu=0 cpu=1" 各几次（要都是 0）：
+       grep "MPPI CUDA debug" …/planning.INFO | grep -c "fail gpu=1 cpu=0"；同样 "fail gpu=0 cpu=1"
+   - 抄 3 条 "MPPI CUDA debug" 和它后面那条按代价项分的（ObstaclesCritic 那一项的差）；挑一条 "robot footprint in collision"
+     附近的。
+   - 这一次只为了对比，录包和 viz/ 不提交（rm -rf work_dirs/planning_io_t51_cmp）。
+4. 狗在线才做（每一步前 ssh dog true，连不上就跳过这一步，报告里写"狗不在线"）。只读：规矩同 T46，不停、不改机器人别的服务，
+   不 apt install，不在域 0 上发东西，sudo 密码不写进任何文件。输出 data/reports/T51/dog_stack.txt：
+   - 规划、定位怎么起的：systemctl list-units --type=service --all | grep -iE "plan|lightning|loc|nav"；每个相关的 unit：
+     systemctl cat <unit>（ExecStart、Environment、WorkingDirectory、User）；
+   - 二进制和安装目录：ExecStart 里的路径，ls -la；planning 的 PLANNING_ROOT_DIR 和 robot_factory/default_robot_vin 的内容；
+     lightning 用的配置文件路径，里面 system 段的 ins_type、ins_yaw_offset（有没有这一项）、map_path，和 kygi665 话题名；
+   - 版本：dpkg -l | grep -iE "planning|lightning|seres|nav"；二进制的 mtime；ldd 一下 planning 能不能找全库（只看，不改）；
+   - 狗上能不能编：which colcon cmake nvcc；ls /opt/ros；dpkg -l | grep -E "libceres|libgoogle-glog|libopencv|libosqp" 的版本；
+     df -h（编译要几 GB）；nproc；
+   - lightning 日志里 LiDAR 回调卡不卡：找到它的日志（journalctl -u <unit> --since "-1 day" 或 glog 目录），
+     grep -c "LiDAR 回调间隔过大"、grep -c "检测到雷达断流"、grep -c "IMU 回调间隔过大"；
+   - 规划日志里有没有 "failed to compute a collision free path"、"plan path failed"（journalctl 或 glog，最近一天）。
+5. 提交：data/reports/T51/、录包和 viz/（t51_map、t51_ins、t51_switch）、本文档。不提交解开的地图。
+
+停止条件：第 1 步 CUDA 文件编不过；第 3 步 CPU、GPU 的 fail 对不上（抄 10 条不一致的 "MPPI CUDA debug"，停下）。
+报告（写进"T51 结果"）：编译最后几行；三份 report 全文；和 T50 比 local planner 那一行和 solver failed；CPU、GPU 对比的计数和那几条；
+狗上的 dog_stack.txt 摘要（或"狗不在线"）。
+```

@@ -362,7 +362,7 @@ __global__ void costKernel(const MppiDeviceParams *p,
           min_clearance = clearance;
         }
       }
-      if (min_clearance < 0.0f) {
+      if (min_clearance < c->obstacles_collision_threshold) {   // 0 unless the robot starts in collision
         collided = true;
         break;
       }
