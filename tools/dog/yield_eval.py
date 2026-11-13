@@ -42,9 +42,10 @@ def main(argv=None):
     ap.add_argument("--start", type=float, default=0.0, help="[m] fan paths start this far from the robot")
     ap.add_argument("--path", nargs=5, action="append", default=[], metavar=("NAME", "X0", "Y0", "X1", "Y1"))
     ap.add_argument("--pred-horizon", type=float, default=3.0, help="[s] IMM prediction (the robot's: 3.0)")
-    ap.add_argument("--yield-rule", choices=("gap", "stop"), default=None,
-                    help="YieldConfig.yield_rule (stop: wait only for vehicles that could not stop; the unsafe count "
-                         "below is still the gap test against the labels)")
+    ap.add_argument("--yield-rule", choices=("wait", "gap", "stop"), default=None,
+                    help="YieldConfig.yield_rule (default wait: wait for every moving vehicle that may pass, until it "
+                         "has stayed clear wait_clear or been lost lost_hold; stop: only for vehicles that could not "
+                         "stop). The unsafe count below is the gap test against the labels whatever the rule")
     for f in fields(YieldConfig):
         if f.type in (float, "float"):
             ap.add_argument("--" + f.name.replace("_", "-"), type=float, default=None, help="YieldConfig.%s" % f.name)

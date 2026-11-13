@@ -181,8 +181,8 @@ def test_check_planning_mcap_finds_a_robot_inside_its_costmap(tmp_path, capsys):
     _write(bag, old=False, blocked=True)
     assert check_planning_mcap.main([bag]) == 1
     problems = [line for line in capsys.readouterr().out.splitlines() if line.startswith("PROBLEM ")]
-    assert problems == ["PROBLEM /planning/debug/cost_map_production/occmap: the robot's footprint is occupied in "
-                        "60 of 60 grids; TEB will not plan from there"], problems
+    assert problems == ["PROBLEM /planning/debug/cost_map_production/occmap: the robot stands on an obstacle (>= 10% "
+                        "of its footprint) in 60 of 60 grids; the local planner will not plan from there"], problems
 
 
 def test_check_planning_mcap_finds_a_costmap_on_the_wall_clock(tmp_path, capsys):

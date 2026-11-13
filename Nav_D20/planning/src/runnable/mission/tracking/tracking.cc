@@ -109,6 +109,7 @@ void Tracking::spin_s_active() {
   auto local_poses = gmm->ExtractLocalPath(
       start_pose.position,
       conf_.tracking_conf().local_reference_path_length());
+  local_reference_2d_ = local_poses;   // debug (RosDebugBridge::PathTrackingDebug)
   std::vector<Eigen::Vector3d> local_path_2d;
   Transform3d tf;
   TfBuffer::Instance()->get("map", "base_link", tf);

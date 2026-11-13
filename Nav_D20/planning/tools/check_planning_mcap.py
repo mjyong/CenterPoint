@@ -15,9 +15,14 @@
 4. Odometry (nav_msgs/Odometry) a walking robot can have: speed between consecutive messages, height swing,
    jumps. The T41 replay's /lightning/odom ran away between corrections (up to 32 m/s, z down to -46 m) because
    the localization's IMU-rate prediction took the kygi IMU's acceleration in g as m/s^2.
-5. Occupancy grids in base_link with the robot's own footprint occupied (--footprint, D20 1.0 x 0.4 m): TEB
-   refuses to plan from there ("Initial pose is in collision"). In T42 planning's local costmap had it in 2 of 3
-   grids while perception's /map/occupancy_grid never did.
+5. Occupancy grids in base_link with the robot standing on an obstacle (at least 10 % of its footprint's cells,
+   --footprint, D20 1.0 x 0.4 m): the local planner refuses to plan from there ("Initial pose is in collision").
+   On a route-network map (CJGC) that is the dog off the map's route.
+   Planning's costmap topic was published inverted until the T47 review (the costmap's obstacle layer holds
+   255 = free, 0 = obstacle and ros_debug_bridge converted it with (0, 1)): free cells read 100, obstacles 0. Told
+   from perception's obstacles, which planning copies into the costmap as obstacles; reported, and turned over
+   before the footprint check. (T42 and T47 read "footprint occupied in 2 of 3 grids" from the inverted topic:
+   the dog was on the route then.)
 6. With --layout: the layout's topics that the recording does not have.
 
 Prints one line per problem; exit code 1 when there is any. Needs the mcap and rosbags packages.
@@ -41,7 +46,11 @@ MAX_Z_SWING = 3.0     # [m] height change over a recording
 MAX_JUMP = 1.0        # [m] between consecutive odometry messages
 SPEED_WINDOW = 0.2    # [s] speed over at least this: 100 Hz INS odometry 1-2 ms apart reads metres per second from
                       # centimetre jitter (T43 B)
-FOOTPRINT_SHARE = 0.1  # grids with an occupied footprint cell above this share are reported
+FOOTPRINT_SHARE = 0.1  # a grid with this share of the footprint's cells occupied has the robot on an obstacle;
+                       # reported when this share of the grids have it
+COST_MAP = "/planning/debug/cost_map_production/occmap"
+PERCEPTION = "/map/occupancy_grid"
+POLARITY_EVERY = 10    # every n-th costmap is kept for the polarity check
 MARKER_TYPES = ("visualization_msgs/msg/Marker", "visualization_msgs/msg/MarkerArray")
 TF_TYPES = ("tf2_msgs/msg/TFMessage",)
 SLACK = 1.0   # [s] a stamp this far outside the TF's time range still counts as covered
@@ -73,7 +82,7 @@ def read(path):
         raise SystemExit("%s: no .mcap" % path)
     ts = get_typestore(Stores.ROS2_HUMBLE)
     topics = defaultdict(lambda: dict(type=None, stamps=[], frames=set(), log=[], lifetimes=[], xyz=[],
-                                      footprint=[]))
+                                      footprint=[], grids=[]))
     edges = []
     for f in files:
         with open(f, "rb") as fh:
@@ -100,7 +109,10 @@ def read(path):
                     t["stamps"].append(msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9)
                     t["frames"].add(msg.header.frame_id)
                     if msg.header.frame_id == "base_link" and FOOT is not None:
-                        t["footprint"].append(_footprint_occupied(msg, *FOOT))
+                        t["footprint"].append(_footprint_cells(msg, *FOOT))
+                        if channel.topic == PERCEPTION or (channel.topic == COST_MAP and
+                                                           len(t["footprint"]) % POLARITY_EVERY == 1):
+                            t["grids"].append((message.log_time * 1e-9, msg.info, np.asarray(msg.data, np.int8)))
                 elif t["type"] == "nav_msgs/msg/Odometry":
                     msg = ts.deserialize_cdr(message.data, t["type"])
                     p = msg.pose.pose.position
@@ -117,27 +129,78 @@ def read(path):
 FOOT = (1.0, 0.4)      # [m] length (x) and width (y) of the robot, set by --footprint
 
 
-def _footprint_occupied(msg, length, width):
-    """Any cell >= 50 under the robot's rectangle (centred on base_link, x forward)."""
+def _footprint_cells(msg, length, width):
+    """(cells >= 50, cells 0..49, all cells) under the robot's rectangle (centred on base_link, x forward)."""
     i = msg.info
     if i.width * i.height == 0 or len(msg.data) != i.width * i.height:
-        return False
+        return (0, 0, 0)
     d = np.asarray(msg.data, np.int16).reshape(i.height, i.width)
     xs = i.origin.position.x + (np.arange(i.width) + 0.5) * i.resolution
     ys = i.origin.position.y + (np.arange(i.height) + 0.5) * i.resolution
     cx = np.abs(xs) <= length / 2
     cy = np.abs(ys) <= width / 2
-    return bool((d[np.ix_(cy, cx)] >= 50).any())
+    under = d[np.ix_(cy, cx)]
+    return (int((under >= 50).sum()), int(((under >= 0) & (under < 50)).sum()), int(under.size))
+
+
+def cost_map_inverted(topics):
+    """(True/False/None, evidence): whether the costmap reads free = 100, from the cells perception calls
+    occupied (the newest perception grid before each kept costmap, both in base_link)."""
+    cm, pg = topics.get(COST_MAP, {}).get("grids"), topics.get(PERCEPTION, {}).get("grids")
+    if not cm or not pg:
+        return None, "no %s to tell by" % PERCEPTION
+    pg_log = [g[0] for g in pg]
+    hits = total = 0
+    for log, gi, gd in cm:
+        k = int(np.searchsorted(pg_log, log, side="right")) - 1
+        if k < 0:
+            continue
+        _, pi, pd = pg[k]
+        r, c = np.nonzero(pd.reshape(pi.height, pi.width) >= 50)
+        x = pi.origin.position.x + (c + 0.5) * pi.resolution - gi.origin.position.x
+        y = pi.origin.position.y + (r + 0.5) * pi.resolution - gi.origin.position.y
+        cc, rr = np.floor(x / gi.resolution).astype(int), np.floor(y / gi.resolution).astype(int)
+        ok = (cc >= 0) & (cc < gi.width) & (rr >= 0) & (rr < gi.height)
+        v = gd.reshape(gi.height, gi.width)[rr[ok], cc[ok]]
+        hits += int((v >= 50).sum())
+        total += int(len(v))
+    if total < 50:
+        return None, "only %d perception obstacle cells in the costmap" % total
+    return hits / total < 0.5, "perception obstacles read 100 in %.1f%% of %d costmap cells" % (100.0 * hits / total,
+                                                                                                total)
 
 
 def footprint_problems(topics):
     out = []
+    inverted, why = cost_map_inverted(topics)
+    if inverted:
+        out.append("%s: inverted, free cells 100 and obstacles 0 (%s): Foxglove shows the road as the obstacle "
+                   "(ros_debug_bridge before the T47 review); tools/planning_mcap_viz.py turns it over" % (COST_MAP, why))
     for name, t in sorted(topics.items()):
         f = t["footprint"]
-        if f and np.mean(f) > FOOTPRINT_SHARE:
-            out.append("%s: the robot's footprint is occupied in %d of %d grids; TEB will not plan from there" % (
-                name, int(np.sum(f)), len(f)))
+        if not f:
+            continue
+        occ = [(o if not (inverted and name == COST_MAP) else free) for o, free, n in f]
+        on = [o >= FOOTPRINT_SHARE * n and n > 0 for o, (_, _, n) in zip(occ, f)]
+        if np.mean(on) > FOOTPRINT_SHARE:
+            out.append("%s: the robot stands on an obstacle (>= %d%% of its footprint) in %d of %d grids%s; the local "
+                       "planner will not plan from there" % (name, 100 * FOOTPRINT_SHARE, int(np.sum(on)), len(on),
+                                                             " (turned over)" if inverted and name == COST_MAP
+                                                             else ""))
     return out
+
+
+def display_notes(topics):
+    """Grids drawn in the same moving frame: in Foxglove they share a plane that tilts with the robot."""
+    by_frame = defaultdict(list)
+    for name, t in sorted(topics.items()):
+        if t["type"] == "nav_msgs/msg/OccupancyGrid":
+            for f in t["frames"]:
+                if f not in ("map", "odom", ""):
+                    by_frame[f].append(name)
+    return ["display: %s are all drawn in %s: the planes tilt with the robot and cut through each other in "
+            "Foxglove (blinking); open tools/planning_mcap_viz.py's output instead" % (", ".join(v), f)
+            for f, v in sorted(by_frame.items()) if len(v) > 1]
 
 
 def tf_problems(edges):
@@ -284,6 +347,8 @@ def main(argv=None):
         print("  %-48s %-36s %6d msgs  frames %s" % (name, t["type"], len(t["log"]), frames))
     for p in problems:
         print("PROBLEM " + p)
+    for n in display_notes(topics):
+        print("NOTE " + n)
     print("no problems found" if not problems else "%d problems" % len(problems))
     return 1 if problems else 0
 

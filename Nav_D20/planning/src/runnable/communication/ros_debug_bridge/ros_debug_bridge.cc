@@ -91,6 +91,14 @@ builtin_interfaces::msg::Time RosDebugBridge::DebugStamp() const {
   return stamp;
 }
 
+void RosDebugBridge::StampMarkers(
+    visualization_msgs::msg::MarkerArray *marker_array) const {
+  const auto stamp = DebugStamp();
+  for (auto &marker : marker_array->markers) {
+    marker.header.stamp = stamp;
+  }
+}
+
 bool RosDebugBridge::Publish() {
   rclcpp::spin_some(node_);
   std_msgs::msg::String debug_string;
@@ -129,7 +137,10 @@ bool RosDebugBridge::Publish() {
       *planning_entry_->preprocess_entry_ptr()
            ->cost_map_production()
            ->GridMap(),
-      "obstacle", 0.0, 1.0, occmap_msg);
+      "obstacle", 255.0, 0.0, occmap_msg);
+  // the obstacle layer holds 255 = free, 0 = obstacle (CostMapProduction::Proc, GlobalMapManager::LoadPGMMap):
+  // dataMin 255, dataMax 0 maps free to 0 and obstacles to 100. With (0, 1) every free cell read 100 and the
+  // obstacles 0: Foxglove showed the road as the obstacle (T47 review).
   // the grid map is stamped with the wall clock; its base_link pose on /tf has the odometry's stamp
   const auto debug_stamp = DebugStamp();
   occmap_msg.header.stamp = debug_stamp;
@@ -192,6 +203,7 @@ bool RosDebugBridge::Publish() {
   RosbagRecorder::Instance()->add(tf2_msg, "/tf", "tf2_msgs/msg/TFMessage");
   PathTrackingDebug();
   if (!goal_pose_marker_.header.frame_id.empty()) {   // none before the first /goal_pose (an empty frame_id)
+    goal_pose_marker_.header.stamp = DebugStamp();
     goal_pose_pub_->publish(goal_pose_marker_);
   }
   TEBDebug();
@@ -213,6 +225,7 @@ bool RosDebugBridge::Publish() {
           VisualizationUtil::getColor(VisualizationUtil::YELLOW));
       marker_array.markers.emplace_back(contact_marker);
     }
+    StampMarkers(&marker_array);
     collision_checker_pub_->publish(marker_array);
   }
 
@@ -223,7 +236,7 @@ bool RosDebugBridge::Publish() {
       if (cur_count > last_global_occmap_sub_count_) {
         nav_msgs::msg::OccupancyGrid occmap_msg;
         grid_map::GridMapRosConverter::toOccupancyGrid(
-            gmm->global_map(), "obstacle", 0.0, 1.0, occmap_msg);
+            gmm->global_map(), "obstacle", 255.0, 0.0, occmap_msg);   // 255 = free, as above
         global_occmap_pub_->publish(std::move(occmap_msg));
       }
       last_global_occmap_sub_count_ = cur_count;
@@ -267,6 +280,14 @@ void RosDebugBridge::PathTrackingDebug() {
   //       VisualizationUtil::getColor(VisualizationUtil::BLUE));
   //   marker_array.markers.push_back(footprint_marker);
   // }
+  // the local planner's input: the reference cut from the global path (Tracking::spin_s_active)
+  const auto &local_reference_2d = mission_tracking->local_reference_2d();
+  if (local_reference_2d.size() >= 2) {
+    marker_array.markers.push_back(VisualizationUtil::createLineStripMarker(
+        "map", "local_reference_2d", marker_id++,
+        VisualizationUtil::getColor(VisualizationUtil::PURPLE),
+        local_reference_2d));
+  }
   auto local_path_2d = mission_tracking->local_path_2d();
   auto local_path_marker = VisualizationUtil::createLineStripMarker(
       "map", "local_path_2d", marker_id++,
@@ -332,6 +353,7 @@ void RosDebugBridge::PathTrackingDebug() {
       VisualizationUtil::getColor(VisualizationUtil::CYAN));
   marker_array.markers.push_back(heading_arrow_marker);
 
+  StampMarkers(&marker_array);
   RosbagRecorder::Instance()->add(marker_array, "/planning/debug/path_tracking",
                                   "visualization_msgs/msg/MarkerArray");
   path_tracking_pub_->publish(marker_array);
@@ -430,6 +452,7 @@ void RosDebugBridge::TEBDebug() {
     }
   }
 
+  StampMarkers(&marker_array);
   teb_debug_pub_->publish(marker_array);
 }
 
@@ -464,6 +487,7 @@ void RosDebugBridge::FollowingDebug() {
   
   if (planner == nullptr || planner->target_path().empty()) {
     if (!marker_array.markers.empty()) {
+      StampMarkers(&marker_array);
       following_debug_pub_->publish(marker_array);
     }
     return;
@@ -523,6 +547,7 @@ void RosDebugBridge::FollowingDebug() {
           VisualizationUtil::getColor(VisualizationUtil::GREEN), traj_pts));
     }
   }
+  StampMarkers(&marker_array);
   RosbagRecorder::Instance()->add(marker_array, "/planning/debug/following",
                                   "visualization_msgs/msg/MarkerArray");
   following_debug_pub_->publish(marker_array);

@@ -72,6 +72,11 @@ public:
   const std::vector<Pose2d> *local_path_2d() override {
     return &local_path_2d_;
   }
+  // debug: the reference handed to the local planner (MPPI / TEB) this cycle, in map: ExtractLocalPath of the
+  // global path from the robot; local_path_2d() is what the planner made of it
+  const std::vector<Pose2d> &local_reference_2d() const {
+    return local_reference_2d_;
+  }
 
   const MissionFSMBase::StateType &mission_status() override {
     return mission_state_;
@@ -147,6 +152,7 @@ private:
   Pose3d target_pose_;
   bool constraint_theta_{false};
   std::vector<Pose2d> local_path_2d_;
+  std::vector<Pose2d> local_reference_2d_;
 
   bool update_fail_{false};
   double accumulate_s_{0.0};

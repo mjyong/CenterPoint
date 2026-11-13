@@ -42,6 +42,8 @@ private:
   // Stamp of the debug messages drawn in base_link: the odometry's, as the map -> base_link transform on /tf
   // (node time until the first odometry). The wall clock went wrong in bag replays, weeks after the TF.
   builtin_interfaces::msg::Time DebugStamp() const;
+  // planning's markers had stamp 0: Foxglove places one in base_link (collision contacts) with the earliest TF
+  void StampMarkers(visualization_msgs::msg::MarkerArray *marker_array) const;
 
 private:
   PlanningEntry *planning_entry_{nullptr};
