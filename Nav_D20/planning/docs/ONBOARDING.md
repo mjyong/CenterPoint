@@ -82,6 +82,7 @@ Tracking 的状态（`src/runnable/mission/mission_state_machine/mission_fsm_bas
   - 起点不合格（定位偏几分米就会落到 1.7 m 宽的路外面）：`allow_collision_start` 开着，在 1 m 内挪到最近的空地，日志 `Start adjusted`（我们加的，T47 验证）。终点同理 `allow_collision_goal`。
   - **两个门槛要对上**：`AstarSearch::plan` 起点 `distance_cost > 0.99` 才算碰撞，扩展邻格却要 ≤ 0.9。起点在 0.9–0.99 之间（D20 配置下离路边 0.17–0.34 m）时既不报碰撞、也一步走不出去，只打一行 stdout `GridPathPlanner plan path failed`，任务进 fault。T49 现场地图和切图两次都是这样（离路边 0.22 m，0.96）。现在挪起点的门槛改成 0.9（`kAstarStepCost`）。
   - 搜完用平滑器平滑（`use_smoother`）。
+- 起来就读的站点地图：`global_map_manager_conf.startup_map_dir`（我们加的，T53 复核），读法同切地图，有人行横道；没配就只有 `input_dir/input_name` 的 PGM、没有人行横道。回放里 `PLANNING_STARTUP_MAP=<地图目录>`。狗上 `tools/deploy/nav_cw.sh configure` 配上。
 - 切地图：`/map/switch`（`std_msgs/String`，地图目录）。`ReloadMap` 读那个目录 `global_map.yaml` 第一层的 `map_image_file`（ad68517c 是 `2d/<id>/map.png`）和 `map_yaml_file`，再读同目录的 `map.osm`，没有就读 `semantic.osm`（人行横道在这里面）。
 - **新地图 ad68517c 比 CJGC 多一段路**：人行横道 6 往西那段（x 66–106、y 207–231）。T47 的狗 107 s 以后走在这段上，用 CJGC 时局部代价地图认为狗站在障碍里。
 - 人行横道：`GlobalMapManager::crosswalks()`（`third_party/osm_map` 读，我们注册了 `crosswalk`），只存多边形，不改障碍层。

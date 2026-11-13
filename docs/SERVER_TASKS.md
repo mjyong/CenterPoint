@@ -163,6 +163,8 @@
 | T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 完成，已复核（2026-11-13）：编过，门控 38787 帧 0 差；回放状态切换对。复核发现：没放行、狗的中心进了人行横道就直接过（回放里是录包的狗自己走上去的，狗上定位跳一下也会这样），已改成离入口 1.5 m 内还当在路口等；外参链加了检查工具 |
 | T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 完成，已复核（2026-11-13）：GPU 版贴边也不卡了（切图回放 3%）；狗上录的真实目标进了门控（最多 5 辆）。1112 那一带没有人行横道；狗上的地图 c1adbe7b 只有 47 m 见方。复核发现：狗上的规划配置是旧版本的，我们的程序读不了（会起不来），上狗要用仓库的配置加狗上的取值 |
 | T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 任务已写好（T53 做完再做） |
+| T55 | 用机器人团队的交叉编译镜像编规划、定位、感知（仓库的代码和配置）；装到狗上 /opt/seres/nav_cw（原来的不动），地图换成仓库的，写 cw-*.service；在狗上用域 42 放 1112 演练一遍（我们的感知用仓库配置重算目标，验外参）。不切换 | Agent | T54、镜像 | 3 小时 | 任务已写好（等镜像） |
+| T56 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T55 | 半天 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -9016,6 +9018,13 @@ C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 �
 8. 4b（现场重算目标）没做：规划的环境里没有 TensorRT。不追了，改用改正以后在狗上录的包（T54 第 4 步先找；没有就请人录一段）。
 9. 定位配置的不同（`with_ins` false、噪声参数、`init_t`）不影响：上狗只换规划，不换定位。
 
+**人定（2026-11-13，看了上面以后）**，第 6、9 条按这个改：
+- 代码和配置都用仓库的（仓库是最新的），不搬狗上的取值；只改路径（地图、车型），`tools/deploy/nav_cw.sh configure`；
+- 机器人团队同意了：规划、定位、感知一起装到另一个目录，原来的服务关掉、原版不动，换和换回各一条命令（`nav_cw.sh`）；
+- 狗上的地图换成仓库里的（规划加了 `startup_map_dir`，起来就读，不靠 App 切图）；
+- 1112 的天线是接正的（INS、点云都对）。第 3 条说的是包里的目标：那是狗上我们的感知节点当时用旧配置（180°）现场算的（T40：18:59:23 节点自己报了不一致，19:25 才改配置重启）。所以 T55 在狗上用仓库配置把 1112 重算一遍，验外参。
+- 编译：机器人团队的交叉编译镜像（sysroot 和狗一样是 L4T R36.4.0），服务器连不上他们的镜像仓库，要一份 `docker save` 的 tar。任务 T55、T56。
+
 ### T52 复核（2026-11-13）
 
 1. **编译、对帧都过了**：接口包和规划编过；门控在 1104 的真实跟踪结果上 38787 帧 0 差，闭环模拟 0 失败。这次的二进制在 48fbe15（GPU 起点间隙）之前，GPU 那条留给 T53。
@@ -9147,19 +9156,24 @@ crosswalk_vehicles 的最大值；b 做没做、为什么。
 仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42。mkdir -p data/reports/T54
 
 0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py \
-       tests/dog/test_yield_gate_cpp.py tests/dog/test_bag_on_map.py tests/dog/test_objects_in_map.py -q | tail -1
-   （56 passed；test_yield_gate_cpp 要 g++ 和 Eigen，同 T52 加 EIGEN_DIR）
+       tests/dog/test_yield_gate_cpp.py tests/dog/test_bag_on_map.py tests/dog/test_objects_in_map.py tests/dog/test_nav_cw.py -q | tail -1
+   （62 passed；test_yield_gate_cpp 要 g++ 和 Eigen，同 T52 加 EIGEN_DIR）
+   grep -c "startup_map_dir" Nav_D20/planning/src/proto/preprocess_conf.proto \
+       Nav_D20/planning/src/runnable/preprocess/global_map_manager/global_map_manager.cc   （各 ≥ 1）
    grep -c "max_unreleased_depth" Nav_D20/planning/src/proto/mission_conf.proto Nav_D20/planning/src/runnable/mission/tracking/crosswalk_yield.cc
    （各 ≥ 1）
 1. 重编 planning（同 T52 第 1 步，接口包没改不用再编），存 data/reports/T54/build_planning.txt（tail -30）。
-   T53 已经编过 48fbe15 的话，这次只多了 crosswalk_yield、tracking.cc 和 mission_conf.proto。
+   T53 已经编过 48fbe15 的话，这次只多了 crosswalk_yield、tracking.cc、global_map_manager.cc 和两个 proto。
 2. 对帧和闭环模拟（同 T52 第 2 步的命令，YIELD_PARITY_DIR=/tmp/t54_parity，输出 data/reports/T54/parity.txt）：
    - "N frames, 0 differ"（N 和 T52 一样是 38787）；
    - crosswalk_sim 七行都是 ok（多了三行：pose jumps onto the crosswalk ×2、starts 3 m onto the crosswalk），"crosswalk_sim: 0 failed"。
-3. 再放一次 T52 那次（同 T52 第 3 步，名字 t54_cross）：
+3. 再放一次 T52 那次（同 T52 第 3 步，名字 t54_cross），但不切图，改用狗上的配法：规划起来就读这张图（startup_map_dir，T53 复核
+   加的，PLANNING_STARTUP_MAP 让回放脚本临时配上）：
      M=$PWD/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
-     LOC_MAP_PATH=$M MAP_SWITCH=$M bash Nav_D20/planning/script/replay_planning_check.sh t54_cross 78.7 226.6
+     PLANNING_STARTUP_MAP=$M LOC_MAP_PATH=$M bash Nav_D20/planning/script/replay_planning_check.sh t54_cross 78.7 226.6
      cp work_dirs/planning_io_t54_cross/report.txt data/reports/T54/report_cross.txt
+   - report 里 "startup map: 1"、"Map switch: 0"；planning.INFO 里那行 "GlobalMapManager: startup map … 5 crosswalks" 抄下；
+     没有这行或是 failed：停下，抄 planning.INFO 里 GlobalMapManager 的几行；
    - "Crosswalk yield:" 那几行：录包的狗还是会自己走上人行横道，但现在应该是 approach → align（stale）→ 一行带 "on the crosswalk
      without a go (… m past the entry)" 的 align 或 wait（刚走上去、离入口 1.5 m 以内，还在等；这句一出现就记一行）→ 过了 1.5 m
      才 cross（同样带这一句，米数 > 1.5）→ none。抄全；
@@ -9173,13 +9187,14 @@ crosswalk_vehicles 的最大值；b 做没做、为什么。
      抄 local planner 那一行、mission_state、有没有 standstill。还是很多就停下：抄 planning.INFO 里 "MPPI CUDA: robot footprint
      in collision" 那几行和前后 20 行（不用往下做第 4 步以后）；
    - 录包走 LFS，viz/ 是普通文件。
-4. 外参（只用 CPU）。1112 的目标是天线改正之前算的（狗上 19:25 才改，包是 18:59 录的）：狗一走，停着的车在感知里看着像在动，
-   motion 标成 moving，默认的筛法会把它们都去掉，所以加 --any-motion（所有车的航迹都用，看几条在地图上不动）：
+4. 外参（只用 CPU）。1112 的天线是接正的，INS 和点云都对；但包里录的目标是狗上我们的感知节点当时现场算的，那时它的配置还是旧的
+   180°（T40：18:59:23 节点自己报了 "ins_azimuth_offset_deg 180 does not match the INS antennas"，19:25 才改成 0 重启）。狗一走，
+   停着的车在感知里看着像在动，motion 标成 moving，默认的筛法会把它们都去掉，所以加 --any-motion（所有车的航迹都用，看几条在地图上不动）：
      python Nav_D20/planning/tools/objects_in_map.py work_dirs/planning_io_t53_1112 | tee data/reports/T54/objects_in_map.txt
      python Nav_D20/planning/tools/objects_in_map.py work_dirs/planning_io_t53_1112 --any-motion | tee -a data/reports/T54/objects_in_map.txt
    - 要 "extrinsic OK"，配置的 −90° 那行 "<- best"，抄四行的数（median 和 "k of n still"）；
    - 两次都 "nothing to check"：写明，再试 --min-frames 10；
-   - "WRONG"：不要改配置里的外参，抄全文，接着做（这批目标本身有问题，不算定论；定论要用改正以后录的包）。
+   - "WRONG"：不要改配置里的外参，抄全文，接着做（这批目标本身有问题，不算定论；定论在 T55 第 6 步：狗上用仓库配置把 1112 重算一遍）。
    改正以后录的包：ls -la /public/zjst/robot/cp_data/，看有没有 2026-11-12 19:25 以后录的、带 /perception/lidar_3d/objects 的
    （ros2 bag info 看话题和开始时间）。有的话挑一个，同 T53 第 3、4a 步：bag_on_map.py 找图和目标，LOC_INS_YAW_OFFSET=0 回放
    （名字 t54_fixed），再对它跑 objects_in_map.py（先不加 --any-motion）。这次是定论：WRONG 就停下报告。没有这样的包就写"没有"。
@@ -9210,4 +9225,114 @@ crosswalk_vehicles 的最大值；b 做没做、为什么。
 报告（写进"T54 结果"）：编译最后几行；parity 的帧数和七行模拟；report_cross 全文、"Crosswalk yield:" 那几行、align 到 cross 之间的
 CMD 统计；report_switch 的 local planner 那一行、mission_state；objects_in_map 全文（和改正以后的包，有的话）；狗上感知配置的比对和
 日志几行；狗上的地图（装了哪些、哪张有人行横道、最近一周切过哪些图）；没做的写为什么。
+```
+
+
+---
+
+## T55 交叉编译三样，装到狗上另一个目录，换地图，写服务，域 42 演练（不切换）
+
+```text
+任务 T55（T54 做完、拿到机器人团队的交叉编译镜像以后做）。人定（2026-11-13）：规划、定位、感知（地面分割 lidar_seg 和局部栅格
+grid_map_memory_node）都用仓库的代码和配置，装到狗上另一个目录 /opt/seres/nav_cw，原来的不动；换和换回各一条命令
+（tools/deploy/nav_cw.sh）；狗上的地图换成仓库里的（Nav_D20/map/*.zip）。机器人团队已同意。
+这一轮：编、装、写服务、在狗上用域 42 演练。不切换（切换在 T56，人在现场）。
+狗上的规矩：只往 /opt/seres/nav_cw/、/etc/systemd/system/cw-*.service、/userdata/config/robot_service/map/（先备份）、
+/home/nvidia/bags/ 写；不 apt；原来的服务和它们的文件不动、不停；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。
+仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T55
+
+0. git pull；pytest（同 T54 第 0 步，62 passed）。
+   镜像：docker images | grep jetpack6.1-crosscompile-aarch64-x86。没有：停下，报告"等镜像"（人去向机器人团队要 docker save 的 tar，
+   放到 /public 下，docker load）。机器人团队的脚本假定 sysroot 在镜像里的 /l4t/jetson_arm64_sysroot（JetPack 6.1 = L4T R36.4.0，
+   和狗一样），先 docker run --rm <镜像> ls /l4t/jetson_arm64_sysroot/opt/ros/humble 看在不在。
+1. 交叉编译（镜像里，仓库挂进去；照机器人团队各自的 -arm 步骤，只把安装前缀换掉）：
+   - 规划：Nav_D20/planning/build.sh 的 build_arm（seres_interface 接口包、third_party/nav_interface、planning）；
+   - 定位：bash Nav_D20/slam/build_l4t.sh -arm（lightning，含 mode_switch_node）；
+   - 感知：Nav_D20/perception_combo_ros/build_perception_crosscompile.sh，只要 lidar_seg 和 grid_map_memory_node（别的包能跳就跳）；
+   - 产物放 build/nav_cw/{planning,slam,nav_perception}，目录结构和狗上的 /opt/seres/nav/planning、/opt/seres/nav/slam、
+     /opt/seres/nav_perception 一样（狗上的启动命令按那个结构写）；
+   - 依赖照 planning/build.sh 打包时的做法收：ld-linux-aarch64.so.1 --list 列出的 sysroot 里的库拷进各自的 lib/（planning 是
+     lib/planning/lib），--list 里 "not found" 要是 0；setup.bash、local_setup.*、*.cmake、_local_setup_util_sh.py 里的 sysroot 路径换成
+     /opt/ros/humble、安装前缀换成 /opt/seres/nav_cw/<名>（同 build.sh 的 sed）；
+   - 每个目录写 version.txt（日期、git rev-parse HEAD）；
+   - 打包：tar -C build -czf build/nav_cw.tar.gz nav_cw，外加 tools/deploy/nav_cw.sh、Nav_D20/map/*.zip。
+   编不过：我们的补丁（Nav_D20/PATCHES.md 里的文件）就改，写进 PATCHES.md；别的停下，抄错误前 30 行。
+   报告：各自编译的最后 30 行，三个主程序（planning、mode_switch_node、lidar_seg、grid_map_memory_node）的 --list 里 not found 的行数。
+2. 狗在线（ssh dog true）。/opt/seres/nav_cw 已经存在就停下问（不覆盖）。
+     scp build/nav_cw.tar.gz tools/deploy/nav_cw.sh Nav_D20/map/*.zip dog:/tmp/
+     ssh dog 'sudo -n tar -C /opt/seres -xzf /tmp/nav_cw.tar.gz && sudo -n cp /tmp/nav_cw.sh /opt/seres/nav_cw/ && df -h /'
+3. 地图（人定：狗上的地图换成仓库的）：
+   - 两张 zip 解到 /opt/seres/nav_cw/maps/<id>/（我们的服务用这份）；
+   - App 的地图目录 /userdata/config/robot_service/map/：同名的目录先 sudo -n mv 成 <id>.orig-20261113，再把仓库的拷进去；没有同名的直接拷。
+     换回用：删掉拷进去的、把 .orig-20261113 改回来（写进报告，T56 用不上就不动它）；
+   - ls -la 两处，抄进报告；App 里能不能选到这两张图问人（不改 App 的数据库或配置）。
+4. 配置（其余都是仓库的，不改）：
+     ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh configure /opt/seres/nav_cw /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13'
+   抄输出（定位的 map_path、规划的 startup_map_dir、车型 d20/001）。规划的 PLANNING_TIMEOUT_WALL_CLOCK 不设（那是回放用的）。
+5. 服务（/etc/systemd/system/，sudo -n tee 写）。照原来三个 unit 的样子（T51 dog_stack.txt 里抄了 ExecStart、User、WorkingDirectory、
+   Environment；systemctl cat 再看一遍），路径换成 /opt/seres/nav_cw/...，Environment（CycloneDDS、URI，域不设 = 0）照抄，各加一行
+   Conflicts=<原来那个>.service（systemd 不会让两个同时跑），Restart 照抄：
+   - cw-planning.service：ExecStart 同 planning.service，source /opt/seres/nav_cw/planning/share/planning/local_setup.bash；
+   - cw-slam.service：ExecStart 同 slam.service，source /opt/seres/nav_cw/slam/setup.bash，ros2 launch lightning model_switch_launch.py rviz:=false；
+     launch 里配置路径来自安装目录（nav_cw 里那份 default_d20.yaml），确认 config_path 指到 /opt/seres/nav_cw；
+   - cw-nav-perception.service：启动脚本照 /opt/seres/nav_perception/start/start_nav_perception_bg.sh（仓库里是
+     Nav_D20/perception_combo_ros/cfg/start_nav_perception_bg.sh）写一份到 /opt/seres/nav_cw/nav_perception/start/：lidar_seg 和
+     grid_map_memory_node 用 /opt/seres/nav_cw/nav_perception 的；ptz_data_detection_2d、perception_recharge 照旧从 /opt/seres/nav_perception
+     起（只读用它们的程序，云台检测和回充不能因为换了我们的就断）；SERES_PERCEPTION_INSTALL_DIR 给我们的两个指 nav_cw。
+   不 enable。sudo -n systemctl daemon-reload。三个 unit 全文和启动脚本存进 data/reports/T55/。
+   ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status' → "running: theirs"（不是就停下）。
+6. 演练（域 42；狗停着、人知道；原来的服务照常在域 0 跑）：
+   - 1112 拷到狗上 /home/nvidia/bags/1112_t40（5.9 GB）；
+   - 起四样（mkdir -p /tmp/nav_cw_rehearsal，日志都放那）：环境同 cw-*.service（source、LD_LIBRARY_PATH、CycloneDDS），再加
+     ROS_DOMAIN_ID=42、PLANNING_TIMEOUT_WALL_CLOCK=1（bag 的时间）：cw-nav-perception 的启动脚本（只要 lidar_seg、grid_map_memory_node，
+     不起云台和回充）、ros2 launch lightning model_switch_launch.py rviz:=false、ros2 run planning planning、我们的感知第二个实例
+     （lidar-3d-detection.service 的 ExecStart，ROS_DOMAIN_ID=42，配置用狗上装好的那份：T54 第 5 步核过和仓库一致，偏置 0）；
+     定位用的是 mode_switch_node（狗上的入口；服务器回放一直用的是 run_loc_online），日志里看它起来了、读了 nav_cw 的地图；
+   - ROS_DOMAIN_ID=42 ros2 bag record -s mcap -o /home/nvidia/bags/t55_rehearsal <replay_planning_check.sh 第 41–47 行那些话题>；
+   - ROS_DOMAIN_ID=42 ros2 bag play /home/nvidia/bags/1112_t40 --clock --remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects；
+     开始放 5 s 后发目标：bag_on_map.py 给 ad68517c 的目标（T53 修过以后不再是起点；服务器上先跑一遍拿到），
+     ROS_DOMAIN_ID=42 ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped "{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}"；
+   - 放的同时 tegrastats --interval 1000 > /tmp/nav_cw_rehearsal/tegrastats.txt（CPU、GPU、温度：狗上原来那套也在跑，是两套的量）；
+   - 放完停掉；/tmp/nav_cw_rehearsal 和录包拷回服务器 work_dirs/t55_rehearsal/（录包走 LFS），狗上的录包和 1112 删掉。
+7. 服务器上看演练的录包：
+     python Nav_D20/planning/tools/check_planning_mcap.py work_dirs/t55_rehearsal/<录包> | tee data/reports/T55/check.txt
+     python Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/t55_rehearsal --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
+     python Nav_D20/planning/tools/objects_in_map.py work_dirs/t55_rehearsal/<录包> | tee data/reports/T55/objects_in_map.txt
+   - planning 日志：车型 d20/001、"startup map … 5 crosswalks"、mission_state 没有 fault、CMD 有往前的；local planner 那一行（check 或 viz 的 note）；
+   - 定位：odom 有没有跳、朝向（viz 的 heading）；
+   - objects_in_map：这次目标是我们的感知用偏置 0 现场重算的，是定论：要 "extrinsic OK"。WRONG 就停下，T56 不做；
+   - tegrastats：CPU 平均和最高、GPU 平均、最高温度。
+8. 提交：data/reports/T55/、work_dirs/t55_rehearsal（录包 LFS，viz/ 普通文件）、本文档。不提交 build/。
+
+停止条件：第 0 步没有镜像；第 1 步不是我们文件的编不过；第 2 步目录已存在；第 5 步 status 不是 theirs；第 7 步 WRONG。
+报告（写进"T55 结果"）：编译和依赖（not found 行数）；狗上装了什么、多大；地图两处的 ls；configure 输出；三个 unit 和启动脚本；
+演练的 planning、定位、objects_in_map、tegrastats 的数；地图的换回方法。
+```
+
+---
+
+## T56 现场：换成我们的，过人行横道，换回
+
+```text
+任务 T56（T55 通过以后，人在现场）。人和 Agent 一起做；每一步 Agent 先说要做什么，人说可以再做。
+准备：狗在 ad68517c 那片（要测的人行横道路线从它上面过：6、13、32、38 号，人定哪一个）；有人拿急停；App 里选 ad68517c；
+服务器上开着 Foxglove 或者能看 journalctl。
+
+1. ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status' → running: theirs。
+2. 换：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'。15 s 内没起稳它会自己换回原来的并退出 1（抄输出，停下）。
+   成功后看（journalctl -u <服务> -n 50）：
+   - cw-slam：定位收敛（没有 fault、没有一直重定位）；
+   - cw-planning："startup map … 5 crosswalks"，"Tracking: crosswalk yield on, rule wait"；
+   - lidar-3d-detection：每秒一行，10 Hz 左右；
+   - 狗在 App 里位置对、能遥控。有一条不对就换回（第 6 步），停下。
+3. 录包（每次测试一个，名字 1113_cw_<n>）：ros2 bag record（域 0）1112 那些话题，加上 /lightning/odom、/cmd_vel、
+   /planning/debug/plotjuggler/string、/planning/debug/path_tracking、/map/occupancy_grid、/perception/lidar_3d/objects。
+4. 测（每次都：人用 App 发人行横道对面的目标；Agent 跟着 journalctl -u cw-planning -f | grep "Crosswalk yield"，报状态）：
+   a. 空的人行横道：应该 approach → align（转到面朝对面）→ go → cross → none；狗在入口前停下、转向、走过去，中间不停；
+   b. 同事开车低速（≤ 10 km/h）从左边、再从右边经过：车在可能经过的范围里时应该 wait（理由 vehicle），车过去以后 go；
+   c. 正常车流：看等多久、有没有不该放的时候放了（人判断）。
+   任何时候人觉得不对就急停；Agent 记下时间。
+5. 每次测完：停录，拷回服务器 /public/zjst/robot/cp_data/，跑 planning_mcap_viz.py、objects_in_map.py。
+6. 换回：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original' → running: theirs；App 里狗正常。
+7. 提交：报告（每次测试的状态序列、等了多久、人的判断、急停了没有）、录包的 viz，写进"T56 结果"。
 ```

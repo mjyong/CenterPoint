@@ -115,7 +115,7 @@ fi
     echo "车型：$(grep -m 1 '规划车型' "/tmp/replay_${name}_stack.txt" || echo 没找到)；$(grep -m 1 -o 'Load robot config:.*' "${p}" || true)"
     echo "定位：$(grep -m 1 'INS 朝向偏置' "/tmp/replay_${name}_stack.txt" || echo 没找到)；$(grep -m 1 -o 'system.ins_yaw_offset = .*' /tmp/nav_stack_debug/loc.log 2> /dev/null || echo 定位日志里没有，lightning 没重新编译？)"
     for k in "Start adjusted" "Goal adjusted" "Start point is in collision" "Initial pose is in collision" \
-             "No free point found near start" "Map switch" "crosswalks in" "OSM file not exist" "Failed to parse OSM" \
+             "No free point found near start" "Map switch" "startup map" "crosswalks in" "OSM file not exist" "Failed to parse OSM" \
              "Data timeout exceeded" "Data recovered, resuming" "local planner solver failed" "Crosswalk yield:"; do
       echo "${k}: $(grep -c "${k}" "${p}" || true)"
     done

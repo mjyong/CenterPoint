@@ -44,6 +44,19 @@ bool GlobalMapManager::Init(PlanningEntry *planning_entry) {
     grid_path_planner_ =
         std::make_shared<GridPathPlanner>(config_.grid_path_planner_conf());
   }
+  // ours (T53 review): the site map with its crosswalks from the start, so the dog does not depend on the App's
+  // /map/switch (a later one still replaces it). On failure the PGM above stays.
+  if (!config_.startup_map_dir().empty()) {
+    std::string dir = config_.startup_map_dir();
+    if (dir[0] != '/') dir = ConfigHelper::Instance()->GetConfDir() + dir;
+    if (ReloadMap(dir)) {
+      AINFO << "GlobalMapManager: startup map " << dir << ", " << crosswalks_.size() << " crosswalks";
+    } else {
+      AERROR << "GlobalMapManager: startup map " << dir << " failed, keeping " << map_file_path;
+      map_loaded_ = LoadPGMMap(pgm_file_path, yaml_file_path);
+      crosswalks_.clear();   // nothing half-read from that map's OSM
+    }
+  }
   return true;
 }
 

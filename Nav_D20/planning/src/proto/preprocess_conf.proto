@@ -45,5 +45,9 @@ message PreprocessConf {
     required bool enable_overlay = 3;
     required double cell_timeout_seconds = 4;
     optional GridPathPlannerConf grid_path_planner_conf = 5;
+    // ours (T53 review): a site map directory (global_map.yaml, its PGM, semantic.osm with the crosswalks) loaded at
+    // start as /map/switch would, after input_dir/input_name; relative paths are under the config directory. Empty:
+    // only input_dir/input_name (no crosswalks until a /map/switch)
+    optional string startup_map_dir = 6;
   }
 }

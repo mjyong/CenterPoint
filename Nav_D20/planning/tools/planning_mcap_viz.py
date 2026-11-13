@@ -1751,7 +1751,7 @@ class Converter:
                              ros.new("rcl_interfaces/msg/Log", stamp=ros.time(t), level=level, name=name, msg=text))
 
 
-GLOG_KEYWORDS = ("Start adjusted", "Goal adjusted", "in collision", "No free point", "Map switch", "crosswalks in",
+GLOG_KEYWORDS = ("Start adjusted", "Goal adjusted", "in collision", "No free point", "Map switch", "startup map", "crosswalks in",
                  "OSM", "SetPubFlag", "pausing", "resum", "Received goal", "goal", "A*", "replan", "fail", "Fail",
                  "Crosswalk yield", "crosswalk yield")
 # I1113 11:35:32.023888 ... (old glog) or I20261113 11:35:32.023888 ... (glog 0.7, the server's since T48: the year

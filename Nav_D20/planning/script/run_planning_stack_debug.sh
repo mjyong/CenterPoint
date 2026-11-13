@@ -73,6 +73,12 @@ set -u
 source "${nav_root}/planning/script/planning_vin.sh"
 PLANNING_ROOT_DIR="$(planning_root_for_vin "${PLANNING_ROOT_DIR}" "${PLANNING_VIN:-d20/001}" "${log_dir}/planning_root")" \
   || exit 1
+# PLANNING_STARTUP_MAP=<站点地图目录>：规划起来就读这张图和人行横道（startup_map_dir，狗上就这么配），不用 MAP_SWITCH
+if [[ -n "${PLANNING_STARTUP_MAP:-}" ]]; then
+  PLANNING_ROOT_DIR="$(planning_root_with_startup_map "${PLANNING_ROOT_DIR}" "${PLANNING_VIN:-d20/001}" \
+    "${PLANNING_STARTUP_MAP}" "${log_dir}/planning_root_map")" || exit 1
+  echo "规划起来就读的地图：${PLANNING_STARTUP_MAP}"
+fi
 export PLANNING_ROOT_DIR
 echo "规划车型 ${PLANNING_VIN:-d20/001}（PLANNING_ROOT_DIR=${PLANNING_ROOT_DIR}）"
 
