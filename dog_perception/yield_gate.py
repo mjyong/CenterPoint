@@ -76,8 +76,10 @@ class YieldConfig:
     wait_clear: float = 3.0         # [s] wait rule: a vehicle waited for must stay clear of the path this long
     lost_hold: float = 5.0          # [s] wait rule: a vehicle waited for and then lost is waited for this much longer
     # T49 (1104, wait rule): 179 of the 187 unsafe crossings were vehicles nobody had seen when the robot went, 165 of
-    # them first seen 10-30 m away at 130-140 deg (the edge of the rear blind sector), 55% within 5 s of the go,
-    # 92% within 8 s. Watching the road a while at the curb sees most of them coming.
+    # them first seen 10-30 m away at 130-140 deg (the edge of the rear blind sector). Watching the road a while at
+    # the curb was meant to see them coming. T50: it does not help (unsafe 5.5% of the crossings at 0 s, 5.8 / 6.5 /
+    # 7.6% at 3 / 5 / 8 s; the same as going at the later time without watching): it only moves the go, and what is
+    # in the blind sector then is still unseen. Kept off; the blind sector needs the robot turned (or another lidar).
     min_watch: float = 0.0          # [s] at the curb the robot watches at least this long before it goes (0: off;
                                     # from the first update after reset, i.e. arriving)
 
