@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+import "errcode.proto";
+
+package srcp;   // seres remote control protocal
+
+//-----------------------------------------------------------------------------------------
+// 通用回复消息
+message GeneralResult
+{
+    Errcode.ID code = 1;    // 错误码
+    string message  = 2;    // 描述信息
+}

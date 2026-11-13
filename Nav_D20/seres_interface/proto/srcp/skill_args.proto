@@ -1,0 +1,863 @@
+syntax = "proto3";
+
+
+package srcp.skill.args;   // seres remote control protocal
+
+import "nav_operation.proto";
+import "task_args.proto";
+
+// ----------------------------------------------- SkillFocusRequest --------------------------------------------------- //
+
+// 获取所有技能, 参数暂时为空
+message QueryAllSkills {
+
+}
+
+message ConfigureOptions {
+    // 探测服务端和客户端是否存活的策略
+    enum LivenessProbeType {
+        PID = 0;             // 通过监听pid来（旧版本）
+        HEARTBEAT = 1;       // 通过心跳机制（支持跨设备）
+    }
+    int32 res_priority = 1;
+    int32 pid = 2;
+    LivenessProbeType probe_type = 3;
+    string client_flag = 4;
+    bool enable_task_callback = 5;      // enable任务的MSG_TYPE_TASK_STATE/MSG_TYPE_TASK_EVENT回调
+}
+
+// 技能信息
+message SkillInfo {
+    string skill = 1;
+    int32 resource_bitmask = 2;                  // 占用的资源
+}
+
+// 获取所有技能的结果
+message QueryAllSkillResult {
+    int32 body_resource_bitmask = 1;        // 全身资源
+    repeated SkillInfo skills = 2;          // 每个技能所占有的焦点的集合
+}
+
+// 获取模块ROS2地址的结果
+message ConfigureResult {
+    string token = 1;
+    string publish_topic_addr = 2;          // 调用者发布给robot service的topic地址
+    string subscribe_topic_addr = 3;        // 订阅来自robot service的topic地址
+    string focus_status_topic_addr = 4;     // 焦点状态变化topic
+    int32 server_pid = 5;                   // 服务端的进程ID
+}
+
+message SkillTask {
+    string task_id = 1;
+    string conn_token = 2;
+    int32 focus = 3;
+    int32 task_state = 4;
+    int64 timestamp = 5;
+}
+
+message RunningTaskList {
+    repeated SkillTask tasks = 1;
+}
+
+// 任务事件
+message SkillTaskEvent {
+    enum TaskEvent {
+        TASK_EVENT_READY = 0;    // 任务准备就绪了（进入队列等待执行）
+        TASK_EVENT_START = 1;    // 任务开始执行了
+        TASK_EVENT_START_SUCCESS = 2;   // 任务开始成功
+        TASK_EVENT_START_FAILED = 3;    // 任务开始失败
+        TASK_EVENT_END = 4;             // 任务执行结束
+    }
+    TaskEvent event = 1;                // 任务事件
+    string task_id = 2;                 // 任务ID
+    string skill = 3;                   // 任务技能
+}
+
+enum Direction{
+    LEFT = 0;
+    RIGHT = 1;
+}
+
+message MoveCommand {
+
+}
+
+message MoveFeedback {
+
+}
+
+message MoveResult {
+    
+}
+
+// 灵巧抓取的参数
+message HandGrasp {
+    string good = 1;          // 物品
+    string prompt = 2;        // 语意
+
+    // 物品ID, 不是必传, 通常在有多个目标物时才传入，例如有多个水杯时，good_id表示要拿取的目标物id;
+    // 如果不传, 由算法自行决定拿哪一个目标物; 这个ID通常是算法的感知模块输出
+    oneof good_id {
+        int32 int_good_id = 3;  // int类型的物品ID
+        string str_good_id = 4; // string类型的物品ID
+    };
+}
+
+message RelocationManual {
+
+}
+
+// {"left_arm":0,"right_arm":0,"left_hand":1,"right_hand":0,"head":0}
+enum UpperJointMask {
+    DEFAULT = 0;    // 默认, 表示按
+    LEFT_ARM = 1;   // 1 << 0
+    RIGHT_ARM = 2;  // 1 << 1;
+    LEFT_HAND = 4;  // 1 << 2;
+    RIGHT_HAND = 8; // 1 << 3;
+    HEAD = 16;      // 1 << 4;
+}
+
+message ResetBody {
+    int32 upper_joint_mask = 1;  // 上肢关节掩码, 当重置类似是上肢时会读取这个参数, 值为0时表示重置全部上肢;
+}
+
+// 单手比出半颗心
+// （机器人手臂弯曲并跨至胸前，四指聚拢向下，拇指向内弯曲，形成半心形手势。
+// 在与用户互动时，通过与用户的半心手势配合，共同构成完整心形图案。为增强生命感，可结合身体整体的轻微倾斜姿态）
+message HalfHeartShapeAtChest {
+    srcp.args.HandRes hand = 1; // 左手或右手
+}
+
+enum NavCalibType {
+    SINGLE = 0;              // 单传感器标定
+    PAIR = 1;                // 双传感器联合标定 
+}
+message DeviceCalibInfo {
+    enum CalibState {
+        NONE = 0;                // 未标定
+        SUCCESS = 1;             // 标定成功
+        FAILED = 2;              // 标定失败
+        NOT_NEED = 3;            // 无需标定
+        CALIBING = 4;            // 标定中
+        DATA_COLLECTING = 5;     // 数据采集中
+        DATA_COLLECTED = 6;      // 数据采集完成
+        DATA_COLLECT_FAILED = 7; // 数据采集失败
+    }
+
+    enum DeviceType {
+        TYPE_NONE = 0;           // 占位枚举
+        CAMERA = 1;              // 普通相机
+        CAMERA_DEPTH = 2;        // 深度相机
+        LIDAR = 3;               // 激光雷达
+        UWB   = 4;               // UWB
+        IMU   = 5;
+        ULTRASONIC_RADAR = 6;    // 超声波雷达
+    }
+    string device_name = 1;      // 标定设备名
+    int32 device_id = 2;         // 标定设备ID
+    int32 calib_state = 3;       // 标定状态
+    int64 calib_timestamp = 4;   // 标定时间戳
+    int32 calib_type = 5;        // 标定类型
+    repeated int32 ids = 6;      // calib_type为PAIR时传入, 参数是联合标定的传感器ID
+}
+
+// NAV_CALIBATION_LIST
+message NavCalibrationInfo {
+    repeated DeviceCalibInfo device_calib_list = 1;
+}
+
+message ExplorePoint {
+    string map_uuid = 1;
+    string message = 2;
+    repeated Point points = 3;
+}
+
+message NavCalib {
+    repeated int32 device_ids = 1;
+    int32 calib_type = 2;
+    string param = 3;
+}
+
+message NavCalibFeedback {
+    // 标定进展
+    enum CALIB_PROGRESS {
+        START = 0;              // 标定开始
+        STOP = 1;               // 标定结束
+        DOING = 2;              // 标定中
+    };
+
+    int32 calib_total = 1;      // 标定的设备总数
+    int32 calib_idx = 2;        // 标定的索引, 从0开始计数; 例如标定5个设备, 那么idx从0,1,2, 3, 4,
+    int32 calib_progress = 3;   // 标定进展, 开始、结束
+    DeviceCalibInfo info = 4;   // 标定信息
+}
+
+message NavCalibData {
+    int32 device_id = 1;
+    string result = 2;
+    int32 crc16 = 3;            // 标定数据的crc16校验码, 0xFFFF & crc16可以得到校验码
+}
+message NavCalibResult {
+    repeated NavCalibData datas = 1;
+}
+
+
+message FollowImage {
+    string format = 1;
+    bytes data = 2;
+}
+
+message BoundingBox {
+    int32 id = 1;           //目标唯一跟踪ID
+    string class_name = 2;  //类别标签（如 "person"）详见感知目标类型定义 
+    float score = 3;      //置信度 [0..1]
+    
+    //中心点（x,y）+ 旋转角 theta（通常0）
+    double center_x = 4;
+    double center_y = 5;
+    double center_theta = 6;
+    float size_x = 7;  //宽度（像素）
+    float size_y = 8;  //高度（像素）
+}
+
+message FollowObject {
+    enum FollowMode {
+        FOLLOW_MODE_AUTO = 0;    //跟踪当前正对目标
+        FOLLOW_MODE_UWB = 1;     //UWB目标信标跟随
+        FOLLOW_MODE_PIC = 2;     //目标图像跟随
+        FOLLOW_MODE_BOX = 3;     //目标框对象跟随
+    }
+    enum FollowPeriod {
+        FOLLOW_PERIOD_CONTINUE = 0;    //持续跟随
+        FOLLOW_PERIOD_ONCE     = 1;    //单次跟随，到达目标跟随范围后即完成
+    }
+    enum PlanMode {
+        PLAN_MODE_AUTO     = 0;     //自动规划路径
+        PLAN_MODE_PATH     = 1;     //按指定路径跟随
+        PLAN_MODE_SURROUND = 2;     //环绕跟随
+        PLAN_MODE_LINE     = 3;     //直线跟随，跟随目标直进直退
+    }
+    FollowMode mode = 1;
+    FollowPeriod period = 2;
+    PlanMode planMode = 3;
+    float speed = 4;                 //跟随速度，有效值：大于0
+    repeated FollowImage images = 5; //目标对象，mode为FOLLOW_MODE_PIC时有效
+    BoundingBox box = 6;             //目标框对象，mode为FOLLOW_MODE_BOX时，有效
+    int32 distance = 7;              //距离，单位cm。PLAN_MODE_SURROUND时为环绕距离
+    repeated Point point = 8;        //跟随路径，PLAN_MODE_PATH时有效
+    int32 follow_id = 9;             //目标唯一2D跟踪ID
+}
+
+// 安全守卫: 守卫轨迹/区域/地图边缘, 危险源进入守卫范围时触发告警
+message SafetyGuard {
+    enum GuardMode {
+        GUARD_MODE_TRAJECTORY = 0;   //轨迹守卫: 守卫给定轨迹
+        GUARD_MODE_REGION     = 1;   //区域守卫: 守卫给定多边形区域
+        GUARD_MODE_MAP_EDGE   = 2;   //地图边缘守卫: 守卫地图边界, points 留空
+    }
+    GuardMode mode = 1;                  //守卫模式
+    string map_uuid = 2;                 //所属地图
+    repeated Point points = 3;           //守卫几何: 轨迹守卫=轨迹点串; 区域守卫=多边形顶点(按序连线闭合); 地图边缘守卫忽略
+    repeated string hazard_sources = 4;  //危险源类别: 如 "person", "animal"; 空: 全部
+    int32 patrol_duration_sec = 5;       //巡逻时长(s): 0=沿路线走一整圈(回到进入点)后结束; >0=限时巡逻(走满时长后在顶点收尾结束); -1=无限巡逻; 不传默认0
+}
+
+message SpinningOnTheSpot {
+    enum SpinMode {
+        SKILL_ID_ROTATE = 0;    //原地旋转, parm转角度[-pi,+pi], 负数为向右，正数为向左
+        SKILL_ID_MOVE_DIS = 1;  //移动距离, parm:角度[-pi,+pi],距离(m)
+    }
+    SpinMode mode = 1;
+    repeated float para = 2;
+    // todo: 这两个direction和avoid_obstacles是优奇算法使用的, 暂定参数是这两个; 后面可能会修改
+    Direction direction = 3;
+    srcp.args.AvoidObstacles avoid_obstacles = 4;
+}
+
+message PTZCamera {
+    enum SensorMode {
+        SENSOR_CAMERA_RGB = 0;
+        SENSOR_CAMERA_THERMA = 1;    // 热红外相机
+    }
+
+    SensorMode mode = 1;         //传感器编号, SensorMode
+    Point targetPoint = 2;       //目标位置
+    Point targetScale = 3;       //目标大小, 长宽高
+    float imgScale = 4;          //目标在图像中的比例 0~1
+}
+
+message Joint {
+    int32 id = 1;   //jointid, id定义见URDF及设备属性描述文件
+    float q = 2;    //rad
+    float dq = 3;   //rad/s
+    float tau =4;   //N/m
+    float kp = 5;   //刚性系数
+    float kd = 6;   //阻尼系数
+}
+
+message JointsControl {
+    repeated Joint joints = 1;
+}
+
+message MotorCalibInfo {
+    string motor_name = 1;          // 电机描述
+    int32 motor_id = 2;             // 电机ID
+    int32 zeroing_state = 3;        // 标0状态; 0表示未标定/1表示已标定或标定成功/2表示标定失败
+    int32 set_kp_state = 4;         // 刚性系数标定状态; 0表示未标定/1表示已标定或标定成功/2表示标定失败
+    int32 set_kd_state = 5;         // 阻尼系数标定状态; 0表示未标定/1表示已标定或标定成功/2表示标定失败
+    double kp_min = 6;              // 刚性系数最小值
+    double kp_max = 7;              // 刚性系数最大值
+    double kd_min = 8;              // 阻尼系数最小值
+    double kd_max = 9;              // 阻尼系数最大值
+    int64 zeroing_timestamp = 10;   // 标0时间戳
+    int64 set_kp_timestamp = 11;    // 刚性系数设置时间戳
+    int64 set_kd_timestamp = 12;    // 阻尼系数设置时间戳
+    double pos_threshold_min = 13;      // 位置标定最小值
+    double pos_threshold_max = 14;      // 位置标定最大值
+    int32 pos_threshold_state = 15;     // 位置标定状态，0表示未标定/1表示已标定或标定成功/2表示标定失败
+    int64 pos_threshold_timestamp = 16; // 位置标定时间戳
+}
+
+enum MotorCalibCapability {
+    CAP_DEF                 = 0;       // 默认, 主要是兼容旧版本接口, 为0时全部显示支持即可; 大于0时再根据掩码计算支持情况
+    CAP_ZEROING_ALL         = 1;       // 1 << 0; 整机标0
+    CAP_ZEROING             = 2;       // 1 << 1; 指定电机ID标0
+    CAP_SET_KP_ALL          = 4;       // 1 << 2; 整机设置kp
+    CAP_SET_KP              = 8;       // 1 << 3; 指定ID设置kp
+    CAP_SET_KD_ALL          = 16;      // 1 << 4; 整机设置kd
+    CAP_SET_KD              = 32;      // 1 << 5; 指定ID设置kd
+    CAP_POS_THRESHOLD_ALL   = 64;      // 1 << 6; 整机位置值标定
+    CAP_POS_THRESHOLD       = 128;     // 1 << 7; 位置值标定
+}
+
+message MotorCalibResult {
+    repeated MotorCalibInfo motor_calibs = 1;
+    // 添加上电机标定能力
+    uint32 capabilities = 2;
+}
+
+message MotorCalibParam {
+    int32 motor_id = 1;           // 电机ID
+    double min = 2;               // 最小值
+    double max = 3;               // 最大值
+}
+
+enum MotorCalibType{
+    ZEROING_ALL = 0;                // 电机整机标0
+    SET_KP_ALL = 1;                 // 设置所有电机的刚性系数
+    SET_KD_ALL = 2;                 // 设置所有电机的阻尼系数
+    ZEROING = 3;                    // 指定电机标0
+    SET_KP = 4;                     // 设置指定电机的刚性系数
+    SET_KD = 5;                     // 设定指定电机的阻尼系数
+    POS_THRESHOLD_ALL = 6;          // 整机位置值标定, 需要传入整机电机的限位参数
+    POS_THRESHOLD = 7;              // 指定电机位置值标定, 需要传入电机的限位参数
+}
+message MotorCalib {
+    MotorCalibType type = 1;
+
+    // 整机标0时params不需要传;
+    // 整机设置kp/kd值时, 只需要传入一个param, 里面包含min, max即可，不用指定motor_id
+    // 指定电机标0时, 需要传至少一个param, 参数包含motor_id即可
+    // 设置指定电机kp/kd值时，需要传入至少一个param, motor_id, min, max都需要设置
+    repeated MotorCalibParam params = 2;
+}
+
+message MotorCalibFeedback {
+    MotorCalibType type = 1;    // 标定的类型
+    int32 calib_total = 2;      // 标定的设备总数
+    int32 calib_idx = 3;        // 标定的索引, 从0开始计数; 例如标定5个设备, 那么idx从0,1,2, 3, 4,
+    int32 calib_progress = 4;   // 标定进展, 开始(0)、结束(1)
+    MotorCalibInfo info = 5;    // 标定信息
+}
+
+// 向前走向后走，左转右转的运控控制参数
+// 向前向后走: speed表示行走的速度(m/s), value表示行走的距离(m)
+// 左转右转：speed表示旋转的叫速度(degree/s), value表示旋转的角度(degree)
+message MotionCommand {
+    double speed = 1;            // 速度: m/s
+    double value = 2;            // 角度或者距离 
+}
+
+// 腰部控制
+message WaistControl {
+    enum Mode {         
+        TWIST_WAIST = 0;         // 弯腰 
+        SIDEBEND_WAIST = 1;      // 侧腰
+    }
+    Mode mode = 1;              // 模式
+    float degree = 2;           // 角度
+}
+
+// 鞠躬
+message Bow {
+    float degree = 1;
+}
+
+// 优奇小脑算法原子能力
+message ForearmAction {
+    enum Mode {
+        // ForearmRotation = 0;             // 小臂旋动（前臂以肘关节为轴做内旋/外旋）
+        FOREARM_ROTATION = 0;
+        // ForearmExtension = 1;            // 小臂前伸（肘关节展开使前臂远离上臂）
+        FOREARM_EXTENSION = 1;
+        // ArmPendulumSwing_SingleArm = 2;
+        ARMPENDULUMSWING_SINGLEARM = 2;     // 单臂钟摆式摆动（单臂在冠状面绕肩关节做钟摆式运动）
+    }
+
+    Mode mode = 1;     // 模式
+    srcp.args.HandRes hand = 2;  // 手指编号
+    float degree = 3;  // 目标角度
+}
+
+// {"hand_number":0,"finger_number":0,"pose":{"point":[x,y,z],"yaw":[x,y,z,w]},"Intensity":1 }
+message FingerTap_SingleHand {
+    srcp.args.HandRes hand = 1;  // 灵巧手编号
+    repeated int32 finger_number = 2; // 手指编号
+    srcp.args.PointOrientation point_orientation = 3;  // 目标点
+    int32 intensity = 4;  // 点击力度 单位: 牛顿
+}
+
+message TerminatingCurrentTask {
+
+}
+
+message StandUpFromSquatting {
+
+}
+
+message StandUpFromSitting {
+
+}
+
+message SteppingOnTheSpot {
+
+}
+
+message TiltHead {
+    
+}
+
+// {"hand_number":0,"finger_number":0}
+message FingerPointing_FixedPose {
+    srcp.args.HandRes hand = 1;  // 灵巧手编号
+    int32 finger_number = 2;     // 使用哪只手指
+}
+
+// 手部动作
+message HandAction {
+    enum Type {
+        // 单手张开手指（单手五指自然张开，掌心朝前，表示开放或友好）
+        OpenFingers_SingleHand = 0;
+        // 单手聚指邀招（单手手指靠拢；手臂向前伸出，掌心朝上，做招手动作，重复三次）
+        FingersTogetherForwardBeckon = 1;
+        // 单手手掌下压（单手手掌向下，做下压动作，重复三次）
+        PalmPushDown_SingleHand = 2;
+        // 单手压掌前送（单手手臂向前平伸，掌心向下，做推进动作，重复三次）
+        PressPalmDownPushForward_SingleHand = 3;
+        // 单手招呼进入（单手手掌向前推进后回收，重复数次，表示“请进”，重复三次）
+        InvitingInGesture_SingleHand = 4;
+        // 握拳点赞（单手拇指向上，其余手指握拳，表示认同或鼓励）
+        ThumbsUp_SingleHand = 5;
+        // 单手拢指握拳（单手五指弯曲收拢，模仿握紧物体的动作）
+        MakingFist_SingleHand = 6;
+        // 碰拳（单手握拳，举至胸前，拳面朝前，与他人拳头轻触）
+        FistBump_FixedPose = 7;
+        // 击掌（单手快速上扬，与他人手掌击打，表示庆祝或配合）
+        HighFive_FixedPose = 8;
+        // 单手OK手势（单手拇指与食指指尖相触成圈，其余三指自然伸直，手心朝外）
+        OKGesture_SingleHand = 9;
+        // 单手停止手势（一只手抬起，掌心朝前，五指并拢竖直举止，呈“停”或“暂停”姿态）
+        StopGesture_SingleHand = 10;
+        // 单手石头手势（单手五指握拳，手背朝外，拳心朝内）
+        RockGesture_SingleHand = 11;
+        // 单手剪刀手势（单手食指和中指伸出呈V字，其余手指握拳，手心朝外）
+        ScissorsGesture_SingleHand = 12;
+        // 单手布手势（五指并拢伸直，掌心朝下，手指自然张开）
+        PaperGesture_SingleHand = 13;
+        // 讲解动作-指向上方（一只手臂抬起，食指竖直向上，其余手指握拳，指尖朝天）
+        ExplanationGesture_PointingUp = 14;
+        // 讲解动作-指向下方（手臂自然下垂或略向前伸，食指向下伸出，其余手指握拳，指尖朝地面）
+        ExplanationGesture_PointingDown = 15;
+        // 讲解动作-指向左侧（左臂平举，食指伸出，其余手指握拳，手腕带动指尖指向左侧）
+        ExplanationGesture_PointingLeft = 16;
+        // 讲解动作-指向右侧（右臂平举，食指伸出，其余手指握拳，手腕带动指尖指向右侧）
+        ExplanationGesture_PointingRight = 17;
+        // 展示单手手掌背面（单手手背朝外举起，五指伸直，强调手部反面）
+        ShowPalmBack_SingleHand = 18;
+    }
+    srcp.args.HandRes hand = 1;  // 灵巧手编号
+    Type type = 2;
+}
+
+message InitialLocateAuto {
+    string map_uuid = 1;
+}
+
+message VLNPathPlanningForNav {
+    string prompt = 1;
+}
+
+enum MapCMD {
+    MAP_CMD_ADD = 0;
+    MAP_CMD_DELETE = 1;
+    MAP_CMD_START_MAPPING = 2;
+}
+
+message MapOperate {
+    MapCMD cmd = 1;         // 指令，支持MAP_CMD_ADD-导入地图; MAP_CMD_DELETE-删除地图
+    string map_uuid = 2;    // 地图UUID
+    string content = 3;     // MAP_CMD_ADD时传入url; MAP_CMD_DELETE时不需要传入
+    string map_md5 = 4;     // 地图的md5签名，下载地图时会使用md5值进行校验; 删除地图时不需要传
+}
+
+message MapOperateFeedback {
+    enum MapOpState {
+        MAP_OP_STATE_DOING = 0;     // 开始操作
+        MAP_OP_STATE_SUCCESS = 1;   // 执行成功
+        MAP_OP_STATE_FAILED = 2;    // 执行失败
+    }
+
+    string map_uuid = 1;            // 地图UUID
+    MapOpState map_op_state = 2;    // 地图操作的反馈
+    string message = 3;             // 信息，失败时通过这个反馈错误原因
+}
+
+message MapEstablishment {
+
+}
+
+message ElectronicFenceMarkManual {
+    string map_uuid = 1;
+    string map_path = 2;
+}
+
+message ShakeEars {
+    // 摇耳朵的动作类型
+    enum EarsActionType {
+        BASIC = 0;              // 基础动作(交替摇耳朵),废弃
+        FLAP_ALTERNATE = 1;     // （周期动作）双耳交替煽动
+        AIRPLANE = 2;           // （单次动作）飞机耳
+        RESPIRATORY_RHYTHM = 3; // （周期动作）双耳呼吸律动
+        ERECT = 4;              // （单次动作）双耳前倾竖立
+        VIBRATION_FORWARD = 5;  // （单次动作）双耳前倾微颤
+        RETRACT_SLOWLY = 6;     // （单次动作）双耳缓缓下垂
+        RETRACT_WHOLLY = 7;     // （单次动作）双耳完全收起
+        RETRACT_HALF = 8;       // （单次动作）双耳稳态半收
+        ROTATE_ALTERNATE = 9;   // （周期动作）双耳交替转动
+        RETRACT_RAPID = 10;     // （单次动作）双耳快速收起
+        ERECT_INDEPENDENT = 11; // （单次动作）单耳独立竖起
+        OPEN_GENTLY = 12;       // （单次动作）双耳平缓张开
+        VIBRATION_CLOSE = 13;   // （周期动作）双耳紧贴颤动
+        FLAP_ALTERNATE_QUICK = 14;    // （周期动作）双耳交替扇动
+        JUMP_RESET = 15;        // （单次动作）双耳弹跳复位
+        INSTANT_REAR_BOUNCE = 16; // （单次动作）双耳瞬间后弹
+        DODGE = 2026;               // （单次动作）单耳后撇闪避, para[0]:左耳：1.0；右耳：2.0，其他无效
+    }
+
+    enum EarsType {
+        LEFT_EARS = 0;
+        RIGHT_EARS = 1;
+    }
+    srcp.args.RepeatMode mode = 1;    // 是执行一次，还是循环执行
+    float interval_time = 2;          // 周期执行时，两次执行的间隔时间，单位是秒
+    EarsActionType type = 3;          // 执行的耳朵控制类型
+    EarsType earsType = 4;            // 耳朵类型，左耳或右耳; 双耳动作时这个参数不用设置
+    bool finish_after_once = 5;       // 单次动作执行完成时，是否自动停止任务;
+}
+
+message ScissorsGesture {
+    srcp.args.HandRes hand = 1; // 左手或右手
+}
+
+message RecordMoveTrajectory { //录制移动轨迹
+}
+
+message StopMoveTrajectory { //停止移动轨迹
+}
+
+message ReplayMoveTrajectory { //回放录制轨迹
+    string file_name = 1;
+}
+
+// 速度参数控制摆动身体
+message SwingBody {
+  float vx = 1;
+  float vy = 2;
+  float vyaw = 3;
+  float duration = 4;
+}
+
+message BodyWobble {
+    float roll = 1;
+    float pitch = 2;
+    float yaw = 3;
+    float z = 4;
+    float duration = 5;
+}
+
+// 邀请动作
+message InviteGesture {
+
+}
+
+// 导航/跟随/前进距离 状态反馈
+enum NavState {
+    NAV_STA_TASK_EXEC_SUCCESS    = 0;         // 任务执行成功
+    NAV_STA_TASK_EXEC_FAILED     = 1;         // 任务执行失败
+    NAV_STA_TASK_EXEC_DOING      = 2;         // 任务执行中
+
+    NAV_STA_MAP_DOING            = 1001;       // 建图中
+    NAV_STA_MAP_LOAD_FAILED      = 1002;       // 地图加载失败
+
+    NAV_STA_NAVGATING            = 2001;       // 导航中
+    NAV_STA_EXPLORING            = 2002;       // 探索中 
+    NAV_STA_PLAN_DOING           = 2011;       // 路径规划中
+    NAV_STA_PLAN_DONE            = 2012;       // 路径规划完成
+    NAV_STA_PLAN_PATH_FAILED     = 2013;       // 路径规划失败
+    NAV_STA_MAP_UNMATCHED        = 2014;       // 导航下发的map_uuid不匹配
+
+    NAV_STA_OBSTACLE_WAY         = 3001;      // 路径遇障碍
+    NAV_STA_OBSTACLE_AVOIDING    = 3002;      // 避障中
+    NAV_STA_OBSTACLE_FAILED      = 3003;      // 绕障失败
+    NAV_STA_OBSTACLE_SUCCESS     = 3004;      // 绕障成功
+
+    NAV_STA_RELOCATION_FAILED    = 4001;      // 重定位失败
+
+    NAV_STA_FOLLOW_DOING         = 5001;      // 跟随中
+    NAV_STA_FOLLOW_OBJ_LOST      = 5002;      // 跟随目标丢失
+    NAV_STA_FOLLOW_OBJ_MISMATCH  = 5003;      // 跟随目标不匹配
+
+    NAV_STA_STAKE_NOT_FOUND      = 6001;      // 充电桩未找到
+    NAV_STA_STAKE_TO_FAILE       = 6002;      // 回桩失败
+
+    NAV_STA_GUARD_DOING          = 7001;      // 守卫中
+    NAV_STA_GUARD_TRIGGERED      = 7002;      // 守卫触发(危险源进入守卫范围)
+    NAV_STA_GUARD_CLEAR          = 7003;      // 守卫恢复(危险源离开守卫范围)
+    NAV_STA_GUARD_FAILED         = 7004;      // 守卫任务失败
+}
+
+message NavigateFeedback {
+    NavState nav_state = 1;     // 状态
+}
+
+message FollowObjectFeedback {
+    NavState nav_state = 1;     // 状态
+    int32 follow_id = 2;        // 2D跟踪ID
+    uint32 progress = 3;        // 环绕拍摄进度
+}
+
+message SpinningOnTheSpotFeedback {
+    NavState nav_state = 1;     // 状态
+}
+
+message SafetyGuardFeedback {
+    NavState nav_state = 1;         // 状态, 详见 NavState (NAV_STA_GUARD_*)
+    repeated uint32 box_ids = 2;    // 触发守卫的危险源3D box框ID序列 (同 common_interface/BoundingBox3D.id), 空: 无
+}
+
+message SafetyGuardResult {
+    string message = 1;             // 结果描述
+}
+
+message PTZCameraFeedback {
+    NavState nav_state = 1;     // 状态
+    repeated double ptz = 2;    // {x, y, z}
+}
+
+// 头部姿态控制，将头部转到对应的角度
+// 如果reset_flag不为0时，优先重置
+message HeadPoseControl {
+    float yaw = 1;          // 左转右转(-PI, PI)(左， 右)的弧度，Yaw（偏航角）：确实表示左右方向，即绕垂直轴（Z轴）旋转; 为0时表示不修改这个角度值
+    float pitch = 2;        // 表示上下方向(-PI, PI)(上，下)，即绕水平横轴旋转; 为0时表示不修改这个角度值
+    float roll = 3;         // 横滚角(-PI, PI)(低头，抬头); 为0时表示不修改这个角度值
+    int32 reset_flag = 4;   // 重置角度的标志位, 0b1表示重置yaw角, 0b10表示重置pitch, 0b100表示重置roll
+}
+// 头部姿态控制
+message HeadPoseControlFeedback {
+    repeated float yaw_limit = 1;     // {-yaw, yaw} 限位角度
+    repeated float pitch_limit = 2;   // {-pitch, pitch} 限位角度
+    float target_yaw = 3;             // 目标偏航角度
+    float target_pitch = 4;           // 目标俯仰角度
+    float cur_yaw = 5;                // 当前的偏航角度
+    float cur_pitch = 6;              // 当前的俯仰角度
+    repeated float roll_limit = 7;    // {-roll, roll} 限位角度
+    float target_roll = 8;            // 目标的roll角度
+    float cur_roll = 9;
+}
+
+// 加油手势
+message CheerGesture {
+
+}
+
+// 击掌（单手快速上扬，与他人手掌击打，表示庆祝或配合）
+message HighFive {
+
+}
+
+// 手势哭哭
+message CryGesture {
+
+}
+
+// QUERY_MAP_STATIONS - 查询点位名称
+message QueryMapStationsReq {
+    string map_uuid = 1;          // 地图uuid, 为空时查询当前地图
+    srcp.Point point = 2;         // 查询点位坐标 (m)
+}
+
+message QueryMapStationsResp {
+    bool success = 1;             // 查询是否成功
+    string message = 2;           // 结果描述
+    string name = 3;              // 区域名或站点名
+}
+
+message RecordTrajectoryResult { //轨迹文件
+    enum ValidType {
+        VALID = 0;                         // 文件有效
+        INVALID_TIME_TOO_SHORT = 1;        // 事件太短，无法保存
+        INVALID_DISTANCE_TOO_SHORT = 2;    // 距离太短无法保存
+        INVALID_SAVE_WITH_INSUFFICIENT_STORAGE = 3; // 空间不足，保存失败
+    }
+    ValidType valid_type = 1;
+    string file_name = 2;
+    int32 record_time = 3;
+}
+
+message RecordMoveTrajectoryFeedback { //录制移动轨迹
+    enum RecordTrajectoryState {
+        DOING = 0;    // 录制中
+        PAUSED = 1;   // 录制暂停
+    }
+
+    RecordTrajectoryState state = 1;
+    GeometryPose geometryPose = 2;        // 轨迹坐标
+}
+
+
+message QueryTrajectorysResp {
+    repeated string file_names = 1;
+}
+
+// DELETE_TRAJECTORYS
+message DeleteTrajectorysReq {
+    repeated string file_names = 1;
+}
+
+message DeleteTrajectoryInfo {
+    string file_name = 1;   // 要删除的文件ID
+    bool ret = 2;  // 是否删除成功，true表示删除成功; false表示删除失败
+}
+message DeleteTrajectorysResp {
+    repeated DeleteTrajectoryInfo rets = 1;
+}
+
+message ReplayMoveTrajectoryFeedback {
+    NavState nav_state = 1;     // 状态
+    GeometryPose geometryPose = 2;        // 轨迹坐标
+}
+
+// 耳朵标定类型(暂只支持同时标定上下限, 仅上限/仅下限类型待底软接口定稿后扩展)
+enum EarsCalibType {
+    EARS_CALIB_TYPE_THRESHOLD = 0;  // 同时标定上下限
+}
+
+// 耳朵标定操作(同时标定类型下使用)
+enum EarsCalibOperation {
+    EARS_CALIB_OP_QUERY_POSITION = 0;   // 查询电机位置(人工扳动耳朵到限位后调用, 需调用两次分别对应上/下限)
+    EARS_CALIB_OP_EXECUTE_CALIB = 1;    // 执行标定(两次位置查询成功后调用)
+}
+
+// 耳朵标定(双耳整体)
+message EarsCalib {
+    EarsCalibType type = 1;         // 标定类型, 缺省为同时标定上下限
+    EarsCalibOperation operation = 2; // 操作参数: 0查询电机位置/1执行标定
+}
+
+// 耳朵标定单个电机信息
+message EarsCalibMotorInfo {
+    string motor_name = 1;          // 电机描述(LE/RE)
+    int32 motor_id = 2;             // 电机ID
+    int32 calib_state = 3;         // 标定状态; 0未标定/1成功/2失败
+    double position_min = 4;       // 位置下限(标定成功后查询填充, 查询失败为0)
+    double position_max = 5;       // 位置上限(标定成功后查询填充, 查询失败为0)
+    int64 calib_timestamp = 6;     // 标定时间戳
+}
+
+// 耳朵标定反馈
+message EarsCalibFeedback {
+    int32 calib_total = 1;          // 标定电机总数
+    int32 calib_idx = 2;            // 当前反馈电机索引, 从0开始
+    int32 calib_progress = 3;      // 进展: 开始(0)/结束(1)
+    EarsCalibMotorInfo info = 4;    // 电机标定信息
+}
+
+// 焦点暂停的信息
+message FocusPausedInfo {
+    int32 trigger_priority = 1;     // 触发焦点暂停的客户端的优先级
+    int32 paused_focus = 2;         // 被暂停的焦点
+    string trigger_alias = 3;       // 触发焦点暂停的客户端别名
+}
+
+// 任务覆盖的信息
+message TaskOverrideInfo {
+    int32 trigger_priority = 1;     // 触发任务覆盖的客户端的优先级
+    int32 trigger_task_focus = 2;   // 触发任务覆盖的新任务的资源焦点
+    string trigger_alias = 3;       // 触发任务覆盖的客户端别名
+    string trigger_task_id = 4;     // 触发任务覆盖的新任务的id
+    string trigger_skill = 5;       // 触发任务覆盖的新任务的技能名
+}
+
+//导航速度调节
+message SpeedAdjust {
+  float speed = 1; //当前最新速度
+}
+
+message RechargingCheckResult {
+    enum Status {
+        OK = 0;                          // 可以触发回桩
+        FAILED = 1;                      // 无法触发回桩
+        FAILED_LOCATION_LOST = 2;        // 定位丢失，无法触发回桩
+        FAILED_NO_DOCK_AVAILABLE = 3;    // 无可用充电桩，无法触发回桩
+    }
+    Status status = 1;
+    string reason = 2;                   // 失败原因/补充说明
+}
+
+// 
+// https://sai-seres.feishu.cn/wiki/SEOPwZ7jDinVgak94aJcD97undX?sheet=D4YogZ: 电机故障掩码
+// 故障码格式: 0x0106NNXX, 其中 NN 为节点号, 此处统一用 00 代替
+enum MotorFaultMask {
+  MOTOR_FAULT_MASK_UNSPECIFIED = 0;                       // 未指定/无故障
+
+  MOTOR_FAULT_MASK_LINK_ABNORMAL = 0x01060001;            // 链路异常: 无法控制或访问外设
+  MOTOR_FAULT_MASK_DATA_ABNORMAL = 0x01060002;            // 数据异常: 能接收到数据，但是无法正确识别
+  MOTOR_FAULT_MASK_OVER_TEMPERATURE = 0x01060003;         // 温度过高: 温度超过阈值
+  MOTOR_FAULT_MASK_OVER_VOLTAGE = 0x01060004;             // 电压过高: 输入电压过压
+  MOTOR_FAULT_MASK_OVER_CURRENT = 0x01060005;             // 电流过高: 输入电流过流
+  MOTOR_FAULT_MASK_VERSION_MISMATCH = 0x01060006;         // 版本不匹配: 固件版本不匹配
+  MOTOR_FAULT_MASK_ENCODER_FAULT = 0x01060007;            // 编码器故障: 位置或速度反馈传感器失效
+  MOTOR_FAULT_MASK_MOTOR_FAULT = 0x01060008;              // 电机故障: 电机故障
+  MOTOR_FAULT_MASK_SHORT_CIRCUIT = 0x01060009;            // 短路: 电路短路
+  MOTOR_FAULT_MASK_UNDER_VOLTAGE = 0x0106000A;            // 欠压: 电压欠压
+  MOTOR_FAULT_MASK_MOTOR_STALL = 0x0106000B;              // 电机堵转: 电机堵转
+  MOTOR_FAULT_MASK_PRE_DRIVER_FAULT = 0x0106000C;         // 预驱故障: 预驱故障
+  MOTOR_FAULT_MASK_CAN_COMM_FAULT = 0x0106000E;           // CAN通讯故障: 连续两帧控制报文间隔时间超过500ms
+  MOTOR_FAULT_MASK_LEVEL3_OVER_TEMP_PROTECTION = 0x01060010; // 三级过温保护
+  MOTOR_FAULT_MASK_STEP_PROTECTION = 0x01060011;          // 阶跃保护: Iq(k)-Iq(k-1) > 阈值
+  MOTOR_FAULT_MASK_OVERLOAD_PROTECTION = 0x01060012;      // 过载保护(相电流过流故障)
+  MOTOR_FAULT_MASK_ACTUATOR_DISABLED = 0x01060013;        // 执行器失能
+  MOTOR_FAULT_MASK_ACTUATOR_CONTROL_TIMEOUT = 0x01060014; // 执行器控制超时
+  MOTOR_FAULT_MASK_LEVEL2_OVER_TEMP_PROTECTION = 0x01060015; // 二级过温保护
+  MOTOR_FAULT_MASK_LEVEL1_OVER_TEMP_PROTECTION = 0x01060016; // 一级过温保护
+}
+
+message MotorFault {
+    int32 motor_id = 1;
+    MotorFaultMask motor_fault_mask = 2;
+}
+
+// 任务覆盖的信息
+message MotorFaultInfo {
+    repeated MotorFault motor_faults = 1;
+}

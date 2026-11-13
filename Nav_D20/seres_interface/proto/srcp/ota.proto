@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package srcp;
+
+// 指令下发
+message RobotOtaControl
+{
+    oneof action {
+        DownloadControl download_control = 1; // 下载升级控制
+        CheckResult check_result = 2;
+        CheckState check_state = 3;
+        AutoUpgrade auto_upgrade = 4; // 自动升级配置下发
+        Reserve reserve = 5; // 预约升级配置下发
+    }
+}
+
+// 确认下载
+message DownloadControl
+{
+    enum DownloadType {
+        DOWNLOAD_UNKNOWN = 0;
+        DOWNLOAD_START = 1;
+        DOWNLOAD_PAUSE = 2;
+        DOWNLOAD_CANCEL = 3;
+    }
+    DownloadType download_type = 1;
+}
+
+// 下发升级检测
+message CheckResult
+{
+}
+
+message CheckState
+{
+}
+
+// 自动升级配置下发
+message AutoUpgrade
+{
+    enum AutoUpgradeType {
+        AUTO_UPGRADE_UNKNOWN = 0;
+        AUTO_UPGRADE_ON = 1;
+        AUTO_UPGRADE_OFF = 2;
+    }
+    AutoUpgradeType auto_upgrade_type = 1;
+}
+
+// 预约升级配置下发
+message Reserve
+{
+    string task_id = 1;
+    string session_id = 2;
+    int64 start_time = 3; // 开始时间, 毫秒
+    int64 end_time = 4;   // 结束时间, 毫秒
+}
+
+message RobotOtaProcessStateReport
+{
+    string task_id = 1;
+    string session_id = 2;
+    int32 state = 3; //1：下载进度，2：升级进度
+    int32 progress = 4; //0-100
+    string error_code = 5;
+    string error_msg = 6;
+    int32 total_progress = 7;
+    uint64 complete_time =8 ; 
+}

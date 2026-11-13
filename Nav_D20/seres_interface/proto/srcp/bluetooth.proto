@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package srcp;
+
+enum BluetoothOperation {
+  BLUETOOTH_UNKNOWN = 0;
+  BLUETOOTH_QUERY = 1; // 蓝牙列表查询
+  UWB_RING = 2; // UWB响铃
+}
+message BluetoothCtl {
+  // 蓝牙控制项
+  BluetoothOperation operation = 1;
+  // 蓝牙控制动作
+  oneof action {
+    BluetoothQuery bluetoothQuery = 2;  // 蓝牙列表查询
+    UwbRing uwbRing = 3;  // UWB响铃
+  }
+}
+// 蓝牙列表查询
+message BluetoothQuery {
+}
+// 蓝牙查询结果
+message BluetoothQueryResult {
+  repeated BluetoothInfo bluetoothInfoList = 1;  // 扫描到的蓝牙列表
+}
+message BluetoothInfo {
+  string name = 1;                  // 蓝牙设备名
+  string mac = 2;                   // MAC 地址 "XX:XX:XX:XX:XX:XX"
+  int32 rssi = 3;                   // 信号强度 dBm (原始值)
+}
+
+// UWB响铃
+message UwbRing {
+  string mac = 1; // MAC 地址 "XX:XX:XX:XX:XX:XX"
+}

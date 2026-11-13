@@ -1,0 +1,13 @@
+# Request
+string requester_node_name      # Name of the requesting node (max 64 chars)
+bool hold_lock                  # TRUE:hold power lock,  FALSE: relase power lock
+
+---
+# Response
+uint8 ret_code                  # Result of the operation
+string message                  # Optional message, e.g., error description
+
+# Return code constants
+uint8 RET_SUCCESS     = 0       # Request accepted successfully
+uint8 RET_TIMEOUT     = 1       # Request TimeOut
+uint8 RET_ERROR       = 2       # Request rejected due to invalid parameters or system state

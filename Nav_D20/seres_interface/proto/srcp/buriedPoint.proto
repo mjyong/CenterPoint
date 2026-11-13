@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package srcp;
+
+import "google/protobuf/wrappers.proto";
+
+// 性格初始化数据
+message InitialPersonalityData{
+  // 外向度得分
+  google.protobuf.Int32Value extraversionScore = 1;
+  // 依赖度得分
+  google.protobuf.Int32Value attachmentScore = 2;
+  // 灵动度得分
+  google.protobuf.Int32Value agilityScore = 3;
+}
+
+// 交互事件类型
+enum EventTypeEnum{
+  ACTION = 0;    // 动作交互
+  TOUCH = 1;     // 触摸交互
+  APPROACH = 2;  // 接近交互
+}
+
+// 交互类型标签枚举
+enum InteractionTypeLabelEnum{
+  POSITIVE_AFFECT = 0;  // 情感陪伴型交互-积极
+  NEGATIVE_AFFECT = 1;  // 情感陪伴型交互-消极
+  TASK_ORIENTED = 2;    // 任务型交互
+}
+
+// 性格演变主动交互数据
+message ProactiveInteractionData{
+  repeated ProactiveInteractionEvent proactiveInteractionEvent = 1;
+}
+
+message ProactiveInteractionEvent{
+  string eventId = 1;                                // 交互事件ID，端侧生成，保证唯一性
+  EventTypeEnum eventType = 2;                       // 交互事件类型枚举
+  InteractionTypeLabelEnum interactionTypeLabel = 3; // 交互类型标签
+  string interactionTopicLabel = 4;                  // 交互主题标签（表示本次交互的具体意图），例：拍照
+  string eventDesc = 5;                              // 交互事件详情描述
+  google.protobuf.Int64Value eventTime = 6;          // 交互事件发生时间，13位UTC毫秒时间戳
+}

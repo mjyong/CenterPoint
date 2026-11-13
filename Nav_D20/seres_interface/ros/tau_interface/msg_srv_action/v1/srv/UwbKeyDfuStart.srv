@@ -1,0 +1,5 @@
+# 触发 UWB 钥匙升级
+string zip_path           # 升级包绝对路径
+---
+int32 return_code         # 返回码，0-成功受理，非0-失败
+string error_msg          # 失败原因(未连接钥匙/文件无效/已在升级中等)

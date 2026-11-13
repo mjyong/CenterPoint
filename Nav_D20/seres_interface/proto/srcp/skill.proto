@@ -1,0 +1,396 @@
+syntax = "proto3";
+
+package srcp.skill;
+import "task_args.proto";
+import "skill_args.proto";
+
+//-----------------------------------------------------------------------------------------
+
+// 技能执行状态
+enum SkillTaskState {
+    READY = 0;              // 准备就绪, 等待执行
+    RUNNING = 1;            // 执行中
+    CANCELING = 2;          // 取消中
+    PAUSED = 3;             // 暂停
+    PENDING_RESUME = 4;     // 等待恢复
+}
+
+// 操作返回值
+enum SkillRet{
+    RET_OK = 0;                     // 成功
+    RET_BUSY = 1;                   // 被高优模块占用
+    RET_STR = 2;                    // 休眠模式申请焦点失败，或进休眠模式时丢失焦点
+    RET_STAGNANT = 3;               // 僵停中
+    RET_UNSUPPORT_SKILL = 4;        // 不支持的技能
+    RET_UNSUPPORT_MODEL = 5;        // 不支持模块
+    RET_UNSUPPORT_FOCUS = 6;        // 不支持的焦点
+    RET_FAILED = 7;                 // 失败, 例如在执行技能过程触发释放焦点, 直接返回失败
+    RET_FOCUS_NOT_MATCHED = 8;      // 焦点不匹配
+    RET_INVALID_PARAM = 9;          // 请求参数无效
+    RET_UNSUPPORT = 10;             // 不支持的操作
+    RET_OFFLINE = 11;               // 服务端不在线
+    RET_TIMEOUT = 12;               // 超时
+    RET_INTERRUPTED = 13;           // 被中断(调用过程进程退出)
+    RET_PB_PARSE_ERROR = 14;        // 反序列化失败
+    RET_NO_MATCH_TASK = 15;         // 无匹配的任务; 在取消任务, 结束任务等的时候如果任务ID不匹配会返回这个状态
+    RET_FOCUS_PAUSED = 16;          // 焦点暂停
+    RET_NOT_IMPL = 17;              // 未实现
+    RET_REQ_PB_PARSE_ERROR = 18;    // 请求数据PB解析失败
+    RET_INVALID_PID = 19;           // 无效PID
+    RET_UNSUPPORT_RESOURCE_PRIORITY = 20;   // 不支持的资源优先级
+    RET_INVALID_TOKEN = 21;         // token 无效
+    RET_INTERNAL_ALGO_ERROR = 22;   // 内部算法执行错误
+    RET_TASK_CANCELED = 23;         // 任务被取消
+    RET_TASK_EXEC_TIMEOUT = 24;     // 任务执行超时
+    RET_TASK_NO_IMPL_RESULT = 25;   // 任务执行完毕后没有设置结果
+    RET_ALGO_UNSUPPORT_SKILL = 26;  // 算法不支持技能
+    RET_TASK_OVERRIDE = 27;         // 任务被覆盖
+    RET_SKILL_RUNNING = 28;         // 技能重复，已经执行中
+    RET_ON_DAMP = 29;               // 关节阻尼中
+    RET_ON_STALLING = 30;           // 关节僵硬中
+    RET_SERVICE_DISABLED = 31;      // 服务被失能
+    RET_ON_FAULT = 32;              // 整机故障. 无法响应请求
+    RET_ON_STAND_NOT_READY = 33;    // 未站立就绪
+    RET_ALGO_DENIED = 34;           // 算法拒绝执行
+    RET_BUSY_ON_OTA = 35;           // 在OTA升级中
+    RET_BUSY_ON_SHUTDOWN = 36;      // 在准备关机中
+    RET_FOCUS_RELEASED = 37;        // 焦点被释放, 执行任务过程中客户端直接释放焦点时，任务会被取消并返回这个结果码
+    RET_ON_CALIB_MODE = 38;         // 标定模式下，此模式下不允许执行技能，只能触发执行器标定（motorCalib）
+    RET_CANCELED_BY_OBSTACLE = 39;  // 导航/跟随等任务因为遇到障碍物，且持续（X）分钟未能绕过障碍物，自动停止导航/跟随任务
+    RET_WORK_MODE_UNSUPPORT_OP = 40;    // 当前工作模式下不支持此操作或技能; 场景：在非标定模式下去请求执行器标定
+    RET_CANCELED_EMERGENCY_PAUSE = 41;  // 紧急暂停触发的取消
+    RET_CANCELED_EMERGENCY_STOP = 42;   // 紧急停止触发的取消
+    RET_BUSY_ON_TELEOPMODE = 43;        // 在全身遥操模式下, 此模式下不允许执行导航/跟随等等导航算法; 仅允许切换运控模式
+    RET_LOCATE_FAILED = 44;             // 定位失败，在触发导航时，如果定位失败，会直接返回这个状态码
+    RET_MAP_ID_MATCH_FAILED = 45;       // 地图ID匹配失败，比如当前正在使用地图A，但是发起的导航，重定位等等使用地图B，就会返回这个状态码
+    RET_LOWER_BATTERY_TERMINATED = 46;  // 低电量
+    RET_DISTANCE_LIMIT_EXCEEDED = 47;   // 距离太长，自动停止
+    RET_ONCHARGING = 48;                // 充电中
+    RET_NOT_CALIBED = 49;               // 机器未标定，没有标定过机器时直接触发执行技能，会返回这个状态
+    RET_OVERHEAT_LIMITED = 50;          // 过热受限（高温保护中）
+    RET_NO_CHARGING_POS = 51;           // 无充电桩点
+    RET_MOTOR_FAULTS = 52;              // 电机故障
+}
+
+// RobotService的api功能, 提供普通的查询、获取等功能
+enum ApiType {
+    QUERY_ALL_SKILLS = 0;           // (技能焦点)查询支持的技能以及相应的mask;
+    CONFIGURE = 1;                  // 配置
+    DECONFIGURE = 2;                // 取消配置
+    GET_RUNNING_TASK_INFO = 3;      // 查询技能执行情况
+    NAV_CALIBATION_INFO = 4;        // 获取导航模块的标定信息
+    QUERY_EXPLORE_POINT = 5;        // 漫游点位获取
+    MOTOR_CALIBRATION_INFO = 6;     // 电机标定信息
+    HEARTBEAT = 7;                  // 心跳(需要携带token, RobotService.srv中的token需要为真正的token值)
+    QUERY_MAP_STATIONS = 8;         // 查询点位名称
+    QUERY_TRAJECTORYS = 9;          // 查询录制的轨迹列表Trajectory
+    DELETE_TRAJECTORYS = 10;        // 删除轨迹
+    RECHARGING_CHECK = 11;          // 回桩信息检查，响应数据为rechargingCheckResult
+}
+
+// api请求体
+message ApiRequest {
+    int32 api = 1;
+
+    oneof para {
+        srcp.skill.args.QueryAllSkills queryAllSkills = 2;
+        srcp.skill.args.ConfigureOptions configureOptions = 3;
+        srcp.skill.args.QueryMapStationsReq queryMapStationsReq = 4;  // 查询点位名称
+        srcp.skill.args.DeleteTrajectorysReq deleteTrajectorysReq = 5;  // 删除轨迹
+    }
+}
+
+// api响应体
+message ApiResponse {
+    int32 api = 1;
+
+    oneof result {
+        srcp.skill.args.QueryAllSkillResult queryAllSkillsResult = 2;
+        srcp.skill.args.ConfigureResult configureResult = 3;
+        srcp.skill.args.RunningTaskList runingTaskList = 4;
+        srcp.skill.args.NavCalibrationInfo NavCalibrationInfo = 5;
+        srcp.skill.args.ExplorePoint explorePoint = 6;
+        srcp.skill.args.MotorCalibResult motorCalibResult = 7;
+        srcp.skill.args.QueryMapStationsResp queryMapStationsResp = 8; // 查询点位名称（响应）
+        srcp.skill.args.QueryTrajectorysResp queryTrajectorysResp = 9; // 查询轨迹列表的响应
+        srcp.skill.args.DeleteTrajectorysResp deleteTrajectorysResp = 10; // 删除轨迹列表的响应
+        srcp.skill.args.RechargingCheckResult rechargingCheckResult = 11; //
+    }
+}
+
+// 可访问这个在线表格查看每个机型所支持的技能
+// https://sai-seres.feishu.cn/wiki/QCf8whKXWiOSAYk7C5scB7Zxn0F
+message SKillRequest {   
+    string name          = 1;   // 任务名称
+    string id            = 2;   // 任务UUID
+    string skill         = 3;   // 技能
+
+    int64 timestamp      = 1000;    // 数据包的时间戳, 方便用来测试调用链路的延迟
+    string trigger_alias = 1001;    // 触发的客户端的别名，默认传进程名
+    int32 priority       = 1002;    // 技能执行的优先级
+
+    oneof para {
+        srcp.args.SitDown sitDown                              = 4;    // 坐下
+        srcp.args.MoveLevel moveLevel                          = 5;    // 调整行走速度
+        srcp.args.Move move                                    = 6;    // 行走
+        srcp.args.StopMove stopMove                            = 7;    // 停止行走
+        srcp.args.Squat squat                                  = 8;    // 蹲下
+        srcp.args.LieDown lieDown                              = 9;    // 躺下
+        srcp.args.Damp damp                                    = 10;   // 阻尼
+        srcp.args.Wave wave                                    = 11;   // 挥手
+        srcp.args.JointDisable jointDisable                    = 12;   // 失能
+        srcp.args.LockJoint lockJoint                          = 13;   // 僵硬
+        srcp.args.UnlockJoint unlockJoint                      = 14;   // 解除僵硬
+        srcp.args.Mapping mapping                              = 16;   // 建图
+        srcp.args.Navigate navigate                            = 17;   // 全身导航
+        srcp.args.Grab grab                                    = 18;   // 全身灵巧抓取
+        srcp.args.Relocation relocation                        = 19;   // 重定位
+        srcp.args.Stand stand                                  = 20;   // 站立
+        srcp.args.JointEnable jointEnable                      = 21;   // 使能
+        srcp.args.Handshake handshake                          = 22;   // 握手
+        srcp.args.ExplainAction explainAction                  = 23;   //讲解动作
+        srcp.args.Reset reset                                  = 24; // 复位
+        srcp.args.Nod nod                                      = 25; //点头
+        srcp.args.ShakeHead shakeHead                          = 26; //摇头
+        srcp.args.TurnHead turnHead                            = 27; //摆头
+        srcp.args.ThumbsUp thumbsUp                            = 28; //竖大拇指
+        srcp.args.VictorySign victorySign                      = 29; //比耶
+        srcp.args.HeartGesture heartGesture                    = 30; //比心
+        srcp.args.FistSalute fistSalute                        = 31; //抱拳
+        srcp.args.Recharging recharging                        = 32; //回充
+        srcp.args.Dance dance                                  = 33; //跳舞
+        srcp.args.ExplainLeftUpper explainLeftUpper            = 34; //讲解动作细分，左上
+        srcp.args.ExplainRightUpper explainRightUpper          = 35; //讲解动作细分，右上
+        srcp.args.ExplainLeftLower explainLeftLower            = 36; //讲解动作细分，左下
+        srcp.args.ExplainRightLower explainRightLower          = 37; //讲解动作细分，右下
+        srcp.args.ExplainLeftCenter explainLeftCenter          = 38; //讲解动作细分，左中
+        srcp.args.ExplainRightCenter explainRightCenter        = 39; //讲解动作细分，右中
+        srcp.args.ExplainXGesture explainXGesture              = 40; //左中右手势
+        srcp.args.ExplainYGesture explainYGesture              = 41; //上中下手势
+        srcp.args.ExplainFrontGesture explainFrontGesture      = 42; //前伸手势
+        srcp.args.Shrug shrug                                  = 43; //摊手手势
+        srcp.args.RaiseHand raiseHand                          = 44; //抬手手势
+        srcp.args.Celebrate celebrate                          = 45; //恭喜
+        srcp.args.RaiseMicrophone raiseMicrophone              = 46; //举麦
+        srcp.args.GrabMicrophone  grabMicrophone               = 47; //拿起话筒
+        srcp.args.PutDownMicrophone putDownMicrophone          = 48; //放下话筒
+        srcp.args.LifePosture lifePosture                      = 49; //生命态  note:: 这两个robot_service不支持
+        srcp.args.MultiModal multiModal                        = 50; //多模态  note:: 这两个robot_service不支持
+        srcp.args.Navigate navigate_lowerBody                  = 51; // 下半身导航
+        srcp.skill.args.HandGrasp grasp_leftHand               = 52; // 左手抓取
+        srcp.skill.args.HandGrasp grasp_rightHand              = 53; // 右手抓取
+        srcp.skill.args.RelocationManual relocation_manual     = 54; // 手动重定位
+        srcp.skill.args.ResetBody reset_upperBody              = 55; // 上半身重置
+        srcp.skill.args.ResetBody reset_lowerBody              = 56; // 下半身重置
+        srcp.skill.args.ResetBody reset_wholeBody              = 57; // 全身重置
+        srcp.args.ThumbsUp thumbsUp_left                       = 58; // 左手点赞
+        srcp.args.ThumbsUp thumbsUp_right                      = 59; // 右手点赞（右大拇指）
+        srcp.args.VictorySign victorySign_left                 = 60; // 左手比耶
+        srcp.args.VictorySign victorySign_right                = 61; // 右手比耶
+        srcp.skill.args.HalfHeartShapeAtChest halfHeartShape   = 62; // 单手比出半颗心
+        srcp.args.Hug hug                                      = 63; // 拥抱
+        srcp.args.FingerDance fingerDance                      = 64; // 手势舞
+        srcp.args.HoldPlate holdPlate                          = 65; // 握盘子
+        srcp.args.RaisePlate raisePlate                        = 66; // 抬盘子
+        srcp.args.Wave leftWave                                = 67; // 左手挥手
+        srcp.args.Wave rightWave                               = 68; // 右手挥手
+        srcp.args.WalkWithLoad walkWithLoad                    = 69; // D系列负重行走
+        srcp.args.ImcMode imcMode                              = 70; // R系列独立运控模式
+        srcp.args.BalanceStand balanceStand                    = 71; // R系列平衡站立
+        srcp.args.LiftLeftArm liftLeftArm                      = 72; // 抬左臂
+        srcp.args.LiftRightArm liftRightArm                    = 73; // 抬右臂
+        srcp.args.LiftDualArm liftDualArm                      = 74; // 抬双臂
+        srcp.args.SpeechNod speechNode                         = 75; // 讲解点头
+        srcp.args.ThreeSix threeSix                            = 76; // 666
+        srcp.args.IntroduceSelf introduceSelf                  = 77; // 自我介绍
+        srcp.args.Appearance appearance                        = 78; // 登场
+        srcp.args.Announce announce                            = 79; // 宣布
+        srcp.skill.args.NavCalib navCalib                      = 80; // 触发导航标定
+        srcp.args.StepStill stepStill                 	       = 81;  // 原地踏步
+        srcp.args.TakePhoto photo                     	       = 82;  // 拍照
+        srcp.args.PanTiltAngle angle                  	       = 83;  // 云台角度
+        srcp.args.VisibleLightFocalLength focal       	       = 84;  // 可见光焦距
+        srcp.args.GaitCtrl gaitCtrl                   	       = 85;  // 步态控制
+        srcp.args.PatrolMissions patrolMissions       	       = 86;  // 巡逻任务
+        srcp.args.ReleaseMicrophone releaseMicrophone 	       = 87;  // 松开话筒
+        srcp.args.RightThumbUp rightThumbUp           	       = 88;  // 右大拇指
+        srcp.args.Walk walk                           	       = 89;  // 行走
+        srcp.args.Run run                            	       = 90;  // 跑
+        srcp.args.Getup getup                         	       = 91;  // 倒地恢复
+        srcp.args.Jump jump                          	       = 92;  // 跳
+        srcp.args.GetDown getDown                    	       = 93;  // 趴姿
+        srcp.args.Handstand handstand                	       = 94;  // 倒立
+        srcp.args.Upright upright                     	       = 95;  // 直立
+        srcp.args.FistBump fistBump                   	       = 96;  // 碰拳
+        srcp.args.GuessBump guessBump                	       = 97;  // 猜拳
+        srcp.args.WaistRotation waistRotation        	       = 98;  // 腰部转动（转腰）
+        srcp.args.Pause pause                         	       = 99; // 暂停
+        
+        srcp.args.Mapping exploreMapping                       = 100; // 探索建图
+        srcp.skill.args.FollowObject followObject              = 101; // 目标跟随
+        srcp.skill.args.SpinningOnTheSpot spinningOnTheSpot    = 102; // 原地旋转/前进距离/原地转圈
+        srcp.skill.args.PTZCamera ptzCamera                    = 103; // 云台相机控制
+        srcp.skill.args.JointsControl jointsControl            = 104; // 运动关节控制
+
+        srcp.skill.args.MotorCalib motorCalib                  = 105; // 电机标定  
+        srcp.args.Handclap handclap                            = 106; // 鼓掌
+        srcp.args.Move slope                                   = 107; // 上下坡(复杂地形平衡行走)
+        srcp.skill.args.ShakeEars shakeEars                    = 108; // 摇耳朵
+        srcp.skill.args.ScissorsGesture scissorsGesture        = 109; // 剪刀手势（石头剪刀布）
+
+        srcp.args.Guide guide                                  = 120;  //引导
+        srcp.args.OpenExplain openExplain                      = 121; //开放讲解
+        srcp.args.LongPresent longPresent                      = 122; //长讲解
+        srcp.args.StaticGesture staticGesture                  = 123; //静态动作
+        srcp.skill.args.SwingBody swingBody                    = 124; // 摆动身体
+        srcp.skill.args.InviteGesture inviteGesture            = 125; // 邀请动作
+        srcp.skill.args.RecordMoveTrajectory recordMoveTrajectory   = 126; //录制移动轨迹
+        srcp.skill.args.ReplayMoveTrajectory replayMoveTrajectory   = 127; //回放录制轨迹
+        srcp.args.SitBow sitBow                                = 128; //坐姿作揖
+        srcp.args.StraightLegs straightLegs                    = 129; //四腿打直
+        srcp.args.FastLeanForward fastLeanForward              = 130; //快速前倾
+        srcp.args.LeanForwardSwing leanForwardSwing            = 131; //前倾摆动
+        srcp.args.StretchLazily stretchLazily                  = 132; //伸懒腰
+        srcp.args.SmallStep smallStep                          = 133; //小踏步
+        srcp.skill.args.HeadPoseControl headPoseControl        = 134; // 头部角度控制
+        srcp.skill.args.CheerGesture cheerGesture              = 135; // 加油手势（小幅手势加油）
+        srcp.skill.args.HighFive highFive                      = 136; // 击掌
+        srcp.skill.args.CryGesture cryGesture                  = 137; // 手势哭哭
+        srcp.args.PoiMark poiMark                              = 138; // 点位标记(请求这个技能后主动上报一次Location给云端)
+        srcp.args.TeleopMode teleopMode                        = 139; // 切换到运控的全身遥操模式
+        srcp.args.Move joyWalk                                 = 140; // 使用摇杆控制行走
+        srcp.args.Move joyStairs                               = 141; // 使用摇杆控制上下楼梯
+        srcp.args.Move joyUpHighPlatform                       = 142; // 使用摇杆控制上高台
+        srcp.args.Move joyCrawl                                = 143; // 使用摇杆控制匍匐
+        srcp.args.Move joyStraightenLeg                        = 144; // 使用摇杆控制腿打直
+        srcp.skill.args.EarsCalib earsCalib                    = 145; // 耳朵标定
+        srcp.args.ScratchHead scratchHead                      = 146; // 挠头（固定动作）
+        srcp.args.CrawlForward crawlForward                    = 147; // 匍匐前进（固定动作）
+        srcp.args.RubHand rubHand                              = 148; // 搓手（固定动作）
+        srcp.args.RaiseRightBackLeg raiseRightBackLeg          = 149; // 抬右后腿（固定动作）
+        srcp.args.ChestOut chestOut                            = 150; // 挺胸（固定动作）
+        srcp.args.BounceBackward bounceBackward                = 151; // 向后弹跳（固定动作）
+        srcp.args.BounceInPlace bounceInPlace                  = 152; // 原地弹跳（固定动作）
+        srcp.args.SwayBody swayBody                            = 153; // 摆动身体（固定动作）
+        srcp.args.ProudNod proudNod                            = 154; // 昂首点头（固定动作）
+        srcp.args.BounceForward bounceForward                  = 155; // 向前弹跳（固定动作）
+        srcp.args.LifeCrawl lifeCrawl                          = 156; // 匍匐待机生命态
+        srcp.args.RiseFallSlightly riseFallSlightly            = 157; // 身体微起伏
+        srcp.args.StartupAction startupAction                  = 158; // 开机动作
+        srcp.args.ShutdownAction shutdownAction                = 159; // 关机动作
+        srcp.skill.args.SafetyGuard safetyGuard                = 160; // 安全守卫
+        srcp.args.HonorWallGesture honorWallGesture            = 161; // 问界展厅荣誉墙定制手势
+        srcp.args.GestureDance gestureDance                    = 162; // 手势舞蹈
+        srcp.args.LiftArm liftArm                              = 163; // 震动手臂
+        srcp.args.Explore explore                              = 164; // 探索漫游
+        srcp.args.LifeSit lifeSit                              = 165; // 坐姿待机生命态
+        srcp.args.LifeStand lifeStand                          = 166; // 站立待机生命态
+        srcp.skill.args.BodyWobble bodyWobble                  = 167; // 摇晃身体（音乐律动等）
+
+
+        srcp.skill.args.MotionCommand moveForward              = 300; // 前进
+        srcp.skill.args.MotionCommand moveBackward             = 301; // 后退
+        srcp.skill.args.MotionCommand turnLeft                 = 302; // 左转
+        srcp.skill.args.MotionCommand turnRight                = 303; // 右转
+        srcp.skill.args.WaistControl waistControl              = 304; // 扭腰、侧腰
+        srcp.skill.args.Bow bow                                = 305; // 弯腰（鞠躬）
+        srcp.skill.args.ForearmAction forearmAction            = 306; // 手臂动作
+        srcp.skill.args.FingerTap_SingleHand fingerTap_SingleHand = 307;         // 单手点击
+        srcp.skill.args.TerminatingCurrentTask terminatingCurrentTask = 308;     // 停止当前任务
+        srcp.skill.args.StandUpFromSquatting standUpFromSquatting = 309;         // 蹲姿起立
+        srcp.skill.args.StandUpFromSitting standUpFromSitting = 310;             // 坐姿起立
+        srcp.skill.args.SteppingOnTheSpot steppingOnTheSpot = 311;               // 原地踏步
+        srcp.skill.args.TiltHead tiltHead                       = 312; // 侧头
+        srcp.skill.args.FingerPointing_FixedPose fingerPointing_FixedPose = 313; // 固定手指戳
+        srcp.skill.args.HandAction handAction                   = 314;           // 手指动作
+        srcp.args.Grab upperGrab                                = 315;   // 上半身灵巧抓取
+        srcp.skill.args.InitialLocateAuto initialLocateAuto     = 316;   // 自动初始定位 （todo: 是否需要暴露给上层应用）
+        srcp.skill.args.VLNPathPlanningForNav vlnPathPlanningForNav     = 317;  // VLN导航路径规划
+        srcp.skill.args.MapOperate mapOperate                   = 318;  // 地图操作, 包括删除地图，导入地图;
+        srcp.skill.args.MapEstablishment mapEstablishment       = 319;  // 地图构建
+        srcp.skill.args.ElectronicFenceMarkManual electronicFenceMarkManual = 320;  // 电子围栏标注-手动
+        srcp.args.SwitchMap switchMap                           = 321;
+
+        srcp.args.LowerLeftArm lowerLeftArm             = 322;   // 放左手
+        srcp.args.LowerRightArm lowerRightArm           = 323;   // 放右手
+        srcp.args.OneKeyExpand oneKeyExpand             = 324;   // 一键展开
+        srcp.args.OneKeyFold oneKeyFold                 = 325;   // 一键折叠
+        srcp.args.PickUp pickUp                         = 326;   // 拿取
+        srcp.args.PlaceDown placeDown                   = 327;   // 放置
+        srcp.args.Approach approach                     = 328;   // 靠近
+        srcp.args.PushForward pushForward               = 329;   // 前推
+        srcp.args.PullBack pullBack                     = 330;   // 后拉
+        srcp.args.Carry carry                           = 331;   // 搬运
+        srcp.args.StartWork startWork                   = 332;   // 开始工作
+        srcp.args.EndWork endWork                       = 333;   // 结束工作
+        srcp.args.MotionControl motionSkill             = 334;   // 运动控制，需要下发参数的运控技能
+        srcp.args.WaistRise waistRise                   = 335;   // 腰部上升
+        srcp.args.WaistLower waistLower                 = 336;   // 腰部下降
+
+
+    }
+}
+
+message SkillCommand {
+    string id            = 1;   // 任务UUID
+    string skill         = 2;   // 技能
+    int64 timestamp      = 1000;    // 数据包的时间戳, 方便用来测试调用链路的延迟
+
+    oneof para {
+        srcp.args.Move move    = 3;    // 移动的参数
+        srcp.skill.args.JointsControl jointsControl = 4; // 运动关节控制
+        srcp.args.StepStill stepStill               = 5; // 原地踏步
+        srcp.skill.args.SwingBody swingBody         = 6; // 摆动身体
+        srcp.args.PanTiltAngle angle                = 7; // 云台控制
+        srcp.args.MotionControl motionSkill         = 8; // 运动控制，需要下发参数的运控技能
+        srcp.args.Move slope                        = 9; // 上下坡(复杂地形平衡行走)
+        srcp.args.Move joyWalk                      = 10; // 使用摇杆控制行走
+        srcp.args.Move joyStairs                    = 11; // 使用摇杆控制上下楼梯
+        srcp.args.Move joyUpHighPlatform            = 12; // 使用摇杆控制上高台
+        srcp.args.Move joyCrawl                     = 13; // 使用摇杆控制匍匐
+        srcp.args.Move joyStraightenLeg             = 14; // 使用摇杆控制腿打直
+        srcp.skill.args.NavCalib navCalib           = 15; // 二次下发导航标定参数
+        srcp.skill.args.BodyWobble bodyWobble       = 16; // 摇晃身体（音乐律动等）
+        srcp.skill.args.SpeedAdjust speedAdjust     = 17; // 速度调节
+    }
+}
+
+message SkillFeedback {
+    string id            = 1;   // 任务UUID
+    string skill         = 2;   // 技能
+
+    oneof para {
+        srcp.skill.args.MoveFeedback move    = 3;           // 移动的参数
+        srcp.skill.args.NavCalibFeedback navCalib = 4;      // 导航标定数据
+        srcp.skill.args.MotorCalibFeedback motorCalib = 5;  // 电机标定数据
+        srcp.skill.args.NavigateFeedback navigate = 6;                              // 导航反馈数据, 停障，恢复等等（事件触发）
+        srcp.skill.args.FollowObjectFeedback followObject = 7;                      // 跟随反馈数据, 停障，恢复等等（事件触发）
+        srcp.skill.args.SpinningOnTheSpotFeedback spinningOnTheSpot = 8;            // 前进距离反馈数据, 停障，恢复等等（事件触发）
+        srcp.skill.args.PTZCameraFeedback ptzCamera = 9;                            // 云台相机控制
+        srcp.skill.args.HeadPoseControlFeedback headPoseControl        = 10;        // 头部角度控制的反馈
+        srcp.skill.args.RecordMoveTrajectoryFeedback recordMoveTrajectory = 11;     // 录制轨迹
+        srcp.skill.args.ReplayMoveTrajectoryFeedback replayMoveTrajectory = 12;     // 轨迹回放
+        srcp.skill.args.EarsCalibFeedback earsCalib = 13;                           // 耳朵标定反馈
+        srcp.skill.args.SafetyGuardFeedback safetyGuard = 14;                       // 安全守卫反馈MapOperateFeedback
+        srcp.skill.args.MapOperateFeedback mapOperate = 15;                         // 地图操作反馈
+    }
+}
+
+message SkillResult {
+    string id            = 1;   // 任务UUID
+    string skill         = 2;   // 技能
+    int32 ret            = 3;   // 执行结果
+
+    oneof para {
+        srcp.skill.args.MoveResult move    = 4;    // 移动的参数
+        srcp.skill.args.RecordTrajectoryResult recordMoveTrajectory = 5; // 轨迹录制的结果
+        srcp.skill.args.SafetyGuardResult safetyGuard = 6;  // 安全守卫的结果
+        srcp.skill.args.NavCalibResult navCalibResult = 7;   // 标定结果; 仅在标定执行成功时才有值
+    }
+
+    oneof ret_info {
+        srcp.skill.args.FocusPausedInfo focusPaused = 2000;                 // 焦点暂停时的信息, RET_FOCUS_PAUSED时有效
+        srcp.skill.args.TaskOverrideInfo taskOverride = 2001;               // 任务覆盖信息, RET_TASK_OVERRIDE时有效
+        srcp.skill.args.MotorFaultInfo motorFaultInfo = 2002;               // 电机故障信息, RET_MOTOR_FAULTS时有效
+    }
+}

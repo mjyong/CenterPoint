@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package srcp;
+
+message Errcode
+{
+    enum ID
+    {
+        SUCCESS     = 0;
+        FAILURE     = 1;
+        NOT_SUPPORT = 2;
+        TIME_OUT    = 3;
+
+        PARA_LENGTH_MISMATCH = 10;          // 参数字段长度不匹配
+
+        ERR_ACTION_GOAL_REJECTED    = 100;
+
+        ERR_SERVER_UNAVAILABLE      = 150;  // 服务不可用
+        ERR_SERVER_ALREADY_STARED   = 151;  // 非可重入服务执行过程中，不支持再次启动
+
+        /* 远程获取日志 */
+        REMOTE_RESULT_CODE_MAINT_NO_RESPONSE = 1000;            // 未使用
+        REMOTE_RESULT_CODE_MAINT_PARAM_ERROR_TBOX = 1001;       // TAU参数错误（包括：http 响应具体错误；）
+        REMOTE_RESULT_CODE_MAINT_PARAM_ERROR_CDC = 1002;        // CCU参数错误
+        REMOTE_RESULT_CODE_MAINT_INTERNAL_ERROR_TBOX = 1003;    // 未使用
+        REMOTE_RESULT_CODE_MAINT_INTERNAL_ERROR_CDC = 1004;     // CDC内部错误（包括：http 请求错误；解析 http 响应错误；）
+        REMOTE_RESULT_CODE_MAINT_LOG_NOT_FOUND = 1005;          // 日志文件不存在
+        REMOTE_RESULT_CODE_MAINT_EXECUTION_BUSY = 1006;         // 任务列表中存在相同的上报任务
+        REMOTE_RESULT_CODE_MAINT_OTA_MODE = 1007;               // 未使用
+        REMOTE_RESULT_CODE_MAINT_NOT_SUPPORT_TBOX = 1008;       // 未使用
+        REMOTE_RESULT_CODE_MAINT_NOT_SUPPORT_CDC = 1009;        // 未使用
+
+        /* 远程诊断 */
+        REMOTE_RESULT_CODE_DIAG_OTA_MODE = 2001;                // mqtt远程诊断启停错误码--OTA占用
+        REMOTE_RESULT_CODE_DIAG_OBD_MODE = 2002;                // mqtt远程诊断启停错误码--OBD占用
+        REMOTE_RESULT_CODE_DIAG_RESTORE_FACTORY = 2003;         // 未使用
+        REMOTE_RESULT_CODE_DIAG_EMISSION_MODE = 2004;           // mqtt远程诊断启停错误码--排放实验占用
+        REMOTE_RESULT_CODE_DIAG_COMP_NO_RESPONSE = 2005;        // 未使用
+        REMOTE_RESULT_CODE_DIAG_CMD_PARSE_ERROR = 2006;         // mqtt远程诊断启停错误码--指令解析失败
+        REMOTE_RESULT_CODE_DIAG_DUPLICATE_REQ = 2007;           // 未使用
+        REMOTE_RESULT_CODE_DIAG_REQ_RESOURCE_FAIL = 2008;       // mqtt远程诊断启停错误码--资源请求错误（DoipDiagStart返回的错误）
+        REMOTE_RESULT_CODE_DIAG_GW_CNT_FAIL = 2009;             // 未使用
+        REMOTE_RESULT_CODE_DIAG_TSP_CNT_FAIL = 2010;            // 未使用
+    }
+}

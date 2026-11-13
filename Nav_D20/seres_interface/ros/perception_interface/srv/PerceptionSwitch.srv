@@ -1,0 +1,14 @@
+#具体服务开关由各名称确定其唯一性
+
+uint32 STATE_OFF        = 0 # 关闭
+uint32 STATE_ON         = 1 # 开启
+
+string source           # 发起端名称[节点名_idx]，开&关需同源
+uint32 state            # 开关状态，详见本体协议STATE_*
+
+---
+
+bool success
+string message
+
+

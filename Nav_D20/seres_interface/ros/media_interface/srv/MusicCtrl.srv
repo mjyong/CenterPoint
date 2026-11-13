@@ -1,0 +1,16 @@
+#在线音乐播放指定歌曲
+string id # 歌曲ID
+bool online #true在线音乐,false本地音频文件
+string task_id #任务Id
+uint8 action #动作类型,取值见 ACTION_*
+uint8 ACTION_START=0 #开始
+uint8 ACTION_PAUSE=1 #暂停
+uint8 ACTION_RESUME=2 #恢复
+
+---
+
+uint8 result_code #响应：结果码,取值见 RESULT_*
+uint8 RESULT_SUCCESS=0 #成功
+uint8 RESULT_FILE_NOT_EXIST=1 #音频文件不存在
+uint8 RESULT_FOCUS_FAILED=2 #音频焦点申请失败
+uint8 RESULT_PLAY_ERROR=3 #播放错误

@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package srcp;
+
+enum ConfigType
+{
+    ACTION_LIST   = 0; // 机器人支持的动作数据文件列表
+    STAGE_SCRIPT  = 1; // 舞台剧本
+    NAVI_MAP_LIST = 2; // 机器人支持的地图文件列表
+
+    PARAM_QUERY = 3;   //查询参数
+    PARAM_UPDATE = 4;  //更新参数 
+    PARAM_DELETE=5;    //删除参数
+
+    DEVICE_PARAM_QUERY = 6; // 设备参数查询
+    FILE_DOWNLOAD = 7; //配置文件下载
+    FILE_DELETE = 8;   //配置文件删除
+
+    VALUE_ADD = 9;     //增加参数值，针对数组类型,结合历史数据进行处理
+    VALUE_DEL = 10;   //删除参数值，针对数组类型,结合历史数据进行处理
+    VALUE_UPDATE = 11; //修改参数值，针对数组类型,结合历史数据进行处理
+
+    RESTORE_FAC = 12; //恢复出厂设置,云端和本体同时恢复，此时json为空即可
+}
+
+message RemoteConfig
+{
+    ConfigType type = 1; // 配置类型
+    string json     = 2; // 配置内容的 Json 序列化字符串
+    //type = 3，6时，json内容为空。
+    //type = 4,5,9,10时，格式如下
+    //[
+    // {
+    //节点名称,如果下发的参数是全局性的，则使用'/'代替
+    // "nodeName":"/robot_motion_node",//string类型
+    // "paramName":"motion_list",//string类型
+    // "paramValue":["handshake","wave"]
+    // }
+    //]
+    //type = 11时格式如下：
+    //[
+    // {
+    // #节点名称,如果下发的参数是全局性的，则使用'/'代替
+    // "nodeName":"/robot_motion_node",  //string类型
+    // "paramName":"motion_list",//string类型
+    // "searchFlag": ["0x10001","0x10002"], //string 类型
+    // "paramValue":["{id:0x10001,value:v1}","{id:0x10002,value:v2}"]  //使用searchFlag在历史数据数组中搜索相关value字段，匹配则替换
+    // }
+    //]
+    //type = 7,8时,主动推送下载内容：
+    //[
+    // {
+    // "url":"http://seres.com.cn/test.json",
+    // "name":"test.json",
+    // "md5":"e7e165cac351d692329a8c58fdc7c906",
+    // "module":"nav"，
+    // "downloadtype":"continue"   //rewrite 重新下载；continue 断点续传 D30新增
+    // }
+    //]
+}
+
+//上报配置参数
+message ReportConfig
+{
+    ConfigType type = 1; // 配置类型
+    string json_param = 2; //上报所有配置参数或者设备参数json格式字符串 
+    //[
+    // {
+    //节点名称,如果下发的参数是全局性的，则使用'/'代替
+    // "nodeName":"/robot_motion_node",//string类型
+    // "paramName":"motion_list",//string类型
+    // "paramValue":["handshake","wave"]
+    // }
+    //]
+}

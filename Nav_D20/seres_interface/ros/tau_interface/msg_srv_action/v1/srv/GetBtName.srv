@@ -1,0 +1,5 @@
+---
+# 蓝牙名称
+string bt_name              # 蓝牙名称(UTF-8 字节数 <= 32)
+# 蓝牙地址
+string bt_addr              # 蓝牙 MAC 地址 "XX:XX:XX:XX:XX:XX"

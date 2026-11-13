@@ -1,0 +1,303 @@
+syntax = "proto3";
+
+package srcp;
+
+message Point 
+{
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+message Quaternion 
+{
+    double x = 1;
+    double y = 2;
+    double z = 3;
+    double w = 4;
+}
+
+message Pose 
+{
+    Point position = 1; //位置
+    Quaternion orientation = 2; //朝向
+}
+
+message Twist 
+{
+    message Linear
+    {
+        double x = 1; 
+        double y = 2;   
+        double z = 3;
+    }
+
+    message Angular
+    {
+        double x = 1; 
+        double y = 2;   
+        double z = 3;   
+    }
+
+    Linear linear = 1;
+    Angular angular = 2;
+}
+
+enum MapEditTaskType
+{
+    MAP_EDIT_TASK_UNKNOWN = 0;     //未知
+    MAP_EDIT_TASK_UPLOAD = 1;      //上传
+    MAP_EDIT_TASK_DOWNLOAD = 2;   //下载
+    MAP_EDIT_TASK_BROWSE = 3;      //浏览
+    MAP_EDIT_TASK_DELETE = 4;      //删除
+    MAP_EDIT_TASK_RENAME = 5;      //重命名
+    MAP_EDIT_TASK_SELECT = 6;      //选择
+    MAP_EDIT_TASK_DOWNLOAD_SUBMAP = 7; //下载虚拟地图
+    MAP_EDIT_MARK_POINT = 8;//标记点
+}
+
+enum MapType
+{
+    MAP_UNKNOWN = 0;
+    MAP_GLOBAL = 1;
+    MAP_UPDATE = 2;
+    MAP_LOCAL  = 3;
+    MAP_EXPLORE = 4;
+}
+
+message MapBuildStatus
+{
+    enum MapBuildState
+    {
+        MAP_BUILD_STATE_UNKNOWN = 0; //未知
+        MAP_BUILD_STATE_DOING = 1;   //建图中
+        MAP_BUILD_STATE_DONE  = 2;   //建图完成
+        MAP_BUILD_STATE_FAILED = 3;  //建图失败
+        MAP_BUILD_STATE_PAUSED = 4;  //建图暂停
+        MAP_BUILD_STATE_CANCEL = 5; //建图取消
+    }
+
+    enum MapFileType
+    {
+        PNG = 0;    // png
+        PGM = 1;   // pgm
+    }
+    string uuid = 1;  //任务id
+    MapBuildState map_build_state = 2; //建图状态
+    uint32 map_progress = 3;   //建图进度
+    Pose pose = 4;  //实时位姿
+    bytes  map = 5; //实时2D地图
+    string map_uuid = 6; //地图UUID
+    string map_name = 7; //地图名称
+    float width = 8; //宽度
+    float hight = 9; //高度
+    float resolution = 10; //分辨率
+    Point map_origin_point = 11; //地图原点
+    MapFileType file_type = 12; //地图文件格式png、pgm
+    string map2d_name = 13; //所建2D地图名称
+    string error_msg = 14;  //建图失败原因
+    string trigger_alias = 15; // 触发建图的别名
+}
+
+message MapEditStatus
+{
+    enum MapEditState
+    {
+        MAP_EDIT_STATE_UNKNOWN = 0;
+        MAP_EDIT_STATE_DOING = 1;
+        MAP_EDIT_STATE_FAILED = 2;
+        MAP_EDIT_STATE_SUCCESS = 3;
+    }
+
+    string uuid = 1; //任务ID
+    MapEditTaskType task_type = 2; //地图任务类型
+    string map_name = 3; //地图文件名称
+    string map_uuid = 4; //地图ID
+    MapType map_type = 5; //地图类型
+    uint32 progress = 6;   //上传下载进度0-100
+    MapEditState state = 7; //执行结果
+}
+
+message LocationStatus 
+{
+    enum LocaltionState
+    {
+        LOCATION_UNKNOWN = 0; //未知
+        LOCATION_DOING = 1;   //定位中
+        LOCATION_DONE  = 2;   //定位成功
+        LOCATION_FAILED = 3;  //定位失败
+    }
+
+    string uuid = 1; //任务id
+    LocaltionState state = 2;  //定位状态
+    string child_frame_id = 3; //机器人基座坐标系ID
+    Pose pose = 4; //位姿
+    Twist twist = 5; //速度
+    string map_uuid = 6; //关联地图uuid
+}
+
+message PlanningStatus
+{
+    enum PlanningState
+    {
+        PLANNING_STATE_IDLE = 0;
+        PLANNING_STATE_DOING = 1;
+        PLANNING_STATE_PAUSE = 2;
+        PLANNING_STATE_DONE = 3;
+        PLANNING_STATE_FAILED = 4;
+    }
+
+    enum ActionState
+    {
+        ACTION_STATE_IDLE = 0;  //空闲
+        ACTION_STATE_DOING = 1; //执行中 
+        ACTION_STATE_PAUSE = 2; //暂停
+        ACTION_STATE_SUCCESS = 3; //完成
+        ACTION_STATE_FAILED = 4; //失败
+        ACTION_STATE_WAITTING = 5; //停留计时
+    }
+
+    string uuid = 1; //任务id
+    PlanningState planning_state = 2;
+    repeated ActionState action_state = 3;
+    string trigger_alias = 4;        // 触发导航或者回充的客户端别名
+}
+
+
+message Trajectory
+{
+    enum TrajectoryType
+    {
+        TRAJECTORY_GLOBAL = 0; //全局
+        TRAJECTORY_LOCAL = 1;  //局部
+    }
+
+    uint32 id = 1;
+    string map_uuid = 2; //关联地图uuid
+    TrajectoryType type = 3;
+    repeated Point point_array = 4;
+}
+
+//Map Edit Task
+message NavOperation
+{
+    string uuid = 1; //任务id
+    MapEditTaskType task_type = 2; //地图编辑任务类型
+    repeated string url = 3;      //地图文件https链接地址
+    string map_name = 4; //地图名称
+    string map_uuid = 5; //地图UUID
+    MapType map_type = 6; //地图类型
+}
+
+message NavOperationResult
+{
+    enum Type 
+    {
+        MAP_ISSUE = 0; //地图下发结果上报
+        MAP_FILE_UPLOAD = 1; //建图文件上传结果上报
+        MAP_DELETE = 2; //删除地图结果上报
+    }
+
+    string uuid = 1; //任务id
+    bool task_result = 2;  //任务执行结果
+    repeated string map_list = 3; //地图文件名称列表
+    Type type = 4; //类型
+    string error_msg = 5; //失败原因
+}
+
+// D10 巡逻任务 点位上报
+message TaskMapPointReport
+{
+    Point point      = 1;  // 多个点位位置
+    string pointName = 2;  // 点位名称
+    int32 sort       = 3;  // 点位顺序
+    string taskUuid  = 4;  // 任务uuid
+}
+
+// D10 巡逻任务轨迹点位上报
+message TrackPointReport
+{
+  Point point      = 1; // 轨迹点位置
+  int32 sort       = 2; // 点位顺序
+  string taskUuid  = 3; // 任务uuid
+}
+
+message RealtimeLocationReport
+{
+  GeometryPose geometryPose = 1;        // 地图坐标
+  GeographicPose geographicPose = 2;    // 地理坐标
+  Twist twist = 3;                      // 速度
+  string navTaskUuid = 4;               // 导航任务uuid
+  GeometryPose pose_odometry = 5;       // 里程计位置，uuid无效为null
+  string select_map_uuid = 6;           // 本体当前选择使用的地图id，这个地图可能还没定位
+}
+
+//地理坐标
+message GeographicPose
+{
+  enum Status
+  {
+    STATUS_UNKNOW =  0;       // 无效定位
+    STATUS_FIX =  1;        // 单点定位，一般精度误差>2m
+    STATUS_SBAS_FIX = 2;        // 差分定位，一般精度误差1m
+    STATUS_GBAS_FIX = 3;       // 固定解，精度误差厘米级
+  }
+  Status status = 1;  //定位状态
+  float latitude = 2;      // 纬度 [-90, 90]，单位：度
+  float longitude = 3;     // 经度 [-180, 180]，单位：度
+  float altitude = 4;      // 海拔高度，单位：米（WGS84 椭球或 MSL）
+  Quaternion orientation = 5; //朝向
+}
+
+//地图坐标
+message GeometryPose
+{
+  enum LocaltionStatus
+  {
+    LOCATION_UNKNOWN = 0; //未知
+    LOCATION_DOING = 1;   //定位中
+    LOCATION_DONE = 2;   //定位成功
+    LOCATION_FAILED = 3;  //定位失败
+  }
+
+  LocaltionStatus status = 1;  //定位状态
+  Point point = 2; //点位坐标
+  string mapUuid = 3; // 地图uuid
+  Quaternion orientation = 4; //朝向
+}
+
+//请求初始姿态结果上报
+message InitialPoseResponse {
+     bool result = 1;  //任务执行结果
+     Pose pose = 2;
+}
+
+message PoiMarkReport {
+    enum MarkStatus {
+        MARK_STATUS_OK = 0;
+        MARK_STATUS_FAIL = 1;
+    }
+    string uuid = 1;   // 仅有云端触发的标记时有值;
+    string map_uuid = 2; // 地图ID
+    string mark_name = 3;  // POI名字, 云端触发时是空; 语音触发时有值
+    string trigger_alias = 4; // 触发端别名, voice_agent是语音
+    MarkStatus mark_status = 5;  // 状态，Ok时表示坐标有效; 
+    GeometryPose geometryPose = 6;  //地图坐标
+    GeographicPose geographicPose = 7;// 地理坐标
+    Twist twist = 8; //速度
+}
+
+// 重定位状态上报
+message RelocationStatusReport{
+  enum RelocationState {
+    RELOCATION_UNKNOWN = 0; //未知
+    RELOCATION_DOING = 1;   //定位中
+    RELOCATION_DONE = 2;   //定位成功
+    RELOCATION_FAILED = 3;  //定位失败
+  }
+  string id = 1; // 任务id
+  string map_uuid = 2; // 地图ID
+  Pose pose = 3; //重定位的坐标
+  RelocationState state = 4;
+  string error_msg = 5; //定位失败原因
+}

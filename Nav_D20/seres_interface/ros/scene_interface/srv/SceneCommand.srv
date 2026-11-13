@@ -1,0 +1,7 @@
+int32  type           # 消息命令类型，即对应的消息ID(协议定义)
+uint8[] datastream    # 含义同data, 建议使用datastream.约束: 二进制和文本字符串均可
+---
+bool result           # 命令分发结果
+string msg            # 失败原因或处理消息
+int32 resp_type       # 数据类型
+uint8[] datastream    # 返回数据

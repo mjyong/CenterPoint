@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package srcp;
+import "scene_args.proto";
+
+message SceneOperate {
+  enum Ctrl {
+    START = 0;
+    PAUSE = 1;
+    RESUME = 2;
+    CANCEL = 3;
+    OPTION = 4;
+  }
+  string id = 1;
+  Ctrl ctrl = 2;
+  string taskUuid = 3;
+  string sceneName = 4;
+
+  oneof scene {
+    srcp.args.FetchOrDeliverObject fetchOrDeliverObject = 5;
+    srcp.args.RunningCompanionStart runningCompanionStart =6;
+    srcp.args.GuardScene guardScene = 7;
+    srcp.args.AntiTheft antiTheft = 8;
+    srcp.args.AutoFollow autoFollow = 9;
+    srcp.args.AICompanion aiCompanion = 10;
+    srcp.args.NavigationScene navigationScene = 11;
+    srcp.args.ExploreScene exploreScene = 12;
+    srcp.args.RechargingNon rechargingnon  = 13;
+  }
+}
+
+
+
+//RemotePush下新增类，场景拍摄控制类
+message SceneRecordCtl {
+    srcp.args.SceneRecordOperation sceneRecordOperation = 1;
+    oneof action {
+        srcp.args.TrajectoryRecord trajectoryRecord = 2;
+        srcp.args.FollowShoot FollowShoot = 3;
+        srcp.args.OrbitRecord orbitRecord = 4;
+        srcp.args.DelayShoot delayShoot = 5;
+    }
+}

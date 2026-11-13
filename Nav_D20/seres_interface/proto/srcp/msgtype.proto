@@ -1,0 +1,197 @@
+syntax = "proto3";
+
+package srcp;
+
+message MsgType
+{
+    enum ID
+    {
+        reserve             = 0;
+
+        Login               = 0x0001;
+        Logout              = 0x0002;
+        Status              = 0x0003;
+        RobotBindConfirm    = 0x0004;
+        // 通用消息回复
+        GeneralResult       = 0x0010;
+        RemoteResponse      = 0x0011;
+        RobotResponse       = 0x0012;
+
+        // 分片消息
+        ChunkInfo           = 0x0013;
+        Chunk               = 0x0014;
+        ChunkAck            = 0x0015;
+
+        // 任务相关
+        GeneralTaskStateReport = 0x00FD;
+        TaskGeneralMapPointReport= 0x00FE;
+        TaskGeneralStatusReport= 0x00FF;
+        TaskOperate         = 0x0100;
+        TaskSkillsQuery     = 0x0101;
+        TaskSkills          = 0x0102;
+        TaskStateQuery      = 0x0103;
+        TaskState           = 0x0104;
+        TaskStateResponse   = 0x0105;
+	    ReceiveJobPointReport = 0x0106;
+	    ReceiveJobPointStatusReport = 0x0107;
+        ShowStatusReport = 0x0108;  //表演状态上报
+
+	    RemoteControlTask   = 0x0109;  //远控任务
+        AudioAdjust          = 0x010A;  //音量调节
+        MusicOperate          = 0x010B;  //在线音乐 
+        MusicOperateRep       = 0x010C;  //音乐请求回复
+        MusicPublishInfo      = 0x010D;  //音乐主动上报
+        VoiceStyleQuery  = 0x010E;  //音色查询
+        VoiceStyleQueryResult = 0x010F;  //音色查询响应
+
+        // 机器人模式
+        RobotModeQuery      = 0x0110;
+        RobotMode           = 0x0111;
+
+        // RHR
+        GetRhrLog           = 0x0120;
+        RobotAlarm          = 0x0121;
+        RobotStates         = 0x0122;
+        RobotLogUploadTaskInit         = 0x0123;
+        EmptyLogComponents             = 0x0124;
+        RobotLogUploadTaskInitResponse = 0x0125;
+        RhrConfigs                     = 0x0126;
+        RemoteDiagnosisEnable          = 0x0127;
+        RemoteDiagnosisDisable         = 0x0128;
+        RemoteDiagnosisStatus          = 0x0129;
+        EventRecord                    = 0x012A;
+
+        //RMS
+        RemoteConfig        = 0x0130;
+        ReportConfig        = 0x0131;
+
+        // 导航
+        MapBuildStatus          = 0x0140;
+        LocationStatus          = 0x0141;
+        NavOperation            = 0x0142;
+        NavOperationResult      = 0x0143;
+        TaskMapPointReport      = 0x0144;
+        PlanningStatus          = 0x0145;
+        MapEditStatus           = 0x0146;
+        Trajectory              = 0x0147;
+        RealtimeLocationReport  = 0x0148;
+        InitialPoseResponse     = 0x0149;
+        PoiMarkReport           = 0x014A;
+        NavStateReport          = 0x014B;
+        RelocationStatusReport  = 0x014C;//重定位状态上报
+
+        // WiFi
+        WiFiAPRequest       = 0x0150;
+        WiFiAPResponse      = 0x0151;
+
+
+        
+        // 音视频通话
+        AudioVideoCallData     = 0x0160;
+        // 相机控制
+        CameraCtl              = 0x0161;
+        //场景拍摄
+        SceneRecordCtl         = 0x0162;
+        //轨迹拍摄录制状态上报
+        TrajectoryRecordStatus = 0x0163;
+        //跟随拍摄状态信息上报
+        FollowShootStatusReport = 0x0164;
+        //环绕拍摄状态信息上报
+        OrbitRecordStatus       = 0x0165;
+        // 相机状态信息上报
+        CameraStatusReport = 0x0166;
+        //延时拍摄状态信息上报
+        DelayShootStatus        = 0x0167;
+        // 下线质检PLC数据下发
+        OfflineInspectPlc        = 0x0168;
+        // 底盘质检PLC数据下发
+        ChassisInspectPlc        = 0x0169;
+        // 场景机器人任务配置下发
+        SceneRobotJobConfig      = 0x016A;
+        // 场景机器人运行状态信息上报
+        SceneRobotStatus         = 0x016B;
+        // 场景机器人调度下发
+        SceneRobotDispatch       = 0x016C;
+        // 场景机器人调度结果上报
+        SceneRobotDispatchResult = 0x016D;
+        // 车辆检测状态上报
+        CarDetectStatus          = 0x016E;
+        // 场景机器人岗位状态查询
+        SceneRobotPostStatusQuery= 0x016F;
+        // 场景机器人恢复工作上报
+        SceneRobotRecoverWorkReport = 0x0170;
+        //场景操作通用
+        SceneOperate            = 0x0171;
+        //回充上报
+        ReChargeReport            = 0x0172;
+        //D30防盗模式
+        AntiTheftStatus            = 0x0173;
+        // 内存格式化上报
+        MemoryFormatReport     =   0x0174;
+        //取送物状态上报
+        FetchOrDeliverInfo      = 0x0175;
+        SceneRobotPostStatusResult = 0x0176;
+        //区域守卫状态上报
+        GuardSceneStatusReport = 0x0179;
+        //区域守卫异常事件上报
+        GuardSceneEventReport  = 0x0180;
+        //自主跟随状态上报
+        AutoFollowStatusReport = 0x0181;
+        //自主跟随状态检查
+        AutoFollowCheckResult  = 0x0182;
+        RemoteControlTaskState  = 0x0183;  //远程控制指令执行状态上报
+        // 场景机器人恢复工作结果
+        SceneRobotRecoverWorkResult = 0x0184;
+        
+        //ai陪跑状态上报
+        AICompanionStatusReport = 0x0185;
+        AICompanionStatusTipsReport = 0x0187;
+
+        //智能Vlog上报（状态+高光成片结果）
+        VlogReport = 0x0186;
+        
+        // OTA指令下发
+        RobotOtaControl = 0x2000;
+        // OTA进度状态（下载，升级）上报
+        RobotOtaProcessStateReport = 0x2007;
+        
+        TrackPointReport     = 0x2006;
+        // D10巡逻点位下发
+        MapPointIssue        = 0x2004;
+        // 巡逻点位和巡逻轨迹上报
+        MapPointReport        = 0x2005;
+        // reserve to 0x014F for navigation
+        
+        // rhr平台化
+        RobotAlarmInfo         = 0x3000;// RHR告警上报
+        RobotEventInfo         = 0x3001;// RHR事件上报
+        RobotStateInfo         = 0x3002;// RHR状态上报
+        GetPlatformRhrLog      = 0x3003;// RHR平台化日志获取下发
+        GetRhrData             = 0x3004;// RHR数据获取下发
+        RobotStateQuery        = 0x3005;// RHR状态查询
+
+        SceneStatusReport      = 0x4000;// 
+
+        // 设备用户模块
+        UserTask              = 0x4010;
+        UserTaskStatusReport  = 0x4001;
+        UserGuideQuery        = 0x4002;
+        UserGuidQueryResult   = 0x4005;
+
+        // WiFi查询
+        WifiQuery = 0x4003; // WiFi 扫描结果查询指令
+        WifiQueryResult = 0x4004; // WiFi 扫描结果查询响应
+
+        // 蓝牙控制类
+        BluetoothCtl =  0x4006;
+        BluetoothQueryResult = 0x4007; // 蓝牙扫描结果查询响应
+
+        // WiFi控制类
+        WifiCtl = 0x4008;                      // WiFi控制指令（开关/连接/忘记网络/触发扫描）
+        WifiStatusReport = 0x4009;             // WiFi状态上报（开关状态+连接状态）
+
+        // 数据埋点类
+        InitialPersonalityData = 0x6001;       // 性格初始化数据
+        ProactiveInteractionData = 0x6002;     // 性格演变主动交互数据
+    }
+}

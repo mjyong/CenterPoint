@@ -1,0 +1,187 @@
+syntax = "proto3";
+
+package srcp;
+import "task_args.proto";
+
+enum VideoFormat{
+  UNKNOWN_VIDEO_FORMAT = 0;
+  MP4 = 1;
+}
+enum PhotoFormat{
+  UNKNOWN_PHOTO_FORMAT = 0;
+  JPEG = 1;
+  RAW_JPEG = 2; //表示需要同时保存两个格式
+}
+enum AspectRatio{
+  UNKNOWN_RATIO = 0;
+  RATIO_16_9 = 1;
+  RATIO_4_3 = 2;
+  RATIO_1_1 = 3;
+}
+enum Resolution {
+  UNKNOWN_RESOLUTION = 0;
+  RESOLUTION_1K = 1;
+  RESOLUTION_2K = 2;
+  RESOLUTION_4K = 3;
+}
+//额外配置 提前下发
+message CameraConfig {
+  int32 cameraId = 1;   // 相机 id（可选）
+  bool autoFocus = 2; //自动对焦 （如果和手动调焦同时下发以自动对焦为准）
+  float focus = 3; //调节焦距 数字表示几倍焦距  1/2/3/4
+  VideoFormat videoFormat = 4;  // 视频格式 MP4（默认值）
+  PhotoFormat photoFormat = 5; //照片格式 JPEG（默认值）JPEG+RAW(同时保存)
+  AspectRatio aspectRatio = 6;  //拍摄比例 16:9（默认值）4:3,1:1
+  int32 brightness = 7;   //亮度 -100-100 默认0，0是自动亮度
+  Resolution resolution = 8; //分辨率 1k(默认值），2K，4K
+  int32 frame = 9; //帧率默认30 24/30/60/120
+  int32 flashlight = 10;  //闪光灯  打开 1、关闭 0（默认值），自动闪光灯2
+  FocusCoordinates focusCoordinates = 11;  //焦点坐标
+  int32 scheduledTime = 12;//定时拍摄时间，单位秒
+  bool beautyEnabled = 13; //一键美颜开关 true开启 false关闭
+  string filterConfig = 14; //滤镜配置（JSON字符串，包含滤镜参数）示例："{\"enabled\":true,\"filterId\":\"Filter_12_08\",\"intensity\":0.7}"
+}
+
+//焦点坐标
+message FocusCoordinates {
+  float x = 1;
+  float y = 2;
+}
+
+enum CameraOperation {
+  CAMERA_UNKNOWN = 0;
+  CAMERA_TAKE_PHOTO = 1; //拍照
+  CAMERA_VIDEO_START = 2; //录像
+  CAMERA_VIDEO_PAUSE = 3; //暂停录制
+  CAMERA_VIDEO_STOP = 4;  //停止录像
+  CAMERA_CONFIG_SET = 5;   //相机配置
+  CAMERA_SUBJECT_DETECTION = 6;   // 主体识别
+  MEMORY_FORMAT = 7;   // 内存或SD卡格式化
+  SMART_VLOG = 8;   // 智能Vlog
+}
+
+message CameraCtl {
+  CameraOperation operation = 1;
+  oneof action {
+    TakePhoto takePhoto = 2; //拍照
+    VideoRecord videoRecord = 3; //录像
+    CameraConfig cameraConfig = 4; // 相机配置
+    SubjectDetection subjectDetection = 5; // 主体识别
+    MemoryFormat memoryFormat = 6; // 内存或SD卡格式化
+    SmartVlog smartVlog = 7; // 智能Vlog
+  }
+}
+
+// 主体识别
+message SubjectDetection {
+    bool onOff = 1; //主体识别 true开 false关
+}
+
+// 远程拍照
+message TakePhoto {
+  //相机id
+  int32 cameraId = 1;
+  //定时拍摄时间，单位秒
+  int32 scheduledTime = 12;
+}
+
+// 录像控制
+message VideoRecord {
+  enum Mode {
+    START = 0;   // 开始录像
+    PAUSE  = 1;   // 暂停录像
+    STOP = 2;     // 停止录像
+  }
+  Mode mode = 1;        // 录像控制
+  int32 cameraId = 2;   // 相机 id（可选）
+}
+
+//相机状态上报
+message CameraStatusReport{
+  enum State {
+    UNKNOWN = 0;
+    SHOOTING = 1;          // 拍摄中
+    CANCEL = 2;            // 取消拍摄
+    COMPLETED = 3;         // 拍摄完成
+    ERROR = 4;             // 异常
+  }
+  State state = 1;
+  string err_code = 2; // 状态消息
+  string err_msg = 3;
+}
+
+// SD卡格式化
+message MemoryFormat {
+  enum MemoryType {
+    UNKNOWN = 0;
+    SDCARD = 1;          // SD卡
+    INNER_MEMORY = 2;    // 内置内存
+  }
+  MemoryType memoryType = 1;
+}
+
+// SD卡格式化
+message MemoryFormatReport
+{
+    enum State {
+        UNKNOWN = 0;
+        FORMAT_ING = 1;
+        FORMAT_DONE = 2;
+        FORMAT_ERROR = 3;
+    }
+    State state = 1; // 格式化状态
+    string err_code = 2; // 格式化错误码
+    string err_msg = 3;  // 格式化错误提示
+}
+
+// 智能Vlog控制
+message SmartVlog {
+  oneof action {
+    SmartVlogStart smartVlogStart = 1;  // 开始智能Vlog任务
+    SmartVlogStop smartVlogStop = 2;    // 停止智能Vlog任务
+    SmartVlogQuery smartVlogQuery = 3;  // 查询智能Vlog任务状态
+  }
+}
+
+// 开始智能Vlog任务
+message SmartVlogStart {
+  string taskUuid = 1;   // 智能Vlog任务UUID（云端生成）
+  int32 maxDuration = 2; // 最大运行时长，单位：分钟（15-180，步长5）
+}
+
+// 停止智能Vlog任务（仅拍摄阶段支持，剪辑阶段不支持）
+message SmartVlogStop {
+  string taskUuid = 1;   // 智能Vlog任务UUID
+}
+
+// 查询智能Vlog任务状态
+message SmartVlogQuery {
+  string taskUuid = 1;   // 智能Vlog任务UUID
+}
+
+// Vlog上报（整合智能Vlog状态与高光成片结果，用 type 标识区分）
+message VlogReport {
+  // 上报类型标识
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    SMART_VLOG_STATUS = 1;     // 智能Vlog状态上报
+    HIGHLIGHT_VLOG_RESULT = 2; // 高光成片结果上报
+  }
+  // 任务状态
+  enum State {
+    STATE_UNKNOWN = 0;
+    SHOOTING = 1;          // 拍摄中
+    SHOOT_COMPLETED = 2;   // 拍摄完成
+    EDITING = 3;           // 剪辑中
+    SUCCESS = 4;           // 成片成功
+    FAILURE = 5;           // 成片失败
+  }
+  Type type = 1;           // 上报类型标识
+  string taskUuid = 2;     // 智能Vlog任务UUID
+  State state = 3;         // 状态
+  int32 maxDuration = 4;   // 最大运行时长，单位：分钟
+  int32 elapsedTime = 5;   // 已运行时长，单位：秒
+  string vlogId = 6;       // 生成的Vlog成片ID（成片成功时返回）
+  string err_code = 7;     // 异常错误码
+  string err_msg = 8;      // 异常错误信息
+}

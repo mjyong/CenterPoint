@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package srcp;
+
+enum WiFiAPEncryption {
+    WIFI_AP_ENCRYPTION_DEFAULT = 0;    // 未加密
+    WIFI_AP_ENCRYPTION_NONE = 1;       // 未加密
+    WIFI_AP_ENCRYPTION_WPA2 = 2;       // WPA2
+    WIFI_AP_ENCRYPTION_WPA = 3;        // WPA
+    WIFI_AP_ENCRYPTION_WEP = 4;        // WEP
+    WIFI_AP_ENCRYPTION_WAPI_PSK = 5;   // WAPI PSK
+    WIFI_AP_ENCRYPTION_WAPI_CERT = 6;  // WAPI CERT
+}
+
+enum WiFiAPFrequency {
+    WIFI_AP_FREQUENCY_2G = 0;     // 2.4G
+    WIFI_AP_FREQUENCY_5G = 1;     // 5G
+    WIFI_AP_FREQUENCY_2G_5G = 2;  // 2.4G+5G
+}
+
+message WiFiAPRequest
+{
+    string name = 1;                  // WiFi-AP热点名称
+    string password = 2;              // WiFi-AP热点密码
+    WiFiAPEncryption encryption = 3;  // WiFi-AP加密方式[必须使用 WIFI_AP_ENCRYPTION_* 常量]
+    WiFiAPFrequency frequency = 4;    // WIFI频段[必须使用 WIFI_FREQUENCY_* 常量]
+    int32 capacity = 5;               // 容量(允许连接的最大设备数量)
+}
+
+message WiFiAPResponse
+{
+    int32 return_code = 1;  // 返回码，0-成功，1-失败
+}

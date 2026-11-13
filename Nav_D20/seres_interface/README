@@ -1,0 +1,18 @@
+# 共用接口仓库
+
+proto
+    protobuf相关协议
+ROS消息
+    在机器人项目会涉及到很多，为减少冲突，按团队接口分别进行维护，统一命名为xxx_interface。
+    xxx为软件架构中定义的各团队名称缩写。具体如下：
+
+    hmi_interface:      显示交互相关协议接口，显示交互团队输出&维护
+    voice_interface:    语音相关协议接口，语音团队输出&维护
+    mc_interface:       运控相关协议接口，运控团队输出&维护
+    nav_interface:      导航相关协议接口，导航团队输出&维护
+    robot_interface:    应用集成相关协议接口，应用集成团队输出&维护
+    sysapp_interface:   系统应用相关协议接口，系统应用团队输出&维护
+    rte_interface:      底软相关协议接口，底软团队输出&维护
+    tau_interface:      终端接入相关协议接口，终端接入团队输出&维护
+    iot_interface:      物联网协议接口，应用团队输出&维护
+    media_interface:    多媒体协议接口（音视频、相机、媒体），应用团队输出&维护

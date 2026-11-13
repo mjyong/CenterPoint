@@ -1,0 +1,1041 @@
+syntax = "proto3";
+
+package srcp.args;
+import "nav_operation.proto";
+
+/*
+* 一个指令参数对应一个技能
+* 技能名称规则为技能参数名称首字母小写
+* 例如：
+* SitDown对应技能sitDown技能名称
+* Stand对应技能stand技能名称
+* 其余类推      
+*/
+
+//运控指令参数，坐下，无具体参数，仅占位，表示支持坐下功能
+message SitDown {
+}
+
+//运控指令参数，站立，含各种姿态下的起立，
+//如：蹲姿起立、躺姿起立、坐姿起立等
+message Stand {
+}
+
+enum HandRes {
+    HAND_RES_DEFAULT = 0;   // 默认
+    HAND_RES_LEFT    = 1;   // 左手
+    HAND_RES_RIGHT   = 2;   // 右手
+    HAND_RES_BOTH    = 3;   // 双手
+}
+
+// 导航/跟随/前进距离 状态反馈
+enum NavState {
+    NAV_STA_TASK_EXEC_SUCCESS    = 0;         // 任务执行成功
+    NAV_STA_TASK_EXEC_FAILED     = 1;         // 任务执行失败
+    NAV_STA_TASK_EXEC_DOING      = 2;         // 任务执行中
+
+    NAV_STA_MAP_DOING            = 1001;       // 建图中
+    NAV_STA_MAP_LOAD_FAILED      = 1002;       // 地图加载失败
+
+    NAV_STA_NAVGATING            = 2001;       // 导航中
+    NAV_STA_EXPLORING            = 2002;       // 探索中 
+    NAV_STA_PLAN_DOING           = 2011;       // 路径规划中
+    NAV_STA_PLAN_DONE            = 2012;       // 路径规划完成
+    NAV_STA_PLAN_PATH_FAILED     = 2013;       // 路径规划失败
+    NAV_STA_MAP_UNMATCHED        = 2014;       // 导航下发的map_uuid不匹配
+
+    NAV_STA_OBSTACLE_WAY         = 3001;      // 路径遇障碍
+    NAV_STA_OBSTACLE_AVOIDING    = 3002;      // 避障中
+    NAV_STA_OBSTACLE_FAILED      = 3003;      // 绕障失败
+    NAV_STA_OBSTACLE_SUCCESS     = 3004;      // 绕障成功
+
+    NAV_STA_RELOCATION_FAILED    = 4001;      // 重定位失败
+
+    NAV_STA_FOLLOW_DOING         = 5001;      // 跟随中
+    NAV_STA_FOLLOW_OBJ_LOST      = 5002;      // 跟随目标丢失
+    NAV_STA_FOLLOW_OBJ_MISMATCH  = 5003;      // 跟随目标不匹配
+
+    NAV_STA_STAKE_NOT_FOUND      = 6001;      // 充电桩未找到
+    NAV_STA_STAKE_TO_FAILE       = 6002;      // 回桩失败
+}
+
+// 重复模式
+enum RepeatMode {
+    ONCE = 0;            // 只摇一次
+    PERIODIC = 1;        // 周期性, 需要调用者手动停止
+}
+
+//运控指令参数，调整移动速度
+message MoveLevel {
+    enum Level {
+        LOW_SPEED = 0; //低速
+        MIDDLE_SPEED = 1; //中速
+        HIGH_SPEED = 2; //高速
+    }
+    Level level = 1; //运控速度等级控制
+}
+
+//运控指令参数，行走
+message Move {
+    float vx = 1; //vx: 前后速度(正为前)
+    float vy = 2; //vy: 左右速度(正为左)
+    float vyaw = 3; //vyaw: 左右旋转速度(正为逆时针旋转)
+    float duration = 4; //持续移动时间，单位秒(目前仅R11涉及)
+}
+
+//运控指令参数，原地踏步;
+// 速度参数为0时表示原地踏步，不为0时表示踏步行走
+// duration大于0时表示执行duration秒后自动停止;为0时表示一直执行， 不主动停止
+message StepStill {
+    float vx = 1; //vx: 前后速度(正为前)
+    float vy = 2; //vy: 左右速度(正为左)
+    float vyaw = 3; //vyaw: 左右旋转速度(正为逆时针旋转)
+    float duration = 4; //持续移动时间，单位秒
+}
+
+//运控指令参数，停止移动，无具体参数，仅占位，表示支持该功能
+message StopMove {
+}
+
+//运控指令参数，蹲下，无具体参数，仅占位，表示支持该功能
+message Squat {
+}
+
+//运控指令参数，躺下，无具体参数，仅占startPosstartPos位，表示支持该功能
+message LieDown {
+}
+
+//运控指令参数，阻尼，无具体参数，仅占位，表示支持该功能
+message Damp {
+}
+
+//挥手，无具体参数，仅占位，表示支持该功能
+message Wave {
+  enum Hand {
+    HAND_DEFAULT = 0;   // 默认
+    LEFT_HAND    = 1;   // 左挥手
+    RIGHT_HAND   = 2;   // 右挥手
+    BOTH_HANDS   = 3;   // 双手挥手
+  }
+
+  Hand hand = 1;     // 挥手模式
+}
+
+//运控指令参数，关节失能，无具体参数，仅占位，表示支持该功能
+message JointDisable {
+}
+
+//运控指令参数，解除关节失能，无具体参数，仅占位，表示支持该功能
+message JointEnable {
+}
+
+//运控指令参数，僵停，无具体参数，仅占位，表示支持该功能
+message LockJoint {
+}
+
+//运控指令参数，解除僵停，无具体参数，仅占位，表示支持该功能
+message UnlockJoint {
+}
+
+//电源指令参数，关机，无具体参数，仅占位，表示支持该功能
+message PowerOff {
+}
+
+//语音指令参数，播放文本以及表情
+message PlayTTS {
+    string text = 1; //待播放的文本
+    string emo = 2; //播放时表情
+    int32 num_cycles = 3; //文本播放次数
+    int32 interval = 4; //任意两次播放中间等待时间
+    string intent =5;
+    bool interruptible = 6;
+    int32 mode = 7;
+}
+
+//音视频指令参数，监控机器人本体音视频
+message MonitorAVStream {
+    bool av_enabled          = 1; //true本体开始向云端推音视频流，false本体停止向云端推音视频流
+    repeated uint32 cameraId = 2; //表示摄像头id 摄像头编号，0为左路摄像头，1为右路摄像头,
+                                  //2为前路摄像头，3为后路摄像头，4为拼接环视视频，5为可见光视频，6为红外视频 (cameraId目前仅D10涉及)
+}
+
+//音视频指令参数，本体向云端推音视频流，云端向本体推音视频流
+message Call {
+    int32 audio_enabled = 1; //1-本体开始向云端推音频流，2-本体停止向云端推音频流
+    bool video_enabled = 2; //本体和云端双向推视频流
+    int32 audio_enabled_down = 3; //1-云端向本体推音频流，2-云端停止向本体推音频流
+}
+
+//导航指令参数，建图
+message Mapping
+{
+    enum Mode {
+        START   = 0; //开始建图
+        STOP    = 1; //结束建图
+        PAUSE   = 2; //暂停建图
+        RECOVER = 3; //恢复建图
+        CANCEL = 4; //取消建图
+    }
+
+    enum ExploreMode {
+      EXPLORE_MODE_MAPPING = 0; //建图模式
+      EXPLORE_MODE_WANDER = 1;  //漫游
+    }
+    Mode mode       = 1; //建图方式
+    string map_name = 2; //地图名称，创建地图时必须
+    string map_uuid = 3; // 建图的uuid,新建时为空
+
+    //探索时才需要以下数据，普通建图不需要
+    ExploreMode explore_mode = 4; 
+    string object_name = 5; //在EXPLORE_MODE_WANDER中寻物目标，非空有效,参考https://sai-seres.feishu.cn/wiki/ONdUw04Lki0eVykh351cCdJVnzh
+    int32 distance = 6; //探索半径，单位cm，非0有效
+};
+
+message EulerAngles {
+    float roll = 1;
+    float pitch = 2;
+    float yaw = 3;
+}
+
+message Quaternion {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+    float w = 4;
+}
+
+// 坐标系头部信息，类似 ROS2 std_msgs/Header
+message FrameHeader {
+    int64 sec = 1;              // 秒
+    int32 nanosec = 2;            // 纳秒
+    string frame_id = 3;         // 
+}
+
+message PointOrientation {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+    FrameHeader header = 4;   // header为相对于第一个点时间，0无效
+    
+    oneof orientation {
+        EulerAngles euler = 5;     // 欧拉角表示
+        Quaternion quat = 6;       // 四元数表示
+    }
+}
+
+enum AvoidObstacles {
+  OBSTACLE_AVOID = 0;  // 绕障 - 主动避让障碍物
+  OBSTACLE_STOP  = 1;  // 停障 - 遇到障碍物停止
+}
+
+//导航指令参数，导航
+message Navigate
+{
+    enum Mode {
+        POINT   = 0;         //点导航
+        PATH    = 1;         //路径导航
+        TRACK   = 2;         // 跟踪导航（参数传入trackId）
+        TARGET  = 3;         // 目标物导航(参数传入trackId， 导航到目标物体前， 导航结束)
+        UVD     = 4;         // 视距导航
+    }
+
+    enum Control {
+        START   = 0;         //开始导航
+        STOP    = 1;         //结束导航
+    }
+
+    message Point {
+        float x = 1;         // 坐标X
+        float y = 2;         // 坐标Y
+        float z = 3;         // 坐标Z
+
+        // 这三个参数可以通过tf2::Quaternion转换为geometry_msgs/msg/Quaternion
+        float roll  = 4;     // 旋转角度 - 横滚
+        float pitch = 5;     // 旋转角度 - 俯仰
+        float yaw   = 6;     // 旋转角度 - 航向
+
+    }
+
+    Control ctrl        = 1;    //导航控制, robot_service 这个字段废弃不再使用;
+    string map_name     = 2;    //地图名称
+    Mode nav_mode       = 3;    //导航模式
+    repeated Point point = 4;   //目标点或者路径
+    string track_id     = 5;    // 追踪ID, Mode为TRACK时必传
+    string map_uuid     = 6;
+
+    double max_speed    = 7; //导航的最大速度，单位m/s, 值为0时robot_service默认设置为1m/s
+    AvoidObstacles avoid_obstacles = 8; // 避障策略
+    repeated PointOrientation point_orientation = 9; // 点位坐标, 优先识别point_orientation，如果数据是空，再去识别point(兼容旧接口)
+    float speed = 10; //指定导航速度，0：无效；有效时，忽略PoseStamped中时间限定
+    float obstacles_fail_timeout = 11;      // 停障失败时，自动取消任务的超时时间：单位是秒数, 不设置时默认是15分钟
+}
+
+//灵巧抓取指令，抓取目标
+// start_pos: 从哪儿抓取
+// good: 抓取的物品
+// action: 动作，deliver
+// 
+message Grab {
+    string start_pos = 1;
+    string end_pos = 2;
+    string good = 3;
+    string action = 4;
+}
+
+// 远程拍照(目前仅D10涉及)
+message TakePhoto
+{
+  int32 cameraId = 1; //相机id
+  int32 scheduledTime = 2; //定时拍摄时间，单位秒
+}
+
+// 云台控制(目前仅D10涉及)
+message PanTiltAngle
+{
+  uint32 angle = 1;   // 1: 表示水平左移，2：表示水平右移，3：表示俯仰上移， 4：表示俯仰下移; 0表示全部复位
+  float speed = 2;  //速度，传值0到1
+}
+
+// 云台控制 云台相机(目前仅D10涉及)
+message VisibleLightFocalLength
+{
+  uint32 focusMode = 1;    // focusMode: 可见光聚焦模式1， 自动聚焦， 2 手动聚焦
+  uint32 focal = 2;        // focal: 1:放大，2：缩小
+  int32 cameraId = 3;      // cameraId: 相机id 摄像头编号，5为可见光视频，6为红外视频
+}
+
+// 步态切换命令
+message GaitCtrl
+{
+    // 步态类型枚举
+    enum GaitType {
+        GAIT_UNKNOWN        = 0;    // 默认
+        GAIT_WALK           = 1;    // 行走
+        GAIT_RUNNING        = 2;    // 跑步
+        GAIT_STAIR_ASCEND   = 3;    // 上楼梯
+        GAIT_STAIR_DESCEND  = 4;    // 下楼梯
+    }
+
+    GaitType gaitType       = 1;     // 步态类型
+}
+
+//LED灯控制
+message LightCtrl
+{
+  enum BrightnessLevel {
+    LOW     = 0; // 低
+    MEDIUM  = 1; // 中
+    HIGH    = 2; // 高
+  }
+
+  enum LightCtrlState {
+    LIGHT_OFF     = 0; // 关闭
+    LIGHT_ON      = 1; // 开启
+  }
+
+  enum LightType {
+    LIGHT_MAIN      = 0; // 主照明灯（D30，R11等）
+    LIGHT_FRONT     = 1; // 前补光灯（D20）
+    LIGHT_REAR      = 2; // 后补光灯（D20）
+  }
+
+  enum LightMode {
+    LIGHT_MODE_MANUAL = 0; // 手动模式
+    LIGHT_MODE_AUTO   = 1; // 自动模式
+  }
+
+  BrightnessLevel level = 1; // 灯亮度等级
+  LightCtrlState state = 2; // 是否开启
+  LightType light_type = 3; // 灯类型，默认主照明灯（兼容旧版本）
+  LightMode light_mode = 4; // 灯模式，默认手动（兼容旧版本）
+}
+
+
+//巡逻任务(目前仅D10涉及)
+message PatrolMissions
+{
+  string mapUuid = 1; //地图uuid
+}
+
+// 重定位
+message Relocation {
+    message Pose {
+        float x = 1; // 坐标x
+        float y = 2; // 坐标y
+        float z = 3; // 坐标z
+
+        float roll  = 4; // 旋转角度
+        float pitch = 5; // 旋转角度
+        float yaw   = 6; // 旋转角度
+    }
+
+  string map_uuid = 1; // 地图id
+  Pose pose       = 2; // 位姿 0:默认无效
+  string map_name = 3;
+}
+
+//握手，无具体参数，仅占位，表示支持该功能
+message Handshake {
+  HandRes hand = 1;       // 使用哪只手; 有的算法不支持传左手右手编号, 有的则需要传; 不传时默认使用右手
+}
+
+//讲解动作，无具体参数，仅占位，表示支持该功能
+message ExplainAction {
+}
+
+// 接待任务执行该点位的所有流程（动作 + 语料）
+message ReceiveJobPointAction {
+  string receiveJobUuid = 1;//接待任务UUID
+  string pointUuid = 2;  //点位UUID
+  string receiveJobTemplateUuid = 3;  //点位UUID
+  int32 actionIndex = 4; //任务序号
+}
+
+//接待任务导航下发
+message ReceiveJobNavigation
+{
+  string receiveJobUuid = 1;//接待任务UUID
+  string pointUuid = 2;  //点位UUID
+  string receiveJobTemplateUuid = 3;  //点位UUID
+}
+
+//复位，无具体参数，仅占位，表示支持该功能
+message Reset {
+}
+
+//表情切换
+message DisplayEmoji {
+  // 枚举定义在消息内部
+  enum EmojiType {
+    EMOJI_UNKNOWN              = 0; 
+    BROADCAST_STATE            = 1;
+    LISTENING_STATE            = 2;
+    IDLE_STATE                 = 3;
+    WORKING_STATE              = 4;
+    YELLOW_ANIMATION           = 5;
+    RED_ANIMATION              = 6;
+    CHARGING_CONNECTED_ONGOING = 7;
+    CHARGING_COMPLETED         = 8;
+    CHARGER_DISCONNECTED       = 9;
+    STARTUP_ANIMATION          = 10;
+    SHUTDOWN_ANIMATION         = 11;
+  }
+  
+  EmojiType emojiType = 1;  // 使用内部定义的枚举
+}
+
+//接待任务语料下发
+message ReceiveJobCorpus
+{
+  string receiveJobUuid = 1;//接待任务UUID
+  string corpusUuid = 2;//语料UUID
+  string corpusContent = 3;//临时语料
+  string receiveJobTemplateUuid = 4;//模版uuid
+}
+
+//开始迎宾对象
+message ReceiveJobStart
+{
+   string receiveJobUuid = 1;//接待任务UUID
+   string module = 2;//接待任务模版配置文件路径: emoji-表情文件;nav-接待任务模版配置文件
+   string fileName = 3;//接待任务文件名称
+   string receiveJobTemplateUuid = 4;//模版uuid
+   string jobType = 5;//任务模板类型:AUTO-自动导航;MANUAL-手动导航
+}
+
+//迎宾
+message GreetGuest {
+}
+
+//送宾
+message SendGuest {
+}
+
+//唤醒
+message Wakeup {
+}
+
+//休眠
+message SleepMode {
+}
+
+//点头
+message Nod {
+}
+
+//摇头
+message ShakeHead {
+  enum ShakeHeadMode {
+    BASIC = 0;                  // 基础的摇头动作
+    SLOW = 1;                   // 缓摇头
+    FAST = 2;                   // 快速（强）摇头
+  }
+  RepeatMode action_mode = 1;   // 动作模式，是只执行一次， 还是循环执行;
+  float interval_time = 2;      // 周期执行时，两次执行的间隔时间，单位是秒
+  ShakeHeadMode mode = 3;       // 摇头的类型
+}
+
+//摆头
+message TurnHead {
+  enum TurnHeadMode {
+    NONE       = 0;       // 默认值, 算法会任意选一种模式进行摆头
+    LEFT_RIGHT = 1;       // （机器人向左/右转动头部xxx度）
+    UP_DOWN    = 2;       // （机器人向上/下转动头部xxx度）
+  }
+
+  TurnHeadMode mode = 1;
+  float degree      = 2;  // 转动角度, 正值为左/上，负值为右/下，没有具体角度可以传-1或1 ，也可以不传, 不传时每个算法会按一个默认方向和角度进行转动
+}
+
+//竖大拇指
+message ThumbsUp {
+  HandRes hand = 1; // 左手或右手
+}
+
+//比耶
+message VictorySign {
+  HandRes hand = 1; // 左手或右手
+}
+
+//比心
+message HeartGesture {
+  HandRes hand = 1; // 左手或右手
+}
+
+//抱拳
+message FistSalute {
+}
+
+//回充
+message Recharging {
+  enum TaskMode{
+    TASK_POINT_TO_STAKE = 0;     // 点位回桩，桩前配置点位
+    TASK_POINT_BACK_STAKE = 1;   // 点位退桩，退到指定点位
+    TASK_EXPLORE_TO_STAKE = 2;   // 从当前点位探索回桩
+    TASK_EXPLORE_BACK_STAKE = 3; // 自动探索退桩
+  }
+  TaskMode mode = 1;
+  Pose pose = 2;
+  bool tostake_when_idle = 3;   // 是否仅在空闲时回桩，默认 false（强制回桩）; 仅在回桩时会读取这个字段
+}
+
+//跳舞
+message Dance {
+  int32 dance_id = 1;
+}
+
+message ExplainLeftUpper {
+}
+
+message ExplainRightUpper {
+}
+
+message ExplainLeftLower {
+}
+
+message ExplainRightLower {
+}
+
+message ExplainLeftCenter {
+}
+
+message ExplainRightCenter {
+}
+
+message InspectionTask {
+}
+
+message GenericSceneStart {
+  string genericSceneTaskUuid = 1;//此次节目表演任务UUID
+  string genericSceneUuid = 2; //节目UUID
+  string module = 3;//剧本文件夹
+  string fileName = 4;//文件名称
+  string startTime = 5; //毫秒时间戳
+}
+
+// 左中右手势
+message ExplainXGesture {
+}
+
+// 上中下手势
+message ExplainYGesture {
+}
+
+// 前伸手势
+message ExplainFrontGesture {
+}
+
+// 摊手（无奈 / 展示）
+message Shrug {
+}
+
+// 抬手
+message RaiseHand {
+}
+
+// 恭喜
+message Celebrate {
+}
+
+// 举麦
+message RaiseMicrophone {
+}
+
+//拿起话筒
+message GrabMicrophone {
+}
+
+//放下话筒
+message  PutDownMicrophone {
+}
+
+//松开话筒
+message ReleaseMicrophone{
+}
+
+//生命态
+message LifePosture {
+}
+
+//多模态
+message MultiModal {
+}
+
+//握盘子
+message HoldPlate {
+}
+
+//抬盘子
+message RaisePlate{
+}
+
+//手势舞
+message FingerDance{
+}
+
+//左手挥手
+message LeftWave{
+} 
+
+//D系列负重行走
+message WalkWithLoad {
+}
+
+//R系列独立运控模式
+message ImcMode {
+}
+
+//R系列平衡站立
+message BalanceStand {
+}
+
+//抬左臂
+message LiftLeftArm {
+}
+
+//抬右臂
+message LiftRightArm {  
+}
+
+//抬双手
+message LiftDualArm {
+}
+
+//讲解点头
+message SpeechNod {
+}
+
+//右大拇指
+message RightThumbUp {
+}
+
+//666
+message ThreeSix {
+  HandRes hand = 1;
+}
+
+//自我介绍
+message IntroduceSelf {
+}
+
+//登场
+message Appearance { 
+}
+
+//
+message Announce {  
+}
+
+//拥抱
+message Hug {
+}
+
+//行走
+message Walk {
+}
+
+//跑
+message Run {
+}
+
+//倒地恢复
+message Getup {
+}
+
+//跳
+message Jump {
+}
+
+//趴姿
+message GetDown {
+}
+
+//倒立
+message Handstand {
+}
+
+//直立
+message Upright {
+}
+
+//碰拳
+message FistBump {
+}
+
+//猜拳
+message GuessBump {
+  enum ActionMode {
+    NONE = 0;
+    STONE = 1;      // 五指握拳，手背朝外，拳心朝内
+    SCISSORS = 2;   // 食指和中指伸出呈V字，其余手指握拳，手心朝外
+    CLOTH = 3;      // 从当前点位五指并拢伸直，掌心朝下，手指自然张开探索回桩
+  }
+  ActionMode mode = 1;  //类型
+}
+
+//腰部转动
+message WaistRotation {
+  enum WaistRotationMode {
+    NONE       = 0;       // 默认值, 算法会任意选一种模式进行腰部转动
+    LEFT_RIGHT = 1;       // （机器人向左/右转动腰部xxx度）
+    UP_DOWN    = 2;       // （机器人向上/下转动腰部xxx度）
+  }
+
+  WaistRotationMode mode = 1;
+  float degree            = 2;  // 转动角度, 正值为左/上，负值为右/下，没有具体角度可以传-1或1 ，也可以不传, 不传时每个算法会按一个默认方向和角度进行转动
+}
+
+//急停
+message EmergencyStop {
+}
+
+//重启
+message Restart {
+}
+
+//暂停
+message Pause {
+}
+
+message Guide {
+  enum Hand {
+    LEFT_HAND    = 0;   // 左手
+    RIGHT_HAND   = 1;   // 右手
+  }
+  Hand hand = 1;
+}
+
+// R11/R11-W
+/*
+    双手摊开讲解上	openExplainUp	   											openExplain dir=0
+    双手摊开讲解下	openExplainLow	 										  openExplain	dir=1
+    双手摊开讲解上（静态）	openExplainUpStatic			        openExplain	dir=2
+    双手摊开讲解下（静态）	openExplainLowStatic 		        openExplain	dir=3
+    左介绍/左引导	introduceLeft												    openExplain	dir=4
+    右介绍/右引导	introduceRight	    										openExplain	dir=5
+    左中讲解	explainLeftMed														 openExplain	dir=6
+    右中讲解	explainRightMed														 openExplain	dir=7
+    左中右动态讲解（右手）	explainLeftMidRight				     openExplain	dir=8
+    上中下动态讲解（右手）	explainUpMidLowRight		       openExplain	dir=9
+    五分钟长时间讲解-左手起步	explainGestureLeft		       openExplain	dir=10
+    五分钟长时间讲解-右手起步	explainGestureRight		       openExplain	dir=11
+*/
+message OpenExplain {
+  enum Direcation {
+    HIGH = 0; //开放上讲解
+    LOW = 1;  //开放下讲解
+  }
+  Direcation dir = 1;
+}
+
+/*
+      长时间介绍-50秒（双手-右手起步）	long_present   mode=3
+    长时间介绍-60秒	long_present60        mode=2   
+    长时间介绍-30秒（双手-右手起步）	long_present30  mode=1
+*/
+message LongPresent {
+  enum Mode {
+    DURATION_TWENTY = 0; //20s
+    DURATION_THIRTY = 1; //30s long_present30
+    DURATION_60S = 2;    // 长时间介绍-60秒	long_present60
+    DURATION_50S = 3;    // 长时间介绍-50秒（双手-右手起步）long_present
+  }
+  Mode mode = 1;
+}
+
+message StaticGesture {
+  enum StaticMode {
+    STATIC_GOOD = 0;
+    STATIC_666 = 1; 
+  }
+  StaticMode mode = 1;
+}
+
+message ExceptionTTS{
+  string code = 1;
+}
+
+message TaskAction{
+  string taskTemplateUuid = 1; //任务模版UUID
+  string mapLineUuid = 2; //路线UUID
+  string module = 3; //任务模版配置文件路径
+  string fileName = 4; //任务文件名称
+}
+
+// 鼓掌
+message Handclap {
+
+}
+
+// 前倾后仰
+message BodyTilt {
+  float direction = 1; //-1~1 前正后负
+}
+
+//解除急停
+message CancelEmergencyStop{
+}
+//解除暂停
+message CancelPause{
+}
+
+//初始姿态
+message InitialPose{
+}
+
+message SwitchMap{
+  string map_uuid = 1;
+}
+
+//坐姿作揖
+message SitBow {
+}
+
+//小踏步
+message SmallStep {
+}
+
+//四腿打直
+message StraightLegs {
+}
+
+//快速前倾
+message FastLeanForward {
+}
+
+//前倾摆动
+message LeanForwardSwing {
+}
+
+//伸懒腰
+message StretchLazily {
+}
+
+// 荣誉墙手势
+message HonorWallGesture {
+}
+
+// 录像控制
+message VideoRecord {
+    enum Mode {
+        START = 0;   // 开始录像
+        PAUSE = 1;   // 暂停录像
+        STOP = 2;     // 停止录像
+    }
+    Mode mode = 1;        // 录像控制
+    int32 cameraId = 2;   // 相机 id（可选）
+}
+
+message NavStateReport {
+    NavState nav_state = 1;     // 状态
+    string trigger_alias = 2;   // 触发端别名
+    Navigate nav_args = 3;      // 导航请求参数
+    string uuid = 4;            // 任务ID
+}
+
+//音量大小调节
+message AudioAdjust {
+  enum Mode {
+    MODE_UPDATE = 0; //更新
+    MODE_QUERY = 1; //查询
+  }
+  Mode mode = 1; //模式: 0-更新,1-查询
+  int32 size = 2; //音量大小
+}
+
+// 放左手
+message LowerLeftArm {
+}
+
+// 放右手
+message LowerRightArm {
+}
+
+// 一键展开
+message OneKeyExpand {
+}
+
+// 一键折叠
+message OneKeyFold {
+}
+
+// 拿取
+message PickUp {
+}
+
+// 放置
+message PlaceDown {
+}
+
+// 靠近
+message Approach {
+}
+
+// 前推
+message PushForward {
+}
+
+// 后拉
+message PullBack {
+}
+
+// 搬运
+message Carry {
+}
+
+// 腰部左转
+message WaistTurnLeft {
+}
+
+// 腰部右转
+message WaistTurnRight {
+}
+
+// 腰部上升
+message WaistRise {
+}
+
+// 腰部下降
+message WaistLower {
+}
+
+//开始工作
+message StartWork {
+}
+
+//结束工作
+message EndWork {
+}
+
+// 点位标记
+// 存在的场景: 在建图时语音可能会标记点位名; 
+// 只反馈标记成功或失败，对应的点位数据是直接报给云端
+message PoiMark {
+  string mark_name = 1;    // 标记的点位名，可以为空
+  string map_uuid = 2;     // 标记点位时传入的地图uuid, 可以为空（云端会下发有效值，其他模块下发空）
+}
+
+message TeleopMode {
+  
+}
+
+// # 运控姿态控制
+message MotionControl {
+    enum MotionSkill{
+        MOTION_POSE_UNKNOWN = 0;
+        MOTION_BODY_POSE            = 106;   // 躯干位姿控制：torso_yaw(关节3)和hip_pitch(关节2)步进运动，para=[torso_yaw, hip_pitch, duration?]
+        MOTION_EULER_BODY           = 107;   // 身体Euler控制（按速度到指定角度，执行loop次相对于0点的来回摆动），7个参数：roll,pitch,yaw，vr,vp,vy， loop；单位：rpy：rad， vrpy：rad/s
+        MOTION_JOINTS_TARGET_POSE   = 108;   // 关节目标姿态位置控制；para[]关节目标位置参数，详见具体设备关节id定义
+        MOTION_HEAD_POSE            = 3000;  // 头部姿态控制(按频率实时控制)，控制频率20Hz；3个参数：vroll,vpitch,vyaw；单位：vrpy:rad/s
+        MOTION_EULER_HEAD           = 3001;  // 头部Euler控制（按速度到指定角度，执行loop次相对于0点的来回摆动），7个参数：roll,pitch,yaw，vr,vp,vy， loop；单位：rpy：rad， vrpy：rad/s
+    }
+    float duration = 1;
+    MotionSkill motion_skill = 2;
+    repeated float para = 3;
+}
+
+message ScratchHead {}
+
+message CrawlForward {}
+
+message RubHand {}
+
+message RaiseRightBackLeg {}
+
+message ChestOut {}
+
+message BounceBackward {}
+
+message BounceInPlace {}
+
+message BounceForward {}
+
+// 注意和SwingBody区分，SwingBody是下发速度控制roll yaw pitch三个轴的摆动
+// swayBody是固定的一个动作
+message SwayBody {}
+
+// ProudNod:昂首点头, 会用到身体; Nod，单纯的点头动作
+message ProudNod {}
+
+// LIFE_CRAWL 匍匐待机生命态
+message LifeCrawl {}
+
+// LIFE_SIT   坐姿待机生命态
+message LifeSit {}
+
+// LIFE_STAND 站立待机生命态
+message LifeStand {}
+
+// RISE FALL SLIGHTLY
+message RiseFallSlightly {
+  int32 type = 1; // 身体微起伏;para[0]:1:站姿起伏;2:坐姿起伏
+}
+
+// 开机动作
+message StartupAction {}
+// 关机动作
+message ShutdownAction {}
+
+// 手势舞蹈
+message GestureDance {}
+
+// 摆动手臂
+message LiftArm {}
+// 自动探索漫游
+message Explore {
+  string object_name = 1;
+  uint32 distance = 2;
+}
+
+//停止充电
+message StopCharging {
+}
+
+//音色风格查询
+message VoiceStyleQuery {
+}
+
+//音色风格查询响应
+message VoiceStyleQueryResult {
+  repeated string voice_list = 1; //音色JSON字符串  {"voice":"xiaoyuan","name":"汉语-普通话-成年女声"}
+}

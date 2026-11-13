@@ -1,0 +1,86 @@
+# DeviceUpgrade.action - 设备固件升级接口
+# ============================================
+# Goal definition - 升级请求
+# ============================================
+DeviceUpgradeRequest[] upgrade_requests
+
+# DeviceUpgradeRequest 结构说明：
+#   device_type:     设备类型枚举（uint16）
+#   DEV_CAMERA = 0X0101         // 相机
+#   DEV_GIMBAL = 0X0102         // 云台
+#   DEV_LIDAR = 0X0103          // 激光雷达
+#   DEV_SENSOR = 0X0104         // 传感器(含足端、光、触觉、接近觉、六维力等)
+#   DEV_IMU =  0X0105           // 惯性测量单元
+#   DEV_MOTOR = 0X0106          // 驱动电机
+#   DEV_FAN = 0X0107            // 风扇
+#   DEV_BAT = 0X0108            // 电池
+#   DEV_5G = 0X0109             // 5G
+#   DEV_BT_WLAN = 0X010A        // 无线局域网
+#   DEV_BT = 0X010B             // 蓝牙
+#   DEV_GNSS = 0X010C           // 全球导航卫星系统
+#   DEV_ETHERNET = 0X010D       // 以太网
+#   DEV_UWB = 0X010E            // UWB
+#   DEV_EAR_MOTOR = 0X010F      // 电动耳朵
+#   DEV_SSD = 0x0110            // 固态硬盘(SD)
+#   DEV_SPEAKER = 0x0111        // 扬声器
+#   DEV_LED = 0X0112            // 灯控（状态灯/照明灯/氛围灯）
+#   DEV_CHARGE = 0x0113         // 充电设备
+#   DEV_CONTROLLER = 0x0307     //控制器(CCU-SOC/CCU-MCU/PMU/TAM-SOC/TMU-MCU)
+#   DEV_CCU_BOARD = 0x0201  // CCU板电压采集
+#   DEV_TMU_BOARD = 0X0202  // TMU板电压采集
+#   DEV_PMU_BOARD = 0X0203  // PMU板电压采集
+#   device_id:       设备唯一标识符（uint8）
+#
+#   upgrade_mode:    升级模式（uint8）
+#                    - 0 (UPGRADE_MODE_OTA):    OTA自升级模式
+#                    - 1 (UPGRADE_MODE_AGENT):  底软辅助升级模式
+#
+#   firmware_path:   固件文件绝对路径（string，含文件名）
+#
+#   target_version:  目标版本号（string，可选）
+#
+#   force_upgrade:   是否强制升级（bool，默认false）
+#                    - false: 如果当前版本 >= 目标版本，则跳过
+#                    - true:  忽略版本检查，强制执行升级
+
+---
+# ============================================
+# Result definition - 执行结果
+# ============================================
+DeviceUpgradeResult[] results
+
+# DeviceUpgradeResult 完整消息结构：
+#   device_type:      uint16   设备类型（与Goal一致）
+#   device_id:        string  设备ID（与Goal一致）
+#   result_code:      uint8   结果代码（见下方枚举）
+#   message:          string  详细信息（错误原因、成功描述等）
+#   current_version:  string  升级后的实际版本号（代理升级时填写）
+#   reboot_required:  bool    是否需要重启设备才能生效
+
+# result_code 结果代码枚举：
+#   - 0  (UPGRADE_SUCCESS):         升级成功 / 资源释放成功（OTA模式）
+#   - 1  (UPGRADE_FAILED):           升级失败（通用错误）
+#   - 2  (UPGRADE_TIMEOUT):          升级超时
+#   - 3  (UPGRADE_CANCELLED):        用户取消
+#   - 4  (UPGRADE_VERSION_MISMATCH): 版本不匹配（当前版本已 >= 目标版本）
+#   - 5  (UPGRADE_FILE_NOT_FOUND):   固件文件不存在
+#   - 6  (UPGRADE_FILE_CORRUPTED):   固件文件损坏（校验失败）
+#   - 7  (UPGRADE_DEVICE_BUSY):      设备忙（正在运行关键任务，无法停止）
+#   - 8  (UPGRADE_PERMISSION_DENIED): 权限不足（无法读取固件文件）
+#   - 9  (UPGRADE_UNSUPPORTED_MODE): 不支持的升级模式（该设备不支持此模式）
+#   - 10 (UPGRADE_DEVICE_NOT_FOUND): 设备未找到（device_id 不存在）
+#   - 11 (UPGRADE_WRITE_ERROR):      写入失败（通信错误、设备无响应）
+#   - 12 (UPGRADE_VERIFY_ERROR):     验证失败（固件校验和不匹配）
+# current_version 字段说明： 升级后的实际版本号
+
+# reboot_required 字段说明：
+#   - true:  固件已写入但需重启设备才能生效
+#   - false: 升级立即生效
+
+---
+# ============================================
+# Feedback definition - 进度反馈 - 暂不使用
+# ============================================
+# DeviceUpgradeFeedback[] feedbacks
+
+

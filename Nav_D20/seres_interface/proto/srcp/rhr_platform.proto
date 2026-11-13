@@ -1,0 +1,745 @@
+syntax = "proto3";
+
+package srcp;
+
+import "google/protobuf/wrappers.proto";
+
+
+// 告警
+message RobotAlarmInfo
+{
+  enum AlarmState {
+    ALARM_STATE_UNKNOWN = 0; // 未知
+    ALARM_STATE_ON      = 1; // 产生
+    ALARM_STATE_OFF     = 2; // 消除
+  }
+
+  enum AlarmLevel {
+    ALARM_LEVEL_UNKNOWN = 0; // 未知
+    ALARM_LEVEL_GENERAL = 1; // 一般
+    ALARM_LEVEL_SERIOUS = 2; // 严重
+    ALARM_LEVEL_URGENT  = 3; // 紧急
+  }
+
+  uint32 id        = 1; // 告警id 详见健康管理问卷调查表
+  uint64 time      = 2; // 告警状态变化系统时间
+  AlarmState state = 3; // 告警状态
+  AlarmLevel level = 4; // 告警等级
+  string name      = 5; // 告警名
+  string comment   = 6; // 告警描述
+  string system    = 7; // 告警所在系统（通知对象类型）
+  string subsystem = 8; // 告警所在子系统（通知对象）
+  string uuid      = 9; // 告警唯一标识符 用于告警发生后关联数据采集
+}
+
+// 事件
+message RobotEventInfo
+{
+  enum EventState {
+    EVENT_STATE_UNKNOWN = 0; // 未知
+    EVENT_STATE_ON      = 1; // 产生
+    EVENT_STATE_OFF     = 2; // 消除
+  }
+
+  enum EventLevel {
+    EVENT_LEVEL_UNKNOWN = 0; // 未知
+    EVENT_LEVEL_GENERAL = 1; // 一般
+    EVENT_LEVEL_SERIOUS = 2; // 严重
+    EVENT_LEVEL_URGENT  = 3; // 紧急
+  }
+
+  uint32 id        = 1; // 事件id 详见健康管理问卷调查表
+  uint64 time      = 2; // 事件发生系统时间
+  EventState state = 3; // 事件状态(默认EVENT_STATE_ON)
+  EventLevel level = 4; // 事件等级
+  string name      = 5; // 事件名
+  string comment   = 6; // 事件描述
+  string system    = 7; // 事件所在系统（通知对象类型）
+  string subsystem = 8; // 事件所在子系统（通知对象）
+  string uuid      = 9; // 事件唯一标识符 用于事件发生后关联数据采集
+}
+
+
+// 状态
+message RobotStateInfo
+{
+  // 电池状态
+  message BmsInfo
+  {
+    message BmsPackInfo {
+      message BmsProtectStatus {
+        google.protobuf.BoolValue single_high_volt_protect        = 1;  // 单体高压保护
+        google.protobuf.BoolValue single_low_volt_protect         = 2;  // 单体低压保护
+        google.protobuf.BoolValue charge_low_volt_protect         = 3;  // 低压禁充保护
+        google.protobuf.BoolValue charge_high_curr_protect        = 4;  // 充电电流过大保护
+        google.protobuf.BoolValue discharge_high_curr_lv1_protect = 5;  // 放电电流过大1级保护
+        google.protobuf.BoolValue discharge_high_curr_lv2_protect = 6;  // 放电电流过大2级保护
+        google.protobuf.BoolValue discharge_high_curr_lv3_protect = 7;  // 放电电流过大3级保护
+        google.protobuf.BoolValue discharge_high_curr_lv4_protect = 8;  // 放电电流过大4级保护
+        google.protobuf.BoolValue shortcircuit_protect            = 9;  // 短路保护
+        google.protobuf.BoolValue charge_high_temp_protect        = 10; // 充电高温保护
+        google.protobuf.BoolValue charge_low_temp_protect         = 11; // 充电低温保护
+        google.protobuf.BoolValue discharge_high_temp_protect     = 12; // 放电高温保护
+        google.protobuf.BoolValue cell_high_temp_protect          = 13; // 电芯高温保护
+        google.protobuf.BoolValue discharge_low_temp_protect      = 14; // 放电低温保护
+        google.protobuf.BoolValue charge_mos_high_temp_protect    = 15; // 充电MOS高温保护
+        google.protobuf.BoolValue discharge_mos_high_temp_protect = 16; // 放电MOS高温保护
+        google.protobuf.BoolValue pre_discharge_high_temp_protect = 17; // 预放电高温保护
+        google.protobuf.BoolValue volt_diff_protect               = 18; // 压差大保护
+        google.protobuf.BoolValue temp_diff_protect               = 19; // 温差大保护
+        google.protobuf.BoolValue charge_fully_protect            = 20; // 充满保护
+        google.protobuf.BoolValue pack_high_volt_protect          = 21; // 整体高压保护
+        google.protobuf.BoolValue pack_low_volt_protect           = 22; // 整体低压保护
+        google.protobuf.BoolValue mos_lock_protect                = 23; // 软件锁定MOS保护
+        google.protobuf.BoolValue afe_err_protect                 = 24; // AFE通信异常保护
+        google.protobuf.BoolValue charge_mos_fail                 = 25; // 充电MOS失效
+        google.protobuf.BoolValue discharge_mos_fail              = 26; // 放电MOS失效
+        google.protobuf.BoolValue charge_mos_drive_fail           = 27; // 充电MOS驱动故障
+        google.protobuf.BoolValue discharge_mos_drive_fail        = 28; // 放电MOS驱动故障
+        google.protobuf.BoolValue pre_discharge_fail              = 29; // 预放电失败
+        google.protobuf.BoolValue usr_charge_mos_drive_fail       = 30; // 用户层充电MOS驱动故障
+        google.protobuf.BoolValue batt_broken                     = 31; // 电池损坏
+      }
+
+      google.protobuf.UInt32Value state_id                          = 1;  // 状态id 详见健康管理问卷调查表
+      google.protobuf.StringValue id                                = 2;  // 电池包唯一序列号 [serial_number 电池序列号]
+      google.protobuf.FloatValue bms_v_pack_bmu                     = 3;  // 电池包总电压，单位V [total_voltage 总电压，单位10 mV] // 电池电压(V) D20 
+      google.protobuf.FloatValue bms_i_pack                         = 4;  // 电池电流，正值表示放电，负值表示充电，单位A[current 电流，单位10 mA，充电为负，放电为正] //电池电流(A) D20
+      google.protobuf.FloatValue bms_orsoc                          = 5;  // 电池真实剩余电量百分比 [orsoc 原始电量百分比，单位 0.1%] // 电池电量(%) D20
+      google.protobuf.FloatValue bms_soc                            = 6;  // 电池换算剩余电量百分比 [rsoc 保留电量百分比，单位 0.1%]
+      google.protobuf.FloatValue current_capacity                   = 7;  // 电池当前容量，单位Ah [remaining_capacity 剩余容量，单位10 mAh]
+      google.protobuf.FloatValue rated_capacity                     = 8;  // 电池额定容量，单位Ah [nominal_capacity 标称容量，单位10 mAh]
+      google.protobuf.Int32Value bms_cycle_cnt                      = 9;  // 电池循环次数 [number_cycles 循环次数]
+      repeated google.protobuf.Int32Value bms_balance_sw_cell_block = 10;  // 电池电芯均衡状态，0：均衡通路断开，无均衡电流；1：均衡通路接通，有均衡电流 [equilibrium_state 均衡状态,每 bit 表示一串电芯均衡（1~16 串）]
+      BmsProtectStatus protection_status                            = 11; // [protection_status 保护状态]
+      google.protobuf.FloatValue bms_soh                            = 12; // 电池健康状态 [soh 电池健康状态百分比，单位 0.1%]
+      google.protobuf.Int32Value bms_state                          = 13; // 充电状态，0表示放电，2表示充电 [charge_state 充放电状态 bit0\bit1] // 充电状态，0:放电，2:充电，4:已满电 D20
+      google.protobuf.Int32Value charger_connect_state              = 14; // 充电器连接状态，0表示未连接，1表示连接 [charge_state 充放电状态 bit2]
+      google.protobuf.Int32Value charge_mos_state                   = 15; // 充电MOS状态，0表示关闭，1表示打开 [charge_state 充放电状态 bit3]
+      google.protobuf.Int32Value discharge_mos_state                = 16; // 放电MOS状态，0表示关闭，1表示打开 [charge_state 充放电状态 bit4]
+      google.protobuf.FloatValue bms_p_pack                         = 17; // 电池实时功率，单位w [realtime_power 实时功率 mW] 
+      google.protobuf.FloatValue bms_chg_amount                     = 18; // 单次已充电电量，单位wh [single_charge_capacity 单次充电电量 10mwh（W11不支持）]
+      google.protobuf.FloatValue rated_current                      = 19; // 电池额定电流，单位A [rated_current 额定电流 10mA]
+      google.protobuf.FloatValue peak_current                       = 20; // 电池峰值电流，单位A [large_current 峰值电流 10mA]
+      google.protobuf.FloatValue rated_volt                         = 21; // 电池额定电压，单位V [rated_voltage 额定电压 10mV]
+      google.protobuf.Int32Value bms_cell_cnt                       = 22; // 电池单体个数 [bat_num 电池串数]
+      repeated google.protobuf.FloatValue bms_module_x_temp_sensor  = 23; // 电池温度传感器数值，单位℃ [temperature_arr 温度数组 前3] // 电池温度(℃) 数组第一个成员 D20
+      repeated google.protobuf.FloatValue bms_mos_temp              = 24; // MOS温度传感器数值，单位℃ [temperature_arr 温度数组 后3]
+      google.protobuf.Int32Value bms_cell_thremistor_cnt            = 25; // 电池温度传感器个数 [temperature_arr 温度数组 长度]
+      repeated google.protobuf.FloatValue bms_module_x_cell_block   = 26; // 电芯电压，单位V [single_cell_vol_arr 单体电压数组 (bat_num 个 uint16)]
+    }
+
+    google.protobuf.Int32Value bms_major_version_number = 1; // 端侧bms软件主版本号[sw_version 软件版本号]
+    google.protobuf.Int32Value bms_minor_version_number = 2; // 端侧bms软件子版本号[hw_version 硬件版本号]
+    google.protobuf.Int32Value bms_pack_cnt             = 3; // 电池包个数
+    repeated BmsPackInfo bms_pack_info                  = 4; // 电池包信息数组
+  }
+
+  // 电机状态
+  message MotorInfo
+  {
+    message MotorSingleInfo {
+      enum MotorLocation {
+        MOTOR_LOCATION_UNKNOWN = 0; // 未知
+        MOTOR_LOCATION_LEG     = 1; // 足部 D30
+        MOTOR_LOCATION_EAR     = 2; // 耳朵 D30
+        MOTOR_LOCATION_LOWER   = 3; // 下肢 R11
+        MOTOR_LOCATION_UPPER   = 4; // 上肢 R11
+      }
+
+      google.protobuf.UInt32Value state_id                           = 1; // 状态id 详见健康管理问卷调查表
+      MotorLocation motor_location                                   = 2; // 电机所处位置 不使用
+      google.protobuf.Int32Value motor_id                            = 3; // 电机id 不使用
+      google.protobuf.Int32Value motor_state                         = 4; // 电机状态，0：停止；1：工作[mode 电机控制模式] 不使用
+      google.protobuf.FloatValue motor_position                      = 5; // 电机位置，单位弧度 [q 关节反馈位置信息（单位：弧度)] 不使用
+      google.protobuf.FloatValue motor_rotational_speed_rpm          = 6; // 电机转速，单位rpm [dq 关节反馈速度（单位：弧度/秒）] 不使用
+      google.protobuf.FloatValue motor_torque_nm                     = 7; // 电机力矩，单位N·m [tau_est 关节反馈力矩（单位:Nm）] 不使用
+      google.protobuf.FloatValue motor_temp                          = 8; // 电机温度，单位℃
+      google.protobuf.FloatValue motor_volt                          = 9; // 电机电压，单位V
+      google.protobuf.FloatValue motor_current                       = 10;// 电机电流，单位mA
+      google.protobuf.BoolValue link_status                          = 11;// 连接状态
+    }
+
+    repeated MotorSingleInfo motor_infos = 1; // 电机信息数组
+  }
+
+  // 蜂窝移动状态
+  message CellularInfo
+  {
+    enum SimStatus {
+      SIM_CARD_STATUS_UNKNOWN                      = 0; // 未知状态
+      SIM_CARD_STATUS_ABSENT                       = 1; // 离线
+      SIM_CARD_STATUS_PRESENT                      = 2; // 在线
+      SIM_CARD_STATUS_ERROR_UNKNOWN                = 3; // 未知错误
+      SIM_CARD_STATUS_ERROR_POWER_DOWN             = 4; // 掉电错误
+      SIM_CARD_STATUS_ERROR_POLL_ERROR             = 5; // 查询错误
+      SIM_CARD_STATUS_ERROR_NO_ATR_RECEIVED        = 6; // 复位无应答错误
+      SIM_CARD_STATUS_ERROR_VOLT_MISMATCH          = 7; // 电压不匹配错误
+      SIM_CARD_STATUS_ERROR_PARITY_ERROR           = 8; // 奇偶校验错误
+      SIM_CARD_STATUS_ERROR_SIM_TECHNICAL_PROBLEMS = 9; // 内部技术故障
+    }
+
+    enum NwRadioTech {
+      NW_RADIO_TECH_UNKNOWN  = 0;  // 未知
+      NW_RADIO_TECH_TD_SCDMA = 1;  // TD-SCDMA网络（不支持）
+      NW_RADIO_TECH_GSM      = 2;  // GSM网络。仅支持语音
+      NW_RADIO_TECH_HSPAP    = 3;  // HSPA+网络
+      NW_RADIO_TECH_LTE      = 4;  // LTE网络
+      NW_RADIO_TECH_EHRPD    = 5;  // eHRPD网络
+      NW_RADIO_TECH_EVDO_B   = 6;  // EVDO_B网络
+      NW_RADIO_TECH_HSPA     = 7;  // HSPA网络
+      NW_RADIO_TECH_HSUPA    = 8;  // HSUPA网络
+      NW_RADIO_TECH_HSDPA    = 9;  // HSDPA网络
+      NW_RADIO_TECH_EVDO_A   = 10; // EVDO_A网络
+      NW_RADIO_TECH_EVDO_0   = 11; // EVDO_0网络
+      NW_RADIO_TECH_1XRTT    = 12; // 1xRTT网络
+      NW_RADIO_TECH_IS95B    = 13; // IS-95B网络
+      NW_RADIO_TECH_IS95A    = 14; // IS-95A网络
+      NW_RADIO_TECH_UMTS     = 15; // UMTS网络
+      NW_RADIO_TECH_EDGE     = 16; // EDGE网络
+      NW_RADIO_TECH_GPRS     = 17; // GPRS网络
+      NW_RADIO_TECH_NR5G     = 18; // 5G-NR网络
+      NW_RADIO_TECH_NONE     = 19; // 未知网络
+    }
+
+    enum RegStatus {
+      NW_SERVICE_UNKNOWN = 0; // 未知
+      NW_SERVICE_NONE    = 1; // 无服务
+      NW_SERVICE_LIMITED = 2; // 服务受限
+      NW_SERVICE_FULL    = 3; // 服务正常
+    }
+
+    enum CellularStrengthLevel {
+      CELLULAR_STRENGTH_LEVEL_UNKNOWN  = 0; // 未知
+      CELLULAR_STRENGTH_LEVEL_NONE     = 1; // 无信号
+      CELLULAR_STRENGTH_LEVEL_POOR     = 2; // 信号差
+      CELLULAR_STRENGTH_LEVEL_MODERATE = 3; // 信号一般
+      CELLULAR_STRENGTH_LEVEL_GOOD     = 4; // 信号良
+      CELLULAR_STRENGTH_LEVEL_GREAT    = 5; // 信号优
+    }
+
+    message ApnInfo {
+      google.protobuf.Int32Value connect_status = 1; // APN连接状态 0:断开；1:连接
+      google.protobuf.UInt32Value up_rate       = 2; // 上行实时流量速率（字节/秒）
+      google.protobuf.UInt32Value down_rate     = 3; // 下行实时流量速率（字节/秒）
+      google.protobuf.UInt64Value up_flow       = 4; // 上行流量（字节）
+      google.protobuf.UInt64Value down_flow     = 5; // 下行流量（字节）
+    }
+
+    google.protobuf.UInt32Value state_id              = 1; // 状态id 详见健康管理问卷调查表
+    google.protobuf.Int32Value switch_status          = 2; // APN开关状态 0:关闭；1:打开 
+    SimStatus sim_status                              = 3; // SIM卡状态
+    NwRadioTech nw_rat                                = 4; // 网络制式
+    RegStatus reg_status                              = 5; // 注册状态
+    CellularStrengthLevel strength_level              = 6; // 信号强度等级
+    repeated ApnInfo apn_infos                        = 7; // 单个APN状态信息
+  }
+
+  // WIFI状态
+  message WifiInfo
+  {
+    enum WifiStrengthLevel {
+      WIFI_STRENGTH_LEVEL_UNKNOWN  = 0; // 未知
+      WIFI_STRENGTH_LEVEL_NONE     = 1; // 无信号
+      WIFI_STRENGTH_LEVEL_POOR     = 2; // 信号差
+      WIFI_STRENGTH_LEVEL_MODERATE = 3; // 信号一般
+      WIFI_STRENGTH_LEVEL_GOOD     = 4; // 信号良
+      WIFI_STRENGTH_LEVEL_GREAT    = 5; // 信号优
+    }
+
+    enum WifiStandardType {
+      WIFI_STANDARD_UNKNOWN = 0; // 未知标准
+      WIFI_STANDARD_LEGACY  = 1; // 传统模式 (802.11a/b/g)
+      WIFI_STANDARD_N       = 2; // 802.11n (WiFi 4)
+      WIFI_STANDARD_AC      = 3; // 802.11ac (WiFi 5)
+      WIFI_STANDARD_AX      = 4; // 802.11ax (WiFi 6/6E)
+      WIFI_STANDARD_AD      = 5; // 802.11ad (60GHz)
+      WIFI_STANDARD_BE      = 6; // 802.11be (WiFi 7)
+    }
+
+    enum WifiApBandType {
+      WIFI_AP_BAND_UNKNOWN  = 0; // 未知
+      WIFI_AP_BAND_2P4G     = 1; // 2.4G
+      WIFI_AP_BAND_5G       = 2; // 5G
+    }
+  
+    google.protobuf.UInt32Value state_id                 = 1;  // 状态id 详见健康管理问卷调查表
+    google.protobuf.Int32Value sta_switch_state          = 2;  // STA开关状态 0:关闭；1:打开
+    google.protobuf.Int32Value sta_connect_state         = 3;  // STA连接状态 0:未连接；1:已连接
+    google.protobuf.StringValue mac                      = 4;  // mac地址
+    google.protobuf.StringValue ssid                     = 5;  // ssid 已连接wifi名
+    google.protobuf.Int32Value sta_internet_state        = 6;  // STA可上网状态 0:无互联网连接；1:有互联网连接
+    WifiStrengthLevel sta_strength_level                 = 7;  // STA信号强度等级
+    WifiStandardType sta_standard                        = 8;  // STA协议类型
+    google.protobuf.Int32Value sta_frequency             = 9;  // STA带宽
+    google.protobuf.Int32Value sta_channel               = 10; // STA信道号
+    google.protobuf.UInt64Value link_tx_rate             = 11; // STA上行实时流量速率 字节/秒
+    google.protobuf.UInt64Value link_rx_rate             = 12; // STA下行实时流量速率 字节/秒
+    google.protobuf.UInt64Value link_tx_bytes            = 13; // STA上行流量 字节
+    google.protobuf.UInt64Value link_rx_bytes            = 14; // STA下行流量 字节
+    google.protobuf.StringValue sta_ip_addr              = 15; // STA IP地址
+    google.protobuf.Int32Value ap_switch_state           = 16; // AP开关状态 0:关闭；1:打开
+    google.protobuf.Int32Value ap_num_clients            = 17; // AP已连接设备数
+    google.protobuf.Int32Value ap_channel                = 18; // AP信道号
+    WifiApBandType ap_band                               = 19; // AP带宽
+  }
+
+  // 蓝牙状态
+  message BtInfo
+  {
+    message BtDeviceInfo {
+      enum BtDeviceType {
+        BT_DEVICE_UNKNOWN = 0; // 未知设备
+        BT_DEVICE_A2DP    = 1; // a2dp设备
+        BT_DEVICE_HID     = 2; // hid host设备
+        BT_DEVICE_GATTC   = 3; // GATTC设备
+        BT_DEVICE_GATTS   = 4; // GATTS设备
+      }
+
+      enum BtStrengthLevel {
+        BT_STRENGTH_LEVEL_UNKNOWN  = 0; // 未知
+        BT_STRENGTH_LEVEL_NONE     = 1; // 无信号
+        BT_STRENGTH_LEVEL_POOR     = 2; // 信号差
+        BT_STRENGTH_LEVEL_MODERATE = 3; // 信号一般
+        BT_STRENGTH_LEVEL_GOOD     = 4; // 信号良
+        BT_STRENGTH_LEVEL_GREAT    = 5; // 信号优
+      }
+
+      BtDeviceType device_type                  = 1; // 设备类型
+      google.protobuf.StringValue device_name   = 2; // 设备名称
+      google.protobuf.StringValue device_addr   = 3; // 设备地址
+      google.protobuf.Int32Value connect_status = 4; // 连接状态 0:未连接；1:已连接
+      BtStrengthLevel strength_level            = 5; // 信号强度等级
+    }
+
+    google.protobuf.UInt32Value state_id          = 1;  // 状态id 详见健康管理问卷调查表
+    google.protobuf.Int32Value bt_switch          = 2;  // 蓝牙开关状态 0:关闭；1:打开
+    repeated BtDeviceInfo bt_infos                = 3;  // 蓝牙配对设备信息数组
+  }
+
+  // GNSS状态
+  message GnssInfo
+  {
+    google.protobuf.UInt32Value state_id                   = 1;  // 状态id 详见健康管理问卷调查表
+    google.protobuf.Int32Value gnss_status                 = 2;  // GNSS状态 0:关闭；1:打开
+    google.protobuf.FloatValue position_longitude          = 3;  // 经度
+    google.protobuf.FloatValue position_latitude           = 4;  // 纬度
+    google.protobuf.FloatValue speed                       = 5;  // 速度
+    google.protobuf.FloatValue heading                     = 6;  // 航向
+    google.protobuf.Int32Value satellite_num               = 7;  // 搜星数量
+    google.protobuf.FloatValue hdop                        = 8;  // 水平定位精度
+    google.protobuf.UInt64Value utc_time                   = 9;  // UTC时间戳
+    google.protobuf.FloatValue altitude                    = 10; // 海拔高度
+  }
+
+  // 设备资源状态
+  message DeviceResourceInfo
+  {
+    message DeviceResourceSingleInfo {
+      enum DeviceType {
+        DEVICE_UNKNOWN = 0;
+        DEVICE_CCU_SOC = 1;
+        DEVICE_CCU_MCU = 2;    // MCU目前只有CPU利用率
+        DEVICE_TMU_SOC = 3;
+        DEVICE_TMU_MCU = 4;    // MCU目前只有CPU利用率
+        DEVICE_PMU_MCU = 5;    // MCU目前只有CPU利用率
+      }
+
+      message ProcessInfo {
+        google.protobuf.StringValue process_name = 1;    // 进程名
+        google.protobuf.FloatValue cpu_usage     = 2;    // 进程CPU利用率，单位 %
+      }
+
+      google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+      DeviceType device_type                               = 2; // 设备类型
+      google.protobuf.FloatValue cpu_usage                 = 3; // CPU利用率，单位 %
+      google.protobuf.FloatValue cpu_temperature           = 4; // CPU温度，单位 ℃
+      google.protobuf.FloatValue memory_usage              = 5; // 内存利用率，单位 %
+      google.protobuf.FloatValue disk_usage                = 6; // 磁盘利用率，单位 %
+      repeated ProcessInfo process_info                    = 7; // 各进程信息
+      google.protobuf.FloatValue gpu_usage                 = 8; // GPU利用率，单位 %
+      google.protobuf.FloatValue npu_usage                 = 9; // NPU利用率，单位 %
+    }
+
+    repeated DeviceResourceSingleInfo device_resource_infos = 1; // 设备资源信息数组
+  }
+
+  // 机器人模式状态
+  message RobotModeInfo
+  {
+    enum OverallModeType {
+      OVERALL_MODE_UNKNOWN   = 0; // 未知
+      OVERALL_MODE_WORK      = 1; // 工作
+      OVERALL_MODE_STANDBY   = 2; // 待机，未实现
+      OVERALL_MODE_SLEEP     = 3; // 休眠
+      OVERALL_MODE_PAUSE     = 4; // 暂停
+      OVERALL_MODE_EMERGENCY = 5; // 急停
+      OVERALL_MODE_SHUTDOWN  = 6; // 关机
+      OVERALL_MODE_IDLE      = 7; // 空闲
+    }
+
+    enum HealthState {
+      HEALTH_STATE_UNKNOWN   = 0; // 未知
+      HEALTH_STATE_NORMAL    = 1; // 正常 无告警
+      HEALTH_STATE_GENERAL   = 2; // 一般告警
+      HEALTH_STATE_SERIOUS   = 3; // 严重告警
+      HEALTH_STATE_URGENT    = 4; // 紧急告警
+    }
+
+    google.protobuf.UInt32Value state_id         = 1; // 状态id 详见健康管理问卷调查表
+    OverallModeType overall_mode                 = 2; // 整机模式
+    google.protobuf.StringValue emergency_source = 3; // 急停触发源
+    HealthState health_state                     = 4; // 健康状态
+  }
+
+  // 灯光状态
+  message LightInfo
+  {
+    enum AmbModeType {
+      AMB_MODE_UNKNOWN                        = 0;  //未知
+      AMB_MODE_IGNORE                         = 1;  //忽略
+      AMB_MODE_EMERGENCY_STOP                 = 2;  //急停激活
+      AMB_MODE_FAULT_SEVERE                   = 3;  //严重故障
+      AMB_MODE_SHUTTING_DOWN                  = 4;  //关机中
+      AMB_MODE_FAULT_MODERATE                 = 5;  //一般故障
+      AMB_MODE_TASK_PAUSED                    = 6;  //任务暂停
+      AMB_MODE_BOOTING                        = 7;  //开机中
+      AMB_MODE_VOICE_WAKEUP                   = 8;  //唤醒
+      AMB_MODE_TASK_GUARDING                  = 9;  //守卫中
+      AMB_MODE_GUARD_EVENT                    = 10; //守卫事件
+      AMB_MODE_VOICE_LISTENING                = 11; //语音聆听
+      AMB_MODE_VOICE_PLAYBACK                 = 12; //语音播报
+      AMB_MODE_NORMAL                         = 13; //待机（空闲）
+      AMB_MODE_POWER_CHARGING                 = 14; //充电中
+      AMB_MODE_POWER_CRITICAL                 = 15; //低电量
+    }
+
+    enum LampModeType {
+      LAMP_MODE_UNKNOWN                       = 0;  //未知
+      LAMP_MODE_CLOSE                         = 1;  //关闭
+      LAMP_MODE_TAKE_PIC                      = 2;  //拍照补光
+      LAMP_MODE_ILLUMINATE                    = 3;  //暗部照明
+      LAMP_MODE_AUTO                          = 4;  //自动模式
+    }
+
+    enum FillLightStatusType {
+      FILL_LIGHT_STATUS_UNKNOWN               = 0;  //未知
+      FILL_LIGHT_STATUS_ON                    = 1;  //打开
+      FILL_LIGHT_STATUS_OFF                   = 2;  //关闭
+    }
+
+    google.protobuf.UInt32Value state_id            = 1; // 状态id 详见健康管理问卷调查表
+    AmbModeType amb_mode                            = 2; // 氛围灯模式 D30
+    LampModeType lamp_mode                          = 3; // 照明灯模式 D30
+    FillLightStatusType fill_light_front_status     = 4; // 前补光灯状态 D20
+    FillLightStatusType fill_light_back_status      = 5; // 后补光灯状态 D20
+    google.protobuf.BoolValue fill_light_auto_mode  = 6; // 是否为自动灯光模式 D20
+  }
+
+  // 机器人运控状态
+  message RobotMotionInfo
+  {
+    enum MotionModeType {
+      MOTION_MODE_UNKNOWN                     = 0;  //未知
+      MOTION_MODE_DEBUG                       = 1;  //调试模式
+      MOTION_MODE_WBMC                        = 2;  //全身运控模式
+      MOTION_MODE_IMC                         = 3;  //下肢运控模式
+      MOTION_MODE_TELEOP                      = 4;  //遥操模式
+      MODE_THRID_PARTY                        = 1000; //三方运控模式
+    }
+
+    enum MotionStatusType {
+      MOTION_STATUS_UNKNOWN                   = 0;  //未知
+      MOTION_STATUS_DAMP                      = 1;  //阻尼中
+      MOTION_STATUS_STALLING                  = 2;  //僵停中
+      MOTION_STATUS_FAULT                     = 3;  //故障中
+      MOTION_STATUS_DISABLED                  = 4;  //失能中
+      MOTION_STATUS_NORMAL                    = 5;  //正常状态，机器人可以自行保持平衡的站姿/坐姿/蹲姿/躺姿
+      MOTION_STATUS_READY                     = 6;  //就绪状态，表示可以切换到指定姿态
+    }
+
+    enum BodyStateType {
+      BODY_STATE_UNKNOWN                      = 0;  //未知
+      BODY_STATE_STAND                        = 1;  //全身站姿
+      BODY_STATE_SIT                          = 2;  //坐姿
+      BODY_STATE_SQUAT                        = 3;  //蹲姿
+      BODY_STATE_LYING                        = 4;  //躺姿
+      BODY_STATE_MOVING                       = 5;  //全身移动中
+      BODY_STATE_MOVING_LOWERBODY             = 6;  //下半身移动中
+      BODY_STATE_STAND_LOWERBODY              = 7;  //下半身站立
+      BODY_STATE_LIE_BACK                     = 8;  //趴姿
+      BODY_STATE_FOLD                         = 9;  //折叠
+    }
+
+    enum SpeedLevel{
+      SPEED_LEVEL_UNKNOWN                     = 0;  //未知
+      SPEED_LEVEL_SLOW                        = 1;  //低速
+      SPEED_LEVEL_MEDIUM                      = 2;  //中速
+      SPEED_LEVEL_HIGH                        = 3;  //高速
+    }
+
+    google.protobuf.UInt32Value state_id       = 1; // 状态id 详见健康管理问卷调查表
+    MotionModeType mode                        = 2; // 运控模式
+    MotionStatusType status                    = 3; // 运控状态
+    BodyStateType body_state                   = 4; // 身体姿态
+    SpeedLevel speed_level                     = 5; // 当前速度等级 D20
+    google.protobuf.FloatValue speed_x         = 6; // 前进/后退速度 (m/s) D20
+    google.protobuf.FloatValue speed_y         = 7; // 左右平移速度 (m/s) D20
+    google.protobuf.FloatValue speed_yaw       = 8; // 转向角速度 (rad/s) D20
+  }
+
+  // 相机存储状态
+  message CameraMemoryInfo
+  {
+    google.protobuf.UInt32Value state_id                   = 1;  // 状态id 详见健康管理问卷调查表
+    google.protobuf.FloatValue sd_total_memory             = 2;  // SD卡-总存储空间，单位MB
+    google.protobuf.FloatValue sd_used_memory              = 3;  // SD卡-已使用存储空间，单位MB
+    google.protobuf.FloatValue sd_free_memory              = 4;  // SD卡-剩余存储空间，单位MB
+    google.protobuf.FloatValue internal_total_memory       = 5;  // 内部-总存储空间，单位MB
+    google.protobuf.FloatValue internal_used_memory        = 6;  // 内部-已使用存储空间，单位MB
+    google.protobuf.FloatValue internal_free_memory        = 7;  // 内部-剩余存储空间，单位MB
+  }
+
+  // 相机状态
+  message CameraInfo
+  {
+    message CameraSingleInfo {
+      google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+      google.protobuf.BoolValue link_status                = 2; // 连接状态
+    }
+
+    repeated CameraSingleInfo camera_infos                 = 1; // 相机信息数组
+  }
+
+  // 云台状态
+  message GimbalInfo
+  {
+    message GimbalSingleInfo {
+      google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+      google.protobuf.BoolValue link_status                = 2; // 连接状态
+      google.protobuf.FloatValue voltage                   = 3; // 电压
+    }
+
+    repeated GimbalSingleInfo gimbal_infos                 = 1; // 云台信息数组
+  }
+
+  // 雷达状态
+  message RadarInfo
+  {
+      message RadarSingleInfo {
+      google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+      google.protobuf.BoolValue link_status                = 2; // 连接状态
+    }
+
+    repeated RadarSingleInfo radar_infos                   = 1; // 雷达信息数组
+  }
+
+  // 传感器状态
+  message SensorInfo
+  {
+      message SensorSingleInfo {
+      google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+      google.protobuf.BoolValue link_status                = 2; // 连接状态
+    }
+
+    repeated SensorSingleInfo sensor_infos                 = 1; // 传感器信息数组
+  }
+
+  // IMU状态
+  message ImuInfo
+  {
+      message ImuSingleInfo {
+      google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+      google.protobuf.BoolValue link_status                = 2; // 连接状态
+    }
+
+    repeated ImuSingleInfo imu_infos                       = 1; // IMU信息数组
+  }
+
+  // 风扇状态
+  message FanInfo
+  {
+      message FanSingleInfo {
+      google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+      google.protobuf.BoolValue link_status                = 2; // 连接状态
+      google.protobuf.FloatValue voltage                   = 3; // 电压
+      google.protobuf.UInt32Value duty_set                 = 4; // 设置转速占空比 单位%
+      google.protobuf.UInt32Value duty_real                = 5; // 实际转速占空比 单位%
+    }
+
+    repeated FanSingleInfo fan_infos                       = 1; // 风扇信息数组
+  }
+
+  // UWB状态
+  message UwbInfo
+  {
+    enum WorkStatus{
+      WORK_STATUS_UNKNOWN                     = 0;  //未知
+      WORK_STATUS_UWB                         = 1;  //仅UWB工作
+      WORK_STATUS_BLE                         = 2;  //仅BLE工作
+      WORK_STATUS_BOTH                        = 3;  //UWB和BLE都工作
+      WORK_STATUS_LOW_POWER                   = 4;  //低电量
+      WORK_STATUS_SHUTDOWN                    = 8;  //关机
+    }
+
+    enum ShutdownReason{
+      SHUTDOWN_REASON_UNKNOWN                  = 0;  //未知
+      SHUTDOWN_REASON_BUTTON                   = 1;  //手动按键关机
+      SHUTDOWN_REASON_INACTIVE                 = 2;  //长时间未动作关机
+      SHUTDOWN_REASON_LOW_POWER                = 3;  //低电量关机
+    }
+
+    enum ChargeStatus{
+      CHARGE_STATUS_UNKNOWN                   = 0;  //未知
+      CHARGE_STATUS_CHARGING                  = 1;  //充电中
+      CHARGE_STATUS_COMPLETED                 = 2;  //充电完成
+    }
+
+    google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+    google.protobuf.BoolValue link_status                = 2; // 锚点测距状态  都支持
+    google.protobuf.UInt64Value rx_bytes                 = 3; // 收包统计  都支持
+    google.protobuf.UInt64Value tx_bytes                 = 4; // 发包统计  都支持
+    WorkStatus work_status                               = 5; // 工作状态  仅自研支持
+    ShutdownReason shutdown_reason                       = 6; // 关机原因  仅自研支持
+    ChargeStatus charge_status                           = 7; // 充电状态  仅自研支持
+    google.protobuf.UInt32Value batt_volt                = 8; // 遥控器电池电压 mV  仅自研支持
+    google.protobuf.BoolValue uwb_key_link_status        = 9; // 遥控器连接状态  仅全迹支持
+    string uwb_key_name                                  = 10; // 遥控器名称  仅全迹支持
+    string uwb_key_mac                                   = 11; // 遥控器mac地址  仅全迹支持
+    google.protobuf.FloatValue uwb_key_batt_soc          = 12; // 遥控器电池电量  仅全迹支持
+    google.protobuf.BoolValue charger_link_status        = 13; // 充电桩连接状态  仅全迹支持
+    google.protobuf.StringValue charger_name             = 14; // 充电桩名称  仅全迹支持
+    google.protobuf.StringValue charger_mac              = 15; // 充电桩mac地址  仅全迹支持
+  }
+
+  // 电动耳朵状态
+  message EarInfo
+  {
+      message EarSingleInfo {
+      google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+      google.protobuf.BoolValue link_status                = 2; // 连接状态
+      google.protobuf.FloatValue voltage                   = 3; // 电压
+      google.protobuf.FloatValue current                   = 4; // 电流
+    }
+
+    repeated EarSingleInfo ear_infos                       = 1; // 电动耳朵信息数组
+  }
+
+  // AGV状态
+  message AgvInfo
+  {
+    google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+    google.protobuf.BoolValue link_status                = 2; // 连接状态
+  }
+
+  // 导航状态
+  message NaviInfo
+  {
+    google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+    google.protobuf.StringValue navi_state               = 2; // 导航状态
+  }
+
+  // 多媒体状态
+  message MediaInfo
+  {
+    google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+    google.protobuf.BoolValue audio_switch               = 2; // 音视频通话开关
+    google.protobuf.BoolValue camera_switch              = 3; // 相机拍摄开关
+  }
+
+  // 算法状态
+  message PerceptionInfo
+  {
+    google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+    google.protobuf.BoolValue object_switch              = 2; // 目标感知
+    google.protobuf.BoolValue gesture_switch             = 3; // 手势识别
+    google.protobuf.BoolValue face_switch                = 4; // 人脸识别
+  }
+
+  // 场景任务状态
+  message SceneInfo
+  {
+    enum SceneState {
+      SCENE_STATE_UNKNOWN                                = 0; // 未知
+      SCENE_STATE_RUNNING                                = 1; // 运行
+      SCENE_STATE_PAUSING                                = 2; // 正在暂停
+      SCENE_STATE_PAUSED                                 = 3; // 已暂停
+      SCENE_STATE_CANCELING                              = 4; // 正在取消
+      SCENE_STATE_CANCELED                               = 5; // 已取消
+      SCENE_STATE_SUCCESS                                = 6; // 成功
+      SCENE_STATE_FAILURE                                = 7; // 失败
+      SCENE_STATE_PENDING                                = 8; // 待定
+    }
+
+    google.protobuf.UInt32Value state_id                 = 1; // 状态id 详见健康管理问卷调查表
+    google.protobuf.StringValue name                     = 2; // 场景名
+    SceneState state                                     = 3; // 场景状态
+  }
+
+  // SD卡状态
+  message SdInfo
+  {
+    enum SdSpeed {
+      SD_SPEED_UNKNOWN                                = 0; // 未知
+      SD_SPEED_LOW                                    = 1; // 低速
+      SD_SPEED_HIGH                                   = 2; // 高速
+    }
+
+    enum SdType {
+      SD_TYPE_UNKNOWN                                 = 0; // 未知
+      SD_TYPE_EXFAT                                   = 1; // exFAT类型
+      SD_TYPE_OTHER                                   = 2; // 非exFAT类型
+    }
+
+    google.protobuf.UInt32Value state_id              = 1; // 状态id 详见健康管理问卷调查表
+    SdSpeed sd_speed                                  = 2; // SD卡速率
+    SdType sd_type                                    = 3; // SD卡类型
+  }
+
+  google.protobuf.UInt64Value sampling_time = 1;  // 采样时间
+  BmsInfo bmsInfo                           = 2;  // 电池状态
+  MotorInfo motorInfo                       = 3;  // 电机状态
+  CellularInfo cellularInfo                 = 4;  // 蜂窝移动状态
+  WifiInfo wifiInfo                         = 5;  // WIFI状态
+  BtInfo btInfo                             = 6;  // 蓝牙状态
+  GnssInfo gnssInfo                         = 7;  // GNSS状态
+  DeviceResourceInfo deviceResourceInfo     = 8;  // 设备资源状态
+  RobotModeInfo robotModeInfo               = 9;  // 机器人模式状态
+  LightInfo lightInfo                       = 10; // 灯光状态
+  RobotMotionInfo robotMotionInfo           = 11; // 机器人运控状态
+  CameraMemoryInfo cameraMemoryInfo         = 12; // 相机存储状态
+  CameraInfo cameraInfo                     = 13; // 相机状态
+  GimbalInfo gimbalInfo                     = 14; // 云台状态
+  RadarInfo radarInfo                       = 15; // 雷达状态
+  SensorInfo sensorInfo                     = 16; // 传感器状态
+  ImuInfo imuInfo                           = 17; // IMU状态
+  FanInfo fanInfo                           = 18; // 风扇状态
+  UwbInfo uwbInfo                           = 19; // UWB状态
+  EarInfo earInfo                           = 20; // 电动耳朵状态
+  AgvInfo agvInfo                           = 21; // AGV状态
+  NaviInfo naviInfo                         = 22; // 导航状态
+  MediaInfo mediaInfo                       = 23; // 多媒体状态
+  PerceptionInfo perceptionInfo             = 24; // 算法状态
+  SceneInfo sceneInfo                       = 25; // 场景任务状态
+  SdInfo sdInfo                             = 26; // SD卡状态
+
+}
+
+// 远程获取日志
+message GetPlatformRhrLog
+{
+  uint64 logStartTime = 1;                // 日志开始时间
+  uint64 logEndTime = 2;                  // 日志结束时间
+}
+
+// 远程获取数据
+message GetRhrData
+{
+  repeated google.protobuf.UInt32Value dataId = 1;   // 数据id
+  uint32 dataCollectTime = 2;                        // 数据采集时长 单位s
+}
+
+// RHR状态主动查询
+message RobotStateQuery {
+  repeated google.protobuf.UInt32Value state_ids = 1; // 状态ids
+}

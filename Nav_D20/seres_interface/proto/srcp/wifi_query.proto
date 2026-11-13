@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package srcp;
+
+// WiFi查询指令
+message WifiQuery {
+  // 预留参数，可用于指定扫描频段等
+  // 当前版本为空，后续可扩展
+}
+
+// WiFi加密类型枚举
+enum WifiEncryptionType {
+  ENCRYPTION_OPEN = 0;      // 开放网络（无加密）
+  ENCRYPTION_WPA_PSK = 1;   // WPA-PSK
+  ENCRYPTION_WPA2_PSK = 2;  // WPA2-PSK
+  ENCRYPTION_WPA3_SAE = 3;  // WPA3-SAE
+}
+
+// WiFi接入点信息
+message WifiAccessPoint {
+  string ssid = 1;                    // 网络名称(可能为空，隐藏网络可能不广播)
+  string bssid = 2;                   // MAC地址
+  uint32 frequency = 3;               // 频段(MHz)
+  int32 rssi = 4;                     // 信号强度(dBm)
+  bool is_saved = 5;                  // 是否是已保存网络
+  WifiEncryptionType encryption_type = 6;  // 加密类型
+  int32 network_id = 7;               // 默认 -1，如果是已保存网络则 >=0
+}
+
+// WiFi查询结果
+message WifiQueryResult {
+  repeated WifiAccessPoint access_points = 1;  // 扫描到的WiFi列表
+}
+
+// WiFi控制操作类型枚举
+enum WifiOperation {
+  WIFI_OPERATION_UNKNOWN = 0;   // 未知操作
+  WIFI_SET_ENABLED = 1;         // 开关WiFi
+  WIFI_START_SCAN = 2;          // 主动触发扫描
+  WIFI_CONNECT = 3;             // 连接网络
+  WIFI_REMOVE_NETWORK = 4;      // 忘记网络
+}
+
+// WiFi开关控制
+message WifiSetEnabled {
+  bool enable = 1;  // true: 开启WiFi, false: 关闭WiFi
+}
+
+// 主动触发扫描（扫描结果通过WifiQuery/WifiQueryResult获取）
+message WifiStartScan {
+}
+
+// 连接WiFi网络
+// 路由规则：ssid 非空时优先走 config 分支（addNetwork+enableNetwork），
+// 即使同时传了 network_id 也忽略；仅当 ssid 为空且 network_id>=0 时，
+// 才走 enableNetwork(network_id) 重连已保存网络。约定与平台 ROS2 WifiConnect.srv
+// 的 onWifiConnect 实现保持一致，避免重复 addNetwork 产生脏配置。
+message WifiConnect {
+  string ssid = 1;                          // 网络名称（非空时优先走 config 分支）
+  string password = 2;                      // 密码（开放网络可为空）
+  WifiEncryptionType encryption_type = 3;   // 加密类型
+  int32 network_id = 4;                     // 已保存网络 ID, 需要是 >=0，连接新网络时传 -1
+}
+
+// 忘记网络（根据网络ID删除已保存网络，正在连接的网络会同时断开）
+message WifiRemoveNetwork {
+  int32 network_id = 1;  // 网络ID
+}
+
+// WiFi控制指令
+message WifiCtl {
+  WifiOperation operation = 1;  // WiFi控制项
+  // WiFi控制动作参数
+  oneof action {
+    WifiSetEnabled wifiSetEnabled = 2;        // 开关WiFi
+    WifiStartScan wifiStartScan = 3;          // 主动触发扫描
+    WifiConnect wifiConnect = 4;              // 连接网络
+    WifiRemoveNetwork wifiRemoveNetwork = 5;  // 忘记网络
+  }
+}
+
+// WiFi状态上报（开关状态+连接状态共用结构体，通过oneof区分，已连接WiFi状态数据不再走RHR上报）
+message WifiStatusReport {
+  oneof data {
+    WifiStateInfo wifi_state_info = 1;            // WiFi开关状态
+    WifiConnectionInfo wifi_connection_info = 2;  // WiFi连接状态
+  }
+}
+
+// WiFi开关状态
+message WifiStateInfo {
+  uint32 wifi_state = 1;  // WiFi开关状态: 0=错误状态, 1=正在关闭, 2=已关闭, 3=正在打开, 4=已打开
+}
+
+// WiFi连接状态
+message WifiConnectionInfo {
+  uint32 state = 1;                       // 连接状态: 0=未连接, 1=正在连接, 2=已连接, 3=连接失败
+  string ssid = 2;                        // 当前正在操作或已连接的SSID
+  string bssid = 3;                       // 当前BSSID
+  string mac = 4;                         // WiFi网卡MAC地址
+  uint32 standard = 5;                    // WiFi标准: 0=未知, 1=传统模式(802.11a/b/g), 2=802.11n, 3=802.11ac, 4=802.11ax, 5=802.11ad, 6=802.11be
+  string ipv4_address = 6;                // 当前IPv4地址
+  string ipv4_gateway = 7;                // IPv4网关
+  string ipv4_netmask = 8;                // IPv4子网掩码
+  repeated string ipv6_addresses = 9;     // 当前所有IPv6地址列表
+  string ipv6_gateway = 10;               // IPv6网关
+  repeated string dns_servers = 11;       // DNS服务器
+  int32 frequency = 12;                   // 工作频段(MHz)
+  int32 channel = 13;                     // 信道号
+  int32 rssi = 14;                        // 信号强度(dBm)
+  uint32 signal_level = 15;               // 信号强度等级: 0=无信号, 1=信号差, 2=信号一般, 3=信号良, 4=信号优
+  uint32 internet_state = 16;             // 互联网连接状态: 0=无互联网连接, 1=有互联网连接
+  int32 link_speed = 17;                  // 链路上行(tx)速度(Mb)
+  int32 link_speed_rx = 18;               // 链路下行(rx)速度(Mb)
+  uint64 link_tx_bytes = 19;              // 自连接建立以来已发送总数据量(字节)
+  uint64 link_rx_bytes = 20;              // 自连接建立以来已接收总数据量(字节)
+  uint64 link_tx_rate = 21;               // 上行实时流量速率(字节/秒)
+  uint64 link_rx_rate = 22;               // 下行实时流量速率(字节/秒)
+  int32 network_id = 23;                  // 网络ID
+  WifiEncryptionType encryption_type = 24;  // 加密类型
+  bool is_scanning = 25;                  // 是否正在扫描
+  string error_message = 26;              // 错误原因(当state=3连接失败时填充)
+}

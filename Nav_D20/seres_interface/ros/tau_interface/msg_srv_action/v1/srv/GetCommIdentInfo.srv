@@ -1,0 +1,17 @@
+# SIM卡槽(枚举型)
+uint8 SIM_ID_DEFAULT=0x00                                   # 默认数据卡
+uint8 SIM_ID_ONE=0x01                                       # SIM1
+uint8 SIM_ID_TWO=0x02                                       # SIM2
+
+uint8 sim_id                                                # SIM卡槽[必须使用 SIM_ID_* 常量]
+---
+# 运营商(枚举型)
+uint8 OPERATOR_UNKNOWN=0x00                    # 未知
+uint8 OPERATOR_CHINA_MOBILE=0x01               # 中国移动
+uint8 OPERATOR_CHINA_TELECOM=0x02              # 中国电信
+uint8 OPERATOR_CHINA_UNICOM=0x03               # 中国联通
+
+string iccid                                # ICCID(集成电路卡识别码)
+string imei                                 # IMEI(国际移动设备识别码)
+string msisdn                               # MSISDN(本机号码)
+uint8 operator_type                         # 运营商[必须使用 OPERATOR_* 常量]

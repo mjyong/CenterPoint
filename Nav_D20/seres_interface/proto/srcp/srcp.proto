@@ -1,0 +1,231 @@
+syntax = "proto3";
+
+import "msgtype.proto";
+
+import "task.proto";
+import "result.proto";
+import "rhr.proto";
+import "ota.proto";
+import "config.proto";
+import "nav_operation.proto";
+import "scene.proto";
+import "remote_control_task.proto";
+import "audio_video_call.proto";
+import "camera_ctl.proto";
+import "rhr_platform.proto";
+import "task_args.proto";
+import "scene_args.proto";
+import "scene_upload.proto";
+import "user_manager.proto";
+import "wifi_query.proto";
+import "bluetooth.proto";
+import "buriedPoint.proto";
+package srcp;   // seres remote control protocal
+
+//==========================================================================================
+message Header
+{
+    string version      = 1;
+    string robot_type   = 2;
+    string robot_id     = 3;
+    uint64 timestamp    = 4;
+    uint64 seq          = 5;    // 发送端seq自增；回复类消息seq与发送端保持一致
+    MsgType.ID msgtype  = 6;    // body消息类型名
+}
+
+//-----------------------------------------------------------------------------------------
+// 云端响应消息
+message RemoteResponse
+{
+    Header head = 1;
+    GeneralResult result = 2;        // 通用返回
+
+    MsgType.ID resp_data_type  = 3;  // 附加响应数据【可选】data数据类型，不需要携带数据时填0
+    oneof data                       // 附加响应数据【可选】（比如查询结果）, resp_data_type != 0时有效
+    {
+        RobotLogUploadTaskInitResponse taskInitResponse = 4;  // 日志上报任务响应
+        srcp.args.SceneRobotPostStatusResult sceneRobotPostStatusResult = 5;// 场景机器人岗位状态结果
+        srcp.args.SceneRobotRecoverWorkResult sceneRobotRecoverWorkResult = 6;// 场景机器人恢复工作结果
+    }
+}
+
+//-----------------------------------------------------------------------------------------
+// 机器人响应消息
+message RobotResponse
+{
+    Header head                = 1;
+    GeneralResult result       = 2;  // 通用返回,所有指令均需回复此字段
+
+    // 以下定义附加响应数据【可选】@begin {
+    MsgType.ID resp_data_type  = 3;  // data数据类型
+    // 附加响应数据（比如查询结果）, resp_data_type != 0时有效
+    oneof data
+    {
+        TaskSkills taskSkills          = 4;  // 任务技能集
+        TaskStateResponse taskStateRsp = 5;  // 任务状态查询回复
+        RobotMode robotMode            = 6;  // 机器人模式
+        ReportConfig reportConfig      = 7;  //上报配置参数信息
+        EmptyLogComponents emptyLogComponents    = 8;  // 远程日志获取，返回无日志文件的节点信息
+        RobotStateInfo robotStateInfoRsp = 9;// RHR状态查询响应（平台化）
+        InitialPoseResponse initialPoseRsp  = 10;
+        srcp.args.AudioAdjust audioAdjustRsp = 11;     // 音量大小查询响应
+        UserGuidQueryResult userGuidQueryResult = 12;  // 用户引导查询响应
+        WifiQueryResult wifiQueryResult = 13; // WiFi 扫描结果查询响应
+        BluetoothQueryResult bluetoothQueryResult = 14; // 蓝牙扫描结果查询响应
+        srcp.args.VoiceStyleQueryResult voiceStyleQueryResult = 15; // 音色查询响应
+        AutoFollowCheckResult autoFollowCheckResult = 16; // 自主跟随前置条件检查上报
+        AutoFollowStatusReport autoFollowStatusReport = 17; // 自主跟随上报
+    }
+    // 附加响应数据 @end }
+}
+
+//-----------------------------------------------------------------------------------------
+message Login
+{
+    message Data
+    {
+        string dev_name   = 1;
+        string sw_ver     = 2;
+        bool   sys_reboot = 3;
+        string iccid      = 4;    // sim卡的iccid号
+        string imei       = 5;    // 绑定sim卡的模组IMEI号
+    }
+    Header head = 1;
+    Data data   = 2;
+}
+
+message Logout
+{
+    Header head = 1;
+}
+
+// 基础状态遗言
+message Status
+{
+    Header head   = 1;
+    string status = 2;
+}
+
+//绑定报文
+message RobotBindConfirm
+{
+  string sn = 1; // 设备SN码
+  string userUuid = 2; // 用户UUID
+}
+
+//-----------------------------------------------------------------------------------------
+// 远端发送的消息体
+message RemotePush
+{
+    Header head = 1;
+    oneof data
+    {
+        TaskOperate     task        = 2;  // 任务操作
+        TaskSkillsQuery skills      = 3;  // 任务技能查询
+        TaskStateQuery  taskState   = 4;  // 任务状态查询
+        RobotModeQuery  robotMode   = 5;  // 机器人模式查询 
+        GetRhrLog rhrLog            = 6;  // 请求RHR上传日志
+        RemoteConfig   remoteConfig = 7;  // 配置管理参数信息
+        NavOperation  navOperation  = 8;  // 地图编辑请求下发
+        RhrConfigs    rhrConfigs    = 9;  // RHR配置
+
+        RemoteDiagnosisEnable remoteDiagnosisEnable = 10; // 远程诊断开启
+        RemoteDiagnosisDisable remoteDiagnosisDisable = 11; // 远程诊断关闭
+        RobotOtaControl      otaControl = 14;
+
+        RemoteControlTask    remoteControlTask = 16;    // //远控任务
+        AudioVideoCallData audio_video_call_data = 17;//音视频通话数据
+        CameraCtl cameraCtl = 18; //拍摄录像
+
+        RobotStateQuery robotStateQuery = 19;//RHR机器人状态查询
+        GetPlatformRhrLog getPlatformRhrLog = 20;  //平台化日志获取
+        GetRhrData getRhrData = 21; //获取数据
+        SceneRecordCtl sceneRecordCtl = 22;  //场景拍摄控制
+        srcp.args.OfflineInspectPlc offlineInspectPlc = 23; // 下线质检PLC信息
+        srcp.args.ChassisInspectPlc chassisInspectPlc = 24; // 底盘质检PLC信息
+        srcp.args.SceneRobotJobConfig sceneRobotJobConfig = 25; // 场景机器人任务配置下发
+        srcp.args.SceneRobotDispatch sceneRobotDispatch = 26; // 场景机器人调度下发
+        // 用户管理模块（新增）
+        UserTask userTask = 50;            // 用户任务下发
+        UserGuideQuery userGuideQuery = 51; // 用户引导查询
+        WifiQuery wifiQuery = 52; // WiFi 扫描结果查询
+
+        SceneOperate SceneOperate = 53; //场景控制
+        BluetoothCtl bluetoothCtl = 54; // 蓝牙控制指令
+        WifiCtl wifiCtl = 55; // WiFi控制指令（开关/连接/忘记网络/触发扫描）
+    }
+}
+
+// 本体对外发送的消息体
+message RobotReport
+{
+    Header head = 1;
+    oneof data
+    {
+        RobotMode robotMode   = 2;  // 机器人模式上报
+        TaskSkills taskSkills = 3;  // 机器人技能集
+        TaskState taskState   = 4;  // 当前任务状态，状态变更时主动上报
+        RobotAlarm alarm      = 5;  // 告警上报
+        ReportConfig config   = 6;  // 设备参数信息
+        RobotStates robotStates = 10;  // RHR上报机器人状态
+        RobotLogUploadTaskInit logUploadTaskInit = 11; // 日志上报任务初始化
+        LocationStatus locationStatus            = 12; // 定位信息上报
+        NavOperationResult navOperationResult    = 13; // 云端地图编辑任务处理结果上报
+        TaskMapPointReport taskMapPointReport    = 14; // 巡逻任务 点位上报(目前仅D10涉及)
+        TrackPointReport   trackPointReport      = 15; // 巡逻轨迹点上报(目前仅D10涉及)
+        MapBuildStatus mapBuildStatus            = 16; // 建图状态上报
+        PlanningStatus planningStatus            = 17; // 规划状态上报
+        MapEditStatus  mapEditStatus             = 18; // 地图编辑状态上报
+        RemoteDiagnosisStatus remoteDiagnosisStatus = 19; // 远程诊断任务状态上报
+        EventRecord eventRecord                     = 20; // 事件记录上报
+        Trajectory   trajectory                     = 21; //轨迹上报
+        ReceiveJobPointReport receiveJobPointReport  = 22; // 接待任务点位上报
+        ReceiveJobPointStatusReport receiveJobPointStatusReport = 23; // 接待任务点位状态上报
+        
+        SceneStatusReport sceneStatusReport = 25; // 场景状态上报
+        TaskGeneralMapPointReport taskGeneralMapPointReport = 26; // 巡逻点位上报
+        TaskGeneralStatusReport taskGeneralStatusReport = 27; //巡逻状态上报
+        RealtimeLocationReport realtimeLocationReport = 28;//通用实时位置上报
+        AudioVideoCallData audio_video_call_data = 29;//音视频通话数据
+        RobotBindConfirm   robotBindConfirm  = 30;    //设备绑定上报
+        RobotAlarmInfo robotAlarmInfo = 31;// RHR告警上报（平台化）
+        RobotEventInfo robotEventInfo = 32;// RHR事件上报（平台化）
+        RobotStateInfo robotStateInfo = 33;// RHR状态上报（平台化）
+        CameraCtl cameraCtl = 34; // 录像状态上报   
+        GeneralTaskStateReport generalTaskStateReport = 35;//新接待任务导航、点位动作状态，变更时主动上报
+        TrajectoryRecordStatus trajectoryRecordStatus = 37; //轨迹拍摄录制状态上报
+        FollowShootStatusReport followShootStatusReport = 38;//跟随拍摄状态上报
+        OrbitRecordStatus orbitRecordStatus = 39; //环绕拍摄状态上报
+        CameraStatusReport cameraStatusReport = 40; //相机状态上报
+        DelayShootStatus delayShootStatus = 41; //延时拍摄状态上报
+        srcp.args.SceneRobotStatus sceneRobotStatus = 42; //场景机器人运行信息上报
+        srcp.args.SceneRobotDispatchResult sceneRobotDispatchResult = 43; // 场景机器人调度结果上报
+        srcp.args.CarDetectStatus carDetectStatus = 44; // 车辆检测状态上报
+        // 42-44预留, 云端42-44有3个任务上报
+        PoiMarkReport poiMarkReport = 45;//点位标记上报
+        srcp.args.NavStateReport navStateReport = 46;//导航状态上报
+        FetchOrDeliverInfo fetchOrDeliverInfo = 47; //取送物状态上报
+        ReChargeReport reChargeReport = 48; //回充
+        AntiTheftStatus antiTheftStatus = 49; //AntiTheft模式
+        RobotOtaProcessStateReport otaProcessStateReport = 50;
+        // 用户管理模块（新增）
+        UserTaskStatusReport userTaskStatusReport = 51;  // 用户任务状态上报
+
+        srcp.args.SceneRobotPostStatusQuery sceneRobotPostStatusQuery = 52;// 场景机器人岗位状态查询
+        srcp.args.SceneRobotRecoverWorkReport sceneRobotRecoverWorkReport = 53;// 场景机器人恢复工作上报
+        MemoryFormatReport memoryFormatReport = 54; // 内存格式化上报
+        GuardSceneStatusReport guardSceneStatusReport = 55;
+        GuardSceneEventReport guardSceneEventReport = 56;
+        AutoFollowStatusReport autoFollowStatusReport = 57; // 自主跟随上报
+        RemoteControlTaskState remoteControlTaskState = 59; // 远程控制指令执行状态上报
+        WifiStatusReport wifiStatusReport = 60; // WiFi状态上报（开关状态+连接状态）
+        InitialPersonalityData initialPersonalityData = 61; // 性格初始化数据
+        ProactiveInteractionData proactiveInteractionData = 62; // 性格演变主动交互数据
+        AICompanionStatusReport aiCompanionStatusReport = 63; // AI陪跑状态上报
+        VlogReport vlogReport = 64; // 智能Vlog上报（状态+高光成片结果）
+        AICompanionStatusTipsReport aiCompanionStatusTipsReport = 65; // AI陪跑事件上报
+        RelocationStatusReport relocationStatusReport = 66; // 重定位状态上报
+        
+    }
+}
+ 

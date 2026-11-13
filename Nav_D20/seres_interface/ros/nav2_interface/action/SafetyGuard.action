@@ -1,0 +1,18 @@
+# Goal
+uint8 GUARD_MODE_TRAJECTORY  = 0    # 轨迹守卫: 守卫给定轨迹
+uint8 GUARD_MODE_REGION      = 1    # 区域守卫: 守卫给定多边形区域
+uint8 GUARD_MODE_MAP_EDGE    = 2    # 地图边缘守卫: 守卫地图边界, points 留空
+
+uint8 mode                          # 守卫模式
+string map_uuid                     # 所属地图
+geometry_msgs/Point[] points        # 守卫几何: 轨迹守卫=轨迹点串; 区域守卫=多边形顶点(按序连线闭合); 地图边缘守卫忽略
+string[] hazard_sources             # 危险源类别: 如 "person", "animal"; 空: 全部
+int32 patrol_duration_sec           # 巡逻时长(s): 0=沿路线走一整圈(回到进入点)后结束; >0=限时巡逻(走满时长后在顶点收尾结束); -1=无限巡逻
+---
+# Result
+string message                      # 结果描述
+
+---
+# Feedback
+uint32 state                        # 详见 nav2_interface/msg/NavState.msg (NAV_STA_GUARD_*)
+uint32[] box_ids                    # 触发守卫的危险源3D box框ID序列 (同 common_interface/BoundingBox3D.id), 空: 无

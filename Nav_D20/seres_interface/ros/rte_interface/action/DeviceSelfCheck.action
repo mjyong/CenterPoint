@@ -1,0 +1,36 @@
+# ============================================================
+# DeviceSelfCheck.action - 设备自检接口
+#
+# 自检内容由 type 决定，后面跟着变长参数 params。
+# 板间报文的 payload 首字节也是 type，长度由报文头 length 字段表达。
+#
+# ── type 与 params 布局对照表 ──────────────────────
+#   0x01  CAN 环回自检
+#         params = [ch_a1, ch_b1, ch_a2, ch_b2, ...]  根据需要检测的回环端口配对
+#         说明：ch_ax、ch_bx 为已物理短接的一对 CAN 通道
+#
+#   （新增类型在此追加，params 长度随之变化, 不会超过max_length）
+# ============================================================
+
+# ── Goal：要自检的内容 ──
+uint8   type       # 自检类型，决定 params 的布局
+uint8[] params            # 变长参数，布局见上方对照表
+                          #   0x01 时：[ch_a, ch_b] 代表自检的一对通道, 可以列出多对通道，保证数组长度是偶数
+uint8 extend          # 保留字段
+
+# ── 自检类型常量 ──
+uint8 SELF_CHECK_CAN_LOOPBACK = 0x01    # CAN 环回自检
+
+---
+# ── Result：逐项结果 ──
+uint8   type              # 回显 Goal 的 type
+uint8[] params            # 回显 Goal 的 params
+uint8[] result_codes      # 每项：0 = 通过 / 1 = 失败
+string[] result_msgs      # 检测结果的可读描述
+                          #   对齐规则由 type 决定：
+                          #   0x01 (CAN环回)：每 2 字节一对 → size == params.size() / 2
+---
+# Feedback 暂时不用
+# ── Feedback：进度 ──
+# uint8 checked             # 已完成项数
+# uint8 total               # 总项数

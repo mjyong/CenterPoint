@@ -1,0 +1,228 @@
+syntax = "proto3";
+
+package srcp;
+
+import "task_args.proto";
+
+//-----------------------------------------------------------------------------------------
+// 任务操作
+message TaskOperate
+{
+    enum Mode
+    {
+        START           = 0;    // 启动任务
+        CANCEL          = 1;    // 取消任务
+        PAUSE           = 2;    // 暂停任务
+        RECOVER         = 3;    // 恢复任务
+        ISSUED          = 4;    // 任务下发(目前仅D10项目涉及)
+        IMMEDIATE       = 5;    // 取消/暂停当前，并立即执行此任务
+    }
+  
+    uint64 timestamp     = 1;   // 任务下发时刻时间戳，单位ms
+    uint64 delay         = 2;   // 延迟执行时间，单位ms，由timestamp，delay共同确定任务开始执行时间
+    string name          = 3;   // 任务名称
+    string id            = 4;   // 任务UUID；当为取消任务时，id:”current”表示取消当前正在执行的任务，id:”all”表示取消所有任务，其他则表示取消指定UUID的任务
+    Mode mode            = 6;   // 任务控制方式，目前大都使用START，部分任务支持CANCEL，协议层面支持PAUSE和RECOVER
+    TaskTree task        = 7;   // 任务树，具体任务执行块，可以是单个或组合任务
+}
+
+// 任务树
+message TaskTree 
+{
+    enum Type {
+        // --- 基础 ---
+        ACTION                = 0;   // 执行动作
+        SEQUENCE              = 1;   // 顺序执行
+        PARALLEL              = 2;   // 并行执行
+    }
+
+    Type type                   = 1;    // 任务树类型
+    repeated TaskTree subTree   = 2;    // Type非ACTION时有效
+    string skill                = 3;    // 技能项名称, Type:ACTION时有效，须与提供的技能名称匹配
+
+// 一个指令参数对应一个技能
+// 技能名称规则为技能参数名称首字母小写
+// 例如：
+// SitDown对应技能sitDown技能名称
+// Stand对应技能stand技能名称
+// 其余类推
+
+    oneof skillPara {
+        srcp.args.SitDown sitDown                   = 4;
+        srcp.args.MoveLevel moveLevel               = 5;
+        srcp.args.Move move                         = 6;
+        srcp.args.StopMove stopMove                 = 7;
+        srcp.args.Squat squat                       = 8;
+        srcp.args.LieDown lieDown                   = 9;
+        srcp.args.Damp damp                         = 10;
+        srcp.args.Wave wave                         = 11;
+        srcp.args.JointDisable jointDisable         = 12;
+        srcp.args.LockJoint lockJoint               = 13;
+        srcp.args.UnlockJoint unlockJoint           = 14;
+        srcp.args.PowerOff powerOff                 = 15;
+        srcp.args.PlayTTS playTTS                   = 16;
+        srcp.args.MonitorAVStream monitorAVStream   = 17;
+        srcp.args.Call call                         = 18;
+        srcp.args.Mapping mapping                   = 19;
+        srcp.args.Navigate navigate                 = 20;
+        srcp.args.Grab grab                         = 21;
+        srcp.args.TakePhoto photo                   = 22;
+        srcp.args.PanTiltAngle angle                = 23;
+        srcp.args.VisibleLightFocalLength focal     = 24;
+        srcp.args.GaitCtrl gaitCtrl                 = 25;
+        srcp.args.PatrolMissions patrolMissions     = 26;
+        srcp.args.Relocation relocation             = 27;
+        srcp.args.LightCtrl lightCtrl               = 28; 
+        srcp.args.Stand stand                       = 29;// 站立
+        srcp.args.JointEnable jointEnable           = 30;
+        srcp.args.Handshake handshake               = 31; // 握手
+        srcp.args.ExplainAction explainAction       = 32; //讲解动作
+        srcp.args.ReceiveJobPointAction receiveJobPointAction = 33; // 接待任务执行该点位的所有功能（导航 + 动作 + 语料）
+        srcp.args.ReceiveJobNavigation receiveJobNavigation = 34; // 接待任务导航下发
+        srcp.args.Reset reset                       = 35; // 复位
+        srcp.args.DisplayEmoji displayEmoji         = 36; //表情切换
+        srcp.args.ReceiveJobCorpus receiveJobCorpus = 37; //接待任务语料下发
+        srcp.args.ReceiveJobStart receiveJobStart   = 38; //开始迎宾
+        srcp.args.GreetGuest greetGuest             = 39; //迎宾
+        srcp.args.SendGuest sendGuest               = 40; //送宾
+        srcp.args.Wakeup wakeup                     = 41; // 唤醒
+        srcp.args.SleepMode sleepMode               = 42; // 休眠
+        srcp.args.Nod nod                           = 43; //点头
+        srcp.args.ShakeHead shakeHead               = 44; //摇头
+        srcp.args.TurnHead turnHead                 = 45; //摆头
+        srcp.args.ThumbsUp thumbsUp                 = 46; //竖大拇指
+        srcp.args.VictorySign victorySign           = 47; //比耶
+        srcp.args.HeartGesture heartGesture         = 48; //比心
+        srcp.args.FistSalute fistSalute             = 49; //抱拳
+        srcp.args.Recharging recharging             = 50; //回充
+        srcp.args.Dance dance                       = 51; //跳舞
+        srcp.args.ExplainLeftUpper explainLeftUpper           = 52; //讲解动作细分，左上
+        srcp.args.ExplainRightUpper explainRightUpper         = 53; //讲解动作细分，右上
+        srcp.args.ExplainLeftLower explainLeftLower           = 54; //讲解动作细分，左下
+        srcp.args.ExplainRightLower explainRightLower         = 55; //讲解动作细分，右下
+        srcp.args.ExplainLeftCenter explainLeftCenter         = 56; //讲解动作细分，左中
+        srcp.args.ExplainRightCenter explainRightCenter       = 57; //讲解动作细分，右中
+        srcp.args.InspectionTask inspectionTask               = 58; // 巡检任务
+        srcp.args.GenericSceneStart genericSceneStart         = 59; //开始场景表演
+        srcp.args.ExplainXGesture explainXGesture             = 60; //左中右手势
+        srcp.args.ExplainYGesture explainYGesture             = 61; //上中下手势
+        srcp.args.ExplainFrontGesture explainFrontGesture     = 62; //前伸手势
+        srcp.args.Shrug shrug                                 = 63; //摊手手势
+        srcp.args.RaiseHand raiseHand                         = 64; //抬手手势
+        srcp.args.Celebrate celebrate                         = 65; //恭喜
+        srcp.args.RaiseMicrophone raiseMicrophone             = 66; //举麦
+        srcp.args.GrabMicrophone  grabMicrophone              = 67; //拿起话筒
+        srcp.args.PutDownMicrophone putDownMicrophone         = 68; //放下话筒
+        srcp.args.ReleaseMicrophone releaseMicrophone         = 69; //松开话筒
+        srcp.args.Hug hug                                      = 77; // 拥抱
+        srcp.args.FingerDance fingerDance                     = 80; //手势舞
+        srcp.args.HoldPlate holdPlate                         = 81; //握盘子
+        srcp.args.RaisePlate raisePlate                       = 82; //抬盘子
+        srcp.args.LeftWave leftWave                           = 83; //左手挥手
+        srcp.args.WalkWithLoad walkWithLoad                   = 84; //D系列负重行走
+        srcp.args.ImcMode imcMode                             = 85; //R系列独立运控模式
+        srcp.args.BalanceStand balanceStand                   = 86; //R系列平衡站立
+        srcp.args.LiftLeftArm liftLeftArm                     = 87; //抬左臂
+        srcp.args.LiftRightArm liftRightArm                   = 88; //抬右臂
+        srcp.args.LiftDualArm liftDualArm                     = 89; //抬双臂
+        srcp.args.SpeechNod speechNode                        = 90; //讲解点头
+        srcp.args.RightThumbUp rightThumbUp                   = 91; //右大拇指
+        srcp.args.ThreeSix threeSix                           = 92; //666
+        srcp.args.IntroduceSelf introduceSelf                 = 93; //自我介绍
+        srcp.args.Appearance appearance                       = 94; //登场
+        srcp.args.Announce announce                           = 95; //
+        srcp.args.LifePosture lifePosture                     = 96; //生命态
+        srcp.args.MultiModal multiModal                       = 97; //多模态
+        srcp.args.Walk walk         = 100;// 行走
+        srcp.args.Run run      = 101;// 跑
+        srcp.args.Getup getup         = 102; //倒地恢复
+        srcp.args.Jump jump         = 103; //跳
+        srcp.args.GetDown getDown         = 104;// 趴姿
+        srcp.args.Handstand handstand         = 105;// 倒立
+        srcp.args.Upright upright         = 106;// 直立
+        srcp.args.FistBump fistBump  = 107; //碰拳
+        srcp.args.GuessBump guessBump  = 108; //猜拳
+        srcp.args.WaistRotation waistRotation = 109;//腰部转动(转腰)
+        srcp.args.EmergencyStop emergencyStop  = 110;// 急停
+        srcp.args.Restart restart         = 111;// 重启
+        srcp.args.Pause pause         = 112;// 暂停
+        srcp.args.Guide guide = 120; //引导
+        srcp.args.OpenExplain openExplain = 121; //开放讲解
+        srcp.args.LongPresent longPresent = 122; //长讲解
+        srcp.args.StaticGesture staticGesture = 123; //静态动作
+        srcp.args.ExceptionTTS exceptionTTS                   = 124;//感知算法异常下发
+        srcp.args.TaskAction taskAction                       = 125;//d20巡逻暂停下发操作
+        srcp.args.Handclap handclap                          = 126; // 鼓掌
+        srcp.args.HonorWallGesture honorWallGesture          = 127; // 荣誉墙手势
+        srcp.args.InitialPose initialPose                     = 128; //初始姿态
+        srcp.args.Mapping exploreMapping                      = 129; // 探索建图
+        srcp.args.SwitchMap switchMap                         = 130;
+
+    }
+}
+
+//-----------------------------------------------------------------------------------------
+// 任务技能集, 查询回复及主动上报对象
+message TaskSkills
+{
+    repeated string skill = 1;
+}
+
+// 查询支持的任务技能
+message TaskSkillsQuery
+{
+}
+
+//-----------------------------------------------------------------------------------------
+// 查询任务状态
+message TaskStateQuery
+{
+    string id = 1;      // id:”current”查询当前正在执行的任务，id:”all”查询所有任务，其他则表示查询指定UUID的任务
+}
+// 任务状态查询回复
+message TaskStateResponse
+{
+    repeated TaskState state = 1;
+}
+
+// 任务状态，变更时主动上报
+message TaskState 
+{
+    enum State
+    {
+        RUNNING     = 0;  
+        SUCCESS     = 1;
+        FAILURE     = 2;
+        CANCELED    = 3;    // 已取消
+        PAUSED      = 4;
+        RECOVERED   = 5;
+    }
+
+    string name     = 1;    // 任务名称
+    string id       = 2;    // 任务UUID
+    State state     = 3;    // 任务状态
+    TaskTree tree   = 4;
+    string failure_reason = 5; // 失败原因
+}
+
+//-----------------------------------------------------------------------------------------
+//机器人模式查询
+message RobotModeQuery
+{
+}
+// 机器人模式查询回复，状态变更时主动上报
+message RobotMode
+{
+    enum Mode {
+        UNKNOWN     = 0;
+        IDLE        = 1;    // 空闲模式
+        WORKING     = 2;    // 作业模式
+        INACTIVE    = 3;    // 未激活模式
+        UPGRADE     = 4;    // 升级模式
+        FAULT       = 5;    // 故障模式
+        SLEEP       = 6;    // 睡眠模式
+        FACTORY     = 7;    // 工厂模式
+        CALIBRATION = 8;    // 标定模式    
+    }
+    Mode mode = 1;
+}

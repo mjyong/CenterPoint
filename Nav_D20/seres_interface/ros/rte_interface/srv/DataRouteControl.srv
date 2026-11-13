@@ -1,0 +1,10 @@
+# 数据通道转发开关
+# 请求部分 
+uint8 type
+uint8 src_ch
+uint8 dst_ch
+uint8 extend
+
+---
+#响应部分
+bool success

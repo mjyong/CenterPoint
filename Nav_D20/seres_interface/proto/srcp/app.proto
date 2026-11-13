@@ -1,0 +1,136 @@
+syntax = "proto3";
+package srcp;
+
+import "msgtype.proto";
+import "result.proto";
+import "task.proto";
+import "nav_operation.proto";
+import "network_config.proto";
+import "remote_control_task.proto";
+import "scene.proto";
+import "scene_upload.proto";
+import "music.proto";
+import "config.proto";
+
+// gRPC消息大小有限制（默认4MB），对于过大的消息需要分片传输
+message ChunkInfo
+{
+    uint32 total_size    = 1;
+    uint32 total_chunks  = 2;
+    MsgType.ID data_type = 3;  // 源数据类型
+}
+message Chunk
+{
+    uint32 index = 1;
+    uint32 size  = 2;
+    bytes data   = 3;
+}
+message ChunkAck
+{
+    bool success   = 1;
+    string message = 2;
+    uint32 index   = 3;
+}
+message AppHeader
+{
+    string mobile_type   = 1;  // 移动设备类型
+    string system_type   = 2;  // 系统类型（iOS，Android等）
+    string environment   = 3;  // 环境类型（dev/test/prod）
+    uint64 timestamp     = 4;  // 时间戳
+    uint64 seq           = 5;  // 请求序号
+    MsgType.ID data_type = 6;  // 携带的数据类型
+}
+message AppLogin
+{
+  AppHeader head  = 1;
+  string username = 2;
+  string password = 3;
+}
+
+message AppLoginResponse
+{
+  AppHeader head      = 1;
+  bool success        = 2;
+  string message      = 3;  // 错误消息
+  string token        = 4;  // 登录成功返回令牌
+  uint64 expires_time = 5;  // 令牌过期时长（秒）
+}
+
+message AppLogout
+{
+  AppHeader head = 1;
+}
+
+message AppLogoutResponse
+{
+  AppHeader head = 1;
+  bool success   = 2;
+  string message = 3;  // 错误消息
+}
+
+message AppReq
+{
+    AppHeader head = 1;
+    oneof data
+    {
+        TaskOperate task = 2;  // 任务操作
+        WiFiAPRequest wifiApReq = 3;   // 新增：WiFi热点配置请求
+        RemoteControlTask remoteControl = 4; // 远控任务
+        MusicOperate musicOperate = 5;
+        RemoteConfig   remoteConfig = 6;  // 配置管理参数信息
+    }
+}
+message RobotResp
+{
+    AppHeader head       = 1;
+    GeneralResult result = 2;  // 通用返回,所有指令均需回复此字段
+
+    // 以下定义附加响应数据【可选】@begin {
+    MsgType.ID resp_data_type = 3;  // data数据类型
+    // 附加响应数据（比如查询结果）, resp_data_type != 0时有效
+    oneof data
+    {
+        TaskSkills taskSkills          = 4;  // 任务技能集
+        TaskStateResponse taskStateRsp = 5;  // 任务状态查询回复
+        RobotMode robotMode            = 6;  // 机器人模式
+        WiFiAPResponse wifiApRsp       = 7;  // 新增：WiFi配置响应
+        MusicOperateRep musicOperateRsp  = 8;  // 音乐账号信息
+        ReportConfig reportConfig      = 9;  //上报配置参数信息
+    }
+    // 附加响应数据 @end }
+}
+message AppSubscription
+{
+  AppHeader head = 1;
+  oneof data
+  {
+    ChunkAck chunk_ack = 2;
+  }
+}
+message RobotPublish
+{
+    AppHeader head = 1;
+    oneof data
+    {
+        RobotMode robotMode   = 2;  // 机器人模式上报
+        TaskSkills taskSkills = 3;  // 机器人技能集
+        TaskState taskState   = 4;  // 当前任务状态，状态变更时主动上报
+        ChunkInfo chunk_info  = 5;  // 分片元数据信息
+        Chunk chunk           = 6;  // 分片数据
+        MapBuildStatus map_task_status = 7; // 建图状态
+        LocationStatus location_status = 8; // 定位信息上报
+        SceneStatusReport sceneStatusReport = 9; // 场景状态上报
+        MusicPublishInfo musicPublishInfo = 10;  //音乐主动推送消息
+        ReportConfig config   = 11;  // 设备参数信息
+    }
+}
+
+message HeartbeatRequest {
+    AppHeader head = 1;
+}
+
+message HeartbeatResponse {
+    AppHeader head = 1;
+    bool success = 2;
+    string message = 3;
+}

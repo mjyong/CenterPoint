@@ -1,0 +1,425 @@
+syntax = "proto3";
+package srcp.args;
+import "task_args.proto";
+import "skill_args.proto";
+import "nav_operation.proto";
+
+enum SceneRecordOperation {
+    UNKNOWN_OPERATION = 0;
+    TRAJECTORY_RECORD_OPERATION = 1;
+    FOLLOW_SHOOT_OPERATION = 2;
+    ORBIT_RECORD_OPERATION = 3;
+    DELAY_SHOOT_OPERATION = 4; //延时拍摄
+}
+
+enum OrbitRecordState {
+    ORBIT_STATE_UNKNOWN = 0;
+    ORBIT_STATE_RECORDING = 1;        // 录制中
+    ORBIT_STATE_SAVING = 2;           // 保存中
+    ORBIT_STATE_COMPLETED = 3;        // 录制完成
+    ORBIT_STATE_FAILED = 4;           // 录制失败
+    ORBIT_STATE_UNRECOVERABLE_ERROR = 5; // 不可恢复异常，已停止
+}
+
+enum DelayShootStatusEnum {
+    DELAY_SHOOT_UKNOWING = 0;
+    DELAY_SHOOTING = 1;  //拍摄中
+    DELAY_SHOOT_FAIL = 2;  //拍摄失败
+    DELAY_SHOOTE_SAVING = 3;  //拍摄保存中
+    DELAY_SHOOT_COMPLETED = 4;  //拍摄完成
+    DELAY_SHOOT_UNRECOVERABLE_ERROR = 5; // 不可恢复异常，停止录制
+}
+
+enum SpeedLevel {
+    UNKNOWN = 0;
+    SLOW = 1;            // 慢
+    MEDIUM = 2;          // 中
+    FAST = 3;            // 快
+}
+
+//跟随速度
+enum FollowSpeed {
+    FOLLOW_SPEED_UNKNOWN = 0;
+    FOLLOW_SPEED_FAST = 1; // 快
+    FOLLOW_SPEED_MIDDLE = 2; // 中
+    FOLLOW_SPEED_SLOW = 3; //慢
+}
+
+//跟随模式
+enum FollowMode {
+    FOLLOW_MODE_UNKNOWN = 0;
+    FOLLOW_MODE_LEFT_REAR = 1; // 左后
+    FOLLOW_MODE_RIGHT_REAR = 2; // 右后
+    FOLLOW_MODE_REAR = 3; //正后
+}
+
+// 录制类型
+enum TrajectoryRecordType {
+    RECORD_TYPE_UNKNOWN = 0;
+    RECORD_TYPE_PATH = 1;              // 路径录制
+    RECORD_TYPE_TRAJECTORY = 2;        // 轨迹录制
+}
+
+// 录制状态
+enum TrajectoryRecordStatusEnum {
+    TRAJECTORY_STATE_UNKNOWN = 0;
+    TRAJECTORY_STATE_RECORDING = 1;        // 录制中
+    TRAJECTORY_STATE_SAVING = 2;           // 保存中
+    TRAJECTORY_STATE_COMPLETED = 3;        // 录制完成
+    TRAJECTORY_STATE_FAILED = 4;           // 录制失败
+    TRAJECTORY_STATE_ARRIVED_START_POINT = 5;  //轨迹录制到达起点
+    TRAJECTORY_STATE_UNRECOVERABLE_ERROR = 6; // 不可恢复异常，停止录制
+}
+
+message Waypoint {
+    float x = 1;   // 2D坐标x
+    float y = 2;   // 2D坐标y
+}
+
+message FetchOrDeliverObject {
+  enum Mode {
+    FETCH = 0; //拿取
+    DLIVER = 1; //送达
+  }
+  string object_name=2;//物品名称
+  string map_uuid=3;//地图uuid
+  string map_name=4;//地图名称
+  string point_name=5;//点位名称
+  srcp.args.PointOrientation point=6;//目标点
+}
+
+
+message OrbitRecordStart {
+    SubjectDetectionInfo orbit_target = 1;           // 环绕主体
+    repeated Waypoint waypoints = 2;                  // 环绕轨迹点（2D 坐标序列）
+    bool hitchcock_enabled = 3;               // 希区柯克效果（滑动变焦）开关
+    SpeedLevel speed_level = 4;               // 环绕速度档位
+}
+
+// App 发起停止，或云端主动停止
+message OrbitRecordStop {
+    // 预留扩展
+}
+
+message DelayShootStart {
+    int32 shoot_time = 1; //延时拍摄总时长
+    int32 interval_time = 2;  //间隔时间
+    string path_id = 3;   //轨迹延时拍摄需要
+}
+
+message DelayShootStop {
+}
+
+// ======================== 轨迹拍摄 ========================
+
+// 录制开始请求
+// - path_id为空：路径录制模式，本体进入路径录制状态，
+// - path_id非空：轨迹拍摄录制模式，本体按模板自动录制
+message TrajectoryRecordStart {
+    string path_id = 1;             // 轨迹录制路径ID（为空则路径录制，非空则轨迹录制）
+}
+
+// 录制停止请求
+message TrajectoryRecordStop {
+    // 预留扩展字段
+}
+
+// 轨迹导航时回到起点
+message TrajectoryPointNavStart {
+    string path_id = 1;
+}
+
+//停止轨迹导航
+message TrajectoryPointNavStrop {
+}
+
+message TrajectoryRecord {
+    oneof action {
+        TrajectoryRecordStart trajectoryRecordStart = 1;  //开始轨迹录制
+        TrajectoryRecordStop trajectoryRecordStop = 2;  //停止轨迹录制
+        TrajectoryPointNavStart trajectoryPointNavStart = 3;  //导航到起点
+        TrajectoryPointNavStrop trajectoryPointNavStop = 4;  //停止导航
+    }
+}
+
+// ======================== 跟随拍摄 ========================
+// 主体信息
+message SubjectDetectionInfo {
+    // 主体类型
+    enum SubjectType {
+        SUBJECT_TYPE_UNKNOWN = 0;
+        SUBJECT_TYPE_GENERAL = 1;          // 一般主体
+        SUBJECT_TYPE_UWB = 2;              // UWB主体
+    }
+    int32 id = 1;
+    SubjectType subject_type = 2;   // 主体类型
+    float x = 3;                    // 坐标 x
+    float y = 4;                    // 坐标 y
+    float w = 5;                    // 宽
+    float h = 6;                    // 高
+}
+
+// 跟随拍摄场景
+message FollowShoot {
+    //拍摄模式
+    enum Mode {
+        START = 0;   // 开始录像
+        PAUSE = 1;   // 暂停录像
+        STOP = 2;     // 停止录像
+        RECOVER = 3;   // 恢复录像
+        ADJUST = 4;   // 调整参数
+    }
+    Mode mode = 1;                                       // 模式
+    SubjectDetectionInfo follow_target = 2;             // 跟随对象
+    FollowSpeed speed = 3;                              // 速度
+    float distance = 4;                                 // 距离
+    float angle = 5;                                    // 角度
+    FollowMode follow_mode = 6;                          // 跟随模式
+}
+
+// ================== 环绕拍摄==================
+// 本消息由云端通过 MQTT 下发给本体
+message OrbitRecord {
+    oneof action {
+        OrbitRecordStart orbitRecordStart = 1;
+        OrbitRecordStop orbitRecordStop = 2;
+    }
+}
+
+// ======================== 延时拍摄 ========================
+message DelayShoot {
+    oneof action {
+        DelayShootStart start = 1;
+        DelayShootStop stop = 2;
+    }
+}
+
+//跑步伴随启动参数
+//对应技能名 runningCompanionStart
+//trigger_source 标识触发来源，用于区分语音/UWB/APP
+message RunningCompanionStart {
+    enum TriggerSource {
+        APP   = 0;  // APP 触发（默认）
+        VOICE = 1;  // 语音触发，开启语音播报
+        UWB   = 2;  // UWB 遥控器触发，关闭语音播报
+    }
+    TriggerSource trigger_source = 1;  // 触发来源
+}
+
+// 下线质检PLC信息
+message OfflineInspectPlc {
+  int32 speed           = 1; // 传送带速度，单位：mm/s
+  int32 encoder_val     = 2; // 传送带实时编码器值
+  int32 encoder_val_ir  = 3; // 红外触发点编码器值
+  string station_vin    = 4; // 工位VIN码
+  string car_type_code  = 5; // 车型编码
+  string car_type_val   = 6; // 车型值
+  string car_color_code = 7; // 颜色编码
+  string car_color_val  = 8; // 颜色值
+}
+
+// 底盘质检PLC信息
+message ChassisInspectPlc {
+  string station_vin   = 1; // 工位VIN码
+  string car_type_code = 2; // 车型编码
+  string car_type_val  = 3; // 车型值
+  int32 honger_speed   = 4; // 吊架速度，单位：mm/s
+  int32 honger_height  = 5; // 吊架高度
+  int32 honger_id      = 6; // 吊架ID
+}
+
+
+// 岗位类型
+enum PostType {
+  POST_TYPE_UNKNOWN                   = 0; // 未知
+  POST_TYPE_OFFLINE_INSPECT_ONE_FAC   = 1; // 总装下线质检（一工厂）
+  POST_TYPE_OFFLINE_INSPECT_TWO_FAC   = 2; // 总装下线质检（二工厂）
+  POST_TYPE_OFFLINE_INSPECT_THREE_FAC = 3; // 总装下线质检（三工厂）
+  POST_TYPE_CHASSIS_INSPECT_ONE_FAC   = 4; // 底盘质检（一工厂）
+  POST_TYPE_CHASSIS_INSPECT_TWO_FAC   = 5; // 底盘质检（二工厂）
+  POST_TYPE_CHASSIS_INSPECT_THREE_FAC = 6; // 底盘质检（三工厂）
+}
+
+// 场景机器人任务配置下发
+message SceneRobotJobConfig {
+  PostType post_type                 = 1; // 岗位类型
+  bool status                              = 2; // true:开，false:关
+}
+
+// 场景机器人运行状态信息上报
+message SceneRobotStatus {
+  enum WorkState {
+    WORK_STATE_UNKNOWN      = 0; // 未知
+    WORK_STATE_IDLE         = 1; // 未工作
+    WORK_STATE_WORKING      = 2; // 工作中
+    WORK_STATE_PAUSING      = 3; // 暂停中
+  }
+  enum ChargeState {
+    CHARGE_STATE_UNKNOWN    = 0; // 未知
+    CHARGE_STATE_NOT_CHARGE = 1; // 未充电
+    CHARGE_STATE_CHARGING   = 2; // 充电中
+  }
+
+  WorkState work_state      = 1; // 工作状态
+  ChargeState charge_state  = 2; // 充电状态
+  string point_code         = 3; // 点位编码
+  int32 bms_soc             = 4; // 电量
+  PostType post_type        = 5; // 岗位类型
+}
+
+// 场景调度类型
+enum SceneDispatchType {
+  DISPATCH_TYPE_UNKNOWN      = 0; // 未知
+  DISPATCH_TYPE_START_CHARGE = 1; // 开始充电
+  DISPATCH_TYPE_STOP_CHARGE  = 2; // 结束充电
+  DISPATCH_TYPE_START_WORK   = 3; // 开始工作
+  DISPATCH_TYPE_STOP_WORK    = 4; // 停止工作
+  DISPATCH_TYPE_PAUSE_WORK   = 5; // 暂停工作
+  DISPATCH_TYPE_RECOVER_WORK  = 6;// 恢复工作
+  DISPATCH_TYPE_NAV_TO_POINT = 7; // 导航到指定点位
+}
+
+// 场景机器人调度下发
+message SceneRobotDispatch {
+  SceneDispatchType dispatch_type = 1; // 调度类型
+  string point_code               = 2; // 点位编码
+}
+
+// 场景机器人调度结果上报
+message SceneRobotDispatchResult {
+  // 调度结果
+  enum DispatchResult {
+    DISPATCH_RESULT_UNKNOWN  = 0; // 未知
+    DISPATCH_RESULT_SUCCESS  = 1; // 成功
+    DISPATCH_RESULT_FAIL     = 2; // 失败
+  }
+
+  DispatchResult result      = 1; // 调度结果
+  SceneDispatchType dispatch_type = 2; // 调度类型
+  string point_code          = 3; // 点位编码
+}
+
+
+// 车辆检测状态上报
+message CarDetectStatus {
+  enum DetectState {
+    DETECT_STATE_UNKNOWN  = 0; // 未知
+    DETECT_STATE_START    = 1; // 开始
+    DETECT_STATE_WAIT_CAR = 2; // 等待车辆
+    DETECT_STATE_FINISH   = 3; // 结束
+    DETECT_STATE_ERROR    = 4; // 异常
+    DETECT_STATE_PAUSE    = 5; // 暂停
+  }
+
+  DetectState state       = 1; // 检测状态
+  string vin              = 2; // 车辆VIN
+  string car_model        = 3; // 车型
+  string car_type_code    = 4; // 车型编码
+  string car_color_code   = 5; // 颜色编码
+  string error_code       = 6; // 异常编码
+  string error_desc       = 7; // 异常描述
+  PostType post_type      = 8; // 岗位类型
+}
+
+// 区域守卫任务控制参数
+message GuardScene {
+  enum Option {
+    UNKNOWN_GUARD_OPTION = 0;
+    ALARM_IGNORE_WARNING = 1; // 告警解除（停止声光警报，守卫任务继续执行）
+  }
+  Option option = 2;        // 控制类型
+}
+
+message AntiTheft {
+  enum Option {
+    ANTI_THEFT_IGNORE_WARNNING = 0; //忽略报警
+  }
+  Option option =1;//操作选项
+}
+
+message TaskMaster {
+  string scriptUuid = 1;
+}
+
+// 场景机器人岗位状态查询
+message SceneRobotPostStatusQuery {
+  PostType post_type      = 1; // 岗位类型
+}
+
+// 场景机器人岗位状态结果
+message SceneRobotPostStatusResult {
+  // 机器人岗位状态
+  enum RobotPostState {
+    ROBOT_POST_STATE_UNKNOWN    = 0; // 未知
+    ROBOT_POST_STATE_NONE       = 1; // 无
+    ROBOT_POST_STATE_ENABLE     = 2; // 启用中
+    ROBOT_POST_STATE_PAUSE      = 3; // 暂停中
+    ROBOT_POST_STATE_WORK       = 4; // 工作中
+  }
+  PostType post_type              = 1;// 岗位类型
+  RobotPostState robot_task_state = 2;// 机器人岗位状态
+}
+
+// 场景机器人恢复工作上报
+message SceneRobotRecoverWorkReport {
+  PostType post_type      = 1; // 岗位类型
+}
+
+// 场景机器人恢复工作结果
+message SceneRobotRecoverWorkResult {
+  PostType post_type              = 1;// 岗位类型
+  bool result                     = 2;// 结果：true成功，false失败
+}
+
+// 自主跟随
+message AutoFollow {
+  enum Option {
+    AUTO_FOLLOW_UNKNOWN = 0; // 未知
+    AUTO_FOLLOW_CHECK = 1; // 自主跟随条件检查，本体上报AutoFollowCheckResult
+    AUTO_FOLLOW_TASK_QUERY_STATUS = 2; // 自主跟随任务状态查询，本体上报 AutoFollowStatusReport
+  }
+  Option option = 1;        // 控制类型
+  string triggerAlias = 2;          //触发方式
+  srcp.skill.args.BoundingBox box = 3; //box框，语音现阶段需要使用
+}
+
+// AI陪跑场景参数
+enum ExerciseMode {
+  EXERCISE_MODE_RUNNING = 0;//跑步
+  EXERCISE_MODE_WALK = 1;//散步
+}
+
+enum TargetCategory {
+  TARGET_CATEGORY_FREE = 0;//自由
+  TARGET_CATEGORY_DISTANCE = 1;//距离
+  TARGET_CATEGORY_DURATION = 2;//时长
+  TARGET_CATEGORY_CALORIES = 3;//卡路里
+  TARGET_CATEGORY_PACE = 4;//配速
+}
+
+message AICompanion{
+  srcp.args.ExerciseMode exerciseMode = 1;//运动模式
+  srcp.args.TargetCategory targetCategory = 2;//目标类别
+  double targetValue = 3;//目标值
+  string triggerAlias = 4;          //触发方式
+}
+
+message NavigationScene {
+  srcp.args.Navigate navigate = 1;//导航
+}
+
+message ExploreScene {
+
+}
+
+message RechargingNon {
+  enum TaskMode{
+    TASK_POINT_TO_STAKE = 0;     // 点位回桩，桩前配置点位
+    TASK_POINT_BACK_STAKE = 1;   // 点位退桩，退到指定点位
+    TASK_EXPLORE_TO_STAKE = 2;   // 从当前点位探索回桩
+    TASK_EXPLORE_BACK_STAKE = 3; // 自动探索退桩
+  }
+  TaskMode mode = 1;
+  srcp.Pose pose = 2;
+  bool tostake_when_idle = 3;   // 是否仅在空闲时回桩，默认 false（强制回桩）; 仅在回桩时会读取这个字段
+}

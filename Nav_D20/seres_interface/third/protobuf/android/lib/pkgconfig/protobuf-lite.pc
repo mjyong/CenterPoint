@@ -1,0 +1,11 @@
+prefix=/home/qiuwei/platform_build/third_lib/protobuf/protobuf-3.21.7/install
+exec_prefix=/home/qiuwei/platform_build/third_lib/protobuf/protobuf-3.21.7/install
+libdir=/home/qiuwei/platform_build/third_lib/protobuf/protobuf-3.21.7/install/lib
+includedir=/home/qiuwei/platform_build/third_lib/protobuf/protobuf-3.21.7/install/include
+
+Name: Protocol Buffers
+Description: Google's Data Interchange Format
+Version: 3.21.7.0
+Libs: -L${libdir} -lprotobuf-lite -pthread
+Cflags: -I${includedir}
+Conflicts: protobuf

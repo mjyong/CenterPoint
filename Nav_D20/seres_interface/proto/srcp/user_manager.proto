@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package srcp;
+
+// 用户任务请求
+message UserTask{
+    enum Mode {
+        MODE_START  = 0;  // 启动任务
+        MODE_CANCEL = 1;  // 取消任务
+        MODE_STOP   = 2;  // 结束任务
+        MODE_SKIP   = 3;  // 跳过任务
+    }
+    enum TASK {
+        TASK_UNKNOWN          = 0; //未知
+        TASK_USER_ADD         = 1; //用户新增
+        TASK_USER_EDIT        = 2; //用户编辑
+        TASK_USE_DEL          = 3; //用户删除
+        TASK_FACE             = 4; //人脸 本体超时时间30s
+        TASK_VOICEPRINT       = 5; //声纹 本体超时时间5s
+        TASK_TOUCH            = 6; //触摸 本体超时时间10s
+        TASK_GESTURE          = 7; //手势 本体超时时间10s
+        TASK_USER_BIND        = 8; //用户绑定
+    }
+    string id = 1;//任务UUID
+    Mode mode = 2;//任务模式
+    TASK task = 3;//用户任务类型
+    string user_id = 4;//用户UUID
+    oneof data{
+        UserInfo user_info = 5;//用户信息
+        UserBindInfo user_bind_info = 6;//用户绑定信息
+        VoicePrintInfo voice_print_info = 7;//用户声纹信息
+    }
+}
+message UserInfo{
+    enum AccountType{
+        MASTER = 0; //主账户
+        RELATIVES = 1; // 亲属账户
+    }
+    string user_id = 1;      //用户UUID
+    string nickname = 2;     //称呼
+    AccountType account_type = 3; //账户类型
+    string app_user_uuid = 4;//app绑定的用户UUID
+}
+
+message UserBindInfo{
+    UserInfo user_info = 1;
+    string name = 2; //设备名称
+    string ssid = 3; //wifi 名称
+    string passwd = 4; //wifi 密码 为空表示开发网络热点
+}
+
+message VoicePrintInfo{
+    string voice_print_data = 1; //声纹数据
+    bool last = 2; //是否最后一条声纹数据
+}
+
+// 用户任务状态上报
+message UserTaskStatusReport{
+    enum Status {
+        STATUS_UNKNOWN  = 0;//未知
+        STATUS_DOING    = 1;//执行中
+        STATUS_DONE     = 2;//成功
+        STATUS_FAILED   = 3;//失败
+        STATUS_CANCEL   = 4;//取消
+        STATUS_STOP     = 5;//结束
+    }
+    string id        = 1;//任务UUID
+    Status status    = 2;//任务状态
+    string error_msg = 3;//失败原因
+    oneof data {
+        UserTouchReport touch_report = 4;     //触摸结果
+        UserGestureReport gesture_report = 5; //手势结果
+        UserVoicePrintReport voice_print_report = 6; //声纹结果
+    }
+}
+
+// 用户引导查询
+message UserGuideQuery{
+    string user_id = 1; //用户UUID
+}
+
+// 用户引导结果
+message UserGuidQueryResult{
+    enum GuideTask{
+        TASK_UNKNOWN          = 0;
+        TASK_FACE             = 1; //人脸
+        TASK_VOICEPRINT       = 2; //声纹
+        TASK_TOUCH            = 3; //触摸
+        TASK_GESTURE          = 4; //手势
+        TASK_NICKNAME         = 5; //昵称
+    }
+    string user_id = 1; //用户UUID
+    repeated GuideResult guide_results = 2;
+    message GuideResult{
+        GuideTask guide_task = 1; //引导任务
+        bool guide_status = 2; //引导状态
+    }
+}
+
+// 用户触摸上报
+message UserTouchReport{
+    string touch = 1; //触摸
+}
+
+// 用户手势上报
+message UserGestureReport{
+    string gesture = 1; //手势
+    bytes img = 2; //拍照图片
+}
+
+// 用户声纹上报
+message UserVoicePrintReport{
+    bool valid = 1; //多次拼接结果是否有效
+}

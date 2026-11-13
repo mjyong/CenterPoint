@@ -1,0 +1,290 @@
+syntax = "proto3";
+package srcp;
+import "task_args.proto";
+import "scene.proto";
+import "scene_args.proto";
+import "nav_operation.proto";
+
+// 接待任务点位上报
+message ReceiveJobPointReport
+{
+  enum Type
+    {
+      ARRIVE    = 0; //到达
+      LEAVE     = 1; //离开
+    }
+  string receiveJobUuid = 1; //接待任务UUID
+  string pointUuid = 2; //点位UUID
+  string targetPointUuid = 3; //点位UUID
+  Type type = 4; // ARRIVE-达到点位 LEAVE-离开点位
+  string receiveJobTemplateUuid = 5; // 模板uuid
+}
+
+
+
+// 接待任务点位状态上报   
+message ReceiveJobPointStatusReport
+{
+  enum Status
+    {
+      NOT_RECEIVED  = 0; //未接待
+      RECEPTING   = 1; //接待中
+      PAUSE   = 2; //暂停
+      END   = 3; //结束
+    }
+  string receiveJobUuid = 1; //接待任务UUID
+  string pointUuid = 2; //点位UUID
+  string corpusUuid = 3; //当前播放语料uuid
+  int32 currentPptPage = 4; // 当前ppt播放页
+  Status status = 5; // 点位接待状态
+  string receiveJobTemplateUuid = 6; // 模板uuid
+}
+
+message SceneStatusReport {
+  enum Status
+    {
+        WAIT_PLAY = 0; //待表演
+        PLAYING = 1;       //表演中
+        PLAY_END = 2;     //表演结束
+        CANCEL_FAIL = 3;  //取消失败
+        CANCEL_SUCCESS = 4;  //取消成功
+    }
+    string scenePlayUuid = 1; //此次节目表演UUID
+    string sceneUuid = 2; //节目UUID
+    Status status = 3;
+}
+
+message FetchOrDeliverInfo {
+  enum Mode {
+    FETCH = 0; //拿取
+    DLIVER = 1; //送达
+  }
+  enum Stage {
+    GO_TO_DESTINATION=0; //前往目的地
+    WAIT_FOR_HANDLE_OBJECT=1; //等待物品放上或取下
+    BACK_TO_START_POINT=2;//返回出发点
+  }
+  Mode mode=1;//拿取or送达
+  Stage stage=2; // 阶段
+  bool overload=3;//是否超重
+}
+
+message TaskGeneralMapPointReport
+{
+  enum Type
+  {
+    ARRIVE = 0;
+    LEAVE = 1;
+    IMMEDIATE = 2;
+  }
+  srcp.args.Navigate.Point point = 1; // 点位
+  string pointUuid = 2; // 点位
+  int32 type = 3; //到达点位-0/离开点位-1/实时位置-2
+  
+  string taskTemplateUuid = 4; // 模板uuid
+  string taskUuid = 5; //任务循环某一轮次的UUID
+}
+
+message TaskGeneralStatusReport
+{
+  enum Status
+  {
+    RUNNING   = 0; //执行中
+    PAUSE = 1;
+    END   = 2; //结束
+    EXCEPTION = 3;
+  }
+  string taskTemplateUuid = 1; //任务UUID
+  string taskUuid = 2;  //循环某一轮次的UUID
+  Status status = 3; // 任务状态
+  string messgae = 4;
+}
+
+message GeneralTaskStateReport
+{
+    enum State
+    {
+        RUNNING = 0;
+        SUCCESS = 1;
+        FAILURE = 2;
+    }
+    enum Type {
+        NAVIGATE_TASK = 0;   // 导航任务(包含引导动作及语料)
+        POINT_TASK = 1;     // 执行点位任务
+        TEMPORARY_CORPUS = 2;  // 临时语料
+    }
+    State state = 1;    // 任务状态
+    Type type = 2;        // 执行类型
+    string taskUuid = 3;  //任务UUID
+    string pointUuid = 4; // 点位UUID (临时语料时非必传)
+    int32 actionIndex = 5; //点位任务序号 默认从1开始 (临时语料、导航任务时非必传)
+    string failureReason = 6; // 失败原因
+}
+
+message ReChargeReport 
+{
+  enum State
+  {
+    RUNNING = 0;
+    SUCCESS = 1;
+    FAILED = 2;
+  }
+  string taskTemplateUuid = 1;
+  State state = 2;
+  string message = 3;
+} 
+
+// 跟随拍摄状态上报
+message FollowShootStatusReport {
+    enum State {
+        FOLLOW_IDLE = 0;
+        FOLLOWING = 1;          // 跟随中
+        PAUSED = 2;             // 已暂停
+        TARGET_LOST = 3;        // 目标丢失
+        COMPLETED = 4;          // 跟随完成
+        ERROR = 5;              // 异常
+    }
+    State state = 1;                            // 当前状态
+    srcp.args.SubjectDetectionInfo follow_target = 2;     // 跟随目标
+    srcp.args.FollowSpeed speed = 3;                      // 速度
+    float distance = 4;                         // 距离
+    float angle = 5;                            // 角度
+    srcp.args.FollowMode follow_mode = 6;                 // 跟随模式
+    string err_code = 7;                        // 异常时附带错误编码
+    string err_msg = 8;                         // 异常时附带错误信息
+}
+
+// ======================== 本体→云端：状态上报 ========================
+// 轨迹拍摄状态上报（本体→云端，周期上报 + 状态变更推送）
+message TrajectoryRecordStatus {
+    srcp.args.TrajectoryRecordType record_type = 1;     // 当前录制类型
+    srcp.args.TrajectoryRecordStatusEnum record_state = 2;    // 当前录制状态
+    int32 elapsed_time = 3;                    // 已录制时间（秒）
+    float elapsed_distance = 4;                // 已录制距离（米）
+    float distance_limit = 5;                  // 距离限制（米），路径录制时本体实时计算上报，云端推送App提示用户
+    string path_id = 6;                   // 模板ID（路径录制完成返回，本体生成）
+    string err_code = 7;                        // 异常时附带错误编码
+    string err_msg = 8;                         // 异常时附带错误信息
+}
+
+// ---------- 本体→云端：环绕拍摄状态上报 ----------
+// 周期上报，状态变更时立即上报
+message OrbitRecordStatus {
+    srcp.args.OrbitRecordState state = 1;                          // 当前状态
+    srcp.args.SubjectDetectionInfo orbit_target = 2;              // 环绕主体
+    float pos_x = 3;                   // 当前位置 X 坐标
+    float pos_y = 4;                   // 当前位置 Y 坐标
+    bool hitchcock_enabled = 5;        // 希区柯克效果（滑动变焦）开关
+    srcp.args.SpeedLevel speed_level = 6;        // 当前速度档位
+    float elapsed_time = 7;            // 已录制时间（秒）
+    string err_code = 8;                        // 异常时附带错误编码
+    string err_msg = 9;                         // 异常时附带错误信息
+    uint32 progress = 10;                    //环绕拍摄里程计初始位姿
+}
+
+message DelayShootStatus {
+    srcp.args.DelayShootStatusEnum shoot_status = 1;
+    string err_code = 2;                        // 异常时附带错误编码
+    string err_msg = 3;                         // 异常时附带错误信息
+}
+
+message GuardWarnMsg {
+
+}
+
+message AntiTheftStatus {
+  bool active = 1; //是否处于AntiTheft模式下
+  bool lost = 2; //是否丢失
+  bool inGpsRange = 3; //是否在gps区域内
+}
+
+message GuardSceneStatusReport {
+  enum Status {
+    STATUS_UNKNOWN          = 0; // 未知
+    STATUS_IDLE             = 1; // 未开启
+    STATUS_SELF_CHECKING    = 2; // 自检中
+    STATUS_SELF_CHECK_FAILED = 3; // 自检失败
+    STATUS_PATROLLING       = 4; // 巡逻中
+    STATUS_ALARMING         = 5; // 警报中
+    STATUS_LOW_POWER_CLOSED = 6; // 低电量自动关闭（电量<10%且无充电桩）
+    STATUS_FINISH = 7;
+    STATUS_CYCLE_FINISH = 8;
+  }
+  string patrolUuid = 1;
+  string guardUuid = 2;             // 守卫任务UUID
+  Status status = 3;                // 守卫状态
+  string message = 4;               // 自检失败/异常原因描述
+  int32 bmsSoc = 5;                 //电量
+}
+
+message GuardSceneEventReport {
+  enum EventType {
+    EVENT_TYPE_PERSON = 0; // 人
+    EVENT_TYPE_ANIMAL = 1; // 动物
+    EVENT_TYPE_FIRE   = 2; // 火焰（预留）
+  }
+  string patrolUuid = 1;
+  string guardUuid = 2; 
+  string eventUuid = 3;
+  string imgName = 4;
+  string videoName = 5;
+  EventType eventType = 6;    // 事件类型
+  uint64 occurTime = 7;        // 事件发生时间，毫秒时间戳
+  srcp.args.Navigate.Point point = 8;    // 事件发生时机器人位置
+  string message = 9; 
+}
+
+// 自主跟随状态上报
+message AutoFollowStatusReport {
+    enum Status {
+        FOLLOW_UNKNOWN = 0;         // 未知
+        FOLLOW_ING = 1;             // 跟随中
+        FOLLOW_DONE = 2;            // 跟随结束
+        FOLLOW_ERROR = 3;           // 跟随异常
+    }
+    string autoFollowUuid  = 1;          // 跟随任务UUID
+    int32 followDistance = 2;      // 跟随距离，0.5米-3米，默认1.5米，精度0.5米
+    Status status = 3;              // 跟随任务状态
+    string errorCode  = 4;         // 上报CODE
+    string errorMessage  = 5;      // 上报MESSAGE
+    string triggerAlias = 6;      // 触发方式
+}
+
+// 自主跟随前置条件查询结果
+message AutoFollowCheckResult {
+  bool result = 1;         // 前置条件是否满足，true满足，false不满足
+  string reason = 2;         // 检测失败理由
+}
+
+message AICompanionStatusReport{
+  enum Status {
+    STATUS_UNKNOWN  = 0;//未知
+    STATUS_DOING    = 1;//执行中
+    STATUS_DONE     = 2;//成功
+    STATUS_FAILED   = 3;//失败
+    STATUS_PAUSE   = 4;//暂停
+    STATUS_STOP     = 5;//结束
+  }
+  string id        = 1;//任务UUID
+  Status status    = 2;//任务状态
+  string errorMsg = 3;//失败原因
+  double distance = 4;//总距离 km
+  int32 duration = 5;//总时长 秒
+  double pace = 6;//实时配速 km/h
+  srcp.GeographicPose geographicPose = 7;// 地理坐标
+  string triggerAlias = 8;//触发别名，值是voice_agent的时候，就是语音
+  srcp.args.ExerciseMode exerciseMode = 9;//运动模式
+  srcp.args.TargetCategory targetCategory = 10;//目标类别
+  double targetValue = 11;//目标值
+  bool upgrade = 12;
+  double speed = 13;//实时速度 km/h
+}
+
+// 提示信息类型
+// LOW_BATTERY_30: 电量低于30%
+// LOW_BATTERY_10: 电量低于10%
+// STILL_LOW_SPEED: 用户保持静止且移动速度低于5km/h持续3分钟
+message AICompanionStatusTipsReport {
+  string id = 1;//任务UUID
+  string tip = 2;//提示信息类型
+}

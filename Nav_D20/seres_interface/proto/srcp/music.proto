@@ -1,0 +1,390 @@
+syntax = "proto3";
+package srcp;
+
+enum MusicCode {
+    CODE_SUCCESS = 0;               //操作成功
+    CODE_COMMON_ERROR = 1;          //通用错误
+    CODE_NOT_LOGGED_IN = 2;         //未登录
+    CODE_LOGIN_IN_PROGRESS = 3;     //用户确认授权后, 数据处理过程. 禁止中断
+    CODE_LOGOUT_IN_PROGRESS = 4;    //正在登出中
+
+    CODE_NET_ERROR = 12;            //网络错误
+    CODE_QR_EXPIRED = 13;           //登录二维码过期
+
+    CODE_SEARCH_EMPTY = 16;         //搜索结果为空
+    CODE_PLAY_FAILED = 17;          //播放失败
+}
+
+message MusicContorl {
+    enum Type {
+        UNKNOWN = 0;   //未知
+        PLAY = 1;      //播放
+        PAUSE = 2;     //暂停
+        NEXT = 3;      //下一曲
+        PREVIOUS = 4;  //上一曲
+        SEEK = 5;      
+    }
+    Type type = 1;
+    QueueType queue_type = 2;   //操作哪个队列
+    uint64 seek_time = 3;       //在seek模式下有效
+}
+
+ enum PaymentType {
+    FREE = 0; 
+    VIP = 1;
+    SVIP = 2;
+}
+
+message MusicItem {
+    string id = 1;                      //歌曲ID
+    string name = 2;                    //歌曲名称
+    string coverUrl = 3;                //封面图
+    repeated ArtistInfo artis = 4;      //艺人姓名
+    PaymentType payType = 5;            //付费等级
+}
+
+enum QueueType {
+    MAIN = 0; //主队列
+    SUB = 1;  //子队列
+}
+
+message MusicQueue {
+    QueueType queueType = 1;         //队列类型
+    string cur_id = 2;               //当前选中音乐id
+    repeated MusicItem items = 3;    //播放队列
+}
+
+enum PlayState {
+    PLAYBACK_STATE_START = 0;
+    PLAYBACK_STATE_PLAYING = 1;
+    PLAYBACK_STATE_PAUSED = 2;
+    PLAYBACK_STATE_STOPPED = 3;
+    PLAYBACK_STATE_ERROR = 4;
+}
+
+enum Quality {
+    UNKNOWN = 0;
+    MEDIUM = 1; //标准
+    HIGHER = 2; //较高
+    AUTO = 3;   //自动
+    HIGHEST = 4; //极高
+    LOSSLESS = 5;//无损
+}
+
+message MusicProgress {
+    QueueType queueType = 1;         //队列类型
+    string id = 2;                   //歌曲ID
+    uint64 time = 3;                 //播放进度ms
+    PlayState play_state = 4;        //播放状态
+    Quality quality = 5;             //音质
+}
+
+message PlayItem {
+    QueueType queueType = 1;            //队列类型
+    string id = 2;                      //音乐id
+    string name = 3;                    //歌曲名称
+    string lyric = 4;                   //歌词
+    string albumName = 5;               //专辑名称
+    string composers = 6;               //作曲者
+    string lyricists = 7;               //作词者
+    bool collection = 8;                //收藏
+    uint64 duration = 9;                //总时长ms
+}
+
+message MusicAccountInfo {
+    bool is_login = 1;         //是否登录(是登录的情况下，后续的值才有效)
+    string id = 2;             //用户ID
+    string nickname = 3;       //昵称
+    string avatarUrl = 4;      //头像
+    bool secret = 5;           //是否私密账号
+    bool isVip = 6;            //是否vip
+    string vipStage = 7;       //Vip 等级
+}
+
+message LoginCtl {
+    enum Mode {
+        LOGIN = 0;
+        LOGOUT = 1;
+        ARORT_LOGIN = 2;
+    }
+    Mode mode = 1;
+}
+
+message QueryAccount {
+}
+
+message QueryQueue {
+}
+
+enum QueueLoopMode {
+    SINGLE = 0;      //单曲循环
+    LIST = 1;        //列表循环
+    SHUFFLE =2;      //随机播放
+}
+
+message QueueInfo {
+    string cur_id = 1;               //当前选中音乐id
+    string lyric = 2;                //当前选中歌词
+    uint64 time = 3;                 //播放进度ms
+    PlayState play_state = 4;        //播放状态
+    Quality quality = 5;             //音质
+    QueueLoopMode loop_mode = 6;     //循环模式
+    string albumName = 7;             //专辑名称
+    string composers = 8;            //作曲者
+    string lyricists = 9;            //作词者
+    bool collection = 10;             //收藏
+    uint64 duration = 11;             //总时长ms
+    repeated MusicItem items = 12;    //播放队列
+}
+
+message QueryQueueRes {
+    QueueInfo mainQueue = 1;
+    QueueInfo subQueue = 2;    //子队列在播放状态时才有效，否则该值为null
+}
+
+// 切换循环模式
+message SwitchLoopMode {
+    QueueType queueType = 1;     //队列类型
+}
+
+message SwitchLoopModeRes {
+    QueueLoopMode mode = 1;     //切换后的模式
+}
+
+//队列循环模式变更推送
+message LoopMode {
+    QueueType type = 1;
+    QueueLoopMode mode = 2;
+}
+
+message Collection {
+    enum Mode {
+        ADD = 0;           //收藏
+        REMOVE = 1;        //取消收藏
+    }
+    string id = 1;         //音乐id
+    Mode mode = 2;      
+}
+
+ enum SearchType {
+    TRACK = 0;        //歌曲
+    ARTIST = 1;       //音乐人
+    ALBUM = 2;        //专辑
+    PLAYLIST = 3;     //歌单
+}
+
+message Search {
+    enum SearchMethod {
+        INPUT = 0;        //用户收入发起的搜索
+        HISTORY = 1;      //用户点击搜索历史发起的搜索
+    }
+
+    string content = 1;                 //搜索关键字
+    SearchType searchTyep = 2;          //搜索类型
+    SearchMethod searchMethod = 3;      //触发搜索的类型
+    string cursor = 4;                  //当前分页的起始位置，第一搜为0
+}
+
+message TrackInfo {
+    string id = 1;             //音乐id
+    string name = 2;           //歌曲名称
+    string artist = 3;         //音乐人
+    PaymentType payType = 4;   
+    string albumName = 5;      //专辑
+    bool collection = 6;       //收藏
+    string coverUrl = 7;    
+}
+
+message ArtistInfo {
+    string id = 1;          //艺人ID
+    string name = 2;        //姓名
+    string artistUrl = 3;   //头像
+    int32 songCount = 4;    //歌曲数
+    int32 collectCount = 5; //收藏数量
+}
+
+message PlaylistInfo {
+    string id = 1;          //歌单ID
+    string name = 2;        //标题
+    int32 songCount = 3;    //歌曲数
+    string playlistUrl = 4; //封面
+    string owner = 5;       //歌单作者
+}
+
+message PlaylistRep {
+    bool hasMore = 1;                //是否有更多
+    string nextCursor = 2;           //游标
+    repeated PlaylistInfo datas = 3; //歌单信息
+}
+
+message PlaylistDetailRep {
+    bool hasMore = 1;                //是否有更多
+    string nextCursor = 2;           //游标
+    repeated MusicItem datas = 3;    //歌曲信息
+}
+
+message SearchRsp {
+    SearchType type = 1;                     //tracks  artists  albums playlists
+    bool hasMore = 2;                        //是否有更多
+    string nextCursor = 3;                   //下一刷的 cursor
+    repeated TrackInfo tracks = 4;           //歌曲tab时有效
+    repeated ArtistInfo artists = 5;         //音乐人tab时有效
+    repeated PlaylistInfo playlists = 6;     //歌单tab时有效
+}
+
+message SearchHistoryCtl {
+    enum Mode {
+        QUERY = 0;
+        DELETE = 1;
+    }
+    Mode mode = 1;
+}
+
+message SearchHistory {
+    repeated string historys = 1;
+}
+
+message QueryPlaylist {
+    string cursor = 1;       //游标(分页使用第一页用 "0")
+}
+
+message QueryPlaylistDetail {
+    string playlistId = 1;      //歌单Id
+    string cursor = 2;          //分页游标
+    int32 count = 3;            //每页数量
+}
+
+//播放歌单
+message PlayPlaylist {
+    string playlistId = 1;     //歌单Id
+    string id = 2;             //开始播放歌曲的id,为空时从歌单第一首歌开始播放
+}
+
+//查询历史播放
+message QueryPlayHistory {
+    string cursor = 1;        //游标
+    int32 count = 2;          //每页数量
+}
+
+//查询历史播放结果回复
+message QueryPlayHistoryRsp {
+    string nextCursor = 1;
+    bool hasMore = 2;
+    repeated MusicItem historys = 3;
+}
+
+//播放队列中指定元素
+message PlayQueueItem {
+    QueueType type = 1;
+    string id = 2;
+}
+
+//歌单操作
+message PlaylistCtrl {
+    enum Mode {
+        APPEND = 0;        //加入歌单
+        REMOVE = 1;        //从歌单移除歌曲
+    }
+    Mode mode = 1;
+    string id = 2;                //歌曲id
+    string playlistId = 3;        //歌单id
+}
+
+//移动队列中Item的顺序
+message MoveItem {
+    QueueType type = 1;       //操作哪个队列
+    string id = 2;            //歌曲id
+    int32 fromIndex = 3;      //初始位置
+    int32 toIndex = 4;        //移动后在队列中的位置
+}
+
+//删除某个Item
+message RemoveItem {
+    QueueType type = 1;       //操作哪个队列
+    string id = 2;            //歌曲id
+}
+
+
+//播放搜索歌曲
+message PlaySearchTrack {
+    string id = 1;          //歌曲id
+}
+
+//播放历史播放
+message PlayPlayHistory {
+    string id = 1;      //第一个开始播放歌曲id,为空的话就是从历史记录的第一个开始播
+}
+
+//获取推荐搜索词
+message QuerySug {
+}
+
+message QuerySugRep {
+    repeated string sugs = 1;
+}
+
+//结束子队列播放
+message CloseSubQueue {
+}
+
+
+message MusicOperate {
+    uint64 timestamp     = 1;   // 任务下发时刻时间戳，单位ms
+    string id            = 2;   // 任务UUID
+    string skill         = 3;   // 技能项名称
+    
+    oneof action {
+        MusicContorl musicControl = 4;                   //播放控制
+        QueryAccount queryAccount = 5;                   //查询账号
+        LoginCtl loginctl = 6;                           //登录操作
+        QueryQueue queryQueue = 7;                       //获取播放队列
+        Collection collection = 8;                       //收藏
+        Search search = 9;                               //搜索
+        SearchHistoryCtl historyCtl = 10;                 //搜索历史
+        QueryPlaylist queryPlaylist = 11;                 //获取歌单
+        QueryPlaylistDetail queryPlaylistDetail = 12;     //歌单详情
+        PlayPlaylist playPlaylist = 13;                  //播放歌单
+        QueryPlayHistory queryPlayHistory = 14;           //历史播放 
+        SwitchLoopMode switchLoopMode = 15;               //切换循环模式
+        PlayQueueItem playQueueItem = 16;                 //播放队列指定元素
+        PlayQueueItem dislike = 17;                       //减少推荐
+        PlaylistCtrl playlistCtl = 18;                    //歌单操作
+        MoveItem moveItem = 19;                           //移动Item的顺序
+        RemoveItem removeItem = 20;                       //删除某个Item
+        PlaySearchTrack searchTrack = 21;                 //播放搜索歌曲
+        PlayPlayHistory historyTrack = 22;                //播放历史播放
+        QuerySug querySug = 23;                           //推荐搜索词
+        CloseSubQueue closeSub = 24;                      //结束子队列播放
+    }
+}
+
+message MusicOperateRep {
+    uint64 timestamp     = 1;   // 时间戳，单位ms
+    string id            = 2;   // 任务UUID
+    string skill         = 3;   // 技能项名称
+    
+    oneof param {
+        MusicAccountInfo account = 4;                   //账号信息
+        QueryQueueRes musicQueue = 5;                   //播放队列
+        SearchHistory searchHistory = 6;                //搜索历史
+        SearchRsp searchRsp = 7;                        //搜索结果
+        PlaylistRep playlistRsp = 8;                    //查询歌单
+        PlaylistDetailRep playlistDetailRsp = 9;        //歌单详情
+        QueryPlayHistoryRsp historyRsp = 10;            //历史播放
+        SwitchLoopModeRes loopModeRsp = 11;             //切换循环模式
+        QuerySugRep sugRsp = 12;                        //推荐搜索词
+    }
+}
+
+message MusicPublishInfo {
+    uint64 timestamp     = 1;   // 时间戳，单位ms
+
+    oneof param {
+        MusicQueue musicQueue = 2;         //播放队列
+        MusicProgress musicProgress = 3;   //播放进度
+        PlayItem playItem = 4;             //当前播放音乐
+        MusicAccountInfo account = 5;      //账号信息
+        LoopMode loopMode = 6;             //循环模式变更推送
+    }
+}
+

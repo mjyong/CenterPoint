@@ -1,0 +1,18 @@
+# cmd常量
+uint8 CMD_SHUTDOWN   = 0    # 关机
+uint8 CMD_SLEEP      = 1    # 休眠
+uint8 CMD_WORK       = 2    # 工作
+uint8 CMD_EMERGENCY  = 3    # 紧急停止
+uint8 CMD_RESTART    = 4    # 重启
+uint8 CMD_BRIGHTNESS = 5    # 屏幕亮度调整
+uint8 CMD_PRE_SHUTDOWN = 6    # 预关机
+
+# Request
+uint8 cmd                   # 请求的命令类型
+uint8 brightness_value      # 屏幕亮度值，0-255,当cmd类型为5时，该值有效,60以下为全黑
+string requester_node_name  # 请求节点名称
+
+---
+# Result
+bool success                # 是否成功
+string result_message       # 成功或失败原因

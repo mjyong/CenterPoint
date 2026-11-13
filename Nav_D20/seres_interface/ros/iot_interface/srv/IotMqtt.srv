@@ -1,0 +1,6 @@
+string target      #哪个设备，比如DIC工厂，问界展厅，A栋大楼 (必填)
+string cmd         #请求命令  (必填)
+string request_id  #唯一ID,多次请求返回的ID(可不填)
+---
+int32 result_code  # 0请求成功,-1失败
+string result

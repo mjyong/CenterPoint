@@ -1,0 +1,11 @@
+# 查询 UWB 钥匙升级状态
+---
+# 升级状态
+uint8 DFU_IDLE=0          # 未在升级
+uint8 DFU_RUNNING=1       # 升级进行中
+uint8 DFU_COMPLETED=2     # 升级成功
+uint8 DFU_FAILED=3        # 升级失败
+
+uint8 dfu_state           # 升级状态[必须使用 DFU_* 常量]
+uint8 progress            # 升级进度百分比(0-100，仅 DFU_RUNNING 时有效；COMPLETED 恒为 100)
+string error_msg          # 失败原因(无失败为空)

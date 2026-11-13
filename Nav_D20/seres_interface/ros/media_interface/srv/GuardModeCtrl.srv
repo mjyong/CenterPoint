@@ -1,0 +1,6 @@
+#守卫模式控制
+string event_uuid # 事件uuid
+string type # 人/动物/火焰
+---
+string picture_name # 图片名称
+string video_name # 视频名称

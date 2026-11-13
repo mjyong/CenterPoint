@@ -1,0 +1,23 @@
+# Goal
+uint8 OBSTACLE_MODE_AVOID   = 0     # 避障
+uint8 OBSTACLE_MODE_STOP    = 1     # 停障
+
+uint8 NAV_MODE_POINT        = 0     # 点位/路径导航
+uint8 NAV_MODE_UVD          = 1     # 视距导航
+
+string map_uuid
+geometry_msgs/PoseStamped[] poses   # Quaternion 全0无效；NAV_MODE_UVD时point对应uvd
+float32 speed                       # 指定导航速度，0：无效；有效时，忽略PoseStamped中时间限定
+
+uint8 max_speed                     # 导航最大速度  
+uint8 obstacle_mode                 # 避障模式， 详见本协议中 OBSTACLE_MODE_*
+uint8 nav_mode                      # 导航模式， 详见本协议中 NAV_MODE_*
+
+---
+# Result
+string message                      # 结果描述
+
+---
+# Feedback
+uint32 state                        # 详见 nav2_interface/msg/NavState.msg
+geometry_msgs/Point[] path          # 规划完成状态，反馈规划路径；其他状态不关注

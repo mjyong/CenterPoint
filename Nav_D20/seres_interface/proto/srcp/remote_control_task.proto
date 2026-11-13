@@ -1,0 +1,215 @@
+syntax = "proto3";
+
+package srcp;
+
+import "task_args.proto";
+import "skill_args.proto";
+
+message RemoteControlTask
+{
+    enum Mode {
+        MODE_START  = 0;  // 启动任务
+        MODE_CANCEL = 1;  // 取消任务
+        PAUSE       = 2;  // 暂停任务
+        RECOVER     = 3;  // 恢复任务
+    }
+
+    uint64 excTimestamp = 1;
+    
+    // ========== 控制字段 (2-19 预留) ==========
+    Mode mode = 2;  // 任务控制模式
+    string id = 3;   // 任务UUID
+    
+    oneof skillPara {
+        // ========== 运动控制模块 (从20开始) ==========
+        srcp.args.SitDown sitDown                   = 20;   // 坐下
+        srcp.args.Stand stand                       = 21;   // 站立
+        srcp.args.MoveLevel moveLevel                = 22;   // 调整行走速度
+        srcp.args.Move move                          = 23;   // 行走
+        srcp.args.StepStill stepStill                 = 24;   //原地踏步
+        srcp.args.StopMove stopMove                   = 25;   // 停止行走
+        srcp.args.Squat squat                         = 26;   // 蹲下
+        srcp.args.LieDown lieDown                     = 27;   // 躺下
+        srcp.args.Damp damp                           = 28;   // 阻尼
+        srcp.args.Wave wave                           = 29;   // 挥手
+        srcp.args.JointDisable jointDisable           = 30;   // 失能
+        srcp.args.JointEnable jointEnable             = 31;   // 使能
+        srcp.args.LockJoint lockJoint                 = 32;   // 僵硬
+        srcp.args.UnlockJoint unlockJoint             = 33;   // 解除僵硬
+        srcp.args.Grab grab                           = 34;   // 灵巧抓取
+        srcp.args.GaitCtrl gaitCtrl                   = 35;   //步态切换命令
+        srcp.args.Handshake handShake                 = 36;   // 握手
+        srcp.args.Nod nod                             = 37;   // 点头
+        srcp.args.ShakeHead shakeHead                 = 38;   // 摇头
+        srcp.args.TurnHead turnHead                   = 39;   // 摆头
+        srcp.args.ThumbsUp thumbsUp                   = 40;   // 竖大拇指
+        srcp.args.VictorySign victorySign             = 41;   // 比耶
+        srcp.args.HeartGesture heartGesture           = 42;   // 比心
+        srcp.args.FistSalute fistSalute               = 43;   // 抱拳
+        srcp.args.Reset reset                         = 44;   // 复位
+        srcp.args.ExplainAction explainAction         = 45;   // 讲解动作
+        srcp.args.ExplainLeftUpper explainLeftUpper   = 46;   // 讲解动作细分，左上
+        srcp.args.ExplainRightUpper explainRightUpper = 47;   // 讲解动作细分，右上
+        srcp.args.ExplainLeftLower explainLeftLower   = 48;   // 讲解动作细分，左下
+        srcp.args.ExplainRightLower explainRightLower = 49;   // 讲解动作细分，右下
+        srcp.args.ExplainLeftCenter explainLeftCenter = 50;   // 讲解动作细分，左中
+        srcp.args.ExplainRightCenter explainRightCenter = 51; // 讲解动作细分，右中
+        srcp.args.Dance dance                         = 52;   // 跳舞
+        
+        // 新增运动控制字段
+      //  srcp.args.Mapping mapping                        = 53;   
+      //  srcp.args.Navigate navigate                      = 54;
+      //  srcp.args.Relocation relocation                  = 55;
+      
+        srcp.args.Recharging recharging                  = 56;   // 回充
+        srcp.args.Shrug shrug                            = 57;   // 摊手手势
+        srcp.args.RaiseHand raiseHand                    = 58;   // 抬手手势
+        srcp.args.Celebrate celebrate                    = 59;   // 恭喜
+        srcp.args.RaiseMicrophone raiseMicrophone        = 60;   // 举麦
+        srcp.args.GrabMicrophone grabMicrophone          = 61;   // 拿起话筒
+        srcp.args.PutDownMicrophone putDownMicrophone    = 62;   // 放下话筒
+        srcp.args.LifePosture lifePosture                = 63;   // 生命态
+        srcp.args.MultiModal multiModal                  = 64;   // 多模态
+        
+        // 手势扩展
+        srcp.args.ExplainXGesture explainXGesture        = 65;   // 左中右手势
+        srcp.args.ExplainYGesture explainYGesture        = 66;   // 上中下手势
+        srcp.args.ExplainFrontGesture explainFrontGesture = 67;  // 前伸手势
+        
+        // 运动控制预留 68-999
+        srcp.args.Hug hug                                      = 68;   // 拥抱
+        srcp.args.FingerDance fingerDance                      = 69;   // 手势舞
+        srcp.args.HoldPlate holdPlate                          = 70;   // 握盘子
+        srcp.args.RaisePlate raisePlate                        = 71;   // 抬盘子
+        srcp.args.Wave leftWave                                = 72;   // 左手挥手
+        srcp.args.WalkWithLoad walkWithLoad                    = 73;   // D系列负重行走
+        srcp.args.ImcMode imcMode                              = 74;   // R系列独立运控模式
+        srcp.args.BalanceStand balanceStand                    = 75;   // R系列平衡站立
+        srcp.args.LiftLeftArm liftLeftArm                      = 76;   // 抬左臂
+        srcp.args.LiftRightArm liftRightArm                    = 77;   // 抬右臂
+        srcp.args.LiftDualArm liftDualArm                      = 78;   // 抬双臂
+        srcp.args.SpeechNod speechNode                         = 79;   // 讲解点头
+        srcp.args.ThreeSix threeSix                            = 80;   // 666
+        srcp.args.IntroduceSelf introduceSelf                  = 81;   // 自我介绍
+        srcp.args.Appearance appearance                        = 82;   // 登场
+        srcp.args.Announce announce                            = 83;   // 宣布
+        srcp.args.TakePhoto photo                              = 84;   // 远程拍照(目前仅D10涉及)
+        srcp.args.PanTiltAngle angle                           = 85;   //  云台控制(目前仅D10涉及)
+        srcp.args.VisibleLightFocalLength focal                = 86;   // 云台控制 云台相机(目前仅D10涉及)
+        srcp.args.PatrolMissions patrolMissions                = 87;   // 巡逻任务(目前仅D10涉及)
+        srcp.args.ReleaseMicrophone releaseMicrophone          = 88;   // 松开话筒
+        srcp.args.RightThumbUp rightThumbUp                    = 89;   // 右大拇指
+        srcp.args.Walk walk                                    = 90;   // 行走
+        srcp.args.Run run                                      = 91;   // 跑
+        srcp.args.Getup getup                                  = 92;   // 倒地恢复
+        srcp.args.Jump jump                                    = 93;   // 跳
+        srcp.args.GetDown getDown                              = 94;   // 趴姿
+        srcp.args.Handstand handstand                          = 95;   // 倒立
+        srcp.args.Upright upright                              = 96;   // 直立
+        srcp.args.FistBump fistBump                            = 97;   // 碰拳
+        srcp.args.GuessBump guessBump                          = 98;   // 猜拳
+        srcp.args.WaistRotation waistRotation                  = 99;   // 腰部转动(转腰)
+        srcp.args.Pause pause                                  = 100;  // 暂停
+        srcp.args.BodyTilt bodyTilt                            = 101; //前倾后仰
+        srcp.args.Handclap handclap                            = 102;  // 鼓掌     
+
+        srcp.args.SitBow sitBow                              = 103; //坐姿作揖
+        srcp.args.StraightLegs straightLegs                  = 104; //四腿打直
+        srcp.args.FastLeanForward fastLeanForward            = 105; //快速前倾
+        srcp.args.LeanForwardSwing leanForwardSwing          = 106; //前倾摆动
+        srcp.args.StretchLazily stretchLazily                = 107; //伸懒腰
+        srcp.args.SmallStep smallStep                        = 108; //小踏步
+        srcp.skill.args.Bow bow                              = 109; // 弯腰（鞠躬）
+        srcp.skill.args.FollowObject followObject            = 110; // 目标跟随
+        srcp.skill.args.ShakeEars shakeEars                    = 111; // 摇耳朵
+        srcp.skill.args.SwingBody swingBody                    = 112; // 摆动身体
+        srcp.skill.args.InviteGesture inviteGesture            = 113; // 邀请动作
+        srcp.skill.args.RecordMoveTrajectory recordMoveTrajectory = 114; //录制移动轨迹
+        srcp.skill.args.StopMoveTrajectory stopMoveTrajectory   = 115;   //停止录制轨迹
+        
+        srcp.args.LowerLeftArm lowerLeftArm             = 116;   // 放左臂
+        srcp.args.LowerRightArm lowerRightArm           = 117;   // 放右臂
+        srcp.args.OneKeyExpand oneKeyExpand             = 118;   // 一键展开
+        srcp.args.OneKeyFold oneKeyFold                 = 119;   // 一键折叠
+        srcp.args.PickUp pickUp                         = 120;   // 拿取
+        srcp.args.PlaceDown placeDown                   = 121;   // 放置
+        srcp.args.Approach approach                     = 122;   // 靠近
+        srcp.args.PushForward pushForward               = 123;   // 前推
+        srcp.args.PullBack pullBack                     = 124;   // 后拉
+        srcp.args.Carry carry                           = 125;   // 搬运
+        srcp.args.StartWork startWork                   = 126;   // 开始工作
+        srcp.args.EndWork endWork                       = 127;   // 结束工作
+        srcp.args.TeleopMode teleopMode                 = 128;   // 切换到运控的全身遥操模式
+        srcp.skill.args.SpinningOnTheSpot spinningOnTheSpot = 129; // 原地旋转（UWB遥控器甩动触发）
+        srcp.args.Move slope                            = 130; // 上下坡(复杂地形平衡行走)
+        srcp.args.Move joyWalk                          = 131; // 使用摇杆控制行走
+        srcp.args.Move joyStairs                        = 132; // 使用摇杆控制上下楼梯
+        srcp.args.Move joyUpHighPlatform                = 133; // 使用摇杆控制上高台
+        srcp.args.Move joyCrawl                         = 134; // 使用摇杆控制匍匐
+        srcp.args.Move joyStraightenLeg                 = 135; // 使用摇杆控制腿打直
+        srcp.args.ScratchHead scratchHead               = 136; // 挠头（固定动作）
+        srcp.args.CrawlForward crawlForward             = 137; // 匍匐前进（固定动作）
+        srcp.args.RubHand rubHand                       = 138; // 搓手（固定动作）
+        srcp.args.RaiseRightBackLeg raiseRightBackLeg   = 139; // 抬右后腿（固定动作）
+        srcp.args.ChestOut chestOut                     = 140; // 挺胸（固定动作）
+        srcp.args.BounceBackward bounceBackward         = 141; // 向后弹跳（固定动作）
+        srcp.args.BounceInPlace bounceInPlace           = 142; // 原地弹跳（固定动作）
+        srcp.args.SwayBody swayBody                     = 143; // 摆动身体（固定动作）
+        srcp.args.ProudNod proudNod                     = 144; // 昂首点头（固定动作）
+        srcp.args.BounceForward bounceForward           = 145; // 向前弹跳（固定动作）
+        srcp.args.LifeCrawl lifeCrawl                   = 146; // 匍匐待机生命态
+        srcp.args.RiseFallSlightly riseFallSlightly     = 147; // 身体微起伏
+        srcp.args.StartupAction startupAction           = 158; // 开机动作
+        srcp.args.ShutdownAction shutdownAction         = 159; // 关机动作
+        srcp.args.HonorWallGesture honorWallGesture     = 161; // 问界展厅荣誉墙定制手势
+        srcp.args.GestureDance gestureDance             = 162; // 手势舞蹈
+        srcp.args.LiftArm liftArm                       = 163; // 震动手臂
+        srcp.args.LifeSit lifeSit                       = 164; // 坐姿待机生命态
+        srcp.args.LifeStand lifeStand                   = 165; // 站立待机生命态
+
+
+        srcp.args.OpenExplain openExplain                      = 166; //开放讲解
+        srcp.args.LongPresent longPresent                      = 167; //长讲解
+        srcp.args.StaticGesture staticGesture                  = 168; //静态动作
+        srcp.args.Guide guide                                  = 169;  //引导
+
+        // ========== 远端控制模块 (0x1000 区间: 1000-1999) ==========
+        srcp.args.PlayTTS playTTS                      = 1000;
+        srcp.args.LightCtrl lightCtrl                  = 1001;
+        srcp.args.DisplayEmoji displayEmoji            = 1002;
+        srcp.args.AudioAdjust audioAdjust              = 1003;     //音量大小调节
+        srcp.args.VoiceStyleQuery voiceStyleQuery      = 1004; // 音色查询
+        // 远端控制预留 1003-1999
+
+        // ========== 音视频模块 (0x2000 区间: 2000-2999) ==========
+        srcp.args.Call call                            = 2000;
+        srcp.args.MonitorAVStream monitorAVStream      = 2001;
+        // 音视频预留 2002-2999
+
+        // ========== 电源管理模块 (0x3000 区间: 3000-3999) ==========
+        srcp.args.PowerOff powerOff                     = 3000;
+        srcp.args.SleepMode sleepMode                   = 3001;
+        srcp.args.Wakeup wakeup                         = 3002;
+        srcp.args.EmergencyStop emergencyStop                  = 3003;  // 急停
+        srcp.args.Restart restart                              = 3004;  // 重启
+        srcp.args.CancelEmergencyStop cancelEmergencyStop       = 3005;  // 解除急停
+        srcp.args.CancelPause cancelPause                       = 3006;  // 解除暂停
+        srcp.args.StopCharging stopCharging             = 3007; // 停止充电
+        // 电源管理预留 3003-3999
+    }
+}
+
+//远程控制指令执行状态上报
+message RemoteControlTaskState
+{
+    enum State
+    {
+        RUNNING = 0;
+        SUCCESS = 1;
+        FAILURE = 2;
+        CANCELED = 3;    // 已取消
+    }
+    string id = 1;    // 任务UUID
+    State state = 2;    // 任务状态
+    string failure_reason = 3; // 失败原因
+}

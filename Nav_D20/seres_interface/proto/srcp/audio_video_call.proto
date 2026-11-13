@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package srcp;
+
+//抖音音视频指令参数，音视频通话控制
+message AudioVideoCall {
+    //音视频通话控制
+    enum CallCtl {
+        CALL_UNKNOWN = 0;
+        CALL_START = 1; //音视频通话呼叫
+        CALL_ANSWERED = 2; //音视频通话呼叫成功
+        CALL_REJECTED = 3; //音视频通话呼叫被拒绝
+        CALL_TIMEOUT = 4; //音视频通话呼叫超时
+        CALL_ACCESS_TOKEN = 5; //音视频通话访问令牌
+        CALL_REFRESH_TOKEN = 6;//音视频通话刷新令牌
+        CALL_HANG_UP = 7;//音视频通话挂断
+        CALL_ERROR = 8; //音视频通话呼叫错误
+        CALL_SUCCESS = 9; //音视频通话成功
+        CALL_FINISH = 10; //音视频通话结束
+        CALL_ARG = 11; //音视频通话参数设置
+    }
+    // 通话场景
+    enum CallScene {
+        SCENE_UNKNOWN = 0;
+        CALL = 1;//音视频通话
+        CONTROL = 2;//趣控
+    }
+    // 推流类型
+    enum  CallStreamType {
+        STREAM_TYPE_UNKNOWN = 0; //未定义
+        STREAM_TYPE_REMOTE = 1; //远程推送
+        STREAM_TYPE_LOCAL = 2; //本地推送
+    }
+    // 音视频通话分辨率
+    enum Resolution {
+        UNKNOWN_RESOLUTION = 0;
+        RESOLUTION_720P = 1;
+        RESOLUTION_1K = 2;
+        RESOLUTION_2K = 3;
+        RESOLUTION_4K = 4;
+    }
+
+    //音视频通话数据
+    message CallStart{
+        string room_id = 1;//房间id RemotePush
+        string access_token = 2;//访问令牌 RemotePush
+        string callee_uuid = 3;//被呼叫方，用户uuid RobotReport
+        CallScene call_scene = 4;//通话场景 RemotePush
+        CallArg call_arg = 5;//通话参数 RemotePush
+        CallStreamType stream_type = 6; //推流类型 RemotePush
+    }
+    message CallAnswered{
+        string room_id = 1;
+    }
+    message CallRejected{
+        string room_id = 1;
+    }
+    message CallAccessToken{
+        string room_id = 1;
+        string access_token = 2;
+        CallArg call_arg = 3;//通话参数
+        CallScene call_scene = 4;//通话场景
+    }
+    message CallRefreshToken{
+        string room_id = 1; //RobotReport/RemotePush
+        string refresh_token = 2;//刷新令牌 RemotePush
+    }
+    message CallTimeout{
+        string room_id = 1;
+    }
+    message CallHangUp{
+        string room_id = 1;
+    }
+    message CallError{
+        string error_code = 1;//错误码
+        string error_msg = 2;//错误信息
+    }
+    message CallSuccess{
+        string room_id = 1;
+    }
+    message CallFinish{
+        string room_id = 1;
+    }
+
+    //音视频通话参数设置参数
+    message CallArg{
+        string room_id = 1;
+        bool audio_ctl = 2;//音频开关 true开 false关
+        bool video_ctl = 3;//视频开关 true开 false关
+        Resolution resolution = 4;//视频流分辨率
+    }
+}
+
+message AudioVideoCallData {
+    //通话控制
+    AudioVideoCall.CallCtl call_ctl = 1;
+    //音视频通话结果数据
+    oneof data
+    {
+        AudioVideoCall.CallStart call_start = 2;//音视频通话呼叫 RobotReport/RemotePush
+        AudioVideoCall.CallAnswered call_answered = 3;//音视频通话呼叫应答 RobotReport/RemotePush
+        AudioVideoCall.CallRejected call_rejected = 4;//音视频通话呼叫被拒绝 RobotReport/RemotePush
+        AudioVideoCall.CallTimeout call_timeout = 5; //音视频通话呼叫超时 RobotReport/RemotePush
+        AudioVideoCall.CallAccessToken call_access_token = 6; //音视频通话访问令牌 RemotePush
+        AudioVideoCall.CallRefreshToken call_refresh_token = 7; //音视频通话刷新令牌 RobotReport/RemotePush
+        AudioVideoCall.CallHangUp call_hang_up = 8;//音视频通话挂断 RobotReport/RemotePush
+        AudioVideoCall.CallError call_error = 9; //音视频通话呼叫错误 RemotePush
+        AudioVideoCall.CallSuccess call_success = 10; //音视频通话成功 RobotReport/RemotePush
+        AudioVideoCall.CallFinish call_finish = 11; //音视频通话结束 RobotReport/RemotePush
+        AudioVideoCall.CallArg call_arg = 12;//音视频通话参数设置 RemotePush
+    }
+}
