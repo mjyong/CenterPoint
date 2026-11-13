@@ -1,0 +1,32 @@
+/public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/util/ConfigureVectorization.h:37:36: note: attribute for ‘struct LivoxPointXyzrtlt’ must follow the ‘struct’ keyword
+   37 | #define EIGEN_ALIGN_TO_BOUNDARY(n) alignas(n)
+      |                                    ^~~~~~~
+/public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Core/util/ConfigureVectorization.h:145:23: note: in expansion of macro ‘EIGEN_ALIGN_TO_BOUNDARY’
+  145 | #define EIGEN_ALIGN16 EIGEN_ALIGN_TO_BOUNDARY(16)
+      |                       ^~~~~~~~~~~~~~~~~~~~~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/common/point_def.h:58:3: note: in expansion of macro ‘EIGEN_ALIGN16’
+   58 | } EIGEN_ALIGN16;
+      |   ^~~~~~~~~~~~~
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.h:19,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/app/run_loc_online.cc:8:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h: In constructor ‘lightning::Keyframe::Keyframe(long unsigned int, lightning::CloudPtr, lightning::NavState)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h:76:14: warning: ‘lightning::Keyframe::state_’ will be initialized after [-Wreorder]
+   76 |     NavState state_;  // 卡尔曼滤波器状态
+      |              ^~~~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h:71:9: warning:   ‘lightning::SE3 lightning::Keyframe::pose_lio_’ [-Wreorder]
+   71 |     SE3 pose_lio_;  // 前端的pose
+      |         ^~~~~~~~~
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Keyframe(unsigned long id, CloudPtr cloud, NavState state)
+      |     ^~~~~~~~
+In file included from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/app/run_loc_online.cc:8:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.h: At global scope:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.h:283:2: warning: extra ‘;’ [-Wpedantic]
+  283 | };  // namespace lightning
+      |  ^
+---
+Finished <<< lightning [59.2s]
+
+Summary: 1 package finished [59.4s]
+  1 package had stderr output: lightning
+

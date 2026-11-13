@@ -158,7 +158,7 @@
 | T47 | 规划回放第二次（起点挪到路上、bag 放完就收、新的回放脚本）；室外 bag 缺帧那一段的 INS；在线对离线扣掉原点差重比；狗在线时验 root 桥白名单 | Agent | T46 复核 | 1.5 小时 | 完成，已复核（2026-11-12）：两次回放都进了 active；之后的 Nav_D20 同步冲掉了我们的补丁，已重打（Nav_D20/PATCHES.md）；新地图的人行横道接进规划；T48 用新版重跑 |
 | T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 完成，已复核（2026-11-13）：编过了，切图读到 5 条人行横道；三次都只 active 约 20 个周期就停在 standstill，两次定位跑飞。原因都是同步带来的：回放超时的补丁丢了、新版 lightning 少了 0921 要的 INS 朝向 180°、默认车型 d30。三处都改了，T49 重跑 |
 | T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 完成，已复核（2026-11-13）：三处修复都生效。INS 直出一路 active、指令往前；现场地图和切图被 A* 起点的夹缝卡在 fault；狗一出路网 MPPI 就失败；LIO 落后时 odom 往回跳。A* 和 odom 已改；wait 不安全 204 → 187，剩下的是没看到的车 |
-| T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 任务已写好 |
+| T50 | 用 T49 复核的修复（A* 起点、odom 补推 IMU、定位耗时日志）重编规划和定位，回放三次：现场地图和切图进 active、odom 不跳、查 LiDAR 卡顿；1104 上评到路边先看 0 / 3 / 5 / 8 s | Agent | T49 复核 | 2.5 小时 | 完成（2026-11-13）：现场地图和切图都 active，起点挪了 0.40 m；odom 只剩开头的初始化跳变。LiDAR 回调仍卡，ProcessLidar 不慢，planning 占一核。min_watch 0/3/5/8 s 不安全 187/133/119/92 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8780,3 +8780,35 @@ wait 的 all 一行：episodes 3396，unknown 3676，unsafe 187，risky 275，ti
 报告（写进"T50 结果"）：编译最后几行；三份 report 全文；和 T49 比：mission_state、CMD、起点挪了多少、odom 跳变次数、
 LiDAR 卡顿的那一行和耗时表（以及 pidstat / top 看到的）；四组 min_watch 的表。
 ```
+
+### T50 结果
+
+2026-11-13。`pytest` 47 passed。planning `Summary: 1 package finished`（1 分 48 秒），lightning 同样（59 秒）。感知没重编。全文在 `data/reports/T50/report_{map,ins,switch}.txt`。
+
+车型是 `d20/001`，INS 朝向偏置日志是 180°。三份的 `Data timeout exceeded` 都是 1 次，都在 bag 放完时（`pausing mission`，没有 `Data recovered`），对应 standstill 27、30、35。任务在这之前是 active。
+
+- 现场地图：active 3238，passive 1，standby 1，standstill 27。`CMD:` 1199 次，中位 vx / vy / ω = 1.256 / 0.004 / 0.282，vx > 0.05 占 97%。`local planner solver failed` 2039 次。`Start adjusted from 78.3043 119.387 to 78.0494 119.696`，挪了 0.40 m。查包的 `/lightning/odom` 只剩 0.2 s 那一次 142.8 m 的初始化跳变。朝向中位 1°，贴图中位 47%，odom − INS 中位 0.34 m。`lightning log` 2036 行、86 个事件；规划 glog 30346 行、74 个事件。狗脚下是障碍第一次在 32.64 s，106 s 附近是 105.09 s。
+  - `定位：LiDAR 回调间隔过大 70 次，ProcessLidar 超过 0.2 s 0 次，雷达断流 21 次`。70 次间隔中位 0.82 s、最长 1.05 s，其中 52 次超过 0.5 s。耗时表：
+    - Incremental Mapping：平均 0.00035 ms，中位 0.00032，95% 0.00058，最长 0.0085，1405 次
+    - ObsModel (IEKF Build Jacobian)：平均 0.014 ms，中位 0.011，95% 0.035，最长 0.075，2000 次
+    - ObsModel (Lidar Match)：平均 4.03 ms，中位 2.82，95% 10.1，最长 41.5，2000 次
+    - IEKF Solve and Update：平均 18.9 ms，中位 17.6，95% 43.1，最长 68.0，1405 次
+    - Preprocess (Standard)：平均 0.00075 ms，中位 0.00043，95% 0.0011，最长 0.047，1427 次
+    - Proc Lidar：平均 4.30 ms，中位 2.73，95% 8.92，最长 76.7，1713 次
+    - Undistort Pcl：平均 4.83 ms，中位 3.76，95% 10.6，最长 32.3，1405 次
+- INS 直出：active 3251，passive 1，standby 1，standstill 30。`CMD:` 1882 次，中位 1.098 / 0.007 / 0.147，vx > 0.05 占 99%。solver failed 1369 次。起点没挪。查包没有报 `/lightning/odom`。朝向中位 0°，odom − INS 中位 0.14 m。定位日志 21 行、9 个事件；规划 glog 35012 行、47 个事件。狗脚下是障碍：106.65 s（17 格）、110.51 s（52 格）。LiDAR 回调间隔过大 0 次（INS 直出没有 LIO）。
+- 切图：`Map switch` 1 次，`5 crosswalks in …/2d/1780551612/semantic.osm` 1 次，`OSM file not exist` 0。路线图是这张图（51340 个路格）。active 3168，passive 1，standby 1，standstill 35。`CMD:` 1533 次，中位 1.275 / 0.002 / 0.254，vx > 0.05 占 99%。solver failed 1635 次。`Start adjusted from 78.316 119.39 to 78.0611 119.698`，挪了 0.40 m。查包的 odom 跳变 2 次，都在 0.1–0.3 s（最大 142.3 m，初始化）。朝向中位 1°，贴图中位 48%，odom − INS 中位 0.34 m。`lightning log` 2029 行、81 个事件；规划 glog 31795 行、67 个事件。106 s 以后仍有狗脚下是障碍：123.88 s（15 格）、131.58 s（17 格），MPPI 失败从 123.36 s 起；105 s 那次没有。更早还有 34.88 s、39.88 s。
+  - `定位：LiDAR 回调间隔过大 60 次，ProcessLidar 超过 0.2 s 0 次，雷达断流 14 次`。耗时表：Incremental Mapping 最长 0.0024 ms；IEKF Jacobian 最长 0.074 ms；Lidar Match 最长 25.2 ms；IEKF Solve and Update 最长 130.6 ms；Preprocess 最长 0.028 ms；Proc Lidar 最长 27.4 ms；Undistort 最长 16.2 ms。
+
+和 T49 比：T49 现场地图和切图是 fault、CMD 0、起点没挪，1 s 之后还有约 40 次 1.5 m 的 odom 回跳。这次两份都是 active（3238、3168），CMD 1199 和 1533，中位 vx 1.26 和 1.28，起点挪了 0.40 m，1 s 之后没有超过 1 m 的跳变。INS 直出和 T49 一样一路 active（这次 3251，T49 是 3232），中位 vx 1.10（T49 1.12），solver failed 1369（T49 1370）。
+
+LiDAR 卡顿：回调间隔过大和 ProcessLidar 超过 0.2 s 对不上（70 对 0、60 对 0），处理本身不慢（Proc Lidar 最长 77 ms 和 27 ms）。按任务又跑了一次 `t50_map_cpu`，`pidstat` 在 `data/reports/T50/pidstat_map.txt`（64 核）。planning 全程大约一核（中位 102%，最高 125%，120 个采样里 118 个超过 50%）。`run_loc_online` 中位 30%、最高 51%；`lidar_seg` 中位 25%、最高 55%；`grid_map_memory` 最高 14%；bag 播放和录包大约 6%。定位进程没有占满。回调隔 0.8 s 到达，单步处理只有几毫秒到几十毫秒，点云是在进 `ProcessLidar` 之前就断了。
+
+1104，`min_watch`（退出码 1 是因为还有 unsafe）。watch0 和 T49 的 wait 相同：unsafe 187、risky 275、timeouts 0，等待 0.0 / 3.8 / 15.5 s；blind 179、far 1、near 0、occluded 0、detection 5、prediction 2。
+
+| min_watch | episodes | unknown | unsafe | risky | timeouts | 等待中位 / p90 / 最长 | blind | far | near | occluded | detection | prediction |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0 s | 3396 | 3676 | 187 | 275 | 0 | 0.0 / 3.8 / 15.5 | 179 | 1 | 0 | 0 | 5 | 2 |
+| 3 s | 2296 | 4776 | 133 | 193 | 0 | 3.1 / 7.8 / 16.5 | 132 | 1 | 0 | 0 | 0 | 0 |
+| 5 s | 1827 | 5245 | 119 | 172 | 0 | 5.1 / 9.4 / 16.5 | 118 | 1 | 0 | 0 | 0 | 0 |
+| 8 s | 1208 | 5864 | 92 | 133 | 0 | 8.1 / 11.4 / 16.5 | 90 | 2 | 0 | 0 | 0 | 0 |

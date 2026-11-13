@@ -1,0 +1,68 @@
+== t50_ins: 目标 (80.0, 126.9) 已发；LOC_MAP_PATH= LOC_INS_ONLY=1 MAP_SWITCH=
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t50_ins: 11 topics, 27353 transforms
+  /cmd_vel                                         geometry_msgs/msg/Twist                3287 msgs  frames -
+  /goal_pose                                       geometry_msgs/msg/PoseStamped             1 msgs  frames map
+  /lightning/odom                                  nav_msgs/msg/Odometry                 17270 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid             1712 msgs  frames base_link
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid             3361 msgs  frames base_link
+  /planning/debug/diagnostic                       diagnostic_msgs/msg/DiagnosticArray    3361 msgs  frames planning
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker          3288 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     3360 msgs  frames map
+  /planning/debug/plotjuggler/string               std_msgs/msg/String                    3361 msgs  frames -
+  /rte/rdap/rtk/inspvax                            kygi665_msgs/msg/INSPVAX              17280 msgs  frames -
+  /tf                                              tf2_msgs/msg/TFMessage                20631 msgs  frames -
+PROBLEM /planning/debug/cost_map_production/occmap: the robot stands on an obstacle (>= 10% of its footprint) in 1367 of 3361 grids; the local planner will not plan from there
+PROBLEM layout: /fused_point_cloud is not in the recording
+NOTE display: /map/occupancy_grid, /planning/debug/cost_map_production/occmap are all drawn in base_link: the planes tilt with the robot and cut through each other in Foxglove (blinking); open tools/planning_mcap_viz.py's output instead
+2 problems
+mission_state: active 3251, passive 1, standby 1, standstill 30, 
+CMD: 1882 次；头两条：
+  I20261113 14:09:42.373905 140467504160768 tracking.cc:181] [PLANNING]CMD: -0.00828153  -0.0377361   0.0313023
+  I20261113 14:09:42.446925 140467504160768 tracking.cc:181] [PLANNING]CMD:  0.128367  0.049207 0.0749596
+CMD 中位 vx vy ω：1.098 0.007 0.147 ；vx > 0.05 的比例 99%
+车型：规划车型 d20/001（PLANNING_ROOT_DIR=/tmp/nav_stack_debug/planning_root）；Load robot config:/tmp/nav_stack_debug/planning_root/robot_factory/d20/001
+定位：INS 朝向偏置 180（bag rosbag2_2026_09_21-16_41_27）；system.ins_yaw_offset = 180 deg
+Start adjusted: 0
+Goal adjusted: 0
+Start point is in collision: 0
+Initial pose is in collision: 0
+No free point found near start: 0
+Map switch: 0
+crosswalks in: 0
+OSM file not exist: 0
+Failed to parse OSM: 0
+Data timeout exceeded: 1
+Data recovered, resuming: 0
+local planner solver failed: 1369
+定位：LiDAR 回调间隔过大 0 次，ProcessLidar 超过 0.2 s 0 次（最长 ），雷达断流 0 次
+  >>> ===== Printing run time =====
+  >>> ===== Printing run time end =====
+== 可视化（tools/planning_mcap_viz.py）
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t50_ins -> /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t50_ins/viz/planning_viz.mcap (14.5 MB), 172.8 s of bag time from 1789980087.992
+  time base: the bag's stamps; the recorder's clock was 4570082.9 s (52.9 days) ahead
+  pose: /tf map -> base_link, 17270 samples
+  costmap values: 100 = obstacle (perception obstacles read 100 in 100.0% of 65741 costmap cells)
+  /planning/debug/cost_map_production/occmap -> /viz/cost_map: 3361 grids
+  /map/occupancy_grid -> /viz/perception_grid: 1712 grids
+  route map: CJGC.yaml:CJGC.pgm, 1130 x 1886 cells around the run, 36516 route cells
+  localization map: /lightning/map_cloud, 12497 points around the run
+  INS: 17280 messages, RTK fixed 100%, odom - INS median 0.14 m (origin 29.731405, 106.783891, 217.2)
+  heading: odom minus the INS direction of travel, median |.| 0 deg over 91 s moving; 1% of it more than 135 deg off
+  lightning log /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t50_ins/logs/loc.log: 21 lines, 9 events
+  glog /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t50_ins/logs/planning.INFO: 35012 lines, 47 events (time zone +8.0 h)
+  overview: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t50_ins/viz/planning_viz.png
+  topics: /tf 17270, /viz/cost_map 3361, /viz/events 80, /viz/flow 3361, /viz/legend 12, /viz/loc/flow 864, /viz/loc/ins 346, /viz/loc/map_cloud 2, /viz/loc/state 864, /viz/perception_grid 1712, /viz/plan 3360, /viz/robot 1728, /viz/route_map 12, /viz/state 3361, /viz/trail 346
+  events: 80 (50 warnings or errors) on /viz/events
+       2.34 s  规划 4.03 s 没有输出（/planning/debug/path_tracking）
+       2.34 s  /planning/debug/cost_map_production/occmap 4.03 s 没有新栅格
+      10.10 s  velocity_calibration.cc:86] [PLANNING]Table i_vx has less than 2 samples
+      10.10 s  velocity_calibration.cc:86] [PLANNING]Table i_vy has less than 2 samples
+      10.10 s  velocity_calibration.cc:86] [PLANNING]Table i_omega has less than 2 samples
+      10.10 s  velocity_calibration.cc:98] [PLANNING]Velocity calibration table load failed
+      10.10 s  规划 1.30 s 没有输出（/planning/debug/path_tracking）
+      10.10 s  /planning/debug/cost_map_production/occmap 1.30 s 没有新栅格
+      11.58 s  mppi_planner.cc:66] [PLANNING]MPPI solver period (0.0762013s) differs from model_dt (0.1s), control sequence shifting disabled
+      39.17 s  optimizer.cc:393] [PLANNING]MPPI optimizer failed to compute a collision free path
+      39.19 s  tracking.cc:147] [PLANNING]local planner solver failed
+      48.73 s  optimizer.cc:393] [PLANNING]MPPI optimizer failed to compute a collision free path
+  open in Foxglove with the layout Nav_D20/planning/script/planning_viz.json
