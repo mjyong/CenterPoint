@@ -247,7 +247,9 @@ def time_problems(topics, edges, display):
         return ["TF: the display frame %s is in no transform" % display] if edges else []
     out = []
     for name, t in sorted(topics.items()):
-        if not t["stamps"]:
+        # only what Foxglove draws needs a TF path: /planning/debug/diagnostic (DiagnosticArray) carries frame
+        # "planning", a label, not a frame (T48)
+        if not t["stamps"] or t["type"] not in DRAWN:
             continue
         s = np.asarray(t["stamps"])
         for frame in sorted(t["frames"]):

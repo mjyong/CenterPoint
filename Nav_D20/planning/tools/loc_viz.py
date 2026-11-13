@@ -5,14 +5,17 @@ ONBOARDING.md) as much as for debugging it.
     /viz/loc/map_cloud   the localization map (3d/global.pcd of --loc-map, or /lightning/map_cloud) around the run,
                          voxel-downsampled; field "height" above the dog's base
     /viz/loc/scan        /lightning/current_scan_world (the de-skewed scan placed with the LIO pose), 5 Hz; field
-                         "match": distance to the nearest map point [m] (green: on the map, red: off it)
+                         "match": distance to the map [m], point to plane the way lightning's LIO measures it
+                         (a plane through the 5 nearest map points; green: on the map, red: off it)
     /viz/loc/ins         the INS (raw INSPVAX, turned into the map frame the way lightning does it: GeographicLib
                          LocalCartesian at system.ins_lat / ins_lon / ins_height of the lightning config): its track,
                          RTK fixed in magenta, anything else grey; where it is now
     /viz/loc/state       JSON 5 Hz: localization valid (/lightning/odom covariance[1]), INS status, odom minus INS,
+                         odom heading minus the INS's direction of travel (about 180: the heading is turned round),
                          height, roll, pitch, scan size and how well it matches
     /viz/loc/flow        JSON per scan: lightning's steps with this scan's numbers and where the code is
-    events               on /viz/events: valid / invalid, RTK fixed / lost, odom off the INS, scans off the map,
+    events               on /viz/events: valid / invalid, RTK fixed / lost, odom off the INS, heading turned round,
+                         scans off the map,
                          lightning's health events and its own warnings (loc.log)
 
 Only what the recording has is drawn; the replay script records the localization topics.
@@ -32,9 +35,18 @@ MAP_VOXEL = 0.3          # [m] of the drawn map cloud
 MATCH_VOXEL = 0.1        # [m] of the map points the scans are matched against
 MAP_MARGIN = 30.0        # [m] around the run
 MAP_PERIOD = 90.0        # [s] the map cloud is sent again
-MATCH_GOOD = 0.2         # [m] a scan point this close to the map is "on" it
+MATCH_GOOD = 0.1         # [m] a scan point this close to the map's surface is "on" it (lightning's own health
+                         # threshold is a mean residual of 0.15 m)
+MATCH_K = 5              # map points a plane is fitted through (lightning: NUM_MATCH_POINTS 5)
+MATCH_REACH = 1.5        # [m] the farthest of them; farther and the point has no plane (it counts as off)
+MATCH_FLAT = 0.1         # [m] every one of them this close to the plane, or it is no plane (faster-lio esti_plane)
+MATCH_SPREAD = 0.02      # [m] their spread across the line through them, or they are a line and give no plane
 MATCH_LOW = 0.5          # share of scan points on the map below which a scan counts as off the map
 INS_FAR = 1.0            # [m] odom this far from the INS is logged
+HEADING_SPEED = 0.5      # [m/s] the INS moving at least this fast gives a direction of travel
+HEADING_WINDOW = 0.5     # [s] over which the direction of travel is taken
+HEADING_BACK = 135.0     # [deg] odom heading this far off the direction of travel: the dog walks backwards, or the
+                         # heading is turned (T48: the INS heading offset of the 0921 bags, 180, was missing)
 INS_VALID_STATUS = 3     # kygi665 ins_status: solution good
 RTK_FIXED = 56           # kygi665 pos_type: INS_RTKFIXED (lightning: NormalizeKygi665PosType)
 LOC_KEYWORDS = ("定位质量", "定位故障", "重初始化", "reinit", "Reinit", "NDT", "雷达断流", "IMU drop", "INS 回调",
@@ -136,20 +148,44 @@ def voxel_first(xyz, voxel):
 
 
 class Nearest:
-    """Distance to the nearest map point (scipy's cKDTree; None without scipy)."""
+    """Distance from scan points to the map's surface (scipy's cKDTree; None without scipy).
+
+    Point to plane, as lightning's LIO measures a scan (laser_mapping.cc: 5 nearest map points, a plane through them,
+    the point's distance to it): the distance to the nearest map point depends on how dense the map is (/lightning/
+    map_cloud is thinned to 0.5 m and read 11-30% "on the map" for a dog standing still, T48), the distance to the
+    plane does not. Where the 5 points are no plane (an edge, a bush) or farther than MATCH_REACH, the nearest point
+    is used instead."""
 
     def __init__(self, xyz):
+        self.xyz = np.asarray(xyz, dtype=np.float64)
         try:
             from scipy.spatial import cKDTree
-            self.tree = cKDTree(xyz) if len(xyz) else None
+            self.tree = cKDTree(self.xyz) if len(self.xyz) >= MATCH_K else None
         except ImportError:
             self.tree = None
 
     def __call__(self, pts, cap=5.0):
         if self.tree is None:
             return None
-        d, _ = self.tree.query(pts, k=1, distance_upper_bound=cap)
-        return np.minimum(d, cap)
+        pts = np.asarray(pts, dtype=np.float64)
+        d, idx = self.tree.query(pts, k=MATCH_K, distance_upper_bound=cap)
+        out = np.minimum(d[:, 0], cap)
+        near = np.isfinite(d[:, -1]) & (d[:, -1] < MATCH_REACH)
+        if not near.any():
+            return out
+        nb = self.xyz[idx[near]]                                  # (m, K, 3)
+        centre = nb.mean(axis=1)
+        q = nb - centre[:, None, :]
+        val, vec = np.linalg.eigh(np.einsum("mki,mkj->mij", q, q))
+        normal = vec[:, :, 0]                                     # the smallest eigenvalue's eigenvector
+        # a plane: every point close to it, and the points spread over two directions (on a line any plane through
+        # it fits, and the normal is arbitrary)
+        flat = (np.abs(np.einsum("mki,mi->mk", q, normal)).max(axis=1) < MATCH_FLAT) & (
+            val[:, 1] > MATCH_K * MATCH_SPREAD ** 2)
+        dist = np.abs(np.einsum("mi,mi->m", pts[near] - centre, normal))
+        sel = np.nonzero(near)[0][flat]
+        out[sel] = np.minimum(dist[flat], cap)
+        return out
 
 
 def roll_pitch(q):
@@ -292,7 +328,35 @@ class LocLayers:
         self.notes.append("INS: %d messages, RTK fixed %.0f%%, odom - INS median %.2f m (origin %.6f, %.6f, %.1f)" % (
             len(out), 100 * np.mean(ins["fixed"]), np.nanmedian(ins["diff"]) if inside.any() else float("nan"),
             *origin))
+        ins["heading"] = self.heading_off_course(ins)
         return ins
+
+    def heading_off_course(self, ins):
+        """Odom heading minus the INS's direction of travel [deg, -180..180], NaN where the INS is not moving. The
+        direction comes from the INS positions, so it does not depend on the INS heading convention (-azimuth +
+        system.ins_yaw_offset in lightning): a dog walking forward reads about 0, a heading turned round about 180."""
+        tr, t = self.c.track, ins["t"]
+        out = np.full(len(t), np.nan)
+        j = np.searchsorted(t, t + HEADING_WINDOW)
+        i = np.nonzero(j < len(t))[0]
+        j = j[i]
+        dt = t[j] - t[i]
+        dx, dy = ins["x"][j] - ins["x"][i], ins["y"][j] - ins["y"][i]
+        mid = 0.5 * (t[i] + t[j])
+        moving = (dt > 0) & (np.hypot(dx, dy) > HEADING_SPEED * np.maximum(dt, 1e-9)) & (mid >= tr.t[0]) & (
+            mid <= tr.t[-1])
+        yaw = np.interp(mid, tr.t, tr.yaw)
+        d = np.degrees(np.angle(np.exp(1j * (yaw - np.arctan2(dy, dx)))))
+        out[i[moving]] = d[moving]
+        m = out[np.isfinite(out)]
+        if len(m):
+            step = float(np.median(np.diff(t))) if len(t) > 1 else 0.0
+            self.notes.append("heading: odom minus the INS direction of travel, median |.| %.0f deg over %.0f s moving"
+                              "; %.0f%% of it more than %.0f deg off%s" % (
+                                  np.median(np.abs(m)), len(m) * step, 100 * np.mean(np.abs(m) > HEADING_BACK),
+                                  HEADING_BACK, " (THE HEADING IS TURNED ROUND: system.ins_yaw_offset? the 0921 bags "
+                                  "need 180)" if np.mean(np.abs(m) > HEADING_BACK) > 0.5 else ""))
+        return out
 
     def write_ins(self):
         if self.ins is None:
@@ -347,11 +411,13 @@ class LocLayers:
             sc = scans[k] if k >= 0 and t - scans[k]["t"] < 0.5 else {}
             i = int(np.searchsorted(ins["t"], t, side="right")) - 1 if ins is not None else -1
             insd = dict(fixed=bool(ins["fixed"][i]), status=int(ins["status"][i]), pos_type=int(ins["pos_type"][i]),
-                        diff=float(ins["diff"][i])) if i >= 0 and t - ins["t"][i] < 0.5 else {}
+                        diff=float(ins["diff"][i]), heading=float(ins["heading"][i])) \
+                if i >= 0 and t - ins["t"][i] < 0.5 else {}
             s = dict(t=t, valid=valid, z=float(np.interp(t, c.track.t, c.track.z)), roll=roll, pitch=pitch,
                      speed=c.track.speed(t), scan_points=sc.get("points"), match_median=sc.get("match_median"),
                      match_inlier=sc.get("match_inlier"), ins_fixed=insd.get("fixed"), ins_status=insd.get("status"),
-                     ins_pos_type=insd.get("pos_type"), odom_minus_ins=insd.get("diff"))
+                     ins_pos_type=insd.get("pos_type"), odom_minus_ins=insd.get("diff"),
+                     heading_off_course=insd.get("heading"))
             self.states.append(s)
             obj = {k: (jnum(v) if not isinstance(v, bool) else int(v)) for k, v in s.items() if k != "t"}
             obj["t"] = jnum(t - c.t0, 3)
@@ -379,7 +445,8 @@ class LocLayers:
                          "INS": "没有" if s["ins_fixed"] is None else ("RTK 固定" if s["ins_fixed"] else
                                                                       "不是 RTK 固定（%s/%s）" % (s["ins_status"],
                                                                                               s["ins_pos_type"])),
-                         "定位减 INS_m": f(s["odom_minus_ins"], "%.2f")},
+                         "定位减 INS_m": f(s["odom_minus_ins"], "%.2f"),
+                         "狗头减行进方向_deg（走路时约 0；约 180 是朝向转反了）": f(s["heading_off_course"], "%.0f")},
             "⑥ 输出": {"代码": FLOW_CODE["out"]},
         }
 
@@ -416,6 +483,20 @@ class LocLayers:
                 on = True
             elif on and d < INS_FAR / 2:
                 c.event(s["t"], "info", "定位和 INS 又对上了（%.2f m）" % d, "loc")
+                on = False
+        # the heading turned round: 2 s in a row (5 Hz states) more than HEADING_BACK off the direction of travel
+        on, run = False, 0
+        for s in st:
+            d = s["heading_off_course"]
+            if d is None or d != d:
+                continue
+            run = run + 1 if abs(d) > HEADING_BACK else 0
+            if not on and run >= 2 * SCAN_RATE:
+                c.event(s["t"], "error", "狗头和走的方向差了 %.0f°（2 s 了）：朝向转反了？INS 朝向偏置 "
+                        "system.ins_yaw_offset 不对（0921 的包要 180）就会这样" % d, "loc")
+                on = True
+            elif on and abs(d) < 45.0:
+                c.event(s["t"], "info", "狗头和走的方向又一致了（%.0f°）" % d, "loc")
                 on = False
         on = False
         for s in st:
@@ -465,7 +546,7 @@ class LocLayers:
 LOC_STATE_SCHEMA = {"type": "object", "title": "planning_viz.LocState",
                     "properties": {k: {"type": ["number", "null"]} for k in (
                         "t", "valid", "z", "roll", "pitch", "speed", "scan_points", "match_median", "match_inlier",
-                        "ins_fixed", "ins_status", "ins_pos_type", "odom_minus_ins")}}
+                        "ins_fixed", "ins_status", "ins_pos_type", "odom_minus_ins", "heading_off_course")}}
 FLOW_SCHEMA = {"type": "object", "title": "planning_viz.Flow", "additionalProperties": True}
 
 

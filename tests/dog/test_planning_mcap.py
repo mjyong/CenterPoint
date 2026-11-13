@@ -110,6 +110,9 @@ def _write(path, old, wall_stamps=None, runaway=False, blocked=False, jitter=Fal
             markers += [marker(0.0, "map", 0, 0.05 if old else 0.5) for _ in range(3)]
             put("/planning/debug/path_tracking", "visualization_msgs/msg/MarkerArray",
                 _make(ts, "visualization_msgs/msg/MarkerArray", markers=markers), wall_t + 0.01 * (i % 3))
+            # planning's diagnostics carry frame "planning", in no transform: not drawn, so no TF problem (T48)
+            put("/planning/debug/diagnostic", "diagnostic_msgs/msg/DiagnosticArray",
+                _make(ts, "diagnostic_msgs/msg/DiagnosticArray", header=header(bag_t, "planning")), wall_t)
         w.finish()
 
 

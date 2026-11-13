@@ -5,7 +5,7 @@
 #   bash Nav_D20/planning/script/replay_planning_check.sh <名字> <目标 x> <目标 y> [--bag BAG]
 #   例：LOC_MAP_PATH=data/loc_maps/ad68517c-... bash Nav_D20/planning/script/replay_planning_check.sh t47_map 80.0 126.9
 #
-# 环境变量同 run_planning_stack_debug.sh：LOC_MAP_PATH、LOC_INS_ONLY；ROS_DOMAIN_ID 默认 42（会发 /cmd_vel，不要用狗的域）。
+# 环境变量同 run_planning_stack_debug.sh：LOC_MAP_PATH、LOC_INS_ONLY、LOC_INS_YAW_OFFSET（不设按 bag 日期定）、PLANNING_VIN；ROS_DOMAIN_ID 默认 42（会发 /cmd_vel，不要用狗的域）。
 # MAP_SWITCH=<地图目录>（有 global_map.yaml 的）：发目标之前先发 /map/switch，规划换成这张图，读它的 semantic.osm。
 # 输出在 work_dirs/planning_io_<名字>/：录包（mcap）、logs/（各进程日志、规划的 glog）、report.txt（查包和关键行）、
 # viz/planning_viz.mcap 和 .png（tools/planning_mcap_viz.py：在 Foxglove 里用 script/planning_viz.json 看规划，
@@ -108,8 +108,15 @@ fi
     echo "mission_state: $(grep -o 'mission_state: [a-z_]*' "${p}" | awk '{print $2}' | sort | uniq -c | awk '{printf "%s %s, ", $2, $1}')"
     echo "CMD: $(grep -c 'CMD: ' "${p}" || true) 次；头两条："
     grep -m 2 'CMD: ' "${p}" | sed 's/^/  /' || true
+    # 指令的中位：狗沿 bag 往前走时 vx 应该大多是正的（T48 狗头反了，vx 约 0、vy 横着）
+    echo "CMD 中位 vx vy ω：$(for k in 2 1 0; do grep 'CMD: ' "${p}" | awk -v k=${k} '{print $(NF-k)}' | sort -g |
+      awk '{a[NR]=$1} END {if (NR) printf "%.3f ", a[int((NR+1)/2)]}'; done)；vx > 0.05 的比例 $(grep 'CMD: ' "${p}" |
+      awk '{n++; if ($(NF-2) > 0.05) k++} END {if (n) printf "%.0f%%", 100*k/n}')"
+    echo "车型：$(grep -m 1 '规划车型' "/tmp/replay_${name}_stack.txt" || echo 没找到)；$(grep -m 1 -o 'Load robot config:.*' "${p}" || true)"
+    echo "定位：$(grep -m 1 'INS 朝向偏置' "/tmp/replay_${name}_stack.txt" || echo 没找到)；$(grep -m 1 -o 'system.ins_yaw_offset = .*' /tmp/nav_stack_debug/loc.log 2> /dev/null || echo 定位日志里没有，lightning 没重新编译？)"
     for k in "Start adjusted" "Goal adjusted" "Start point is in collision" "Initial pose is in collision" \
-             "No free point found near start" "Map switch" "crosswalks in" "OSM file not exist" "Failed to parse OSM"; do
+             "No free point found near start" "Map switch" "crosswalks in" "OSM file not exist" "Failed to parse OSM" \
+             "Data timeout exceeded" "Data recovered, resuming" "local planner solver failed"; do
       echo "${k}: $(grep -c "${k}" "${p}" || true)"
     done
   else

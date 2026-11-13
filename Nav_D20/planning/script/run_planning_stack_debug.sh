@@ -51,8 +51,12 @@ export CONDA_BUILD=0
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export SERES_PERCEPTION_INSTALL_DIR="${install_base}"
 # LOC_MAP_PATH=<定位地图目录>、LOC_INS_ONLY=1：换定位地图 / INS 直出，见 lightning 的 scripts/loc_debug_config.sh
+# LOC_INS_YAW_OFFSET：INS 朝向偏置，没设就按 bag 的录制日期定（0921 那批天线接反 180，1016 起 0；T48 用错了，狗头反了）
 # shellcheck disable=SC1091
 source "${nav_root}/slam/lightning-lm-master/scripts/loc_debug_config.sh"
+LOC_INS_YAW_OFFSET="${LOC_INS_YAW_OFFSET:-$(loc_ins_yaw_offset_for_bag "${bag}")}"
+export LOC_INS_YAW_OFFSET
+echo "INS 朝向偏置 ${LOC_INS_YAW_OFFSET:-配置里的值}（bag $(basename "${bag}")）"
 loc_config="$(loc_debug_config "${loc_config}")" || exit 1
 export config_path="${loc_config}"
 export PLANNING_TIMEOUT_WALL_CLOCK=1
@@ -64,6 +68,13 @@ micromamba activate "${env_prefix}"
 # shellcheck disable=SC1090
 source "${install_base}/setup.bash"
 set -u
+# 车型：PLANNING_VIN，默认 d20/001（新版机器人团队的默认是 d30/001，T48）
+# shellcheck disable=SC1091
+source "${nav_root}/planning/script/planning_vin.sh"
+PLANNING_ROOT_DIR="$(planning_root_for_vin "${PLANNING_ROOT_DIR}" "${PLANNING_VIN:-d20/001}" "${log_dir}/planning_root")" \
+  || exit 1
+export PLANNING_ROOT_DIR
+echo "规划车型 ${PLANNING_VIN:-d20/001}（PLANNING_ROOT_DIR=${PLANNING_ROOT_DIR}）"
 
 mkdir -p "${log_dir}"
 pids=()

@@ -31,7 +31,7 @@
 └──────────────────────────────────────────────────────────┘
 ```
 
-车型由 `robot_factory/default_robot_vin` 决定，现在是 `d20/001`；配置都在 `robot_factory/d20/001/planning_conf/`。
+车型由 `$PLANNING_ROOT_DIR/robot_factory/default_robot_vin` 决定，配置都在 `robot_factory/<车型>/planning_conf/`。**2026-11 同步来的新版里这个文件写的是 `d30/001`**（T48 回放就读成了 d30）；我们的狗是 `d20/001`。调试脚本用 `PLANNING_VIN`（默认 `d20/001`）在临时目录里搭一份软链接把它换掉（`script/planning_vin.sh`），不改安装目录；日志第一行 `Load robot config:` 看读的是哪个。
 
 ## 1. 一个周期怎么跑
 
@@ -139,7 +139,7 @@ Tracking 的状态（`src/runnable/mission/mission_state_machine/mission_fsm_bas
 | 发 | `/mc/motion_control` | `mc_interface/Motion` | | |
 | Action | `/nav/navigation`、`/nav/back_charge`、`/nav/ptz_camera` | `nav2_interface` | 任务侧 | |
 
-断流：任务在 active / standstill 时，里程计或感知栅格超时持续 1 s（`timeout_pause_duration`）就暂停，恢复连续 3 s（`timeout_resume_duration`）后继续。回放旧 bag 时脚本会设 `PLANNING_TIMEOUT_WALL_CLOCK=1`，按收到消息的时刻判断；狗上不要设。
+断流：任务在 active / standstill 时，里程计或感知栅格超时持续 1 s（`timeout_pause_duration`）就暂停，恢复连续 3 s（`timeout_resume_duration`）后继续。超时按消息头的时间戳和本机时钟比；回放旧 bag 时两者差几十天，永远算超时，暂停了就再也恢复不了（T48）。所以 `ros_bridge.cc` 加了 `TimeoutReference()`：脚本设 `PLANNING_TIMEOUT_WALL_CLOCK=1` 时改用收到消息的时刻；狗上不设，行为不变。这个补丁在 2026-11 同步时丢过一次（`PATCHES.md`），同步以后先 `grep -n TimeoutReference` 看还在不在。
 
 调试话题要 `pub_flag: true`（D20 默认 false；本机运行中可以 `ros2 service call /planning/debug/set_pub_flag std_srvs/srv/SetBool "{data: true}"`）：
 
@@ -265,14 +265,14 @@ python3 Nav_D20/planning/tools/check_planning_mcap.py <录包目录或 .mcap>
 
 | 关键字 | 意思 |
 |---|---|
-| `Load robot config:` | 读的是不是 `d20/001` |
+| `Load robot config:` | 读的是不是 `d20/001`（回放报告的"车型"一行；读成 `d30/001` 就是 `PLANNING_VIN` 没生效） |
 | `GlobalMapManager: PGM map loaded` | CJGC 读到了 |
 | `Set mission to Tracking`、`Navigation started` | 终点进了状态机 |
 | `mission_state:` | 状态 |
 | `Start adjusted`、`Goal adjusted` | A\* 起点 / 终点挪到了路上 |
 | `Start point is in collision`、`No free point found near start` | 起点在路外、1 m 内也没路 |
 | `local planner solver failed` | MPPI / TEB 失败，速度清零 |
-| `Data timeout exceeded, pausing mission` | 里程计或感知栅格断了 |
+| `Data timeout exceeded, pausing mission` | 里程计或感知栅格断了；回放时每次都有、又没有 `Data recovered, resuming`，就是按时间戳判超时了（`TimeoutReference` 丢了） |
 | `Map switch`、`crosswalks in`、`OSM file not exist` | 切图、读人行横道 |
 | `Failed to load PGM` | 路径或 `PLANNING_ROOT_DIR` 错了 |
 

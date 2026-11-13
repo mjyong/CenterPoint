@@ -195,7 +195,7 @@
       "isSynced": true,
       "xAxisVal": "timestamp",
       "sidebarDimension": 240,
-      "foxglovePanelTitle": "点云贴在地图上的比例（< 0.2 m）和离地图的距离中位 m",
+      "foxglovePanelTitle": "点云贴在地图上的比例（< 0.1 m，点到面）和离地图的距离中位 m",
       "minYValue": 0
     },
     "Plot!ins": {
@@ -206,6 +206,13 @@
           "timestampMethod": "receiveTime",
           "label": "定位 - INS",
           "color": "#bf5af2"
+        },
+        {
+          "value": "/viz/loc/state.heading_off_course",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "狗头 - 行进方向 °",
+          "color": "#ffd60a"
         }
       ],
       "showLegend": true,
@@ -216,8 +223,7 @@
       "isSynced": true,
       "xAxisVal": "timestamp",
       "sidebarDimension": 240,
-      "foxglovePanelTitle": "定位减 INS m",
-      "minYValue": 0
+      "foxglovePanelTitle": "定位减 INS m；狗头减行进方向 °（走路时约 0，约 ±180 = 朝向反了）"
     },
     "Plot!attitude": {
       "paths": [

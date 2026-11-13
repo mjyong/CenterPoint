@@ -1,4 +1,5 @@
 #include "src/runnable/communication/ros_bridge/ros_bridge.h"
+#include <cstdlib>
 #include "src/common/util/config_helper.h"
 #include "src/runnable/entry/planning_entry.h"
 #include "src/runnable/mission/recharging/recharging.h"
@@ -7,6 +8,16 @@ using planning::common::util::ConfigHelper;
 
 namespace planning {
 namespace communication {
+
+// Bag 回放时消息时间戳和本机时钟差几周，按戳做超时会一直暂停（T48：暂停以后再也没恢复）。
+// 只有调试脚本设置 PLANNING_TIMEOUT_WALL_CLOCK=1 时，改用收到消息的时刻；狗上不设，行为不变。
+static double TimeoutReference(double message_stamp) {
+  const char *flag = std::getenv("PLANNING_TIMEOUT_WALL_CLOCK");
+  if (flag != nullptr && flag[0] == '1' && flag[1] == '\0') {
+    return planning::common::util::TimeKeeper::TimeNowSec();
+  }
+  return message_stamp;
+}
 
 RosBridge::RosBridge(const CommunicationConf::Conf &conf) : rate_(20) {
   conf_ = conf;
@@ -337,12 +348,12 @@ void RosBridge::sync_callback(
   TfBuffer::Instance()->add(tf);
   auto it = timeout_states_.find(config_.sub_odom().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = odometry_.timestamp;
+    it->second.last_time = TimeoutReference(odometry_.timestamp);
   }
 
   it = timeout_states_.find(config_.sub_occupancy_grid().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = odometry_.timestamp;
+    it->second.last_time = TimeoutReference(odometry_.timestamp);
   }
   grid_map::GridMapRosConverter::fromOccupancyGrid(*occ_msg, "obstacle",
                                                    grid_map_);
@@ -371,7 +382,7 @@ void RosBridge::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
   TfBuffer::Instance()->add(tf);
   auto it = timeout_states_.find(config_.sub_odom().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = odometry_.timestamp;
+    it->second.last_time = TimeoutReference(odometry_.timestamp);
   }
 }
 
@@ -406,7 +417,7 @@ void RosBridge::joint_state_callback(
   collision_checker->updateTransforms(link_transforms);
   auto it = timeout_states_.find(config_.sub_joint_state().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = odometry_.timestamp;
+    it->second.last_time = TimeoutReference(odometry_.timestamp);
   }
 }
 
@@ -422,7 +433,7 @@ void RosBridge::local_octomap_callback(
   }
   auto it = timeout_states_.find(config_.sub_octomap().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time = odometry_.timestamp;
+    it->second.last_time = TimeoutReference(odometry_.timestamp);
   }
   auto collision_checker =
       planning_entry_->preprocess_entry_ptr()->collision_checker();
@@ -433,8 +444,8 @@ void RosBridge::occupancy_callback(
     const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
   auto it = timeout_states_.find(config_.sub_occupancy_grid().name());
   if (it != timeout_states_.end()) {
-    it->second.last_time =
-        msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+    it->second.last_time = TimeoutReference(
+        msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9);
   }
   grid_map::GridMapRosConverter::fromOccupancyGrid(*msg, "obstacle", grid_map_);
   auto &matrix = grid_map_.get("obstacle");

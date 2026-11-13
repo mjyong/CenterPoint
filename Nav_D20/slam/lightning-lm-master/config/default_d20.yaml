@@ -81,6 +81,8 @@ system:
   pub_tf: true
   with_ins: true
   ins_only_mode: false # INS直出模式: 不运行LIO和激光定位, 直接用INS位姿发布odom
+  ins_yaw_offset: 0.0 # kygi665 的 INS 朝向 = -azimuth + 这个（度）。狗上 1016 起天线接正了，是 0；0921 那批包录的时候
+                     # 双天线接反，回放它们要 180（调试脚本用 LOC_INS_YAW_OFFSET 写进临时配置，T48 复核）
   publish_map_cloud: true # 是否发布地图点云
   publish_occ_grid: true
   #超级工厂

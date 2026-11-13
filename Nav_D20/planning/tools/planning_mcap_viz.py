@@ -1728,7 +1728,10 @@ class Converter:
 
 GLOG_KEYWORDS = ("Start adjusted", "Goal adjusted", "in collision", "No free point", "Map switch", "crosswalks in",
                  "OSM", "SetPubFlag", "pausing", "resum", "Received goal", "goal", "A*", "replan", "fail", "Fail")
-GLOG_LINE = re.compile(r"^([IWEF])(\d\d)(\d\d) (\d\d):(\d\d):(\d\d)\.(\d+)\s+\S+\s+([^\]]+)\]\s?(.*)$")
+# I1113 11:35:32.023888 ... (old glog) or I20261113 11:35:32.023888 ... (glog 0.7, the server's since T48: the year
+# in front, which the old pattern did not read, so T48's logs gave no events)
+GLOG_LINE = re.compile(r"^([IWEF])(\d{4})?(\d\d)(\d\d) (\d\d):(\d\d):(\d\d)\.(\d+)\s+\S+\s+([^\]]+)\]\s?(.*)$")
+ANSI = re.compile(r"\x1b\[[0-9;]*m")    # FLAGS_colorlogtostderr (lightning) colours warnings and errors
 
 
 def parse_glog(path, default_year=None):
@@ -1743,11 +1746,11 @@ def parse_glog(path, default_year=None):
                 if m:
                     year = int(m.group(1))
                     continue
-            m = GLOG_LINE.match(line.rstrip("\n"))
+            m = GLOG_LINE.match(ANSI.sub("", line.rstrip("\n")))
             if not m:
                 continue
-            lv, mo, d, hh, mi, ss, frac, where, text = m.groups()
-            y = year or default_year or 1970
+            lv, yy, mo, d, hh, mi, ss, frac, where, text = m.groups()
+            y = int(yy) if yy else (year or default_year or 1970)
             naive = calendar.timegm((y, int(mo), int(d), int(hh), int(mi), int(ss), 0, 0, 0)) + float("0." + frac)
             out.append((naive, {"I": "info", "W": "warn", "E": "error", "F": "fatal"}[lv], where.strip(), text))
     return out

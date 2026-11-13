@@ -349,10 +349,10 @@ def _kygi_schema():
     return text
 
 
-def _loc_recording(path, map_pts, shift_after=None, ins_fixed_until=None):
+def _loc_recording(path, map_pts, shift_after=None, ins_fixed_until=None, yaw=0.0):
     """A dog walking along +x at 1 m/s for 4 s: /tf, /lightning/odom (covariance[1] = 1 valid), the scans as
     lightning publishes them (current_scan_world: the map's points around the dog, 1 m off after shift_after),
-    the INS (INSPVAX, RTK fixed until ins_fixed_until)."""
+    the INS (INSPVAX, RTK fixed until ins_fixed_until). yaw: the odom heading (pi: turned round, as in T48)."""
     from mcap.writer import CompressionType, Writer
     from rosbags.typesys import Stores, get_typestore, get_types_from_msg
 
@@ -387,7 +387,8 @@ def _loc_recording(path, map_pts, shift_after=None, ins_fixed_until=None):
         for i in range(80):
             t = BAG_T0 + 0.05 * i
             x, y = 10.0 + (t - BAG_T0), 5.0
-            q = _make(ts, "geometry_msgs/msg/Quaternion", x=0.0, y=0.0, z=0.0, w=1.0)
+            q = _make(ts, "geometry_msgs/msg/Quaternion", x=0.0, y=0.0, z=float(np.sin(yaw / 2)),
+                      w=float(np.cos(yaw / 2)))
             tr = _make(ts, "geometry_msgs/msg/TransformStamped", header=header(t, "map"), child_frame_id="base_link",
                        transform=_make(ts, "geometry_msgs/msg/Transform",
                                        translation=_make(ts, "geometry_msgs/msg/Vector3", x=x, y=y, z=0.0),
@@ -491,12 +492,67 @@ def test_loc_viz_scans_on_the_map_ins_and_events(tmp_path, capsys):
     assert states[3]["valid"] == 1 and states[3]["match_inlier"] > 0.9 and states[-2]["match_inlier"] < 0.5
     # the INS in the map frame where the dog is, RTK fixed until 3 s
     assert abs(states[3]["odom_minus_ins"]) < 0.05 and states[3]["ins_fixed"] == 1 and states[-2]["ins_fixed"] == 0
+    # walking forward: the heading matches the INS's direction of travel
+    assert abs(states[3]["heading_off_course"]) < 5 and "median |.| 0 deg" in text and "TURNED ROUND" not in text
     flow = msgs["/viz/loc/flow"][3][1]
     assert "③ LIO 和地图配准" in flow and "laser_mapping.cc" in flow["③ LIO 和地图配准"]["代码"]
     events = [m.msg for _, m in msgs["/viz/events"]]
     assert any("贴在地图上" in e for e in events), events
     assert any("不是 RTK 固定解" in e for e in events), events
     assert "/viz/loc/map_cloud" in msgs and "/viz/loc/ins" in msgs
+
+
+def test_loc_viz_finds_a_heading_turned_round(tmp_path, capsys):
+    """T48: the 0921 bags replayed without system.ins_yaw_offset 180 had the dog's heading 180 deg off the way it
+    walked. The INS's direction of travel comes from its positions, so it catches that whatever the INS convention."""
+    pytest.importorskip("mcap")
+    pytest.importorskip("rosbags")
+    pytest.importorskip("scipy")
+    sys.path.insert(0, TOOL)
+    import planning_mcap_viz as viz
+
+    locmap, pts = _loc_map(tmp_path)
+    bag = tmp_path / "rec"
+    bag.mkdir()
+    _loc_recording(str(bag / "rec_0.mcap"), pts, yaw=np.pi)
+    cfg = tmp_path / "loc.yaml"
+    cfg.write_text("system:\n  ins_lat: %r\n  ins_lon: %r\n  ins_height: %r\n" % ORIGIN)
+    out = str(tmp_path / "viz.mcap")
+    assert viz.main([str(bag), "-o", out, "--map", "none", "--overview", "none", "--loc-map", locmap,
+                     "--loc-config", str(cfg)]) == 0
+    text = capsys.readouterr().out
+    assert "median |.| 180 deg" in text and "TURNED ROUND" in text, text
+    msgs = _read(out)
+    states = [m for _, m in msgs["/viz/loc/state"]]
+    assert abs(abs(states[5]["heading_off_course"]) - 180) < 5
+    events = [m.msg for _, m in msgs["/viz/events"]]
+    assert any("朝向转反了" in e for e in events), events
+
+
+def test_loc_viz_match_is_point_to_plane_whatever_the_map_density():
+    """T48: the nearest-point distance read a standing dog 11-30% "on the map" against /lightning/map_cloud (thinned
+    to 0.5 m). Point to plane (5 nearest map points, as lightning's LIO) reads the same on a 0.1 m and a 0.5 m map."""
+    pytest.importorskip("scipy")
+    sys.path.insert(0, TOOL)
+    import loc_viz
+
+    rng = np.random.default_rng(0)
+    scan = np.column_stack([rng.uniform(0, 10, 2000), rng.uniform(0, 10, 2000), rng.normal(0, 0.02, 2000)])
+    off = scan + [0.0, 0.0, 0.3]                                    # 0.3 m above the floor
+    for step in (0.1, 0.5):
+        g = np.arange(-1.0, 11.0 + 1e-9, step)
+        floor = np.column_stack([np.repeat(g, len(g)), np.tile(g, len(g)), np.zeros(len(g) ** 2)])
+        near = loc_viz.Nearest(floor)
+        on = near(scan)
+        assert np.mean(on < loc_viz.MATCH_GOOD) > 0.95 and np.median(on) < 0.03, step
+        assert np.mean(near(off) < loc_viz.MATCH_GOOD) < 0.05, step
+    # the nearest point alone: half the scan "off" a 0.5 m map
+    nn = np.min(np.linalg.norm(scan[:, None, :2] - floor[None, :, :2], axis=2), axis=1)
+    assert np.mean(nn < loc_viz.MATCH_GOOD) < 0.3
+    # no plane (5 points on a line) or too far: the nearest point's distance
+    line = np.column_stack([np.arange(0, 1, 0.1), np.zeros(10), np.zeros(10)])
+    assert loc_viz.Nearest(line)([[0.45, 0.1, 0.1]])[0] == pytest.approx(0.15, abs=1e-6)  # to (0.4 or 0.5, 0, 0)
+    assert loc_viz.Nearest(floor)([[5.0, 5.0, 3.0]])[0] == pytest.approx(3.0, abs=1e-6)
 
 
 def test_lla_to_enu_matches_local_cartesian():
@@ -513,3 +569,22 @@ def test_lla_to_enu_matches_local_cartesian():
     assert e == pytest.approx(50.0, abs=0.01) and n == pytest.approx(100.0, abs=0.01) and u == pytest.approx(2.0, abs=0.01)
     assert loc_viz.read_loc_origin("system:\n  ins_lat:  29.7\n  ins_lon: 106.7\n  ins_height: 217.1\n") == (
         29.7, 106.7, 217.1)
+
+
+def test_parse_glog_reads_old_and_new_glog_lines(tmp_path):
+    """glog 0.7 (the server since T48) writes the year in front of the date; lightning colours warnings on stderr.
+    The old pattern read neither, so T48's planning and localization logs gave no events."""
+    sys.path.insert(0, TOOL)
+    import planning_mcap_viz as viz
+
+    log = tmp_path / "loc.log"
+    log.write_text("I1113 11:35:32.023888 139889434583040 tracking.cc:181] [PLANNING]CMD:  0.01 -0.06 -0.01\n"
+                   "I20261113 11:35:33.500000 139889434583040 loc_system.cc:211] kygi665 INS 朝向偏置 "
+                   "system.ins_yaw_offset = 180 deg\n"
+                   "\x1b[1;33mW20261113 11:35:34.000000 1 localization.cc:88] 定位质量差\x1b[m\n"
+                   "[INFO] [1789980087.9] [rclcpp]: not glog\n")
+    lines = viz.parse_glog(str(log), default_year=2026)
+    assert [(lv, where) for _, lv, where, _ in lines] == [
+        ("info", "tracking.cc:181"), ("info", "loc_system.cc:211"), ("warn", "localization.cc:88")]
+    assert lines[1][0] - lines[0][0] == pytest.approx(1.476112, abs=1e-5)
+    assert lines[2][3] == "定位质量差" and "ins_yaw_offset = 180" in lines[1][3]

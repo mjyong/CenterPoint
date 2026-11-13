@@ -35,6 +35,12 @@ if [[ -z "${PLANNING_ROOT_DIR:-}" ]]; then
   exit 1
 fi
 
+# 车型：PLANNING_VIN，默认 d20/001（新版机器人团队的默认是 d30/001，T48）
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/planning_vin.sh"
+PLANNING_ROOT_DIR="$(planning_root_for_vin "${PLANNING_ROOT_DIR}" "${PLANNING_VIN:-d20/001}" /tmp/planning_debug_root)" \
+  || exit 1
+export PLANNING_ROOT_DIR
 vin_file="${PLANNING_ROOT_DIR}/robot_factory/default_robot_vin"
 echo "PLANNING_ROOT_DIR=${PLANNING_ROOT_DIR}"
 echo "vin=$(tr -d '[:space:]' < "${vin_file}")"

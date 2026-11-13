@@ -203,6 +203,12 @@ bool LocSystem::Init(const std::string& yaml_path, bool publish_occ_grid, bool p
     LOG(INFO) << "组合导航类型: " << ins_type_;
 
     time_offset = yaml.GetValue<double>("fasterlio", "time_offset");
+    try {
+        ins_yaw_offset_deg_ = yaml.GetValue<double>("system", "ins_yaw_offset");
+    } catch (...) {
+        ins_yaw_offset_deg_ = 0.0;
+    }
+    LOG(INFO) << "kygi665 INS 朝向偏置 system.ins_yaw_offset = " << ins_yaw_offset_deg_ << " deg";
     rclcpp::QoS qos(10);
 
     // 初始化地理坐标转换器
@@ -569,7 +575,7 @@ void LocSystem::CreateINSSubscription(const rclcpp::QoS& qos, const rclcpp::Subs
                 // 转换为 ENU 坐标
                 Eigen::Vector3d lla(msg->latitude, msg->longitude, msg->height);
                 Eigen::Vector3d enu = lla_to_enu(lla, geo_converter_);
-                double azimuth_rad = (-msg->azimuth) * M_PI / 180.0;
+                double azimuth_rad = (-msg->azimuth + ins_yaw_offset_deg_) * M_PI / 180.0;
                 Eigen::Matrix3d rotation = (Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
                                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
                                             Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ()))
@@ -798,7 +804,7 @@ void LocSystem::CreateINSOnlySubscriptions(const rclcpp::QoS& qos) {
 
                 Eigen::Vector3d lla(msg->latitude, msg->longitude, msg->height);
                 Eigen::Vector3d enu = lla_to_enu(lla, geo_converter_);
-                double azimuth_rad = (-msg->azimuth) * M_PI / 180.0;
+                double azimuth_rad = (-msg->azimuth + ins_yaw_offset_deg_) * M_PI / 180.0;
                 Eigen::Matrix3d rotation = (Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitX()) *
                                             Eigen::AngleAxisd(0.0, Eigen::Vector3d::UnitY()) *
                                             Eigen::AngleAxisd(azimuth_rad, Eigen::Vector3d::UnitZ()))

@@ -153,6 +153,9 @@ class LocSystem {
     std::string ins_topic_;
     std::string ins_type_;  // "novatel" 或 "kygi665"
     std::string kygi665_ins_topic_;
+    // system.ins_yaw_offset [deg]：kygi665 的 INS 朝向 = -azimuth + 这个。没写就是 0（狗上天线 1016 起接正了）；
+    // 0921 那批包录的时候双天线接反，回放要 180。老版本写死 +180，2026-11 的新版改成了 0（T48 复核）
+    double ins_yaw_offset_deg_ = 0.0;
 
     /// 定位命令服务（包括地图切换）
     rclcpp::Service<lightning::srv::LocCmd>::SharedPtr loc_cmd_service_ = nullptr;

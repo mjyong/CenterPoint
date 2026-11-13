@@ -107,7 +107,7 @@ INS 直出（`system.ins_only_mode: true`，本机调试用）：不跑 LIO，�
 
 ## 4. 坐标系和外参
 
-- `map`：ENU，原点在配置的 `system.ins_lat`、`ins_lon`、`ins_height`（生效的是超级工厂那组：29.7314°N、106.7839°E、217.2 m；五云湖那组注释掉了）。INS 的经纬高用 GeographicLib `LocalCartesian` 换过来，朝向取 `-azimuth`（度）绕 z 轴（novatel 是 `90 - azimuth`）。
+- `map`：ENU，原点在配置的 `system.ins_lat`、`ins_lon`、`ins_height`（生效的是超级工厂那组：29.7314°N、106.7839°E、217.2 m；五云湖那组注释掉了）。INS 的经纬高用 GeographicLib `LocalCartesian` 换过来，朝向取 `-azimuth + system.ins_yaw_offset`（度）绕 z 轴（novatel 是 `90 - azimuth`）。偏置在狗上是 0（1016 起双天线接正了）；**0921 那批包录的时候天线接反，回放要 180**。老版本把 +180 写死在代码里，2026-11 的新版去掉了，T48 拿新版放 0921 的包，狗头反了 180°：INS 初始化就把位姿转反，LIO 一走就跑飞（速度上百 m/s），点云只在转 180° 时才贴得上地图。调试脚本按 bag 的录制日期自动选（`loc_ins_yaw_offset_for_bag`，可以用 `LOC_INS_YAW_OFFSET` 指定）。
 - `base_link`：狗身。`system.extrinsic_T/R` 是 IMU 到 `base_link`：IMU 在 (0.139, 0.021, 0.134) m，绕 z 转 −90°（D20 A2）。
 - 雷达到 IMU：`fasterlio.extrinsic_T/R`：(−0.021, 0.18, 0.009) m，绕 z 转 180°。
 - **kygi665 的加速度单位是 g**（静止时约 1.0）。高频预测原来当 m/s² 用，两次配准之间每秒多掉 8.8 m/s²，T41 回放时 z 掉到 −46 m。我们按重力归一化了（`laser_mapping.cc` 的 `ProcessIMU`，T42 验证）。
@@ -209,6 +209,8 @@ bash Nav_D20/slam/lightning-lm-master/scripts/run_loc_online_debug.sh
 # 换地图 / INS 直出：不用改配置，脚本会写一份临时配置（scripts/loc_debug_config.sh）
 LOC_MAP_PATH=$PWD/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 bash .../run_loc_online_debug.sh
 LOC_INS_ONLY=1 bash .../run_loc_online_debug.sh
+# 自己播 0921 的包时要加 LOC_INS_YAW_OFFSET=180（天线接反）；replay_planning_check.sh 按 bag 日期自动加
+LOC_INS_YAW_OFFSET=180 bash .../run_loc_online_debug.sh
 # 连感知、规划一起回放 0921，录包、转可视化（推荐）
 LOC_MAP_PATH=... bash Nav_D20/planning/script/replay_planning_check.sh <名字> 80.0 126.9
 ```
@@ -222,9 +224,9 @@ LOC_MAP_PATH=... bash Nav_D20/planning/script/replay_planning_check.sh <名字> 
 | 看哪 | 是什么 | 看出什么 |
 |---|---|---|
 | 3D：`/viz/loc/map_cloud` | 定位地图的点云，按高度着色 | 现场长什么样 |
-| 3D：`/viz/loc/scan` | 当前帧，按 LIO 的位姿放进地图；颜色是离地图最近点的距离（绿 = 贴上，红 = 对不上） | 配准好不好：墙、树、路沿对不对得上 |
+| 3D：`/viz/loc/scan` | 当前帧，按 LIO 的位姿放进地图；颜色是到地图表面的距离（点到面：最近 5 个地图点拟合的平面，和 LIO 一样；绿 = 贴上，红 = 对不上） | 配准好不好：墙、树、路沿对不对得上 |
 | 3D：`/viz/loc/ins` | INS 轨迹（紫 = RTK 固定，灰 = 不是）和现在的位置 | 定位和 INS 差多少 |
-| 曲线：贴上的比例、距离中位 | 每帧多少点离地图 0.2 m 以内 | 掉下去 = 地图和现场对不上（施工、停的车）或位姿偏了 |
+| 曲线：贴上的比例、距离中位 | 每帧多少点离地图表面 0.1 m 以内 | 掉下去 = 地图和现场对不上（施工、停的车）或位姿偏了。整段都只有一两成、狗站着也一样 = 位姿从一开始就错了（T48：朝向反了 180°） |
 | 曲线：定位减 INS | 两者的水平距离 | |
 | 曲线：高度、横滚、俯仰 | | 高度一路掉 = IMU 单位那类问题 |
 | 状态条：定位有效、INS RTK 固定 | `/lightning/odom` 的 `covariance[1]`、INS 状态 | |

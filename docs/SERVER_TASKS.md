@@ -156,8 +156,8 @@
 | T45 | 让行门控第二版：1104 上重跑四组（新默认、关掉新规则、狗 2 m/s、狗 2 m/s 且 τ 1 s），看盲区以外的原因能不能到 0；狗在线的话只读看外参和补盲雷达 | Agent | T44 复核 | 1 小时 | 完成，已复核（2026-11-12）：新规则 230 → 207；盲区以外剩 12 次，6 次是停着的货车车头压在路线上、停 4 s 后开走，门控加了车身压在路线上要看满 15 s；狗当时不在线，第 1 步放进 T46 |
 | T46 | 8 号狗在线：按顺序做完要用狗的事（T45 第 1 步只看外参、T43、T40 第 1–3 步，装包时开机锁频；T40 第 4 步等人）；服务器上重跑让行评测（停着的车压在路线上看满 15 s） | Agent + 人（T40 第 4 步带狗出门） | T45 复核 | 2–3 小时 + 出门 | 完成，已复核（2026-11-12）：外参 A2；装包、锁频、室内外都做了；挡路车 15 s 后不安全 207 → 204 |
 | T47 | 规划回放第二次（起点挪到路上、bag 放完就收、新的回放脚本）；室外 bag 缺帧那一段的 INS；在线对离线扣掉原点差重比；狗在线时验 root 桥白名单 | Agent | T46 复核 | 1.5 小时 | 完成，已复核（2026-11-12）：两次回放都进了 active；之后的 Nav_D20 同步冲掉了我们的补丁，已重打（Nav_D20/PATCHES.md）；新地图的人行横道接进规划；T48 用新版重跑 |
-| T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 完成（2026-11-13）：接口更新后重编通过。三次都进了 active 约 20 次后停在 standstill。切图读到 5 条人行横道 |
-| T49 | 推 T48；用最新代码重编（参考路径的调试补丁）、回放三次，录上定位的话题，转出规划和定位的可视化；1104 上评 wait 判据 | Agent | T48 | 2.5 小时 | 任务已写好 |
+| T48 | 新版 Nav_D20 加我们的补丁重编（规划、定位、感知）；回放 0921 三次（现场地图、INS 直出、切到新地图读人行横道） | Agent | T47 复核 | 2 小时 | 完成，已复核（2026-11-13）：编过了，切图读到 5 条人行横道；三次都只 active 约 20 个周期就停在 standstill，两次定位跑飞。原因都是同步带来的：回放超时的补丁丢了、新版 lightning 少了 0921 要的 INS 朝向 180°、默认车型 d30。三处都改了，T49 重跑 |
+| T49 | 用 T48 复核的三处修复（回放超时、INS 朝向偏置、车型）重编规划和定位，回放三次：一直 active、定位不跑飞、狗头方向对；1104 上评 wait 判据 | Agent | T48 复核 | 2.5 小时 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -8548,54 +8548,6 @@ t48_switch 里人行横道读进来没有；三份的"狗脚下是障碍"事件�
 
 ---
 
-## T49 推 T48；最新代码重编、回放三次（录上定位）；1104 上评 wait 判据
-
-```text
-任务 T49：T48 的结果没推到远端（远端最新还是 7de44d7）。这一轮：把 T48 推上来；用最新代码重编、回放三次，这次把定位的
-话题也录上，转出规划和定位两份可视化；在 1104 上评新的过人行横道判据 wait（看到可能经过的在动的车就等）。
-先按通用约定做。可以改的范围：Nav_D20/（编不过时只改我们的补丁，改了写进 PATCHES.md）。tools/、dog_perception/ 不改。
-仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42。mkdir -p data/reports/T49
-
-0. T48 的提交还在服务器本地的话：git status；git log --oneline origin/claude/me/v01..HEAD 看有哪些没推的；
-   先 git pull --no-rebase origin claude/me/v01（有冲突：data/、work_dirs/ 里的取 T48 自己的，docs/SERVER_TASKS.md 两边都留），
-   再 git push -u origin claude/me/v01（LFS 的录包一起）。推不上去就把错误抄进报告，接着做下面的。
-   pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py -q | tail -1   （42 passed）
-   补丁都在（T48 第 0 步那几条，再加两条，每个都要 ≥ 1）：
-     grep -c "local_reference_2d" Nav_D20/planning/src/runnable/mission/tracking/tracking.cc
-     grep -c "local_reference_2d" Nav_D20/planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.cc
-   转换要 scipy（当前帧和地图的距离）：仓库 .venv 里没有就 .venv/bin/pip install scipy。
-   新地图解开（同 T48）：mkdir -p data/loc_maps && for z in Nav_D20/map/*.zip; do unzip -oq $z -d data/loc_maps; done
-1. 重编 planning（照 ONBOARDING 第 8 节，--packages-up-to planning），输出存 data/reports/T49/build_planning.txt（tail -30）。
-   T48 编过 lightning 和感知的话跳过；没编过就照 T48 第 1 步编，各存一份 tail -30。
-2. 回放三次（一次一个，不要同时跑）：
-     M=$PWD/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
-     LOC_MAP_PATH=$M bash Nav_D20/planning/script/replay_planning_check.sh t49_map 80.0 126.9
-     LOC_INS_ONLY=1 bash Nav_D20/planning/script/replay_planning_check.sh t49_ins 80.0 126.9
-     LOC_MAP_PATH=$M MAP_SWITCH=$M bash Nav_D20/planning/script/replay_planning_check.sh t49_switch 80.0 126.9
-     for n in map ins switch; do cp work_dirs/planning_io_t49_$n/report.txt data/reports/T49/report_$n.txt; done
-   - 三份都要"已发"；mission_state 有 active；CMD: 的次数；Start adjusted；
-   - 查包：不能有 "inverted"（调试桥的方向修好了）；/tf 一棵树；odom 除开头那一跳以外没有跳变、超速；"NOTE display" 正常；
-   - report 末尾"可视化"一段：
-       t49_map、t49_switch 要有 "localization map"、"/viz/loc/scan: N scans"（N > 0）和"on the map … median"、
-       "INS: … RTK fixed …%, odom - INS median … m"；t49_ins 是 INS 直出，没有当前帧是正常的；
-       抄下每份的贴图比例中位、odom - INS 中位、RTK 固定的比例；
-   - t49_switch：107 s 前后没有"狗脚下是障碍"，t49_map、t49_ins 有（新地图多人行横道 6 那段路）；
-   - 录包走 LFS（work_dirs/planning_io_t49_*），viz/ 是普通文件。
-3. 离线评测（只用 CPU，约 5 分钟）：
-     S=$(for d in data/labels/1104_*/labels_sustech2.pkl; do basename $(dirname $d); done)
-     run() { n=$1; shift; s=$(date +%s); python tools/dog/yield_eval.py --scenes $S --fan 8 --length 8 "$@" \
-         --details data/reports/T49/episodes_$n.csv > data/reports/T49/yield_$n.md 2>&1; echo "$n exit $? $(( $(date +%s) - s )) s"; }
-     { run wait --yield-rule wait --eval-max-wait 120 & run gap --yield-rule gap & wait; } 2>&1 | tee data/reports/T49/runs.txt
-   - gap 应和 T46 的 base 一样（all 一行的 unsafe、risky）；不一样就在报告里写明差多少，接着做；
-   - 抄 wait、gap 两份 all 一行：unsafe（和原因：blind、far、near、occluded、detection、prediction）、等待时间中位 / p90 / 最长、timeouts、unknown；
-   - wait 的 unsafe 剩下的，按原因各挑一次写清是哪个场景、几点、车从哪来。
-4. 提交：data/reports/T49/、录包和 viz/、本文档。不提交解开的地图。
-
-停止条件：第 1 步机器人团队的代码编不过；第 2 步规划起不来。
-报告（写进"T49 结果"）：T48 推了什么（或推不上去的错误）；编译最后几行；三份 report 全文；和 T47 比（active 比例、CMD 次数、起点挪多少）；
-定位那几个数；wait 和 gap 的评测表。
-```
-
 ### T48 结果
 
 2026-11-13。`seres_interface` 换成最新布局并重编之后，规划、定位、感知都编过了。三次回放目标都发出去了，各进了约 20 次 active，然后停在 standstill。切到新地图读进了 5 条人行横道。
@@ -8612,3 +8564,101 @@ t48_switch 里人行横道读进来没有；三份的"狗脚下是障碍"事件�
   - 切图：目标已发。`Map switch` 1 次，`GlobalMapManager: 5 crosswalks in …/semantic.osm` 1 次，`OSM file not exist` 0 次。mission_state：active 21，passive 1，standby 1，standstill 3192。`CMD:` 21 次。起点没挪。odom 同样不是步行速度（p99 46.4 m/s，z −63.9..8.7 m，149 次跳变，最大 142.1 m）。全文 `report_switch.txt`。
 - 和 T47（老版 TEB）比：T47 现场地图 active 3218、CMD 62、起点挪了 0.50 m；INS 直出 active 3222、CMD 791、起点没挪。这次 MPPI 三次都只 active 了约 20 次（发出约 20 条速度）就进了 standstill，起点都没挪。现场地图和切图的定位 odom 仍在掉高度、跳变；INS 直出没有这个报错。
 
+### T48 复核（2026-11-13）
+
+**结论：三次都停在 standstill、两次定位跑飞，三个原因都是 04d3a34 同步带来的，不是新版规划（MPPI）的问题。T48 的 MPPI 结果不能拿来评价新版规划，T49 修好后重跑。** 编译的四处补丁和切图读人行横道是好的。
+
+1. **停在 standstill：回放时输入一直算超时**。
+   - 新版按消息头的时间戳和本机时钟比。回放的 bag 戳比本机慢 52.8 天，里程计和感知栅格永远超时：
+     进 active 约 1 s 后 `pause()`（事件"输入超时，任务暂停"：10.8、13.9、13.8 s），要连续 3 s 不超时才 `resume()`，永远等不到。
+   - 老版本里有我们的 `TimeoutReference`（aff7108，调试脚本设 `PLANNING_TIMEOUT_WALL_CLOCK=1` 时按收到消息的时刻判）。T47 能 active 3218 个周期就靠它。
+     04d3a34 同步冲掉了，T47 复核重打补丁时漏了（它没记在 `PATCHES.md`，脚本里的环境变量还在，所以看不出来）。
+   - 已重新打上（`ros_bridge.cc` 里程计五处、感知栅格一处），记进 `PATCHES.md`；`PATCHES.md` 开头加了"同步以后按 grep 对一遍"。
+2. **定位跑飞（现场地图、切图），INS 直出狗头反了：INS 朝向少了 180°**。
+   - 老版 lightning 是 `-azimuth + 180`，新版改成 `-azimuth`。新版对现在的狗是对的（1016 起双天线接正，`docs/LOCALIZATION.md` 第 10 节），
+     但 0921 是天线接反时录的，要 +180。
+   - 证据一：INS 直出（odom 就是 INS 位姿）。拿本地的 T48 原始录包重转，新加的检查报"狗头减 INS 的行进方向，中位 180°，移动的 91 s 里 98% 超过 135°"；
+     按老约定算，和行进方向只差 0.6°。
+   - 证据二：切图那次的当前帧。朝向在 0–360° 每 10° 转一遍、平移 ±3 m 搜，最贴地图的是转 180°、不平移（< 0.15 m 的点 45%，原样 28%）。
+   - 定位用 RTK 固定解初始化（跳过 NDT），朝向一开始就反了，LIO 往反方向推：速度 p99 46–53 m/s，200 多次 > 1 m 的跳变。
+   - 已改：朝向偏置做成配置 `system.ins_yaw_offset`（`loc_system.{h,cc}`，kygi665 两处）。`default_d20.yaml` 里是 0，狗上不变。
+     调试脚本按 bag 的录制日期自动选：1016 以前 180，以后 0（`loc_debug_config.sh` 的 `loc_ins_yaw_offset_for_bag`；`LOC_INS_YAW_OFFSET` 可以指定）。
+3. **车型**：新树的 `default_robot_vin` 是 `d30/001`，T48 是手改安装目录跑 d20、再改回去的。
+   现在调试脚本用 `PLANNING_VIN`（默认 `d20/001`），在临时目录搭一份只换掉这个文件的 `PLANNING_ROOT_DIR`（`script/planning_vin.sh`），不用再手改。
+4. 其他：
+   - **MPPI 的 20 条指令**：vx 约 0.01 m/s，vy −0.06 到 −0.14 m/s（横着走）。狗头反了、1 s 后就暂停，看不出 MPPI 好坏。
+   - **"狗脚下是障碍"**：INS 直出那次在 107.4、110.2 s，和 T47 一样（CJGC 少了人行横道 6 往西那段）。现场地图、切图两次定位跑飞，事件时间没有意义。
+   - **切图**：`Map switch` 1 次、5 条人行横道、`OSM file not exist` 0 次，是好的。
+   - **查包工具误报** `/planning/debug/diagnostic: no single TF path from planning to map`：诊断消息的 `planning` 是个名字，不是坐标系。现在只对 Foxglove 会画的类型查 TF。
+   - **点云贴图比例 11–27%**：不是指标的问题，是位姿真错了（上面第 2 条）。换成点到面以后同样是 13–18%。
+     指标还是换成了点到面：和 LIO 一样，最近 5 个地图点拟合平面，< 0.1 m 算贴上。它不受地图稀疏影响：地图稀疏到 0.5 m 时，原来的判法（离最近点 < 0.2 m）只把一半贴着的点算成贴上。
+5. **为什么 T48 当时没看出来**：报告只把"输入超时，任务暂停"列成一条事件，没数恢复，也没写车型和朝向偏置。回放报告现在多了几行：
+   - 车型和 `Load robot config:`；
+   - INS 朝向偏置（脚本选的、定位日志里读到的）；
+   - `Data timeout exceeded`、`Data recovered, resuming`、`local planner solver failed` 的次数；
+   - 指令中位 vx vy ω、vx > 0.05 的比例；
+   - 可视化一段多一行 `heading: … median |.| N deg`，超过一半转反时写 `THE HEADING IS TURNED ROUND`，事件里报"朝向转反了"。定位布局的"定位减 INS"图里加了这条曲线。
+6. 文档：`Nav_D20/PATCHES.md`（三条新的；以前的"本次"换成了提交号）、规划 ONBOARDING（车型、超时）、定位 ONBOARDING（朝向偏置、点到面）。测试 44 个（新加：点到面不受地图稀疏影响、朝向转反、诊断话题不报 TF）。
+
+
+---
+
+## T49 用 T48 复核的修复重编、回放三次；1104 上评 wait 判据
+
+```text
+任务 T49：T48 三次回放都停在 standstill、两次定位跑飞。T48 复核查出三个原因（都是同步带来的），已经改了：
+  ① 回放时输入超时按时间戳判，暂停了永远恢复不了 → 重新打上 TimeoutReference（规划 ros_bridge.cc）；
+  ② 新版 lightning 的 INS 朝向是 -azimuth，0921 的包（天线接反）要 +180 → 做成配置 system.ins_yaw_offset，
+     狗上 0，调试脚本按 bag 日期自动给 180（定位 loc_system.cc）；
+  ③ 默认车型 d30/001 → 调试脚本用 PLANNING_VIN（默认 d20/001）搭临时目录，不用再手改安装目录。
+这一轮：重编规划和定位，回放三次，看能不能一直 active、定位不跑飞、狗头方向对；在 1104 上评过人行横道的判据 wait。
+先按通用约定做。可以改的范围：Nav_D20/（编不过时只改我们的补丁，改了写进 PATCHES.md）。tools/、dog_perception/ 不改。
+仓库根目录，export PYTHONPATH=.。ROS_DOMAIN_ID 42。mkdir -p data/reports/T49
+
+0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py -q | tail -1   （44 passed）
+   T48 手改过安装目录里的 default_robot_vin：cat $PLANNING_ROOT_DIR/robot_factory/default_robot_vin（source 过 install/setup.bash 以后），
+   要和源码一样是 d30/001，不是就改回去；以后不要手改，脚本会处理。
+   补丁都在（T48 第 0 步那几条，再加这几条，每个都要 ≥ 1）：
+     grep -c "TimeoutReference" Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc     （7）
+     grep -c "ins_yaw_offset" Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.cc
+     grep -c "local_reference_2d" Nav_D20/planning/src/runnable/mission/tracking/tracking.cc
+     grep -c "local_reference_2d" Nav_D20/planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.cc
+     ls Nav_D20/planning/script/planning_vin.sh
+   转换要 scipy（点到面）：仓库 .venv 里没有就 .venv/bin/pip install scipy。
+   新地图解开（同 T48）：mkdir -p data/loc_maps && for z in Nav_D20/map/*.zip; do unzip -oq $z -d data/loc_maps; done
+1. 重编 planning 和 lightning（同 T48 第 1 步；感知没改，跳过），存 data/reports/T49/build_{planning,lightning}.txt（tail -30）。
+2. 回放三次（一次一个，不要同时跑；PLANNING_VIN、LOC_INS_YAW_OFFSET 都不用设，脚本自己选）：
+     M=$PWD/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+     LOC_MAP_PATH=$M bash Nav_D20/planning/script/replay_planning_check.sh t49_map 80.0 126.9
+     LOC_INS_ONLY=1 bash Nav_D20/planning/script/replay_planning_check.sh t49_ins 80.0 126.9
+     LOC_MAP_PATH=$M MAP_SWITCH=$M bash Nav_D20/planning/script/replay_planning_check.sh t49_switch 80.0 126.9
+     for n in map ins switch; do cp work_dirs/planning_io_t49_$n/report.txt data/reports/T49/report_$n.txt; done
+   每份 report 先看这三行（T48 的三个根因）。第一次回放有一条不对就停下，抄 report 前 40 行和 /tmp/replay_t49_map_stack.txt 前 40 行：
+   - "车型：规划车型 d20/001…"，后面 Load robot config: 里也是 d20/001；
+   - "定位：INS 朝向偏置 180（bag rosbag2_2026_09_21-16_41_27）；system.ins_yaw_offset = 180 deg"
+     （后半句是"定位日志里没有"的话，lightning 没重编进去）；
+   - "Data timeout exceeded" 0 次，或者每次后面都有 "Data recovered, resuming"。
+   然后看：
+   - mission_state 大部分是 active（T47 老版 3218/3280）；有 standstill 的话，可视化事件里是什么引起的；
+     CMD: 的次数；"CMD 中位 vx vy ω" 和 "vx > 0.05 的比例"（狗沿 bag 往前走，vx 应该大多为正）；local planner solver failed 的次数；
+   - 查包：不能报 /lightning/odom（开头 1 s 内初始化那一跳除外，写明时间）；不能有 "inverted"；diagnostic 不再报 TF；"NOTE display" 正常；
+   - "可视化"一段：
+       "heading: … median |.| N deg"：N 要小于 20（T48 是 180），不能有 "TURNED ROUND"；
+       t49_map、t49_switch："/viz/loc/scan: … on the map (< 0.1 m) median P%"，抄 P（T48 位姿反了，13–18%）；
+       三份的 "odom - INS median D m"，抄 D（T48：2.7、3.9 m；INS 直出 0.14 m）；
+   - 107 s 前后"狗脚下是障碍"：t49_switch 应该没有，t49_map、t49_ins 有（新地图多了人行横道 6 往西那段路），抄时间；
+   - 录包走 LFS（work_dirs/planning_io_t49_*），viz/ 是普通文件。
+3. 离线评测（只用 CPU，约 5 分钟）：
+     S=$(for d in data/labels/1104_*/labels_sustech2.pkl; do basename $(dirname $d); done)
+     run() { n=$1; shift; s=$(date +%s); python tools/dog/yield_eval.py --scenes $S --fan 8 --length 8 "$@" \
+         --details data/reports/T49/episodes_$n.csv > data/reports/T49/yield_$n.md 2>&1; echo "$n exit $? $(( $(date +%s) - s )) s"; }
+     { run wait --yield-rule wait --eval-max-wait 120 & run gap --yield-rule gap & wait; } 2>&1 | tee data/reports/T49/runs.txt
+   - gap 应和 T46 的 base 一样（all 一行的 unsafe、risky）；不一样就在报告里写明差多少，接着做；
+   - 抄 wait、gap 两份 all 一行：unsafe（和原因：blind、far、near、occluded、detection、prediction）、等待时间中位 / p90 / 最长、timeouts、unknown；
+   - wait 的 unsafe 剩下的，按原因各挑一次写清是哪个场景、几点、车从哪来。
+4. 提交：data/reports/T49/、录包和 viz/、本文档。不提交解开的地图。
+
+停止条件：第 1 步机器人团队的代码编不过；第 2 步第一次回放那三行有一条不对。
+报告（写进"T49 结果"）：编译最后几行；三份 report 全文；和 T47（老版 TEB）比：active 比例、CMD 次数和中位、起点挪多少；
+朝向、贴图比例、odom - INS 那几个数；wait 和 gap 的评测表。
+```
