@@ -1,0 +1,26 @@
+--- deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/config/lidar_3d_detection.yaml	2026-11-13 17:10:59.252003153 +0800
++++ /tmp/t54_dog_perception.yaml	2026-11-14 15:11:47.367183753 +0800
+@@ -138,6 +138,8 @@
+   odom_topic: "/Odometry"
+   odom_twist: "none"
+   inspvax_topic: "/rte/rdap/rtk/inspvax"
++  ins_lever_arm: [0.0213, -0.18, 0.0]
++  ins_azimuth_offset_deg: 0.0
+   extrinsic_t: [0.0, 0.0, 0.0]
+   extrinsic_rpy: [0.0, 0.0, 3.141592653589793]
+   base_height: 0.72
+@@ -146,8 +148,6 @@
+   num_sweeps: 5
+   world_frame: "camera_init"
+   publish_cloud: false
+-  ins_lever_arm: [0.0213, -0.18, 0.0]
+-  ins_azimuth_offset_deg: 0.0
+   model_dir: "model"
+   objects_topic: "/perception/lidar_3d/objects"
+   tracks_topic: "/perception/lidar_3d/tracks"
+===== keys =====
+20:    base_height: 0.72
+141:  ins_lever_arm: [0.0213, -0.18, 0.0]
+142:  ins_azimuth_offset_deg: 0.0
+145:  base_height: 0.72
+152:  objects_topic: "/perception/lidar_3d/objects"

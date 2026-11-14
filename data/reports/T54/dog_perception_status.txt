@@ -1,0 +1,52 @@
+● lidar-3d-detection.service - lidar_3d_detection: lidar 3D detection, tracking and prediction (ROS 2)
+     Loaded: loaded (/lib/systemd/system/lidar-3d-detection.service; enabled; vendor preset: enabled)
+     Active: active (running) since Sat 2026-11-14 15:05:53 CST; 10min ago
+    Process: 1639 ExecStartPre=/opt/seres/perception/lidar_3d_detection/bin/lock_clocks.sh (code=exited, status=0/SUCCESS)
+   Main PID: 2408 (lidar_3d_detect)
+      Tasks: 16 (limit: 74757)
+     Memory: 166.1M
+        CPU: 2min 13.105s
+     CGroup: /system.slice/lidar-3d-detection.service
+             └─2408 /opt/seres/perception/lidar_3d_detection/lib/lidar_3d_detection/lidar_3d_detection --ros-args -p threads:=4
+
+Nov 14 15:16:22 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:22.989374  2408 lidar_3d_detection.cpp:112] no pose for scan yet (waiting for odometry / IMU)
+===== /etc/default =====
+# Environment of lidar-3d-detection.service (start_lidar_3d_detection.sh). Kept on upgrades.
+ROS_DOMAIN_ID=0
+# DDS: the same middleware and settings as the robot's other nodes, or they do not hear each other (README "DDS")
+#RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+# Fast DDS: 8 MB socket buffers, else ~3 MB clouds are lost (T33); the lidar driver needs them as well
+#FASTRTPS_DEFAULT_PROFILES_FILE=/opt/seres/perception/lidar_3d_detection/share/lidar_3d_detection/fastdds_large_buffers.xml
+LIDAR3D_THREADS=4
+# lock the Orin's clocks (jetson_clocks) when the service starts: 1 on, 0 off. Unlocked the node is 2-3x slower
+# (T32, T34), but it sets CPU / GPU / memory of the whole machine to maximum (power, heat): the robot team decides.
+# Back to 0 takes effect at the next reboot.
+LIDAR3D_LOCK_CLOCKS=1
+#LIDAR3D_CONFIG=/opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml
+#LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model
+#LIDAR3D_LOG_DIR=/tmp/lidar_3d_detection_logs
+# a viewer (Foxglove, RViz) on this node: TF and the detector's input cloud; not with the vehicle's own TF tree
+#LIDAR3D_ARGS=-p publish_tf:=true -p publish_cloud:=true
+===== journal =====
+Nov 14 15:16:18 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:18.674314  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0
+Nov 14 15:16:18 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:18.818877  2408 lidar_3d_detection.cpp:112] no pose for scan yet (waiting for odometry / IMU)
+Nov 14 15:16:18 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:18.828730  2408 lidar_3d_detection.cpp:112] waiting for a good INS solution
+Nov 14 15:16:19 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:19.680105  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 10 frames 0 skipped 0
+Nov 14 15:16:20 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:20.799780  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0
+Nov 14 15:16:20 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:20.838687  2408 lidar_3d_detection.cpp:112] waiting for a good INS solution
+Nov 14 15:16:20 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:20.878906  2408 lidar_3d_detection.cpp:112] no pose for scan yet (waiting for odometry / IMU)
+Nov 14 15:16:21 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:21.878399  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0
+Nov 14 15:16:22 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:22.839007  2408 lidar_3d_detection.cpp:112] waiting for a good INS solution
+Nov 14 15:16:22 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:22.989374  2408 lidar_3d_detection.cpp:112] no pose for scan yet (waiting for odometry / IMU)
+Nov 14 15:16:22 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:22.989529  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0
+Nov 14 15:16:24 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:24.079843  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0
+Nov 14 15:16:24 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:24.867901  2408 lidar_3d_detection.cpp:112] waiting for a good INS solution
+Nov 14 15:16:25 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:25.079068  2408 lidar_3d_detection.cpp:112] no pose for scan yet (waiting for odometry / IMU)
+Nov 14 15:16:25 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:25.164788  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0
+Nov 14 15:16:26 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:26.176038  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 10 frames 0 skipped 0
+Nov 14 15:16:26 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:26.868134  2408 lidar_3d_detection.cpp:112] waiting for a good INS solution
+Nov 14 15:16:27 tegra-ubuntu start_lidar_3d_detection.sh[2408]: W1114 15:16:27.132222  2408 lidar_3d_detection.cpp:112] no pose for scan yet (waiting for odometry / IMU)
+Nov 14 15:16:27 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:27.172925  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 10 frames 0 skipped 0
+Nov 14 15:16:28 tegra-ubuntu start_lidar_3d_detection.sh[2408]: I1114 15:16:28.282114  2408 lidar_3d_detection.cpp:181] no frames yet (waiting for a pose) | clouds 11 frames 0 skipped 0

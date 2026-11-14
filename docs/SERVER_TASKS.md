@@ -162,7 +162,7 @@
 | T51 | 重编规划（MPPI 起步就碰着时允许往外退），回放三次验 MPPI 不再贴边卡死、CPU 和 GPU 一致；狗在线时只读摸清狗上规划和定位怎么装、怎么起（为替换做准备） | Agent | T50 复核 | 2 小时 | 完成，已复核（2026-11-13）：现场地图、INS 直出贴边不再卡（1716/1716 → 24/1995、1330/1330 → 4/1342）；切图那次还卡，是 GPU 用了主机算的起点间隙（两份距离场不一样），已改成显卡上自己算；狗上的装法记下了 |
 | T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 完成，已复核（2026-11-13）：编过，门控 38787 帧 0 差；回放状态切换对。复核发现：没放行、狗的中心进了人行横道就直接过（回放里是录包的狗自己走上去的，狗上定位跳一下也会这样），已改成离入口 1.5 m 内还当在路口等；外参链加了检查工具 |
 | T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 完成，已复核（2026-11-13）：GPU 版贴边也不卡了（切图回放 3%）；狗上录的真实目标进了门控（最多 5 辆）。1112 那一带没有人行横道；狗上的地图 c1adbe7b 只有 47 m 见方。复核发现：狗上的规划配置是旧版本的，我们的程序读不了（会起不来），上狗要用仓库的配置加狗上的取值 |
-| T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 任务已写好（T53 做完再做） |
+| T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 完成（2026-11-14）：起来就读站点地图，6 号人行横道离入口 1.5 m 内还在等；切图回放零指令 3%（T51 是 76%）。1112 外参不定论。狗上感知偏置 0，装的图都没有人行横道 |
 | T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 任务已写好 |
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 任务已写好 |
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T56 | 半天 | 任务已写好 |
@@ -9229,6 +9229,37 @@ CMD 统计；report_switch 的 local planner 那一行、mission_state；objects
 日志几行；狗上的地图（装了哪些、哪张有人行横道、最近一周切过哪些图）；没做的写为什么。
 ```
 
+### T54 结果
+
+2026-11-14。`git pull` 到 `abdf2b5`（这一轮跑的规划源码；`5845182` 只改了文档和下载脚本）。pytest 62 passed（`.venv` 的 Python；`EIGEN_DIR` 用规划环境里的 Eigen）。`startup_map_dir` 在 proto 1 处、`global_map_manager.cc` 2 处；`max_unreleased_depth` 两处各 1。planning `Finished <<< planning [11min 8s]`，`Summary: 1 package finished [11min 10s]`。接口包没再编。全文在 `data/reports/T54/`。
+
+对帧 38787 帧，0 differ，和 T52 一样。闭环模拟七行都是 ok（有车等完再过、没车直接过、没感知一直等、先转向、等车时跳上人行横道还接着等、没感知跳上去一直等、在人行横道里 3 m 起步接着过），`crosswalk_sim: 0 failed`。
+
+再放 T52 那次，不切图，`PLANNING_STARTUP_MAP` 起来就读 `ad68517c`。`startup map: 1`，`Map switch: 0`。`GlobalMapManager: startup map …/ad68517c-e845-42a4-b5dd-a6b7c6d2af13, 5 crosswalks`。车型 `d20/001`，INS 朝向偏置 180°。`mission_state` 没有 fault：active 3075，passive 1，standby 1，standstill 31。`CMD:` 2979 次，中位 vx / vy / ω = 0.748 / 0.000 / 0.000，vx > 0.05 占 70%。`local planner solver failed` 96 次。`Data timeout exceeded` 1 次，在 bag 放完时。起点、终点都挪了。odom 跳变 1 次，142.9 m，在 0.1 s（初始化）。朝向中位 1°，odom − INS 中位 0.33 m。贴图百分比没出：回放脚本里的可视化当时用了 conda 的 numpy，失败了；事后用仓库 `.venv` 补转时，当前帧点云那份 heavy 已经删了。
+
+`Crosswalk yield:` 依次是 approach → align（stale）→ align（刚走上人行横道，离入口 0.083 m）→ wait（0.543 m，还在 1.5 m 内）→ cross（1.523 m，过了 1.5 m）→ none：
+
+- approach：stop 39.3 m，entry 40.1 m，exit 40.1 m，heading error −73.6°，车 0
+- align (stale)：stop 0.1 m，entry 0.9 m，exit 34.4 m，heading error 78.6°，perception stale
+- align (stale)：stop −0.8 m，entry 0 m，exit 33.5 m，heading error 78.4°，`on the crosswalk without a go (0.083 m past the entry)`
+- wait (stale)：heading error 9.8°，`on the crosswalk without a go (0.543 m past the entry)`
+- cross (on_crosswalk)：`on the crosswalk without a go (1.523 m past the entry)`
+- cross (on_crosswalk)：不再带那一句
+- none
+
+从第一条 align 到第一条 cross，144 条 CMD，vx、vy 都是 0（align 时只有 ω = 0.5）。`local planner: zero command in 163 of 3075 active cycles (5%); with costmap obstacles under the footprint 70 of 1478, without 93 of 1597`。T52 是 77 of 3097（2%）、脚印下 50 of 1505。多出来的零指令主要是这次在人行横道上等得更久（对齐以后 vx、vy、ω 都是 0，T52 那段只有约 0.5 s 且 ω 不是 0）。solver failed 96，T52 是 76。
+
+第 3b 步原样重放 T51 卡住的切图（目标 80.0 126.9）。`Map switch` 1 次，5 条人行横道。active 3109，passive 1，standby 1，standstill 28（bag 放完时的超时，不是 16 s 后进 standstill）。`local planner: zero command in 95 of 3109 active cycles (3%); with costmap obstacles under the footprint 71 of 1513, without 24 of 1596`。T51 是 270 of 354（76%）。`CMD` 中位 vx / vy / ω = 0.817 / 0.054 / 0.199，vx > 0.05 占 97%。solver failed 94 次。朝向中位 1°，贴图中位 53%，odom − INS 中位 0.34 m。
+
+外参，`work_dirs/planning_io_t53_1112`（1112 开始于 2026-11-12 18:59:04 +08，天线配置 19:25 才改成 0）。默认筛法：2 条静止车的航迹，狗在看见它们时走了中位 393 m、转了 66°；四个方向都在 0.5 m 内，−90° 中位 0.25 m（2 of 2），180° 中位 0.19 m（2 of 2）被标成 `<- best`，结论 `extrinsic WRONG`。`--any-motion`：15 条航迹，−90° 中位 0.30 m、9 of 15 still，是 `<- best`，0° / 90° / 180° 是 2.08 / 3.05 / 2.30 m，结论 `extrinsic OK`。按任务不改外参，这批目标不定论。`/public/zjst/robot/cp_data/` 里没有 19:25 以后、带 `/perception/lidar_3d/objects` 的包。1104 的四个包没有 `/lightning/odom`，也没有 `/perception/lidar_3d/objects`。
+
+狗在线，只读。`lidar-3d-detection.service` 从 15:05 起在跑（今天开机）。`/etc/default/lidar-3d-detection` 里 `LIDAR3D_CONFIG` 没写，节点日志是 `config /opt/seres/perception/lidar_3d_detection/config/lidar_3d_detection.yaml`，`objects /perception/lidar_3d/objects`。和仓库比，只有 `ins_lever_arm`、`ins_azimuth_offset_deg` 两行换了位置，值一样：偏置 0.0，杠杆臂 `[0.0213, -0.18, 0.0]`，`objects_topic` `/perception/lidar_3d/objects`，`base_height` 0.72，`det_frame` 没有差别。最近 10 分钟没有检测帧：每秒一行是 `no frames yet (waiting for a pose) | clouds 10` 或 `11`，`frames 0 skipped 0`，夹着 `waiting for a good INS solution` 和 `no pose for scan yet`。定位还在重试初始化（YawSearch 分数 0），所以不是 10 Hz 出框。
+
+狗上的图：
+
+- App 目录 `/userdata/config/robot_service/map/` 只有 `c1adbe7b`（2d 里是 `map.yaml`、`map.png`，没有 osm）。今天 15:06 定位从配置加载这张图，栅格 234×231、0.2 m。15:07 规划收到切到这张图，`OSM file not exist: …/2d/1791976485/map.osm`。最近 7 天的日志里没有切到别的图。
+- `/opt/seres/nav/data/` 有 `ad68517c`、`a70c6db6`，2d 里是 `map.pgm` / `map.png` / `map.yaml`，没有 `semantic.osm` 或 `map.osm`。这三张图都没有人行横道文件。
+- 规划全局图目录有 `CJGC_DD.pgm`（117463771 字节，和 `CJGC.pgm` 一样大）和 `CJGC_DD.yaml`：10293×11412、0.1 m，原点 `[-716, -321, 0]`。yaml 拷在 `/public/zjst/robot/dog8_stack/astar_pgm/`（不提交）。
 
 ---
 

@@ -1,0 +1,46 @@
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[33m           [100%][0m
+[33m=============================== warnings summary ===============================[0m
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/numba/core/decorators.py:159: NumbaDeprecationWarning: [1mThe keyword argument 'nopython=False' was supplied. From Numba 0.59.0 the default is True and supplying this argument has no effect.[0m
+    warnings.warn(msg, NumbaDeprecationWarning)
+
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488: DeprecationWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 30 durations =============================
+16.09s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate_cpp.py::test_cpp_yield_gate_agrees_with_python
+2.30s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_the_command_line_tool
+1.07s call     d20car_predict/CenterPoint/tests/dog/test_planning_viz.py::test_loc_viz_scans_on_the_map_ins_and_events
+0.88s call     d20car_predict/CenterPoint/tests/dog/test_planning_viz.py::test_loc_viz_finds_a_heading_turned_round
+0.76s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_evaluation_with_a_perfect_detector_is_safe_and_waits_for_the_car
+0.48s call     d20car_predict/CenterPoint/tests/dog/test_bag_on_map.py::test_bag_on_map_finds_the_crosswalk_the_track_crosses_and_a_goal_past_it
+0.38s call     d20car_predict/CenterPoint/tests/dog/test_objects_in_map.py::test_parked_cars_flagged_moving_need_any_motion
+0.37s call     d20car_predict/CenterPoint/tests/dog/test_bag_on_map.py::test_bag_on_map_without_objects_or_crosswalks
+0.37s call     d20car_predict/CenterPoint/tests/dog/test_bag_on_map.py::test_bag_on_map_goal_of_a_loop_is_its_far_end
+0.36s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_min_watch_sees_a_car_coming_out_of_the_rear_blind_sector
+0.31s call     d20car_predict/CenterPoint/tests/dog/test_planning_viz.py::test_planning_mcap_viz_flattens_retimes_and_turns_the_costmap_over[True]
+0.30s call     d20car_predict/CenterPoint/tests/dog/test_planning_viz.py::test_planning_mcap_viz_flattens_retimes_and_turns_the_costmap_over[False]
+0.26s call     d20car_predict/CenterPoint/tests/dog/test_objects_in_map.py::test_the_d20_extrinsic_keeps_parked_cars_still
+0.26s call     d20car_predict/CenterPoint/tests/dog/test_objects_in_map.py::test_a_wrong_extrinsic_is_reported
+0.26s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_use_new_then_back
+0.25s call     d20car_predict/CenterPoint/tests/dog/test_objects_in_map.py::test_messages_without_odometry_count_as_stale
+0.23s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_unsafe_episodes_are_explained_by_where_the_vehicle_came_from
+0.18s call     d20car_predict/CenterPoint/tests/dog/test_planning_mcap.py::test_check_planning_mcap_finds_what_foxglove_cannot_draw[True]
+0.15s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_use_new_puts_theirs_back_when_ours_does_not_come_up
+0.13s call     d20car_predict/CenterPoint/tests/dog/test_planning_viz.py::test_check_planning_mcap_tells_an_inverted_costmap[False]
+0.13s call     d20car_predict/CenterPoint/tests/dog/test_planning_viz.py::test_check_planning_mcap_tells_an_inverted_costmap[True]
+0.11s call     d20car_predict/CenterPoint/tests/dog/test_planning_mcap.py::test_check_planning_mcap_reads_speed_over_a_window
+0.10s call     d20car_predict/CenterPoint/tests/dog/test_planning_mcap.py::test_check_planning_mcap_finds_odometry_no_robot_can_have
+0.10s call     d20car_predict/CenterPoint/tests/dog/test_planning_mcap.py::test_check_planning_mcap_finds_a_costmap_on_the_wall_clock
+0.10s call     d20car_predict/CenterPoint/tests/dog/test_planning_mcap.py::test_check_planning_mcap_finds_a_robot_inside_its_costmap
+0.10s call     d20car_predict/CenterPoint/tests/dog/test_planning_mcap.py::test_check_planning_mcap_finds_what_foxglove_cannot_draw[False]
+0.07s call     d20car_predict/CenterPoint/tests/dog/test_planning_viz.py::test_loc_viz_match_is_point_to_plane_whatever_the_map_density
+0.06s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_wait_rule_goes_when_the_vehicle_has_stayed_clear_for_wait_clear
+0.06s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_status_of_the_robot_teams
+0.05s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_evaluation_catches_a_blind_robot
+[33m[32m62 passed[0m, [33m[1m5 warnings[0m[33m in 27.07s[0m[0m

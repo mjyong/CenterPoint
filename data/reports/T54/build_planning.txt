@@ -1,0 +1,21 @@
+Starting >>> planning
+--- stderr: planning
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/proto/mission_conf.proto:4:1: warning: Import grid_path_planner_conf.proto is unused.
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc: In member function ‘void planning::communication::RosBridge::joint_state_callback(sensor_msgs::msg::JointState_<std::allocator<void> >::SharedPtr)’:
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc:415:57: warning: ‘Eigen::Matrix<typename Eigen::internal::traits<T>::Scalar, 3, 1> Eigen::MatrixBase<Derived>::eulerAngles(Eigen::Index, Eigen::Index, Eigen::Index) const [with Derived = Eigen::Block<const Eigen::Matrix<double, 4, 4>, 3, 3, false>; typename Eigen::internal::traits<T>::Scalar = double; Eigen::Index = long int]’ is deprecated: Use .canonicalEulerAngles() instead. [-Wdeprecated-declarations]
+  415 |              << transform.rotation().eulerAngles(0, 1, 2).transpose() << " "
+      |                                                         ^
+In file included from /public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/Geometry:37,
+                 from /public/zjst/robot/planning_humble_env/env/include/grid_map_core/grid_map_core/GridMap.hpp:14,
+                 from /public/zjst/robot/planning_humble_env/env/include/grid_map_core/grid_map_core/grid_map_core.hpp:13,
+                 from /public/zjst/robot/planning_humble_env/env/include/grid_map_ros/GridMapRosConverter.hpp:12,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.h:3,
+                 from /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc:1:
+/public/zjst/robot/planning_humble_env/env/include/eigen3/Eigen/src/Geometry/EulerAngles.h:136:77: note: declared here
+  136 | EIGEN_DEVICE_FUNC inline Matrix<typename MatrixBase<Derived>::Scalar, 3, 1> MatrixBase<Derived>::eulerAngles(
+      |                                                                             ^~~~~~~~~~~~~~~~~~~
+---
+Finished <<< planning [11min 8s]
+
+Summary: 1 package finished [11min 10s]
+  1 package had stderr output: planning

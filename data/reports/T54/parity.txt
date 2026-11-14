@@ -1,0 +1,35 @@
+/tmp/t54_parity/golden.txt: 38787 frames
+38787 frames, 0 differ
+  car     t  0.00  y  0.00  yaw 124.4 deg  approach              s_stop  9.20
+  car     t 13.30  y  9.10  yaw  90.0 deg  wait     vehicle      s_stop  0.10
+  car     t 20.55  y  9.10  yaw  90.0 deg  go       clear        s_stop  0.10
+  car     t 21.45  y 10.00  yaw  90.0 deg  cross    on_crosswalk s_stop  0.00
+  car     t 29.45  y 18.00  yaw  90.0 deg  none                  s_stop  0.00
+ok   car: waits for it, goes after it has passed, crosses without stopping
+  nocar   t  0.00  y  0.00  yaw 124.4 deg  approach              s_stop  9.20
+  nocar   t 13.30  y  9.10  yaw  90.0 deg  go       clear        s_stop  0.10
+  nocar   t 14.20  y 10.00  yaw  90.0 deg  cross    on_crosswalk s_stop  0.00
+  nocar   t 22.20  y 18.00  yaw  90.0 deg  none                  s_stop  0.00
+ok   no car: goes on arriving and crosses
+  stale   t  0.00  y  0.00  yaw 124.4 deg  approach              s_stop  9.20
+  stale   t 13.30  y  9.10  yaw  90.0 deg  wait     stale        s_stop  0.10
+ok   no perception: waits at the curb, never goes
+  turned  t  0.00  y  0.00  yaw 150.2 deg  approach              s_stop  9.20
+  turned  t 13.30  y  9.10  yaw 150.2 deg  align    clear        s_stop  0.10
+  turned  t 15.45  y  9.10  yaw  99.8 deg  go       clear        s_stop  0.10
+  turned  t 16.35  y 10.00  yaw  90.0 deg  cross    on_crosswalk s_stop  0.00
+  turned  t 24.35  y 18.00  yaw  90.0 deg  none                  s_stop  0.00
+ok   turned away: turns in place to face across, then goes
+  jump    t  0.00  y  0.00  yaw 124.4 deg  approach              s_stop  9.20
+  jump    t 13.30  y  9.10  yaw  90.0 deg  wait     vehicle      s_stop  0.10
+  jump    t 20.55  y 10.30  yaw  90.0 deg  go       clear        s_stop -0.80
+  jump    t 20.60  y 10.35  yaw  90.0 deg  cross    on_crosswalk s_stop  0.00
+  jump    t 28.25  y 18.00  yaw  90.0 deg  none                  s_stop  0.00
+ok   pose jumps onto the crosswalk while waiting for the car: keeps waiting, goes after it has passed
+  jumpstale t  0.00  y  0.00  yaw 124.4 deg  approach              s_stop  9.20
+  jumpstale t 13.30  y  9.10  yaw  90.0 deg  wait     stale        s_stop  0.10
+ok   pose jumps onto the crosswalk with no perception: keeps waiting, never goes
+  deep    t  0.00  y 13.00  yaw 124.4 deg  cross    on_crosswalk s_stop  0.00
+  deep    t  5.00  y 18.00  yaw  90.0 deg  none                  s_stop  0.00
+ok   starts 3 m onto the crosswalk with no perception: crosses (it is on the road)
+crosswalk_sim: 0 failed

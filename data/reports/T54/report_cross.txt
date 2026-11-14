@@ -1,0 +1,89 @@
+== t54_cross: 目标 (78.7, 226.6) 已发；LOC_MAP_PATH=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 LOC_INS_ONLY=0 MAP_SWITCH=
+work_dirs/planning_io_t54_cross: 12 topics, 26242 transforms
+  /cmd_vel                                         geometry_msgs/msg/Twist                3114 msgs  frames -
+  /goal_pose                                       geometry_msgs/msg/PoseStamped             1 msgs  frames map
+  /lightning/odom                                  nav_msgs/msg/Odometry                 16765 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid             1720 msgs  frames base_link
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid             3159 msgs  frames base_link
+  /planning/debug/diagnostic                       diagnostic_msgs/msg/DiagnosticArray    3159 msgs  frames planning
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker          3115 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     3159 msgs  frames map
+  /planning/debug/plotjuggler/string               std_msgs/msg/String                    3159 msgs  frames -
+  /rhr/topic/alarm_info                            rhr_interface/msg/AlarmInfo               2 msgs  frames -
+  /rte/rdap/rtk/inspvax                            kygi665_msgs/msg/INSPVAX              17280 msgs  frames -
+  /tf                                              tf2_msgs/msg/TFMessage                19924 msgs  frames -
+PROBLEM /lightning/odom: not a walking robot: 1 jumps > 1 m (largest 142.9 m; from 0.1 s to 0.1 s); path 296 m, net 240 m over 167.6 s
+PROBLEM /planning/debug/cost_map_production/occmap: the robot stands on an obstacle (>= 10% of its footprint) in 1028 of 3159 grids; the local planner will not plan from there
+PROBLEM layout: /fused_point_cloud is not in the recording
+NOTE display: /map/occupancy_grid, /planning/debug/cost_map_production/occmap are all drawn in base_link: the planes tilt with the robot and cut through each other in Foxglove (blinking); open tools/planning_mcap_viz.py's output instead
+3 problems
+mission_state: active 3075, passive 1, standby 1, standstill 31, 
+CMD: 2979 次；头两条：
+  I20261114 15:00:50.216383 139776599826432 tracking.cc:270] [PLANNING]CMD: 0.108279 0.178028 0.0965397
+  I20261114 15:00:50.317551 139776599826432 tracking.cc:270] [PLANNING]CMD: 0.371343 0.307777 0.196262
+CMD 中位 vx vy ω：0.748 0.000 0.000 ；vx > 0.05 的比例 70%
+车型：规划车型 d20/001（PLANNING_ROOT_DIR=/tmp/nav_stack_debug/planning_root_map）；Load robot config:/tmp/nav_stack_debug/planning_root_map/robot_factory/d20/001
+定位：INS 朝向偏置 180（bag rosbag2_2026_09_21-16_41_27）；system.ins_yaw_offset = 180 deg
+Start adjusted: 1
+Goal adjusted: 1
+Start point is in collision: 0
+Initial pose is in collision: 0
+No free point found near start: 0
+Map switch: 0
+startup map: 1
+crosswalks in: 1
+OSM file not exist: 0
+Failed to parse OSM: 0
+Data timeout exceeded: 1
+Data recovered, resuming: 0
+local planner solver failed: 96
+Crosswalk yield:: 7
+  [PLANNING]Tracking: crosswalk yield on, rule wait
+  [PLANNING]Crosswalk yield: approach () crosswalk 0, stop point in 39.3 m, entry 40.1 m, exit 40.1 m, heading error -73.5502 deg, vehicles 0
+  [PLANNING]Crosswalk yield: align (stale) crosswalk 0, stop point in 0.1 m, entry 0.9 m, exit 34.4 m, heading error 78.554 deg, vehicles 0, perception stale
+  [PLANNING]Crosswalk yield: align (stale) crosswalk 0, stop point in -0.8 m, entry 0 m, exit 33.5 m, heading error 78.4159 deg, vehicles 0, perception stale, on the crosswalk without a go (0.082590 m past the entry)
+  [PLANNING]Crosswalk yield: wait (stale) crosswalk 0, stop point in -0.8 m, entry 0 m, exit 34 m, heading error 9.78691 deg, vehicles 0, perception stale, on the crosswalk without a go (0.543107 m past the entry)
+  [PLANNING]Crosswalk yield: cross (on_crosswalk) crosswalk 0, stop point in 0 m, entry 0 m, exit 0 m, heading error 0 deg, vehicles 0, perception stale, on the crosswalk without a go (1.522685 m past the entry)
+  [PLANNING]Crosswalk yield: cross (on_crosswalk) crosswalk 0, stop point in 0 m, entry 0 m, exit 0 m, heading error 0 deg, vehicles 0, perception stale
+  [PLANNING]Crosswalk yield: none () crosswalk -1, stop point in 0 m, entry 0 m, exit 0 m, heading error 0 deg, vehicles 0
+定位：LiDAR 回调间隔过大 0 次，ProcessLidar 超过 0.2 s 0 次（最长 ），雷达断流 0 次
+  >>> ===== Printing run time =====
+  > [    Incremental Mapping] average time usage: 0.00039033 ms, med: 0.00037 95%: 0.000563 max: 0.01392, called times : 1676
+  > [    ObsModel (IEKF Build Jacobian)] average time usage: 0.010618 ms, med: 0.005872 95%: 0.02584 max: 0.095535, called times : 2000
+  > [    ObsModel (Lidar Match)] average time usage: 2.90852 ms, med: 1.25817 95%: 7.95467 max: 16.2014, called times : 2000
+  > [IEKF Solve and Update] average time usage: 16.6917 ms, med: 15.6795 95%: 33.6183 max: 56.9239, called times : 1676
+  > [Preprocess (Standard)] average time usage: 0.000470724 ms, med: 0.000407 95%: 0.000716 max: 0.008563, called times : 1697
+  > [Proc Lidar] average time usage: 2.7958 ms, med: 2.54212 95%: 4.27002 max: 13.9995, called times : 1706
+  > [Undistort Pcl] average time usage: 3.4053 ms, med: 3.19018 95%: 3.90319 max: 10.3501, called times : 1676
+  >>> ===== Printing run time end =====
+== 可视化（tools/planning_mcap_viz.py）
+work_dirs/planning_io_t54_cross -> work_dirs/planning_io_t54_cross/viz/planning_viz.mcap (28.9 MB), 167.5 s of bag time from 1789980093.243
+  time base: the bag's stamps; the recorder's clock was 4659541.9 s (53.9 days) ahead
+  pose: /tf map -> base_link, 16753 samples, the first 12 dropped (before a start-up jump)
+  costmap values: 100 = obstacle (perception obstacles read 100 in 98.8% of 76728 costmap cells)
+  /planning/debug/cost_map_production/occmap -> /viz/cost_map: 3159 grids
+  /map/occupancy_grid -> /viz/perception_grid: 1720 grids
+  local planner: zero command in 163 of 3075 active cycles (5%); with costmap obstacles under the footprint 70 of 1478, without 93 of 1597
+  route map: CJGC.yaml:CJGC.pgm, 1127 x 1887 cells around the run, 36712 route cells
+  crosswalks: 5 in the map, 2 near the run
+  localization map: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13:3d/global.pcd, 1431542 points around the run
+  INS: 17280 messages, RTK fixed 100%, odom - INS median 0.33 m (origin 29.731405, 106.783891, 217.2)
+  heading: odom minus the INS direction of travel, median |.| 1 deg over 91 s moving; 1% of it more than 135 deg off
+  lightning log work_dirs/planning_io_t54_cross/logs/loc.log: 1913 lines, 51 events
+  glog work_dirs/planning_io_t54_cross/logs/planning.INFO: 42691 lines, 69 events (time zone +8.0 h)
+  overview: work_dirs/planning_io_t54_cross/viz/planning_viz.png
+  topics: /tf 16753, /viz/cost_map 3159, /viz/crosswalks 12, /viz/events 151, /viz/flow 3159, /viz/legend 12, /viz/loc/flow 838, /viz/loc/ins 336, /viz/loc/map_cloud 2, /viz/loc/state 838, /viz/perception_grid 1720, /viz/plan 3159, /viz/robot 1676, /viz/route_map 12, /viz/state 3159, /viz/trail 336
+  events: 151 (98 warnings or errors) on /viz/events
+      -1.97 s  laser_mapping.cc:815] IVox rebuilt from TiledMap, raw: 1520096 downsampled: 194346 (res=0.5) cost: 147.354 ms
+      -1.96 s  laser_mapping.cc:320] No point, skip this scan!
+       0.00 s  位姿跳了 142.9 m（0.01 s 内）：定位初始化，之前的位姿不用
+       7.62 s  代价地图里狗脚下是障碍（160 格）：狗在规划地图的路外面，局部规划会认为起点在碰撞里
+       9.90 s  规划 5.14 s 没有输出（/planning/debug/path_tracking）
+       9.90 s  /planning/debug/cost_map_production/occmap 5.14 s 没有新栅格
+       9.92 s  velocity_calibration.cc:86] [PLANNING]Table i_vx has less than 2 samples
+       9.92 s  velocity_calibration.cc:86] [PLANNING]Table i_vy has less than 2 samples
+       9.92 s  velocity_calibration.cc:86] [PLANNING]Table i_omega has less than 2 samples
+       9.92 s  velocity_calibration.cc:98] [PLANNING]Velocity calibration table load failed
+      15.09 s  mppi_cuda_backend.cu:713] [PLANNING]MPPI CUDA: robot footprint in collision (clearance -0.0875 m), only trajectories moving away are allowed
+      15.10 s  obstacles_critic.cc:91] [PLANNING]MPPI: robot footprint in collision (clearance -0.0875 m), only trajectories moving away are allowed
+  open in Foxglove with the layout Nav_D20/planning/script/planning_viz.json

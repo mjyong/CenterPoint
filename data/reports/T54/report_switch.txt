@@ -1,0 +1,87 @@
+== t54_switch: 目标 (80.0, 126.9) 已发；LOC_MAP_PATH=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 LOC_INS_ONLY=0 MAP_SWITCH=/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t54_switch: 12 topics, 26703 transforms
+  /cmd_vel                                         geometry_msgs/msg/Twist                3149 msgs  frames -
+  /goal_pose                                       geometry_msgs/msg/PoseStamped             1 msgs  frames map
+  /lightning/odom                                  nav_msgs/msg/Odometry                 17058 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid             1646 msgs  frames base_link
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid             3215 msgs  frames base_link
+  /planning/debug/diagnostic                       diagnostic_msgs/msg/DiagnosticArray    3216 msgs  frames planning
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker          3150 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     3215 msgs  frames map
+  /planning/debug/plotjuggler/string               std_msgs/msg/String                    3216 msgs  frames -
+  /rhr/topic/alarm_info                            rhr_interface/msg/AlarmInfo               2 msgs  frames -
+  /rte/rdap/rtk/inspvax                            kygi665_msgs/msg/INSPVAX              17226 msgs  frames -
+  /tf                                              tf2_msgs/msg/TFMessage                20273 msgs  frames -
+PROBLEM /lightning/odom: not a walking robot: 2 jumps > 1 m (largest 142.8 m; from 0.1 s to 0.6 s); path 314 m, net 240 m over 170.6 s
+PROBLEM /planning/debug/cost_map_production/occmap: the robot stands on an obstacle (>= 10% of its footprint) in 1031 of 3215 grids; the local planner will not plan from there
+PROBLEM layout: /fused_point_cloud is not in the recording
+NOTE display: /map/occupancy_grid, /planning/debug/cost_map_production/occmap are all drawn in base_link: the planes tilt with the robot and cut through each other in Foxglove (blinking); open tools/planning_mcap_viz.py's output instead
+3 problems
+mission_state: active 3109, passive 1, standby 1, standstill 28, 
+CMD: 3015 次；头两条：
+  I20261114 15:06:20.671666 140052891303936 tracking.cc:270] [PLANNING]CMD: 0.293286 0.171514 0.0384836
+  I20261114 15:06:20.736307 140052891303936 tracking.cc:270] [PLANNING]CMD: 0.307789 0.273992 0.0963896
+CMD 中位 vx vy ω：0.817 0.054 0.199 ；vx > 0.05 的比例 97%
+车型：规划车型 d20/001（PLANNING_ROOT_DIR=/tmp/nav_stack_debug/planning_root）；Load robot config:/tmp/nav_stack_debug/planning_root/robot_factory/d20/001
+定位：INS 朝向偏置 180（bag rosbag2_2026_09_21-16_41_27）；system.ins_yaw_offset = 180 deg
+Start adjusted: 1
+Goal adjusted: 0
+Start point is in collision: 0
+Initial pose is in collision: 0
+No free point found near start: 0
+Map switch: 1
+startup map: 0
+crosswalks in: 1
+OSM file not exist: 0
+Failed to parse OSM: 0
+Data timeout exceeded: 1
+Data recovered, resuming: 0
+local planner solver failed: 94
+Crosswalk yield:: 4
+  [PLANNING]Tracking: crosswalk yield on, rule wait
+  [PLANNING]Crosswalk yield: align (stale) crosswalk 0, stop point in -0.8 m, entry 0 m, exit 0 m, heading error -72.7323 deg, vehicles 0, perception stale, on the crosswalk without a go (0.032676 m past the entry)
+  [PLANNING]Crosswalk yield: cross (on_crosswalk) crosswalk 0, stop point in 0 m, entry 0 m, exit 0 m, heading error 0 deg, vehicles 0, perception stale, on the crosswalk without a go (5.065139 m past the entry)
+  [PLANNING]Crosswalk yield: cross (on_crosswalk) crosswalk 0, stop point in 0 m, entry 0 m, exit 0 m, heading error 0 deg, vehicles 0, perception stale
+  [PLANNING]Crosswalk yield: none () crosswalk -1, stop point in 0 m, entry 0 m, exit 0 m, heading error 0 deg, vehicles 0
+定位：LiDAR 回调间隔过大 24 次，ProcessLidar 超过 0.2 s 0 次（最长 ），雷达断流 3 次
+  >>> ===== Printing run time =====
+  > [    Incremental Mapping] average time usage: 0.000297128 ms, med: 0.00028 95%: 0.000506 max: 0.002377, called times : 1631
+  > [    ObsModel (IEKF Build Jacobian)] average time usage: 0.0153891 ms, med: 0.011323 95%: 0.037263 max: 0.317261, called times : 2000
+  > [    ObsModel (Lidar Match)] average time usage: 4.28326 ms, med: 3.21935 95%: 10.6288 max: 24.913, called times : 2000
+  > [IEKF Solve and Update] average time usage: 18.8715 ms, med: 17.8942 95%: 39.3612 max: 62.6279, called times : 1631
+  > [Preprocess (Standard)] average time usage: 0.000520033 ms, med: 0.000421 95%: 0.000828 max: 0.032016, called times : 1651
+  > [Proc Lidar] average time usage: 3.71958 ms, med: 2.52924 95%: 8.35358 max: 28.8396, called times : 1728
+  > [Undistort Pcl] average time usage: 4.3819 ms, med: 3.23571 95%: 9.16474 max: 21.7387, called times : 1631
+  >>> ===== Printing run time end =====
+== 可视化（tools/planning_mcap_viz.py）
+/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t54_switch -> /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t54_switch/viz/planning_viz.mcap (44.7 MB), 170.0 s of bag time from 1789980090.743
+  time base: the bag's stamps; the recorder's clock was 4659874.3 s (53.9 days) ahead
+  pose: /tf map -> base_link, 17001 samples, the first 57 dropped (before a start-up jump)
+  costmap values: 100 = obstacle (perception obstacles read 100 in 99.4% of 78024 costmap cells)
+  /planning/debug/cost_map_production/occmap -> /viz/cost_map: 3215 grids
+  /map/occupancy_grid -> /viz/perception_grid: 1646 grids
+  local planner: zero command in 95 of 3109 active cycles (3%); with costmap obstacles under the footprint 71 of 1513, without 24 of 1596
+  route map: ad68517c-e845-42a4-b5dd-a6b7c6d2af13:2d/1780551612/map.png, 1127 x 1894 cells around the run, 51262 route cells
+  crosswalks: 5 in the map, 2 near the run
+  localization map: /lightning/map_cloud, 109642 points around the run
+  /lightning/current_scan_world -> /viz/loc/scan: 618 scans, on the map (< 0.1 m) median 53%
+  INS: 17226 messages, RTK fixed 100%, odom - INS median 0.34 m (origin 29.731405, 106.783891, 217.2)
+  heading: odom minus the INS direction of travel, median |.| 1 deg over 91 s moving; 1% of it more than 135 deg off
+  lightning log /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t54_switch/logs/loc.log: 1980 lines, 72 events
+  glog /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t54_switch/logs/planning.INFO: 43457 lines, 96 events (time zone +8.0 h)
+  overview: /home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint/work_dirs/planning_io_t54_switch/viz/planning_viz.png
+  topics: /tf 17001, /viz/cost_map 3215, /viz/crosswalks 12, /viz/events 241, /viz/flow 3216, /viz/legend 12, /viz/loc/flow 851, /viz/loc/ins 341, /viz/loc/map_cloud 2, /viz/loc/scan 280, /viz/loc/state 851, /viz/perception_grid 1646, /viz/plan 3215, /viz/robot 1701, /viz/route_map 12, /viz/state 3216, /viz/trail 341
+  events: 241 (173 warnings or errors) on /viz/events
+      -2.45 s  loc_system.cc:1125] IMU 粘包！间隔 0.000496864 秒，过短
+      -2.45 s  loc_system.cc:1113] IMU 丢帧！间隔 0.032464 秒，超过 0.015 秒
+      -2.45 s  loc_system.cc:1125] IMU 粘包！间隔 3.45707e-05 秒，过短
+      -2.28 s  laser_mapping.cc:815] IVox rebuilt from TiledMap, raw: 1520096 downsampled: 194346 (res=0.5) cost: 149.539 ms
+      -2.28 s  laser_mapping.cc:320] No point, skip this scan!
+      -0.50 s  位姿跳了 142.8 m（0.01 s 内）：定位初始化，之前的位姿不用
+      -0.42 s  laser_mapping.cc:487] 定位质量下降: effect_num=481 avg_residual=0.268809 fail_count=1/100
+       0.00 s  点云只有 22% 贴在地图上：地图和现场对不上，或位姿偏了
+       0.00 s  位姿跳了 1.3 m（0.01 s 内）：定位初始化，之前的位姿不用
+       4.02 s  代价地图里狗脚下是障碍（160 格）：狗在规划地图的路外面，局部规划会认为起点在碰撞里
+       7.26 s  规划 5.47 s 没有输出（/planning/debug/path_tracking）
+       7.26 s  /planning/debug/cost_map_production/occmap 5.47 s 没有新栅格
+  open in Foxglove with the layout Nav_D20/planning/script/planning_viz.json

@@ -1,0 +1,17 @@
+work_dirs/planning_io_t53_1112: 1669 object messages, 16543 odometry; 0 messages with no odometry within 0.3 s (the gate counts them stale)
+2 static vehicle tracks (the dog moved median 393.1 m, turned median 66 deg while each was seen)
+  det -> base_link yaw  -90.0 deg: cars wander median 0.25 m in the map, 2 of 2 still (< 0.5 m)  (configured)
+  det -> base_link yaw    0.0 deg: cars wander median 0.22 m in the map, 2 of 2 still (< 0.5 m)
+  det -> base_link yaw   90.0 deg: cars wander median 0.21 m in the map, 2 of 2 still (< 0.5 m)
+  det -> base_link yaw  180.0 deg: cars wander median 0.19 m in the map, 2 of 2 still (< 0.5 m)  <- best
+extrinsic WRONG: another yaw keeps parked cars stiller than the configured one
+===== --any-motion =====
+work_dirs/planning_io_t53_1112: 1669 object messages, 16543 odometry; 0 messages with no odometry within 0.3 s (the gate counts them stale)
+15 vehicle tracks, any motion flag (the dog moved median 5.0 m, turned median 18 deg while each was seen)
+  det -> base_link yaw  -90.0 deg: cars wander median 0.30 m in the map, 9 of 15 still (< 0.5 m)  (configured)  <- best
+  det -> base_link yaw    0.0 deg: cars wander median 2.08 m in the map, 2 of 15 still (< 0.5 m)
+  det -> base_link yaw   90.0 deg: cars wander median 3.05 m in the map, 1 of 15 still (< 0.5 m)
+  det -> base_link yaw  180.0 deg: cars wander median 2.30 m in the map, 2 of 15 still (< 0.5 m)
+extrinsic OK: the configured yaw keeps parked cars still
+1104 的包里没有 odom，也没有 /perception/lidar_3d/objects（cp01–cp04 各 8 个话题：四路相机、INSPVAX、IMU、顶激光、lidar_packets_loss）。
+改正以后录的包：没有。/public/zjst/robot/cp_data/ 里只有 1112_t40（开始 2026-11-12 18:59:04 +08，19:25 改配置之前）和 10 月 16 日的 sensor_recording。

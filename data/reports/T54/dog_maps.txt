@@ -1,0 +1,65 @@
+===== ls maps =====
+/opt/seres/nav/data/:
+total 16
+drwxr-xr-x 4 root   root   4096 Oct 27 15:20 .
+drwxr-xr-x 6 root   root   4096 Oct 29 13:55 ..
+drwxrwxr-x 5 nvidia nvidia 4096 Oct 27 15:18 a70c6db6-de74-4337-ad1c-8bc491d9621a
+drwxr-xr-x 5 root   root   4096 Oct 10 16:14 ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+
+/opt/seres/nav/planning/lib/planning/robot_factory/data/astar_pgm/:
+total 272464
+drwxr-xr-x 2 root   root        4096 Nov  4 11:27 .
+drwxr-xr-x 4 root   root        4096 Oct 29 13:55 ..
+-rw-r--r-- 1 root   root        8195 Oct 29 13:51 4lou.pgm
+-rw-r--r-- 1 root   root         186 Oct 29 13:51 4lou.yaml
+-rw-r--r-- 1 root   root   117463771 Nov  4 11:27 CJGC_DD.pgm
+-rw-r--r-- 1 root   root         146 Nov  4 11:27 CJGC_DD.yaml
+-rw-r--r-- 1 root   root   117463771 Oct 29 13:51 CJGC.pgm
+-rw-r--r-- 1 root   root    14963573 Oct 29 13:51 CJGC_ST1.pgm
+-rw-rw-r-- 1 nvidia nvidia  14963581 Nov  3 15:17 CJGC_ST.pgm
+-rw-r--r-- 1 root   root         143 Oct 29 13:51 CJGC_ST.yaml
+-rw-r--r-- 1 root   root         119 Oct 29 13:51 CJGC.yaml
+-rw-r--r-- 1 root   root      776080 Oct 29 13:51 map (Copy).pgm
+-rw-r--r-- 1 root   root      236155 Oct 29 13:51 map.pgm
+-rw-r--r-- 1 root   root         187 Oct 29 13:51 map.yaml
+-rw-r--r-- 1 root   root      810015 Oct 29 13:51 meeting.pgm
+-rw-r--r-- 1 root   root         177 Oct 29 13:51 meeting.yaml
+-rw-r--r-- 1 root   root       40671 Oct 29 13:51 wuyun1.pgm
+-rw-r--r-- 1 root   root         205 Oct 29 13:51 wuyun1.yaml
+-rw-r--r-- 1 root   root    12207278 Oct 29 13:51 wuyun.pgm
+-rw-r--r-- 1 root   root         119 Oct 29 13:51 wuyun.yaml
+
+/userdata/config/robot_service/map/:
+total 12
+drwxr-xr-x 3 root root 4096 Oct 14 19:42 .
+drwxr-xr-x 6 root root 4096 Oct 14 19:45 ..
+drwxr-xr-x 5 root root 4096 Oct 14 19:17 c1adbe7b-2e5e-4e83-ba30-e164914033c4
+===== osm crosswalk counts =====
+===== planning journal map =====
+Nov 14 15:07:14 tegra-ubuntu planning[3454]: I1114 15:07:14.554037  3454 ros_bridge.cc:467] [PLANNING]Map switch: /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4
+Nov 14 15:07:14 tegra-ubuntu planning[3454]: E1114 15:07:14.652920  3454 global_map_manager.cc:233] [PLANNING]OSM file not exist: /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4/2d/1791976485/map.osm
+===== osm retry =====
+FIND_ERR
+===== slam map_path =====
+Nov 14 15:06:01 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:06:01.739224  3816 mode_switch_node.cc:542] 启动时从配置文件加载地图 UUID: c1adbe7b-2e5e-4e83-ba30-e164914033c4，路径: /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4
+Nov 14 15:06:02 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:06:02.072626  3816 tiled_map.cc:91] 检测到模板格式地图，map_path 调整为: /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4/3d
+Nov 14 15:06:02 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:06:02.097464  3816 localization.cpp:40] TiledMap loaded, map_path=/userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4
+Nov 14 15:07:14 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:07:14.504070  3816 mode_switch_node.cc:684] 地图切换通知的 UUID 与当前已加载地图相同(c1adbe7b-2e5e-4e83-ba30-e164914033c4)，忽略
+Nov 14 15:07:14 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:07:14.558696  6891 mode_switch_node.cc:879] 重定位请求 - 地图 UUID: c1adbe7b-2e5e-4e83-ba30-e164914033c4，初始位姿: (0, 0, 0)
+Nov 14 15:07:14 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:07:14.781396  6891 tiled_map.cc:91] 检测到模板格式地图，map_path 调整为: /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4/3d
+Nov 14 15:07:14 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:07:14.791260  6891 localization.cpp:40] TiledMap loaded, map_path=/userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4
+Nov 14 15:07:20 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:07:20.146488  6891 localization.cpp:423] SwitchMapAndReinit: map_path=/userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4
+Nov 14 15:07:20 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:07:20.146589  6891 tiled_map.cc:91] 检测到模板格式地图，map_path 调整为: /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4/3d
+Nov 14 15:07:20 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:07:20.151620  6891 loc_system.cc:1272] 已发布栅格地图: 234x231, resolution=0.2, map_path=/userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4
+Nov 14 15:07:20 tegra-ubuntu slam[1766]: [mode_switch_node-2] I1114 15:07:20.151830  6891 mode_switch_node.cc:961] 定位模块已重新启动（地图未变更: /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4），等待定位收敛...
+===== CJGC_DD.yaml =====
+image: map.pgm
+mode: trinary
+width: 10293
+height: 11412
+resolution: 0.1
+origin: [-716, -321, 0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.25
+pgm size: 117463771 bytes (ls of CJGC_DD.pgm)
