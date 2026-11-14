@@ -166,7 +166,7 @@
 | T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 完成，已复核（2026-11-14）：狗上的 -dev 和 ROS 包都齐，只缺 g2o、acados、OsqpEigen，源码都在服务器上，不用人下载。和狗上的接口两处不同，其中 App 发目标的 /nav/navigation 多了 nav_mode，要人定 |
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步，已复核（2026-11-14）：编、装、地图、服务都过了。复核发现影子模式按原来的做法不生效（规划不读命令行参数），已改；启动脚本的库路径、App 盘快满、App 的地图切换、演练的共享内存四件事交给 T59 |
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T59 | 半天 | 任务已写好 |
-| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 4 步，已复核（2026-11-14）：第 0–3 步都对。App 认数据库（只有 c1adbe7b），改用 appmap ignore（默认），App 目录不放东西；从第 4 步接着做 |
+| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步：共享内存不串域，图也对；定位发 18.6 MB 的块超出 iceoryx 的 16 MB，默认定位没起来。四个导航服务已起回 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
 
@@ -9729,6 +9729,29 @@ rehearsal on 的输出；bag info；演练的日志（60 s 那两条前后）、
 
 T59 从第 4 步接着做（第 4 步改成什么都不放，第 5 步按 ignore）。接着做之前先把第 1 步的 scp 再做一次（nav_cw.sh 改了：默认 ignore、
 `/map/file_update` 也改名），然后 `nav_cw.sh apply`，`switches` 要是 shadow on、appmap ignore，没有 NOT APPLIED。
+
+### T59 续（从第 4 步）
+
+停在第 5 步。第 4 步做了，共享内存不串域，`rehearsal on` 的图是对的。默认定位在发出地图时被 iceoryx 拒绝，没有 odom，回放没有放完。四个导航服务已经起回，`running: theirs`。
+
+**接着做之前。** `nav_cw.sh` 换成 `eff2e72`（sha256 `d0601296…`）。`apply` 之后：shadow on、appmap ignore（`sub_map_switch` 是 `/nav_cw/map/switch`，`sub_map_update` 是 `/nav_cw/map/file_update`，`NAV_CW_SLAM_ARGS=map_switch_topic:=/nav_cw/map/switch`），没有 NOT APPLIED。pytest 87 passed，1 skipped（还是没有 g++ 和 Eigen）。
+
+**第 4 步。** App 目录只有 c1adbe7b（5.9 MB），没有 ad68517c，也没有软链接。`/userdata` 可用 385 MB。数据库没改。
+
+**第 5 步 a–c。** `iox-roudi` 是 root 的 pid 1630，`/opt/ros/humble/bin/iox-roudi`。域 42 的探针收到 `42` 和 `d42`，域 0 的两个文件是空的（`probe_*.txt`），没有串域。`rehearsal on` 停了他们四个导航服务、起了我们三个。图：
+
+```text
+ok  planning          PUBLISHER     not on /mc/motion_control
+ok  planning          PUBLISHER     not on /cmd_vel
+ok  planning          PUBLISHER     on /nav_cw/shadow/mc/motion_control
+ok  planning          SUBSCRIPTION  not on /map/switch
+ok  planning          SUBSCRIPTION  not on /map/file_update
+ok  mode_switch_node  SUBSCRIPTION  not on /map/switch
+```
+
+**第 5 步 d，停下。** 播放器同时带上定位的前缀，`kygi665_msgs/msg/INSPVAX` 能解析，`play.log` 里 Ignoring 是 0。定位读了 ad68517c，接着发地图时 iceoryx 报 `MEPOO__MEMPOOL_GETCHUNK_CHUNK_IS_TOO_LARGE`，块大小 18594925 字节（约 18.6 MB），配置里最大的池是 16777216（16 MB），一共 10 次。然后 `启动默认定位异常: failed to publish message`，定位线程退出，`/lightning/odom` 没有数据，规划一直 `/lightning/odom timeout`、`mission_state: fault`。Foxglove 在域 42：crosswalk、path_tracking、occmap、影子的 motion 各约 160 条，odom 是 0。温度平均 52.0 °C、最高 56.7 °C。没有 `PUBLISHER_LIST_FULL` / `SUBSCRIBER_LIST_FULL`。
+
+回放停掉以后 `rehearsal off`。除了那四个导航服务，别的服务重启次数没有变；那四个也是 0 → 0，都回到 active。`shadow off`。最后的 switches：shadow off、appmap ignore、speed off，没有 REHEARSAL ON。1112 还在狗上。
 
 ---
 

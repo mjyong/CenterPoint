@@ -1,0 +1,7 @@
+Nov 14 20:32:09 tegra-ubuntu cw-slam[25818]: [mode_switch_node-1] 2026-11-14 20:32:09.676 [Warning]: ICEORYX error! MEPOO__MEMPOOL_GETCHUNK_CHUNK_IS_TOO_LARGE
+Nov 14 20:32:09 tegra-ubuntu cw-slam[25818]: [mode_switch_node-1] 2026-11-14 20:32:09.677 [Warning]: ICEORYX error! MEPOO__MEMPOOL_GETCHUNK_CHUNK_IS_TOO_LARGE
+Nov 14 20:32:09 tegra-ubuntu cw-slam[25818]: [mode_switch_node-1] 2026-11-14 20:32:09.678 [Warning]: ICEORYX error! MEPOO__MEMPOOL_GETCHUNK_CHUNK_IS_TOO_LARGE
+Nov 14 20:32:09 tegra-ubuntu cw-slam[25818]: [mode_switch_node-1] 2026-11-14 20:32:09.680 [Warning]: ICEORYX error! MEPOO__MEMPOOL_GETCHUNK_CHUNK_IS_TOO_LARGE
+Nov 14 20:32:09 tegra-ubuntu cw-slam[25818]: [mode_switch_node-1] 2026-11-14 20:32:09.681 [Warning]: ICEORYX error! MEPOO__MEMPOOL_GETCHUNK_CHUNK_IS_TOO_LARGE
+启动默认定位异常: failed to publish message: failed to publish data, at ./src/rmw_node.cpp:1837, at ./src/rcl/publisher.c:250
+chunk of size 18594925 (10 times). Largest iceoryx pool in the same log: ChunkPayloadSize 16777216.
