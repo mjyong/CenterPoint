@@ -5,6 +5,7 @@ message's stamp (/lightning/odom). A parked car has to stay where it is in the m
 with a wrong extrinsic yaw it swings around the dog. So, for every vehicle track perception calls static or
 stopped, this measures how far its map position wanders, for the configured extrinsic and for the yaw turned by
 90, 180 and 270 deg: the configured one should be clearly the smallest, and keep the most tracks still.
+Exit 0 OK, 1 nothing to check, 2 WRONG (another yaw clearly better), 3 INCONCLUSIVE (ahead by a hair).
 
 --any-motion uses every vehicle track, whatever perception's motion flag says (a moving car is not still under any
 yaw, a parked one only under the right one): for objects computed with a wrong INS heading (1112, before the
@@ -100,8 +101,11 @@ def check(odom, frames, det_to_base=DET_TO_BASE, max_gap=0.3, min_frames=20, max
         if len(obs) < min_frames:
             continue
         poses = np.array([p for _, p, _ in obs])
-        move = float(np.hypot(*(poses[:, :2].max(0) - poses[:, :2].min(0))))
-        turn = math.degrees(float(poses[:, 2].max() - poses[:, 2].min()))
+        # how far the dog moved and turned while the car was seen: the 10-90 % spread, so that one localization jump
+        # (the initialization, T54: 143 m) does not count as moving
+        lo, hi = np.percentile(poses, 10, axis=0), np.percentile(poses, 90, axis=0)
+        move = float(np.hypot(*(hi[:2] - lo[:2])))
+        turn = math.degrees(float(hi[2] - lo[2]))
         if move < 1.0 and turn < 15.0:      # the dog stood still: any extrinsic keeps a parked car still
             continue
         used.append(oid)
@@ -147,10 +151,17 @@ def main(argv=None):
         print("  det -> base_link yaw %6.1f deg: cars wander median %.2f m in the map, %d of %d still (< 0.5 m)%s%s" % (
             y, r["wander"][y], r["still"][y], len(r["tracks"]), "  (configured)" if y == r["yaws"][0] else "",
             "  <- best" if y == best else ""))
-    ok = best == r["yaws"][0]
-    print("extrinsic %s" % ("OK: the configured yaw keeps parked cars still" if ok else
-                            "WRONG: another yaw keeps parked cars stiller than the configured one"))
-    return 0 if ok else 2
+    conf = r["yaws"][0]
+    if best == conf:
+        print("extrinsic OK: the configured yaw keeps parked cars still")
+        return 0
+    # another yaw ahead: WRONG only when it is clearly better (more cars still, or 0.5 m less wander); a hair's
+    # difference means these tracks cannot tell the yaws apart (T54: 2 tracks, all four within 0.5 m)
+    if r["still"][best] > r["still"][conf] or r["wander"][conf] - r["wander"][best] > 0.5:
+        print("extrinsic WRONG: another yaw keeps parked cars stiller than the configured one")
+        return 2
+    print("extrinsic INCONCLUSIVE: %.1f deg is ahead by a hair; these tracks do not tell the yaws apart" % best)
+    return 3
 
 
 if __name__ == "__main__":

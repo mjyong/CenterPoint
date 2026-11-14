@@ -45,7 +45,8 @@ def _det(pose, xy_map, det_yaw_deg):
     return cd * bx + sd * by, -sd * bx + cd * by
 
 
-def _bag(path, ts, det_yaw_deg=-90.0, gap=None, parked_flag=0):
+def _bag(path, ts, det_yaw_deg=-90.0, gap=None, parked_flag=0, pose=None):
+    pose_of = pose or _pose
     from rosbags.rosbag2 import Writer
     parked = [(5.0, 6.0), (12.0, -4.0), (4.0, 12.0)]
 
@@ -61,18 +62,18 @@ def _bag(path, ts, det_yaw_deg=-90.0, gap=None, parked_flag=0):
             t = k * 0.02
             if gap and gap[0] <= t < gap[1]:
                 continue
-            x, y, yaw = _pose(t)
-            pose = _make(ts, "geometry_msgs/msg/Pose",
+            x, y, yaw = pose_of(t)
+            msg_pose = _make(ts, "geometry_msgs/msg/Pose",
                          position=_make(ts, "geometry_msgs/msg/Point", x=x, y=y, z=0.0),
                          orientation=_make(ts, "geometry_msgs/msg/Quaternion", x=0.0, y=0.0, z=math.sin(yaw / 2),
                                            w=math.cos(yaw / 2)))
             m = _make(ts, "nav_msgs/msg/Odometry",
                       header=_make(ts, "std_msgs/msg/Header", stamp=stamp(t0 + t), frame_id="map"),
-                      pose=_make(ts, "geometry_msgs/msg/PoseWithCovariance", pose=pose))
+                      pose=_make(ts, "geometry_msgs/msg/PoseWithCovariance", pose=msg_pose))
             w.write(co, int(round((t0 + t) * 1e9)), ts.serialize_cdr(m, "nav_msgs/msg/Odometry"))
         for k in range(25 * 10):        # perception 10 Hz
             t = k * 0.1
-            pose = _pose(t)
+            pose = pose_of(t)
             objs = []
             for i, p in enumerate(parked + [(-10.0 + 3.0 * t, 3.0)]):
                 px, py = _det(pose, p, det_yaw_deg)
@@ -129,3 +130,13 @@ def test_parked_cars_flagged_moving_need_any_motion(tmp_path, capsys, tool):
     line = next(l for l in out.splitlines() if "(configured)" in l)
     assert "3 of 4 still" in line and "<- best" in line
     assert "extrinsic OK" in out
+
+
+def test_a_localization_jump_is_not_moving(tmp_path, capsys, tool):
+    """The dog stands still; its odometry starts 140 m away for 0.2 s (the initialization, T54): nothing to check,
+    not a verdict from tracks that cannot tell the yaws apart."""
+    def standing(t):
+        return (140.0, 0.0, 0.0) if t < 0.2 else (0.0, 0.0, 0.1)
+    _bag(tmp_path / "rec", _ts(), pose=standing)
+    assert tool.main([str(tmp_path / "rec")]) == 1
+    assert "nothing to check" in capsys.readouterr().out

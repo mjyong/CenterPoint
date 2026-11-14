@@ -94,9 +94,11 @@ if [[ -z "${py}" ]]; then
   py=python3
   [[ -x "${repo_root}/.venv/bin/python" ]] && py="${repo_root}/.venv/bin/python"
 fi
+# 不带 ROS / conda 的 PYTHONPATH：那里的 numpy 会盖过 .venv 的（T54 的可视化就是这么失败的）；工具只要仓库在路径上
+py_clean() { env -u PYTHONPATH PYTHONPATH="${repo_root}" "${py}" "$@"; }
 {
   echo "== ${name}: 目标 (${goal_x}, ${goal_y}) $([[ ${sent} -eq 1 ]] && echo 已发 || echo 没发出去)；LOC_MAP_PATH=${LOC_MAP_PATH:-} LOC_INS_ONLY=${LOC_INS_ONLY:-0} MAP_SWITCH=${MAP_SWITCH:-}"
-  "${py}" "${nav_root}/planning/tools/check_planning_mcap.py" "${out}" \
+  py_clean "${nav_root}/planning/tools/check_planning_mcap.py" "${out}" \
     --layout "${nav_root}/planning/script/planning_io.json" || true
   if [[ -f "${out}/logs/planning.INFO" ]]; then
     p="${out}/logs/planning.INFO"
@@ -136,7 +138,7 @@ fi
   heavy_in=()
   ls "${heavy}"/*.mcap > /dev/null 2>&1 && heavy_in=("${heavy}")
   echo "== 可视化（tools/planning_mcap_viz.py）"
-  "${py}" "${nav_root}/planning/tools/planning_mcap_viz.py" "${out}" "${heavy_in[@]}" "${viz_args[@]}" \
+  py_clean "${nav_root}/planning/tools/planning_mcap_viz.py" "${out}" "${heavy_in[@]}" "${viz_args[@]}" \
     || echo "可视化没生成"
 } 2>&1 | tee "${out}/report.txt"
 [[ "${KEEP_HEAVY:-0}" == 1 ]] || rm -rf "${heavy}"
