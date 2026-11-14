@@ -23,7 +23,7 @@
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'          # running: theirs
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches'        # 开关：影子、App 地图、限速、感知调试
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on'       # 第一次：先影子模式（狗不按规划走）
-ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh appmap ignore'   # 不跟 App 切图，一直用站点地图（人定）
+#   App 地图：appmap follow（人定 2026-11-14，默认）：App 当前地图选仓库版 ad68517c；App 里选不到时退路是 appmap ignore
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed 0.5'       # 限速
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'         # 换成我们的（15 s 内没起稳、或 ROS 图和开关对不上，自己换回）
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh check'           # 谁在发狗的指令、谁在听 /map/switch，和开关对得上
@@ -44,7 +44,7 @@ ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original'    # 换回（�
 | 服务器 | `10.36.136.7` | `ssh dog` 经反向隧道到狗（`DEPLOY_ORIN.md` 第 1 节：端口 5038，用户 `nvidia`）；拷回录包，跑分析 |
 | 狗边上的本机 | 连着狗 | 维持隧道；跑 Foxglove 桌面版（连狗的 8765，不在一个网段就 `ssh -N -L 8765:127.0.0.1:8765 nvidia@<狗>`） |
 | 8 号狗 | Orin，L4T R36.4.0，`tegra-ubuntu` | 跑导航；CycloneDDS 只绑 eth1，域 0，`/opt/ros/cyclonedds.xml` |
-| App | 手机 | 看狗的位置和状态、遥控、选地图。App 最后发的 `/map/switch` 是 latched 的，我们的规划和定位一起来就照它切图：`appmap follow`（默认）时 **App 当前地图必须是仓库版的 ad68517c**；`appmap ignore` 时我们不听 App 的，一直用站点地图（App 上显示的位置就不准了）。用哪个人定（T56 复核第 5 条） |
+| App | 手机 | 看狗的位置和状态、遥控、选地图。App 最后发的 `/map/switch` 是 latched 的，我们的规划和定位一起来就照它切图：`appmap follow`（默认）时 **App 当前地图必须是仓库版的 ad68517c**；`appmap ignore` 时我们不听 App 的，一直用站点地图（App 上显示的位置就不准了）。人定（2026-11-14）用 follow，App 目录里只放 ad68517c 一张；ignore 是 App 选不到它时的退路 |
 | 遥控器 | 人手里 | 人接管。和规划的指令谁优先由机器人团队的运控决定，第一次上板先试（第 8 节第 1 步） |
 | 急停 | 专人拿着 | 狗走的时候一直拿着，不干别的 |
 | Foxglove | 本机 | 看（第 6 节）、发目标；不能发别的 |
@@ -224,6 +224,7 @@ full 级别多看的：
 
 **仓库是源头**。狗上改装好的那份只为现场快速试；试好的值抄下来（文件、行、旧值、新值、为什么）回来改仓库、提交，
 下次装（T56 的第 2、3、5 步）就带上了。狗站着的时候改，改完重启对应的服务。
+改了代码要重编：狗上编（T56 第 3 步，一个多小时，占狗的 CPU），或者在服务器上狗的系统镜像里编（T60：`Nav_D20/docker/dog_rootfs.sh`、`run_arm64.sh`，QEMU，不占狗）。重装会盖掉装好的配置：之后要重跑 `nav_cw.sh configure`、重设开关（T60 第 7 步）。
 
 | 模块 | 文件（装好的；`find /opt/seres/nav_cw/install/<模块> -name <文件> -not -path '*/src/*'`） | 常调的 | 生效 |
 |---|---|---|---|
