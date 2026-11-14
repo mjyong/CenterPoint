@@ -1,17 +1,16 @@
 #!/bin/bash
 # Build the D20 stack, one prefix per module, each against its own interface copies, the way each module's own build
-# does it (planning/build.sh, slam/build_l4t.sh -arm, perception_combo_ros/build_perception.sh; our node:
-# docs/DEPLOY_ORIN.md section 8):
+# does it (planning/build.sh, slam/build_l4t.sh -arm, perception_combo_ros/build_perception.sh):
 #   planning        seres_interface (6 packages), planning/third_party/nav_interface, planning
 #   slam            seres_interface (kygi665_msgs ...), slam's novatel_oem7_msgs, basic, livox_ros_driver2, lightning
-#   nav_perception  perception_combo_ros/common_interface, lidar_seg, grid_map_memory_node (the robot team's)
-#   perception      deploy_deb: common_interface, slam/interface, lidar_3d_detection (ours, CUDA + TensorRT)
+#   nav_perception  perception_combo_ros/common_interface, then lidar_seg, grid_map_memory_node and our
+#                   lidar_3d_detection (part of the robot team's perception since 2026-11-14; CUDA + TensorRT)
 # The robot team keeps a copy of the interface packages in each module and the copies differ (13 names twice or three
 # times; kygi665_msgs: "RTK fixed" is 58 in seres_interface, 55 in slam/interface): one shared workspace would quietly
 # change what a module reads. On the dog each module is installed apart the same way (/opt/seres/nav/planning,
-# /opt/seres/nav/slam, /opt/seres/nav_perception, /opt/seres/perception).
+# /opt/seres/nav/slam, /opt/seres/nav_perception).
 #
-#   bash Nav_D20/docker/build_stack.sh [<root>] [planning|slam|nav_perception|perception ...]
+#   bash Nav_D20/docker/build_stack.sh [<root>] [planning|slam|nav_perception ...]
 #     <root> (default <repo>/build/nav_dev): prefixes <root>/install/<module>, build trees <root>/build/<module>
 #   In the nav-dev image (Dockerfile.nav-dev, run with Nav_D20/docker/run.sh) and on dog 8 (T56: /opt/seres/nav_cw,
 #   with its deps prefix already in CMAKE_PREFIX_PATH / AMENT_PREFIX_PATH).
@@ -22,15 +21,14 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 nav="$(cd "${here}/.." && pwd)"
 repo="$(cd "${nav}/.." && pwd)"
 root="${repo}/build/nav_dev"
-if [[ $# -gt 0 && "$1" != planning && "$1" != slam && "$1" != nav_perception && "$1" != perception ]]; then
+if [[ $# -gt 0 && "$1" != planning && "$1" != slam && "$1" != nav_perception ]]; then
   root="$1"
   shift
 fi
 modules=("$@")
-[[ ${#modules[@]} -gt 0 ]] || modules=(planning slam nav_perception perception)
+[[ ${#modules[@]} -gt 0 ]] || modules=(planning slam nav_perception)
 arch="${NAV_CUDA_ARCH:-$([[ "$(uname -m)" == aarch64 ]] && echo 87 || echo 89)}"
 jobs="${NAV_JOBS:-$(nproc)}"
-dd="${repo}/deploy_deb"
 common=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5)
 cuda=(-DCMAKE_CUDA_ARCHITECTURES="${arch}" -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc)
 acados=()
@@ -95,12 +93,9 @@ for m in "${modules[@]}"; do
         stage nav_perception "${nav}/perception_combo_ros/third_party/octomap_related" pcl_msgs,octomap_msgs
       fi
       stage nav_perception "${nav}/perception_combo_ros/common_interface" all
-      stage nav_perception "${nav}/perception_combo_ros/node_src" lidar_seg,grid_map_memory_node ;;
-    perception)
-      stage perception \
-        "${dd}/perception_combo_ros/common_interface:${dd}/slam/interface:${dd}/perception_combo_ros/node_src" \
-        up-to:lidar_3d_detection "${cuda[@]}" ;;
-    *) echo "unknown module ${m} (planning, slam, nav_perception, perception)"; exit 2 ;;
+      stage nav_perception "${nav}/perception_combo_ros/node_src" lidar_seg,grid_map_memory_node,lidar_3d_detection \
+        "${cuda[@]}" -DBUILD_TESTING=OFF ;;
+    *) echo "unknown module ${m} (planning, slam, nav_perception)"; exit 2 ;;
   esac
 done
 echo "done: ${root}/install/{$(IFS=,; echo "${modules[*]}")}"

@@ -7,6 +7,10 @@
 # Fast DDS: 8 MB socket buffers, else ~3 MB clouds are lost (T33); the lidar driver needs them as well
 #FASTRTPS_DEFAULT_PROFILES_FILE=@PREFIX@/lidar_3d_detection/share/lidar_3d_detection/fastdds_large_buffers.xml
 LIDAR3D_THREADS=4
+# lock the Orin's clocks (jetson_clocks) when the service starts: 1 on, 0 off. Unlocked the node is 2-3x slower
+# (T32, T34), but it sets CPU / GPU / memory of the whole machine to maximum (power, heat): the robot team decides.
+# Back to 0 takes effect at the next reboot.
+LIDAR3D_LOCK_CLOCKS=0
 #LIDAR3D_CONFIG=@PREFIX@/lidar_3d_detection/config/lidar_3d_detection.yaml
 #LIDAR3D_MODEL_DIR=@PREFIX@/lidar_3d_detection/model
 #LIDAR3D_LOG_DIR=/tmp/lidar_3d_detection_logs

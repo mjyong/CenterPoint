@@ -3,7 +3,8 @@
 # 特点：不依赖 tmux；所有子进程属于同一 cgroup，systemd stop 时统一终止
 # 日志统一通过 journald 收集（StandardOutput=journal）
 
-PERCEPTION_INSTALL_DIR="/opt/seres/nav_perception"
+# 安装目录：nav_perception.service 的 Environment 给；没给就是原来的 /opt/seres/nav_perception（换到别处装的一套也能用这个脚本起）
+PERCEPTION_INSTALL_DIR="${PERCEPTION_INSTALL_DIR:-/opt/seres/nav_perception}"
 ROS_SETUP="/opt/ros/humble/setup.bash"
 
 # ============================================================
@@ -100,6 +101,17 @@ start_node "grid_map_memory_node" "grid_map_memory_node"
     exec "./perception_recharge_node" \
         --params-file "${PERCEPTION_INSTALL_DIR}/perception_recharge/share/perception_recharge/config/perception_recharge_node.yaml"
 ) &
+
+# 7. lidar_3d_detection（激光 3D 检测、跟踪、预测，发 /perception/lidar_3d/objects，规划过人行横道时用；2026-11-14 并进感知）
+#    配置、模型、线程：它的 bin/start_lidar_3d_detection.sh（LIDAR3D_CONFIG、LIDAR3D_MODEL_DIR、LIDAR3D_THREADS），默认装在一起的那份；
+#    LIDAR3D_LOCK_CLOCKS=1 时先锁频（bin/lock_clocks.sh，要 root；默认不锁）
+if [ -x "${PERCEPTION_INSTALL_DIR}/lidar_3d_detection/bin/start_lidar_3d_detection.sh" ]; then
+    echo "[nav_perception] 启动 lidar_3d_detection..."
+    "${PERCEPTION_INSTALL_DIR}/lidar_3d_detection/bin/lock_clocks.sh" || true
+    "${PERCEPTION_INSTALL_DIR}/lidar_3d_detection/bin/start_lidar_3d_detection.sh" &
+else
+    echo "[nav_perception] WARN: 没有 lidar_3d_detection，跳过" >&2
+fi
 
 echo "[nav_perception] 所有节点已在后台启动，PID 组: $$"
 echo "[nav_perception] 查看日志: journalctl -u nav_perception.service -f"

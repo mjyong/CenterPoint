@@ -11,7 +11,7 @@ TensorRT ports use (pfe + rpn). The PFN's ``Linear/BatchNorm1d`` is rewritten
 as ``Conv2d(1x1)/BatchNorm2d`` over a fixed ``(1, C, P_max, N_max)`` tensor so
 both engines have static shapes and only plain dense ops (FP16 / INT8 friendly).
 The numpy steps (``pillar_host.py``, no PyTorch) are the reference implementation; on Orin they belong
-on the GPU (CUDA kernels, deploy_deb (lidar3d)) because the ARM cores are the bottleneck.
+on the GPU (CUDA kernels, lidar_3d_detection (lidar3d)) because the ARM cores are the bottleneck.
 """
 import copy
 

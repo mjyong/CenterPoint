@@ -1,6 +1,6 @@
-"""Parameters of the C++ pipeline (deploy_deb (lidar3d)) from the Python dataclasses: their single source.
+"""Parameters of the C++ pipeline (lidar_3d_detection's lidar3d) from the Python dataclasses: their single source.
 
-The C++ library hard-codes nothing it could read from here (``lidar3d/config.hpp`` in deploy_deb
+The C++ library hard-codes nothing it could read from here (``lidar3d/config.hpp`` in lidar_3d_detection
 mirrors the defaults only so tests can check they agree). Every key below is required by the loader.
 
     # generic defaults (what PerceptionPipeline() runs with)

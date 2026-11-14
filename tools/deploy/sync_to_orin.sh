@@ -39,14 +39,20 @@ for f in "${FRAMES[@]}"; do dirs="$dirs $DIR/data/$(basename "$(dirname "$f")")/
 for s in "${SEQS[@]}"; do dirs="$dirs $DIR/seq/$(basename "$s")/scans"; done
 for b in "${BAGS[@]}"; do dirs="$dirs $DIR/bags"; done
 ssh "$HOST" "mkdir -p $dirs"
-# build*/: the build directories (build/lidar3d, deploy_deb/.../build_deb) are per machine; excluded ones survive --delete
-rsync -az --delete --exclude '__pycache__' --exclude '*.pyc' --exclude 'build*/' --exclude 'install/' --exclude 'log/' \
-  dog_perception tools deploy_deb configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
-# the board's copy has no .git: deploy_deb's build_deb.sh versions the .deb from this ("count hash [dirty]")
+# build*/: the build directories (build/lidar3d, .../build_deb) are per machine; excluded ones survive --delete
+ex=(--exclude '__pycache__' --exclude '*.pyc' --exclude 'build*/' --exclude 'install/' --exclude 'log/')
+rsync -az --delete "${ex[@]}" dog_perception tools configs tests kygi665_msgs requirements_dog.txt "$HOST:$DIR/repo/"
+# the vehicle node and the interfaces it builds against: the robot team's perception tree (since 2026-11-14), only
+# those two parts of it
+P=Nav_D20/perception_combo_ros
+ssh "$HOST" "mkdir -p $DIR/repo/$P/node_src"
+rsync -az --delete "${ex[@]}" "$P/common_interface" "$HOST:$DIR/repo/$P/"
+rsync -az --delete "${ex[@]}" "$P/node_src/lidar_3d_detection" "$HOST:$DIR/repo/$P/node_src/"
+# the board's copy has no .git: the node's build_deb.sh versions the .deb from this ("count hash [dirty]")
 if commit=$(git rev-list --count HEAD 2> /dev/null); then
   commit="$commit $(git rev-parse --short HEAD)"
-  git diff --quiet HEAD -- deploy_deb || commit="$commit dirty"
-  ssh "$HOST" "echo '$commit' > $DIR/repo/deploy_deb/GIT_COMMIT"
+  git diff --quiet HEAD -- "$P/common_interface" "$P/node_src/lidar_3d_detection" || commit="$commit dirty"
+  ssh "$HOST" "echo '$commit' > $DIR/repo/Nav_D20/GIT_COMMIT"
 fi
 if [ -n "$MODEL" ]; then
   # engines.json is the build log of the engines next to it (build_engines.py): the Orin keeps its own

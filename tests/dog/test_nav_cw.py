@@ -8,7 +8,7 @@ import pytest
 from .conftest import ROOT
 
 SCRIPT = os.path.join(ROOT, "tools", "deploy", "nav_cw.sh")
-ORIG = ["nav_perception.service", "slam.service", "planning.service"]
+ORIG = ["lidar-3d-detection.service", "nav_perception.service", "slam.service", "planning.service"]
 NEW = ["cw-nav-perception.service", "cw-slam.service", "cw-planning.service"]
 
 FAKE = r"""#!/bin/bash
@@ -36,7 +36,7 @@ def dog(tmp_path):
     fake = tmp_path / "systemctl"
     fake.write_text(FAKE)
     fake.chmod(0o755)
-    for u in ORIG + ["lidar-3d-detection.service"]:
+    for u in ORIG:
         (state / u).write_text("active")
     for u in NEW:
         (state / (u + ".unit")).write_text("")
@@ -66,8 +66,9 @@ def test_use_new_then_back(dog):
     assert all(dog.states()[u] == "active" for u in NEW) and all(dog.states()[u] == "inactive" for u in ORIG)
     log = [l for l in dog.log() if l.startswith(("stop", "start"))]
     # planning stops first and starts last
-    assert log[:3] == ["stop planning.service", "stop slam.service", "stop nav_perception.service"]
-    assert log[3:] == ["start cw-nav-perception.service", "start cw-slam.service", "start cw-planning.service"]
+    assert log[:4] == ["stop planning.service", "stop slam.service", "stop nav_perception.service",
+                       "stop lidar-3d-detection.service"]          # the .deb's node too: ours runs it in the perception
+    assert log[4:] == ["start cw-nav-perception.service", "start cw-slam.service", "start cw-planning.service"]
     r = dog("use-original")
     assert r.returncode == 0 and "running: theirs" in r.stdout
     assert all(dog.states()[u] == "active" for u in ORIG) and all(dog.states()[u] == "inactive" for u in NEW)

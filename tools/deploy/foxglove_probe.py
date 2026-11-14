@@ -1,7 +1,7 @@
 """Is foxglove_bridge serving what Foxglove will show? Connects like Foxglove does (WebSocket). Offers
 foxglove.sdk.v1 (ros-humble-foxglove-bridge 3.x) and foxglove.websocket.v1 (older bridges); the server picks
 one. Lists the advertised channels, subscribes to some topics for a few seconds and counts their messages.
-Standard library only, so it runs on the board (deploy_deb's scripts/orin_foxglove.sh).
+Standard library only, so it runs on the board (lidar_3d_detection's scripts/orin_foxglove.sh).
 
     python3 tools/deploy/foxglove_probe.py --url ws://localhost:8765 --seconds 5 \\
         --topics /perception/lidar_3d/tracks /perception/lidar_3d/predictions /perception/lidar_3d/cloud /tf
@@ -125,7 +125,7 @@ def main():
     ap.add_argument("--url", default="ws://localhost:8765")
     ap.add_argument("--topics", nargs="*", default=["/perception/lidar_3d/tracks", "/perception/lidar_3d/predictions",
                                                     "/perception/lidar_3d/cloud", "/tf"],
-                    help="default: what deploy_deb's Foxglove layout shows")
+                    help="default: what lidar_3d_detection's Foxglove layout shows")
     ap.add_argument("--seconds", type=float, default=5.0)
     args = ap.parse_args()
     report = probe(args.url, args.topics, args.seconds)

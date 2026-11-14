@@ -1,12 +1,13 @@
 #!/bin/bash
 # Where the replay scripts take the D20 stack from (sourced by run_planning_stack_debug.sh, replay_planning_check.sh).
 # - NAV_STACK_ROOT=<dir> (set by Nav_D20/docker/run.sh in the nav-dev image): /opt/ros/humble plus one prefix per
-#   module, <dir>/{nav_perception,slam,perception,planning}, built by Nav_D20/docker/build_stack.sh each against its
+#   module, <dir>/{nav_perception,slam,planning} (our lidar_3d_detection is in nav_perception), built by
+#   Nav_D20/docker/build_stack.sh each against its
 #   own interface copies, as on the dog. Each process runs with its own module's prefix in front (nav_exec); the
-#   command-line tools (bag play / record, topic pub) see all four, planning's last so its messages win.
+#   command-line tools (bag play / record, topic pub) see all three, planning's last so its messages win.
 # - otherwise the micromamba environment /public/zjst/robot/planning_humble_env, as before.
 NAV_LEGACY_PREFIX=/public/zjst/robot/planning_humble_env
-NAV_MODULES=(nav_perception slam perception planning)
+NAV_MODULES=(nav_perception slam planning)
 
 nav_env_setup() {
   if [[ -n "${NAV_STACK_ROOT:-}" ]]; then

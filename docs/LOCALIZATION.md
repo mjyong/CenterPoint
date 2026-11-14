@@ -10,7 +10,7 @@ kygi665 机器狗的定位从哪里来、哪里不对、怎么修，离线（做
 | [DOG_DATAFLOW.md](DOG_DATAFLOW.md) 3 | 在线位姿通路的调用链和数组形状 |
 | [DEPLOY_ORIN.md](DEPLOY_ORIN.md) 8 | C++ 节点的消息处理 |
 
-代码位置：`tools/dog/refine_poses.py`（离线融合）、`dog_perception/inspvax.py`（INSPVAX）、`dog_perception/pose_buffer.py`（位姿缓存和 IMU 传播）、`dog_perception/preprocess/`（去畸变、检测系）、`dog_perception/online.py`（在线消息处理）；C++ 在 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/`（下文 `$L`）的 `lidar3d/localization.hpp`、`pose_buffer.hpp`、`online.hpp`。
+代码位置：`tools/dog/refine_poses.py`（离线融合）、`dog_perception/inspvax.py`（INSPVAX）、`dog_perception/pose_buffer.py`（位姿缓存和 IMU 传播）、`dog_perception/preprocess/`（去畸变、检测系）、`dog_perception/online.py`（在线消息处理）；C++ 在 `Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/`（下文 `$L`）的 `lidar3d/localization.hpp`、`pose_buffer.hpp`、`online.hpp`。
 
 ---
 

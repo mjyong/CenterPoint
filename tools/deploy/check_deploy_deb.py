@@ -1,11 +1,14 @@
-"""What deploy_deb (the C++ pipeline, its ROS 2 node and the vehicle's interfaces; docs/DEPLOY_ORIN.md, section 9)
-takes from this repository, checked:
+"""What the vehicle's perception node (lidar_3d_detection: the C++ pipeline and its ROS 2 node, in the robot team's
+perception since 2026-11-14: Nav_D20/perception_combo_ros/node_src; docs/DEPLOY_ORIN.md, section 9) takes from this
+repository, checked (the name is from when it lived in deploy_deb/):
 
 - config/lidar_3d_detection.yaml is ``export_cpp_config.py --robot kygi`` (the Python dataclasses, the single
   source of the parameters) plus the deploy-only keys at the end of its node: section (DEPLOY_KEYS, kept as
   they are);
-- deploy_deb's kygi665_msgs messages have the fields of this repository's kygi665_msgs (what the Python reads);
-- Nav_D20's perception_interface has deploy_deb's LidarObject* messages (what the planner subscribes).
+- the kygi665_msgs it builds against (the perception's common_interface) have the fields of this repository's
+  kygi665_msgs (what the Python reads);
+- planning's perception_interface (Nav_D20/seres_interface) has the same LidarObject* messages as the perception's
+  (what the node publishes and the planner subscribes).
 
     python tools/deploy/check_deploy_deb.py            # exit 1 when something differs
     python tools/deploy/check_deploy_deb.py --write    # rewrite the config from the dataclasses (after changing them)
@@ -16,9 +19,10 @@ import re
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-NODE = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection")
+PERCEPTION = os.path.join(ROOT, "Nav_D20", "perception_combo_ros")
+NODE = os.path.join(PERCEPTION, "node_src", "lidar_3d_detection")
 CONFIG = os.path.join(NODE, "config", "lidar_3d_detection.yaml")
-KYGI = os.path.join(ROOT, "deploy_deb", "slam", "interface", "kygi665_msgs", "msg")
+KYGI = os.path.join(PERCEPTION, "common_interface", "seres_interface", "ros", "kygi665_msgs", "msg")
 # node: keys only the vehicle deployment has (the model next to the config, the vehicle's topic names) and what is
 # true of dog 8 itself rather than of the 0921 recordings the kygi preset follows: its dual antennas were wired
 # the right way round from 1016 (T40 checked on the dog: offset 0, lever arm at the IMU centre). The kygi preset
@@ -59,11 +63,10 @@ def fields(path):
     return out
 
 
-# the objects message our node publishes and the planner subscribes: Nav_D20's perception_interface (what planning
-# builds against) carries the same definitions as deploy_deb's
+# the objects message our node publishes and the planner subscribes: planning's perception_interface
+# (Nav_D20/seres_interface) carries the same definitions as the perception's, which the node builds against
 PERCEPTION_MSGS = ("LidarObject.msg", "LidarObjectArray.msg", "LidarPredictedPath.msg")
-PERCEPTION_DEPLOY = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "common_interface", "seres_interface", "ros",
-                                 "perception_interface", "msg")
+PERCEPTION_DEPLOY = os.path.join(PERCEPTION, "common_interface", "seres_interface", "ros", "perception_interface", "msg")
 PERCEPTION_NAV = os.path.join(ROOT, "Nav_D20", "seres_interface", "ros", "perception_interface", "msg")
 
 
@@ -73,12 +76,12 @@ def message_problems():
         for f in PERCEPTION_MSGS:
             a, b = os.path.join(PERCEPTION_DEPLOY, f), os.path.join(PERCEPTION_NAV, f)
             if not (os.path.exists(a) and os.path.exists(b)) or fields(a) != fields(b):
-                out.append("Nav_D20 perception_interface/msg/%s differs from deploy_deb's" % f)
+                out.append("planning's perception_interface/msg/%s differs from the perception's" % f)
     ref = os.path.join(ROOT, "kygi665_msgs", "msg")
     for f in sorted(set(os.listdir(ref)) | set(os.listdir(KYGI))):
         a, b = os.path.join(ref, f), os.path.join(KYGI, f)
         if not (os.path.exists(a) and os.path.exists(b)) or fields(a) != fields(b):
-            out.append("deploy_deb kygi665_msgs/msg/%s differs from kygi665_msgs/msg/%s" % (f, f))
+            out.append("the perception's kygi665_msgs/msg/%s differs from kygi665_msgs/msg/%s" % (f, f))
     return out
 
 

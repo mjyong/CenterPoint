@@ -1,8 +1,9 @@
 #!/bin/bash
 # Dog 8: navigation by the robot team's services (planning.service, slam.service, nav_perception.service, their
-# files untouched) or by ours (/opt/seres/nav_cw: this repository's planning, localization, ground segmentation and
-# local grid; cw-planning.service, cw-slam.service, cw-nav-perception.service). One command each way. Our
-# lidar-3d-detection.service (the vehicles for the crosswalk gate) runs in both.
+# files untouched; with our earlier lidar-3d-detection.service, the .deb) or by ours (/opt/seres/nav_cw: this
+# repository's planning, localization and perception, our lidar_3d_detection inside the perception;
+# cw-planning.service, cw-slam.service, cw-nav-perception.service). One command each way. Ours runs the node in
+# cw-nav-perception, so the .deb's service stops with theirs (two nodes would publish the same objects).
 #
 #   sudo bash nav_cw.sh status          which set is running
 #   sudo bash nav_cw.sh use-new         stop theirs, start ours; if one of ours is not up and steady after
@@ -16,9 +17,8 @@
 # Their units are not edited; ours carry Conflicts= on theirs, so systemd never runs both.
 set -euo pipefail
 
-ORIG=(nav_perception.service slam.service planning.service)        # start order; stop in reverse
+ORIG=(lidar-3d-detection.service nav_perception.service slam.service planning.service)   # start order; stop in reverse
 NEW=(cw-nav-perception.service cw-slam.service cw-planning.service)
-KEEP=lidar-3d-detection.service
 WAIT="${NAV_CW_WAIT:-15}"
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"   # the tests put a fake one here
 JOURNALCTL="${JOURNALCTL:-journalctl}"
@@ -45,7 +45,6 @@ running() {   # -> theirs / ours / mixed
 status() {
   echo "robot team's:"; show "${ORIG[@]}"
   echo "ours (/opt/seres/nav_cw):"; show "${NEW[@]}"
-  echo "in both:"; show "${KEEP}"
   local r; r="$(running)"
   echo "running: ${r}"
   [[ "${r}" == ours || "${r}" == theirs ]]

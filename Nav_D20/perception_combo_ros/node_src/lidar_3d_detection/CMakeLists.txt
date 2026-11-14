@@ -3,7 +3,7 @@
 # tests against the Python reference. Two ways to build it:
 #
 # With ROS 2 (colcon; the vehicle, scripts/build_deb.sh): the library, the node, the bag replay, the replay tool
-#   colcon build --base-paths common_interface ../slam/interface node_src --packages-up-to lidar_3d_detection \
+#   colcon build --base-paths common_interface node_src/lidar_3d_detection --packages-up-to lidar_3d_detection \
 #       --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=87 -DLIDAR3D_MODEL_DIR=<model with engines>
 #   LIDAR3D_MODEL_DIR installs the model (model_meta.json, the ONNX graphs and the LIDAR3D_PRECISION engines built on
 #   this machine) to <prefix>/model, where config/lidar_3d_detection.yaml's node.model_dir points.
@@ -81,7 +81,7 @@ endif()
 option(LIDAR3D_TESTS "GoogleTest parity tests against the Python reference" OFF)
 set(LIDAR3D_GOLDEN_DIR "" CACHE PATH
     "golden data (tools/deploy/dump_golden.py); empty: CTest writes it into the build (inside the CenterPoint repo)")
-# the CenterPoint repository, when this tree is its deploy_deb/
+# the CenterPoint repository, when this node is its Nav_D20/perception_combo_ros/node_src/lidar_3d_detection
 get_filename_component(LIDAR3D_ALGO_REPO ${CMAKE_CURRENT_SOURCE_DIR}/../../../.. ABSOLUTE)
 set(LIDAR3D_MODEL_DIR "" CACHE PATH "model to install: model_meta.json, *.onnx and the engines built on this machine")
 set(LIDAR3D_PRECISION "fp16" CACHE STRING "engines to install from LIDAR3D_MODEL_DIR (<graph>.<precision>.engine)")
@@ -209,7 +209,7 @@ install(TARGETS lidar_3d_detection lidar_3d_bag_replay lidar_3d_replay
         DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY config DESTINATION .)
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
-install(PROGRAMS packaging/start_lidar_3d_detection.sh DESTINATION bin)
+install(PROGRAMS packaging/start_lidar_3d_detection.sh packaging/lock_clocks.sh DESTINATION bin)
 # optional Fast DDS settings for the large clouds (README "DDS"; scripts/orin_foxglove.sh uses it)
 install(FILES packaging/fastdds_large_buffers.xml DESTINATION share/${PROJECT_NAME})
 

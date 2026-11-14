@@ -470,7 +470,7 @@ def test_soak_report_windows_and_warnings(tmp_path):
 
 
 def test_soak_report_reads_glog_lines():
-    """The vehicle node (deploy_deb) logs with glog: Lmmdd (glog 0.5, Ubuntu 22.04) or Lyyyymmdd."""
+    """The vehicle node (lidar_3d_detection) logs with glog: Lmmdd (glog 0.5, Ubuntu 22.04) or Lyyyymmdd."""
     sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
     from soak_report import parse_line
 
@@ -505,14 +505,14 @@ def test_soak_report_reads_the_vehicle_node_counts(tmp_path):
 
 
 def test_fastdds_profile_is_installed_and_listed():
-    """deploy_deb ships the 8 MB Fast DDS socket buffers T33 measured (600 clouds instead of 341 / 452): valid XML,
+    """the node ships the 8 MB Fast DDS socket buffers T33 measured (600 clouds instead of 341 / 452): valid XML,
     installed by CMake to share/lidar_3d_detection, offered (commented) in /etc/default/lidar-3d-detection, used by
     orin_foxglove.sh."""
     import xml.etree.ElementTree as ET
 
-    node = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection")
+    node = os.path.join(ROOT, "Nav_D20", "perception_combo_ros", "node_src", "lidar_3d_detection")
     if not os.path.isdir(node):
-        pytest.skip("no deploy_deb")
+        pytest.skip("no lidar_3d_detection")
     root = ET.parse(os.path.join(node, "packaging", "fastdds_large_buffers.xml")).getroot()
     sizes = {e.tag.split("}")[-1]: int(e.text) for e in root.iter() if e.tag.endswith("SocketBufferSize")}
     assert sizes == dict(sendSocketBufferSize=8 << 20, listenSocketBufferSize=8 << 20)
@@ -529,12 +529,12 @@ def test_fastdds_profile_is_installed_and_listed():
                                                   ((115200, 2201600), (306000000, 1300500000), 1, "NOT locked"),
                                                   (None, None, 2, "unknown")])
 def test_orin_clocks_tells_whether_jetson_clocks_ran(tmp_path, cpu, gpu, code, word):
-    """deploy_deb's scripts/orin_clocks.sh on a made-up sysfs: locked when the CPU and GPU minimum and maximum
+    """the node's scripts/orin_clocks.sh on a made-up sysfs: locked when the CPU and GPU minimum and maximum
     frequencies are equal (sudo jetson_clocks), which T32 found lost after a reboot (the node 2-3x slower)."""
-    script = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection", "scripts",
+    script = os.path.join(ROOT, "Nav_D20", "perception_combo_ros", "node_src", "lidar_3d_detection", "scripts",
                           "orin_clocks.sh")
     if not os.path.exists(script):
-        pytest.skip("no deploy_deb")
+        pytest.skip("no lidar_3d_detection")
     if cpu:
         c = tmp_path / "devices" / "system" / "cpu" / "cpu0" / "cpufreq"
         g = tmp_path / "class" / "devfreq" / "17000000.gpu"
@@ -553,12 +553,12 @@ def test_orin_clocks_tells_whether_jetson_clocks_ran(tmp_path, cpu, gpu, code, w
     (None, "ok", None), ("0", "ok", None), ("1", "ok", "clocks locked"), ("yes", "ok", "clocks locked"),
     ("1", "fails", "failed (exit 3)"), ("1", "missing", "not found")])
 def test_lock_clocks_runs_jetson_clocks_only_when_switched_on(tmp_path, switch, fake, code_word):
-    """deploy_deb's packaging/lock_clocks.sh (the service's ExecStartPre): jetson_clocks only with
+    """the node's packaging/lock_clocks.sh (the service's ExecStartPre): jetson_clocks only with
     LIDAR3D_LOCK_CLOCKS=1 in /etc/default/lidar-3d-detection (default 0), and it never stops the node from starting."""
-    script = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection", "packaging",
+    script = os.path.join(ROOT, "Nav_D20", "perception_combo_ros", "node_src", "lidar_3d_detection", "packaging",
                           "lock_clocks.sh")
     if not os.path.exists(script):
-        pytest.skip("no deploy_deb")
+        pytest.skip("no lidar_3d_detection")
     marker = tmp_path / "ran"
     jc = tmp_path / "jetson_clocks"
     if fake != "missing":
@@ -578,9 +578,9 @@ def test_lock_clocks_runs_jetson_clocks_only_when_switched_on(tmp_path, switch, 
 
 
 def test_lock_clocks_is_wired_into_the_service_and_off_by_default():
-    node = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection")
+    node = os.path.join(ROOT, "Nav_D20", "perception_combo_ros", "node_src", "lidar_3d_detection")
     if not os.path.isdir(node):
-        pytest.skip("no deploy_deb")
+        pytest.skip("no lidar_3d_detection")
     unit = open(os.path.join(node, "packaging", "lidar-3d-detection.service")).read()
     default = open(os.path.join(node, "packaging", "lidar-3d-detection.default")).read()
     cmake = open(os.path.join(node, "CMakeLists.txt")).read()
@@ -593,9 +593,9 @@ def test_build_deb_packages_lock_clocks_switched_on(tmp_path):
     """build_deb.sh --lock-clocks 1 writes LIDAR3D_LOCK_CLOCKS=1 into the packaged /etc/default (dog 8 locks its clocks
     at boot, 2026-11-12), so an upgrade with --force-confnew keeps it; anything but 0 / 1 is refused before building."""
     import subprocess
-    node = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "node_src", "lidar_3d_detection")
+    node = os.path.join(ROOT, "Nav_D20", "perception_combo_ros", "node_src", "lidar_3d_detection")
     if not os.path.isdir(node):
-        pytest.skip("no deploy_deb")
+        pytest.skip("no lidar_3d_detection")
     script = os.path.join(node, "scripts", "build_deb.sh")
     r = subprocess.run(["bash", script, "--lock-clocks", "2", "--model", str(tmp_path)], capture_output=True, text=True,
                        cwd=str(tmp_path))
@@ -614,7 +614,7 @@ def test_build_deb_packages_lock_clocks_switched_on(tmp_path):
 
 
 def test_objects_bag_reads_the_vehicle_messages(tmp_path):
-    """objects_bag.py also reads deploy_deb's perception_interface/LidarObjectArray (the same fields)."""
+    """objects_bag.py also reads the perception's perception_interface/LidarObjectArray (the same fields)."""
     pytest.importorskip("rosbags")
     from rosbags.rosbag2 import Writer
     sys.path.insert(0, os.path.join(ROOT, "tools", "deploy"))
@@ -656,10 +656,10 @@ def test_objects_bag_reads_the_vehicle_messages(tmp_path):
 
 
 def test_deploy_deb_config_follows_python():
-    """deploy_deb's config is export_cpp_config.py --robot kygi plus the deploy keys, and its kygi665_msgs are this
+    """the node's config is export_cpp_config.py --robot kygi plus the deploy keys, and its kygi665_msgs are this
     repository's (tools/deploy/check_deploy_deb.py; after changing the dataclasses, run it with --write)."""
-    if not os.path.isdir(os.path.join(ROOT, "deploy_deb")):
-        pytest.skip("no deploy_deb")
+    if not os.path.isdir(os.path.join(ROOT, "Nav_D20", "perception_combo_ros", "node_src", "lidar_3d_detection")):
+        pytest.skip("no lidar_3d_detection")
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "deploy", "check_deploy_deb.py")],
                        capture_output=True, text=True, cwd=ROOT)
     assert r.returncode == 0, r.stdout + r.stderr

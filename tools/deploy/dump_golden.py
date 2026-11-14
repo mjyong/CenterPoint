@@ -1,4 +1,4 @@
-"""Golden data for the C++ parity tests (deploy_deb's lidar_3d_detection/tests): every stage in Python, same inputs.
+"""Golden data for the C++ parity tests (lidar_3d_detection/tests): every stage in Python, same inputs.
 
     python tools/deploy/dump_golden.py --out build/lidar3d/golden      # CTest runs this first
 

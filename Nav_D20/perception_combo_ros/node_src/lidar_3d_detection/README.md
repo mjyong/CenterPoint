@@ -89,6 +89,11 @@ sudo systemctl stop lidar-3d-detection
 - 配置和 `/etc/default` 那个文件是 conffile：升级时保留你改过的；`dpkg -r` 卸载时也留着，`dpkg -P` 才删掉；
 - 起来以后日志里有一行 "lidar_3d_detection up: ..."，之后每秒一行：框数、轨迹数、各段耗时（ms），最后是这一秒里最长的回调（`callback_max_ms`，含发布）和 `clouds N frames N skipped N`（收到几帧点云、发出几帧结果、按点云时间戳算中间缺了几帧）；
 - 延迟要在锁频后看：`sudo jetson_clocks`，重启就没了。`scripts/orin_clocks.sh` 查锁没锁。没锁时节点慢 2–3 倍（T32：每帧 55 ms，锁频时 15–21 ms）；
+- 开机锁频：`/etc/default/lidar-3d-detection` 里 `LIDAR3D_LOCK_CLOCKS=1`，服务每次启动前先跑 `jetson_clocks`（`packaging/lock_clocks.sh`，unit 的 `ExecStartPre=+`，以 root 跑）。默认 0，什么都不改。要锁频的狗，打包时加 `build_deb.sh --lock-clocks 1`，开关就写在包自带的 `/etc/default` 里，以后用 `--force-confnew` 升级也不会改回 0（8 号狗，2026-11-12 人定开）。
+  - 它把整台机器的 CPU、GPU、内存频率拉到最高，风扇也开到最大，功耗和发热跟着涨，影响机器人上所有进程，开不开由机器人团队定；
+  - 找不到或跑失败只打一行日志，节点照常起来；
+  - 改回 0 要等下次重启才恢复（脚本不解锁）；
+  - 改过 `/etc/default` 以后升级 deb，dpkg 会问保留哪份配置（`--force-confold` 保留自己的）；
 - 不经过 deb，直接用 colcon 的安装目录也行：`source install/setup.bash && ros2 launch lidar_3d_detection lidar_3d_detection.launch.py`。
 
 ## 用 Foxglove 看（板上循环播 bag）
@@ -98,7 +103,7 @@ sudo systemctl stop lidar-3d-detection
 1. 板上装一次 bridge：`sudo apt install ros-humble-foxglove-bridge`；
 2. 板上（从本机 `ssh seres@192.168.123.100` 进去）：
    ```bash
-   ~/dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_foxglove.sh bags/<bag>
+   ~/dogperc/repo/Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/scripts/orin_foxglove.sh bags/<bag>
    ```
    这个脚本：
    - 服务在跑就先停掉，结束时再起来；
@@ -188,7 +193,7 @@ tail -f /tmp/lidar_3d_detection_logs/lidar_3d_detection.INFO
 
 要看到 `lidar_3d_detection up`，配置是 `/opt/seres/perception/...`，没有 `publishing TF`。一直是 `waiting for a good INS solution` 或 `no pose for scan yet`：定位还不是好解（`ins_status` 要是 3），出门固定后再看，这时还没有框。这时每秒还有一行 `no frames yet (waiting for a pose) | clouds N frames 0 skipped N`：`clouds` 约 10、`skipped` 0，说明点云收齐了，等的只是定位。
 
-狗走起来以后日志里出现 error `the robot walks backwards in the body frame`：配置里的天线接法（`ins_azimuth_offset_deg`，现在是 0921 接反时的 180）和这台狗的不一样，框会叠出重影。接正的狗要把 `ins_azimuth_offset_deg` 改成 0、`ins_lever_arm` 改成 IMU 中心 `[0.0213, -0.18, 0.0]`（`docs/LOCALIZATION.md` 第 10 节）。
+狗走起来以后日志里出现 error `the robot walks backwards in the body frame`：配置里的天线接法（`ins_azimuth_offset_deg`，现在是 0921 接反时的 180）和这台狗的不一样，框会叠出重影。接正的狗要把 `ins_azimuth_offset_deg` 改成 0、`ins_lever_arm` 改成 IMU 中心 `[0.0213, -0.18, 0.0]`（`docs/LOCALIZATION.md` 第 10 节）。8 号狗是接正的，2026-11-12 已在狗上装好的配置里改成这两个值（T40，原配置备份为 `lidar_3d_detection.yaml.T40-180`）。
 
 **2. 狗上，前台开桥。** 环境必须和检测服务一样（systemd 不读 `.bashrc`）。看完在这个终端 Ctrl-C。服务是 root 跑的，车上的 CycloneDDS 开了共享内存。T34 用 `nvidia` 用户按这段环境起桥：`/perception/lidar_3d/*` 列得出来，三个话题都在桥的通道里；没有固定解时 objects、tracks 没有消息；原始点云 10 秒只收到 10 条，不是约 100 条。点云稀，再试把桥改成 root（和雷达节点同一个用户，才能走共享内存），试完停掉。先在同一个环境里 `ros2 topic list | grep perception` 看得到 `/perception/lidar_3d/*` 再开桥，看不到就停下报告。
 
@@ -201,12 +206,16 @@ source /opt/seres/perception/local_setup.bash
 ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765
 ```
 
-要看原始点云时用 root 起（车上的共享内存是 root 的 `iox-roudi`，机器人的节点和检测服务都是 root；`nvidia` 的进程只拿到一部分数据，T34 里连节点名都是 `_NODE_NAME_UNKNOWN_`）。还没在狗上试过：
+要看原始点云时用 root 起（车上的共享内存是 root 的 `iox-roudi`，机器人的节点和检测服务都是 root；`nvidia` 的进程只拿到一部分数据，T34 里连节点名都是 `_NODE_NAME_UNKNOWN_`）。
+
+**root 起桥一定要限定话题**（T40，2026-11-12）：不限话题时，桥一发现整张服务图就退出（`ICEORYX POSH__RUNTIME_ROUDI_PUBLISHER_LIST_FULL`，共享内存的发布者表满了）。T40 只订三个话题、关掉服务和参数，10 秒收到原始点云 100 条。按要看的话题改白名单：
 
 ```bash
 sudo bash -c 'set -a; source /etc/default/lidar-3d-detection; set +a; \
     source /opt/ros/humble/setup.bash; source /opt/seres/perception/local_setup.bash; \
-    ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765'
+    ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765 \
+      -p "topic_whitelist:=[\"^/perception/lidar_3d/.*\", \"^/robot/topic/rdap/top_point_cloud2$\", \"^/tf$\", \"^/tf_static$\"]" \
+      -p "capabilities:=[\"connectionGraph\"]"'
 ```
 
 **3. 笔记本上打开 Foxglove 桌面版。**
@@ -215,10 +224,10 @@ sudo bash -c 'set -a; source /etc/default/lidar-3d-detection; set +a; \
 - Layout → Import from file。布局在狗上：
 
   ```bash
-  scp nvidia@192.168.122.100:dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.json .
+  scp nvidia@192.168.122.100:dogperc/repo/Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.json .
   ```
 
-  仓库里的同一份是 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.json`。显示坐标系用 `camera_init`。
+  仓库里的同一份是 `Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.json`。显示坐标系用 `camera_init`。
 
 **能看到什么。** 有定位、有目标之后：
 
@@ -250,7 +259,7 @@ source /etc/default/lidar-3d-detection
 set +a
 source /opt/ros/humble/setup.bash
 source /opt/seres/perception/local_setup.bash
-rviz2 -d ~/dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.rviz
+rviz2 -d ~/dogperc/repo/Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.rviz
 ```
 
 这份配置已经设好：Fixed Frame 是 `camera_init`，Tracks 订 `/perception/lidar_3d/tracks`，Predictions 订 `/perception/lidar_3d/predictions`，都是 MarkerArray。格子 5 m 一格。两条都在 `camera_init`，平面位置是同一套世界坐标。已经装上车的包把预测折线画在固定高度 `z=0.2`，而且第一个点是 0.5 s 之后的位置，框则画在航迹中心，所以高度一对不上线就离开框。源码里的折线已经改成从框中心出发、用框的高度；车上的服务还是旧包，要重新打 deb 装上去才变。
@@ -275,20 +284,20 @@ source /opt/ros/humble/setup.bash
 rviz2 -d lidar_3d_detection.rviz
 ```
 
-配置文件先从狗上拷下来：`scp nvidia@192.168.122.100:dogperc/repo/deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.rviz .`。Fixed Frame 和两个 MarkerArray 话题同上。笔记本要装 ROS 2 Humble 和 `ros-humble-rviz2`。
+配置文件先从狗上拷下来：`scp nvidia@192.168.122.100:dogperc/repo/Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/foxglove/lidar_3d_detection.rviz .`。Fixed Frame 和两个 MarkerArray 话题同上。笔记本要装 ROS 2 Humble 和 `ros-humble-rviz2`。
 
 ## 和算法仓库对齐
 
 - 改 C++ 就在这里改（算法仓库原来的 `deploy/` 已经删掉，不再有镜像）。库 `lidar3d` 不依赖 ROS，在算法仓库里不带 ROS 编，跑对 Python 的测试：
   ```bash
-  # CenterPoint 仓库根目录；L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection
+  # CenterPoint 仓库根目录；L=Nav_D20/perception_combo_ros/node_src/lidar_3d_detection
   cmake -S $L -B build/lidar3d -G Ninja -DLIDAR3D_ROS=OFF -DLIDAR3D_TESTS=ON     # GPU 部分再加 -DLIDAR3D_WITH_CUDA=ON
   cmake --build build/lidar3d -j && ctest --test-dir build/lidar3d --output-on-failure
   ```
   - `golden`：先用算法仓库的 `tools/deploy/dump_golden.py` 生成黄金数据（同样的输入，Python 每一段的输出，写在 `build/lidar3d/golden`），要 python3、numpy、scipy；
   - `parity`：GoogleTest 逐段和黄金数据比（预处理、体素化、解码、跟踪、预测……），再用 `lidar_3d_replay` 回放黄金序列，和 Python 的整条流水线比；
   - 设了环境变量 `LIDAR3D_MODEL_DIR`（导出的模型目录，引擎已在本机建好）时，GPU 检测器还要和主机拷贝的 TensorRT 检测器逐帧比；
-  - 不在算法仓库里（只有 deploy_deb）时用 `-DLIDAR3D_GOLDEN_DIR=<目录>` 指向生成好的黄金数据；
+  - 不在算法仓库里（只有这棵感知树）时用 `-DLIDAR3D_GOLDEN_DIR=<目录>` 指向生成好的黄金数据；
   - 服务器上用 `docker/Dockerfile.dev` 的镜像编，命令在文件开头；
 - 参数和消息：`python tools/deploy/check_deploy_deb.py`，算法仓库的测试 `test_deploy_deb_config_follows_python` 每次都跑。检查两项：
   - 配置：除末尾 5 个部署键外，等于 `export_cpp_config.py --robot kygi` 的输出（参数的唯一来源是 Python 的 dataclass）。改了 Python 的参数后用 `--write` 重写；

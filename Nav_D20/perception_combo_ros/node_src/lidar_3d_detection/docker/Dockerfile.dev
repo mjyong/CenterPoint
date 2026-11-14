@@ -1,6 +1,6 @@
 # C++ development image of the server (docs/DEPLOY_ORIN.md section 3): TensorRT 10.3.0 and CUDA 12.6 like the
 # Orin, plus what lidar_3d_detection builds and tests with (without ROS). The repository is mounted, not copied;
-# from the CenterPoint repository's root, L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection:
+# from the CenterPoint repository's root, L=Nav_D20/perception_combo_ros/node_src/lidar_3d_detection:
 #   docker build -t dogperc-dev -f $L/docker/Dockerfile.dev $L/docker
 #   docker run --rm --gpus '"device=5"' -u $(id -u):$(id -g) -v $PWD:/repo -w /repo dogperc-dev \
 #       bash -c "cmake -S $L -B build/lidar3d_cuda -G Ninja -DLIDAR3D_ROS=OFF -DLIDAR3D_TESTS=ON -DLIDAR3D_WITH_CUDA=ON && \

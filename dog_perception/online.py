@@ -2,7 +2,7 @@
 
 Messages are read by attribute only, so the same code takes rclpy messages online and ``rosbags``
 messages offline: ``tools/deploy/cpp_parity.py python --bag`` replays a bag through it in arrival
-order, the reference for the C++ node (deploy_deb's lidar_3d_detection, the same steps in ``lidar3d/online.hpp``).
+order, the reference for the C++ node (lidar_3d_detection, the same steps in ``lidar3d/online.hpp``).
 
     inputs = OnlineInputs(node_parameters("kygi"), pipeline, log)
     inputs.on_imu(msg); inputs.on_inspvax(msg)        # or on_odom(msg) with localization odom

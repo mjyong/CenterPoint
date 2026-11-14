@@ -1,10 +1,10 @@
-"""Summary of a long run on the Orin (deploy_deb's scripts/orin_soak.sh): the node's once-a-second lines in time windows
+"""Summary of a long run on the Orin (lidar_3d_detection's scripts/orin_soak.sh): the node's once-a-second lines in time windows
 (milliseconds of those frames, boxes, tracks), with and without the load; its warnings; its memory; tegrastats.
 
     python tools/deploy/soak_report.py data/deploy/T30/soak --window 300 --out soak.json
 
 Times are the board's clock (node.log's ROS stamps, rss.log and load.log from ``date +%s``). node.log can also be
-the vehicle node's (deploy_deb, glog lines; their local time is read with the year of rss.log / load.log), whose
+the vehicle node's (lidar_3d_detection, glog lines; their local time is read with the year of rss.log / load.log), whose
 lines also count the clouds received, the frames out and the scans skipped, and give the longest callback: those
 are summed per window. clocks.txt (orin_clocks.sh) is printed first: unlocked clocks make the node 2-3x slower.
 """

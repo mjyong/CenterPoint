@@ -35,7 +35,7 @@ def test_each_module_its_own_prefix_and_interface_copies(tmp_path):
     for c in cmds:
         prefix = _opt(c, "install-base")[0]
         by.setdefault(os.path.basename(prefix), []).append(c)
-    assert sorted(by) == ["nav_perception", "perception", "planning", "slam"]
+    assert sorted(by) == ["nav_perception", "planning", "slam"]
     for m, cs in by.items():
         for c in cs:
             assert _opt(c, "install-base") == [str(tmp_path / "nd" / "install" / m)]
@@ -49,15 +49,12 @@ def test_each_module_its_own_prefix_and_interface_copies(tmp_path):
     assert _opt(by["planning"][-1], "packages-select") == ["planning"]
     assert "-DCMAKE_CUDA_ARCHITECTURES=89" in by["planning"][-1]
     assert _opt(by["slam"][-1], "packages-select") == ["lightning"]
-    # the robot team's perception: its own common_interface; ours: deploy_deb's copies
+    # the robot team's perception, with our lidar_3d_detection in it: its own common_interface
     assert any(_opt(c, "base-paths") == [os.path.join(nav, "perception_combo_ros", "common_interface")]
                for c in by["nav_perception"])
-    assert _opt(by["nav_perception"][-1], "packages-select") == ["lidar_seg", "grid_map_memory_node"]
-    dd = os.path.join(ROOT, "deploy_deb")
-    assert _opt(by["perception"][0], "base-paths") == [
-        os.path.join(dd, "perception_combo_ros", "common_interface"), os.path.join(dd, "slam", "interface"),
-        os.path.join(dd, "perception_combo_ros", "node_src")]
-    assert _opt(by["perception"][0], "packages-up-to") == ["lidar_3d_detection"]
+    assert _opt(by["nav_perception"][-1], "packages-select") == ["lidar_seg", "grid_map_memory_node",
+                                                                  "lidar_3d_detection"]
+    assert "-DCMAKE_CUDA_ARCHITECTURES=89" in by["nav_perception"][-1]
 
 
 def test_octomap_msgs_from_source_only_when_no_prefix_has_them(tmp_path):
@@ -72,7 +69,7 @@ def test_octomap_msgs_from_source_only_when_no_prefix_has_them(tmp_path):
 
 def test_nav_env_runs_a_process_with_its_modules_prefix_first(tmp_path):
     root = tmp_path / "install"
-    for m in ("nav_perception", "slam", "perception", "planning"):
+    for m in ("nav_perception", "slam", "planning"):
         (root / m).mkdir(parents=True)
         (root / m / "setup.bash").write_text('export ORDER="${ORDER:-}%s "\n' % m)
     fake_ros = tmp_path / "opt_ros"
@@ -91,7 +88,7 @@ echo "bin: $(nav_bin slam lightning run_loc_online)"
                        env=dict(os.environ, NAV_STACK_ROOT=str(root)))
     assert r.returncode == 0, r.stdout + r.stderr
     lines = dict(l.split(": ", 1) for l in r.stdout.splitlines())
-    assert lines["all"].split() == ["ros", "nav_perception", "slam", "perception", "planning"]   # planning last
+    assert lines["all"].split() == ["ros", "nav_perception", "slam", "planning"]   # planning last
     assert lines["bin"] == "%s/slam/lightning/lib/lightning/run_loc_online" % root
     assert lines["slam"].split()[-1] == "slam"                    # its own prefix sourced last = in front
 

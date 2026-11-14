@@ -12,7 +12,7 @@
 - **8 号狗开机锁频**。
 - **过人行横道的判据：宁愿多等**。感知只看 40 m 的点云，太近，算不了"来得及过去"。所以只要看到在动的车、而且它可能经过狗要过的这条人行横道（直行或拐弯，不管多远、多慢），狗就等；这辆车离开了、过了一定时间就不再等它；一直没再看到的车（挡住了、开出了范围），过一定时间也只能过马路。安全第一（`yield_rule="wait"`，下面"判据"一节）。门控的 Python 参考实现是 `dog_perception/yield_gate.py`，离线评测是 `tools/dog/yield_eval.py`（测试 `tests/dog/test_yield_gate.py`）。
 
-规划代码在 `Nav_D20/planning`（入门见 `Nav_D20/planning/docs/ONBOARDING.md`）；检测、跟踪、预测节点在 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection`。
+规划代码在 `Nav_D20/planning`（入门见 `Nav_D20/planning/docs/ONBOARDING.md`）；检测、跟踪、预测节点在 `Nav_D20/perception_combo_ros/node_src/lidar_3d_detection`。
 
 ## 1. 现在的规划怎么跑
 
@@ -292,7 +292,7 @@
 | 3 | C++ 门控 | 和 Python 一致：1104 的 38787 帧 0 差（T52） | 完成 |
 | 4 | 人行横道的走法 | 编过，回放里状态切换对（T52）。T52 复核补了一条：**没放行却在人行横道上**（等的时候定位跳了一下），离入口 1.5 m 内还当在路口等，放行了才过；原来直接过，没有感知也过 | T54 重编、闭环模拟七种、回放看日志 |
 | 5 | 地图：**人定（2026-11-13）狗上的地图换成仓库的**（`Nav_D20/map/` 的 ad68517c、a70c6db6，人行横道 5 个、8 个） | 规划加了 `startup_map_dir`（T53 复核）：起来就读站点地图和它的 `semantic.osm`，不靠 App 发 `/map/switch`（发了照样换）；定位的 `map_path` 指同一张。两张图拷进 `/opt/seres/nav_cw/maps/`，App 的地图目录里同名的先备份再换（T56 第 4 步） | T54 回放验 `startup_map_dir`；T56 装；人定在哪个人行横道测（ad68517c 上路线过 6、13、32、38 号） |
-| 6 | 狗上我们的感知节点（`lidar-3d-detection.service`） | 代码从装上的那版（3d6b0d5）到现在没改，只改了天线两行配置，T40 已经在狗上改了。两套导航下它都照常跑 | T54 第 5 步只读核配置和帧率 |
+| 6 | 我们的感知节点 `lidar_3d_detection` | **2026-11-14 并进机器人团队的感知**（人定：Nav_D20 的感知是最新的）：代码在 `Nav_D20/perception_combo_ros/node_src/lidar_3d_detection`，用感知那份接口包（加了 `LidarObject*`），机器人团队的编译和启动脚本里都有它，`deploy_deb` 删了。换成我们那套时它在 `cw-nav-perception` 里跑，原来单独的 `lidar-3d-detection.service`（deb）随原来的服务一起停、一起回来。代码从狗上那个 deb（3d6b0d5）到现在没改，只改了天线两行配置（T40 已在狗上改） | T54 第 5 步只读核配置和帧率；T58 和 T56 编 |
 | 7 | 和机器人团队说好 | **说好了（2026-11-13）**：规划、定位、感知一起放到另一个目录，原来的服务关掉、原版不动，换和换回各一条命令 | 完成 |
 | 8 | 编译、安装、换：**代码和配置都用仓库的**（人定 2026-11-13；只改路径：地图、车型 d20/001，`nav_cw.sh configure`）。aarch64：机器人团队的交叉编译镜像暂时拿不到，**改在狗上原生编**（人定 2026-11-14）：缺的依赖人在连着狗的本机下（`tools/deploy/nav_cw_fetch.py`，清单由 T55 在狗上用 `apt-get --print-uris` 只算不装得出、验 SHA256），只用 `dpkg-deb -x` 解到 `/opt/seres/nav_cw/deps`、源码编进同一处，系统里不装不升级；先核狗上装的接口定义和仓库的一致（规划和运动控制、App 之间的消息）。装到 `/opt/seres/nav_cw`，服务 `cw-planning`、`cw-slam`、`cw-nav-perception`（带 `Conflicts=` 原来那个，云台检测和回充照旧用原来的程序）；`tools/deploy/nav_cw.sh use-new / use-original / status` 换和换回，起不稳自动换回，不 enable（重启后是原来的）；换之前在狗上用域 42 放 1112 演练一遍（T56） | 脚本写好、测过（假的 systemctl）；下载脚本写好、测过 | T55 列清单 → 人下载传到狗上 → T56 编、装、演练（Agent） |
 | 9 | 上狗测：空的人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流；每次录包，回来转可视化、跑 `objects_in_map.py` | 等 1–8 | T57（人 + Agent） |

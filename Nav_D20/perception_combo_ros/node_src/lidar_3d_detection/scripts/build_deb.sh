@@ -6,7 +6,7 @@
 #   node_src/lidar_3d_detection/scripts/build_deb.sh --model ~/dogperc/models/nusc_pp_dyn [--out DIR]
 #       [--prefix /opt/seres/perception] [--version V] [--service-user USER]
 #       [--precision fp16] [--cuda-arch 87] [--jobs N] [--work DIR] [--skip-build]
-#       [--no-enable-service] [--ros-domain-id N] [--rmw RMW] [--cyclonedds-uri URI]
+#       [--no-enable-service] [--ros-domain-id N] [--rmw RMW] [--cyclonedds-uri URI] [--lock-clocks 0|1]
 #
 #   --model           model_meta.json, pfn.onnx, rpn_head.onnx and the <precision> engines built on this board
 #                     (tools/deploy/build_engines.py). Engines only load on the TensorRT that built them, so the
@@ -20,6 +20,9 @@
 #                     joins the robot's DDS on install, e.g. the kygi dogs (DEPLOY_ORIN.md 2):
 #                     --ros-domain-id 0 --rmw rmw_cyclonedds_cpp --cyclonedds-uri file:///opt/ros/cyclonedds.xml
 #                     (systemd does not read ~/.bashrc). The RMW's package must be installed on this board
+#   --lock-clocks     LIDAR3D_LOCK_CLOCKS in the packaged /etc/default/lidar-3d-detection (default 0: the clocks are
+#                     left as they are). 1 where the robot team has decided to lock the clocks at boot (dog 8,
+#                     2026-11-12): in the package itself, so an upgrade with --force-confnew keeps it
 #
 # No root needed (dpkg-deb --root-owner-group); installing is `sudo apt install ./lidar-3d-detection_*.deb`.
 # Needs patchelf (the interface packages' Python extensions carry an RPATH into the build tree; T31): on PATH, in
@@ -29,9 +32,10 @@ set -euo pipefail
 
 NODE=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)        # node_src/lidar_3d_detection
 WS=$(dirname "$(dirname "$NODE")")                               # perception_combo_ros
-SLAM=$(dirname "$WS")/slam/interface                             # kygi665_msgs
+# the interface packages (kygi665_msgs, perception_interface with our LidarObject* ...) are the robot team's
+# perception copy, Nav_D20/perception_combo_ros/common_interface: our node is part of their perception (2026-11-14)
 MODEL="" OUT=$PWD PREFIX=/opt/seres/perception VERSION="" SERVICE_USER=$(id -un) ENABLE=yes PRECISION=fp16
-CUDA_ARCH=87 JOBS=$(nproc) WORK=$WS/build_deb SKIP_BUILD=0 DOMAIN_ID="" RMW="" CYCLONE_URI=""
+CUDA_ARCH=87 JOBS=$(nproc) WORK=$WS/build_deb SKIP_BUILD=0 DOMAIN_ID="" RMW="" CYCLONE_URI="" LOCK_CLOCKS=""
 while [ $# -gt 0 ]; do
   case $1 in
     --model) MODEL=$(readlink -f "$2"); shift 2 ;;
@@ -49,11 +53,13 @@ while [ $# -gt 0 ]; do
     --ros-domain-id) DOMAIN_ID=$2; shift 2 ;;
     --rmw) RMW=$2; shift 2 ;;
     --cyclonedds-uri) CYCLONE_URI=$2; shift 2 ;;
-    *) sed -n '2,24p' "$0"; exit 2 ;;
+    --lock-clocks) LOCK_CLOCKS=$2; shift 2 ;;
+    *) sed -n '2,27p' "$0"; exit 2 ;;
   esac
 done
 die() { echo "build_deb.sh: $*" >&2; exit 1; }
 case $PREFIX in /*) ;; *) die "--prefix must be absolute" ;; esac
+case $LOCK_CLOCKS in "" | 0 | 1) ;; *) die "--lock-clocks must be 0 or 1" ;; esac
 if [ -n "$DOMAIN_ID" ]; then
   case $DOMAIN_ID in *[!0-9]*) die "--ros-domain-id must be 0-232" ;; esac
   [ "$DOMAIN_ID" -le 232 ] || die "--ros-domain-id must be 0-232"
@@ -78,7 +84,7 @@ if [ $SKIP_BUILD = 0 ]; then
   for f in model_meta.json pfn.onnx rpn_head.onnx pfn.$PRECISION.engine rpn_head.$PRECISION.engine; do
     [ -e "$MODEL/$f" ] || die "$MODEL has no $f (build the engines on this board: tools/deploy/build_engines.py)"
   done
-  [ -d "$SLAM/kygi665_msgs" ] || die "no kygi665_msgs in $SLAM"
+  [ -d "$WS/common_interface/seres_interface/ros/kygi665_msgs" ] || die "no kygi665_msgs in $WS/common_interface"
   [ -e /opt/ros/humble/setup.bash ] || die "ROS 2 Humble not found in /opt/ros/humble"
   NVCC=${CUDACXX:-/usr/local/cuda/bin/nvcc}
   [ -x "$NVCC" ] || die "nvcc not found ($NVCC; set CUDACXX)"
@@ -87,7 +93,7 @@ if [ $SKIP_BUILD = 0 ]; then
   set -u
   command -v colcon > /dev/null || die "colcon not found"
   MAKEFLAGS=-j$JOBS colcon --log-base "$WORK/log" build \
-    --base-paths "$WS/common_interface" "$SLAM" "$WS/node_src" \
+    --base-paths "$WS/common_interface" "$NODE" \
     --build-base "$WORK/build" --install-base "$INSTALL" --packages-up-to lidar_3d_detection \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_CUDA_COMPILER="$NVCC" \
     -DCMAKE_C_FLAGS="-ffile-prefix-map=$WS/=" -DCMAKE_CXX_FLAGS="-ffile-prefix-map=$WS/=" \
@@ -106,7 +112,7 @@ if [ -z "$VERSION" ]; then
   # the commit count first, so that a later build is a higher version for apt
   if sha=$(git -C "$NODE" rev-parse --short HEAD 2> /dev/null); then
     count=$(git -C "$NODE" rev-list --count HEAD)
-    dirty=$(git -C "$NODE" diff --quiet HEAD -- "$WS" "$SLAM" 2> /dev/null || echo dirty)
+    dirty=$(git -C "$NODE" diff --quiet HEAD -- "$WS/common_interface" "$NODE" 2> /dev/null || echo dirty)
   elif [ -e "$(dirname "$WS")/GIT_COMMIT" ]; then
     read -r count sha dirty < "$(dirname "$WS")/GIT_COMMIT"
   fi
@@ -162,6 +168,9 @@ set_default() {
 if [ -n "$DOMAIN_ID" ]; then set_default ROS_DOMAIN_ID "$DOMAIN_ID"; fi
 if [ -n "$RMW" ]; then set_default RMW_IMPLEMENTATION "$RMW"; fi
 if [ -n "$CYCLONE_URI" ]; then set_default CYCLONEDDS_URI "$CYCLONE_URI"; fi
+if [ -n "$LOCK_CLOCKS" ]; then
+  sed -i "s/^LIDAR3D_LOCK_CLOCKS=.*/LIDAR3D_LOCK_CLOCKS=$LOCK_CLOCKS/" "$STAGE/etc/default/lidar-3d-detection"
+fi
 for s in postinst prerm postrm; do
   sub "$NODE/packaging/debian/$s" > "$STAGE/DEBIAN/$s"
   chmod 755 "$STAGE/DEBIAN/$s"

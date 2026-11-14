@@ -20,7 +20,8 @@ The two world frames need not share an origin: online it is the node's first INS
 replay the bag's first (T40: 2.3 m apart). world_offset is the constant shift (replay - live, the median over
 frames with exactly one track of a class on both sides); the live tracks are moved by it before comparing.
 
-The message definitions are read from deploy_deb's perception_interface package (rosbags, no ROS install).
+The message definitions are read from the perception's perception_interface package (Nav_D20/perception_combo_ros,
+rosbags, no ROS install).
 Recordings of the earlier node (T29, T30) carry dog_perception_msgs/ObjectArray, the same fields under other names:
 registered from the same files.
 """
@@ -33,7 +34,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-MSG_DIR = os.path.join(ROOT, "deploy_deb", "perception_combo_ros", "common_interface", "seres_interface", "ros",
+MSG_DIR = os.path.join(ROOT, "Nav_D20", "perception_combo_ros", "common_interface", "seres_interface", "ros",
                        "perception_interface", "msg")
 NAMES = ("LidarPredictedPath", "LidarObject", "LidarObjectArray")
 ARRAYS = ("perception_interface/msg/LidarObjectArray", "dog_perception_msgs/msg/ObjectArray")

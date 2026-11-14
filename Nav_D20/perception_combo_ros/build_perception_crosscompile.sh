@@ -199,6 +199,7 @@ colcon_compile_node=(
     grid_map_memory_node
     ptz_data_detection
     perception_recharge
+    lidar_3d_detection
 )
 
 start_build_time=$(date +%Y-%m-%d-%H-%M-%S)

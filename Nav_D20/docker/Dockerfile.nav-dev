@@ -1,5 +1,5 @@
-# One environment for the server's replays: perception (ours, and the robot team's ground segmentation and local
-# grid), localization and planning build and run here together, in one ROS graph. It is dog 8's where that matters:
+# One environment for the server's replays: perception (the robot team's ground segmentation and local grid, and our
+# lidar_3d_detection, which is part of it), localization and planning build and run here together, in one ROS graph. It is dog 8's where that matters:
 # Ubuntu 22.04, ROS 2 Humble from apt, CycloneDDS, CUDA 12.6, TensorRT 10.3 (nvcr.io/nvidia/tensorrt:24.08-py3 has
 # the versions of the Orin's JetPack 6.1; it is also dogperc-dev's base, so it is already on the server). The
 # packages below are the dog's build dependencies too (T55, T56).

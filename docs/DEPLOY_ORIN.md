@@ -101,7 +101,7 @@ Host orin
 
 ## 3. 环境
 
-下文 `$L` 指 `deploy_deb/perception_combo_ros/node_src/lidar_3d_detection`，C++ 只有这一份（第 7–9 节）。
+下文 `$L` 指 `Nav_D20/perception_combo_ros/node_src/lidar_3d_detection`，C++ 只有这一份（第 7–9 节）。
 
 **Orin**：`$L/scripts/orin_check.sh > orin_env.txt` 记录版本、功耗模式、内存和磁盘、编译工具。T25 时需要的都已经有，没有装任何包。以后标 `MISSING` 的再装：
 
@@ -255,7 +255,7 @@ python tools/dog/run_sequence.py --replay data/runs/<场景> --detectors '' \
 ## 7. C++ 核心库（P3）
 
 ```text
-$L/                  deploy_deb/perception_combo_ros/node_src/lidar_3d_detection：库、测试、节点、打包
+$L/                  Nav_D20/perception_combo_ros/node_src/lidar_3d_detection：库、测试、节点、打包
   include/lidar3d/   头文件，一个 Python 模块对应一个
   src/               CPU 部分；src/cuda/：GPU 体素化（pillars.cu）、TensorRT 引擎、GPU 检测器（LIDAR3D_WITH_CUDA）
   tests/             GoogleTest，读 tools/deploy/dump_golden.py 写的 golden 数据，逐段和 Python 比
@@ -316,7 +316,7 @@ $L/                  deploy_deb/perception_combo_ros/node_src/lidar_3d_detection
 
 ```bash
 # 在仓库根目录，不带 ROS。只要 CPU 部分：Eigen、yaml-cpp、GoogleTest、zlib；golden 数据要 python3 加 numpy、scipy
-L=deploy_deb/perception_combo_ros/node_src/lidar_3d_detection
+L=Nav_D20/perception_combo_ros/node_src/lidar_3d_detection
 cmake -S $L -B build/lidar3d -DLIDAR3D_ROS=OFF -DLIDAR3D_TESTS=ON -DLIDAR3D_WITH_CUDA=OFF
 cmake --build build/lidar3d -j && ctest --test-dir build/lidar3d --output-on-failure
 # 加上 CUDA 和 TensorRT：服务器在 dogperc-dev 容器里，板上原生编译
@@ -387,7 +387,7 @@ $L/
   src/lidar_3d_detection.cpp、src/main.cpp      lidar_3d_detection：在线节点
   src/bag_replay.cpp                            lidar_3d_bag_replay：rosbag2 直接读进节点的同一套处理，离线、逐帧确定
   launch/lidar_3d_detection.launch.py
-deploy_deb/perception_combo_ros/common_interface/seres_interface/ros/perception_interface/
+Nav_D20/perception_combo_ros/common_interface/seres_interface/ros/perception_interface/
   msg/LidarObject、LidarPredictedPath、LidarObjectArray：给规划的消息
 ```
 
@@ -440,30 +440,35 @@ T29 的结果：
 - `objects_bag.py` 按遍查不丢帧，`tools/deploy/soak_report.py` 按 5 分钟汇总延迟、warn、内存、温度。
 
 ```bash
-# 板上编译、不打包（打 deb 见第 9 节）：接口包、kygi665_msgs 和节点
+# 板上编译、不打包（打 deb 见第 9 节）：接口包（含 kygi665_msgs）和节点，都在机器人团队的感知树里
 source /opt/ros/humble/setup.bash
-cd deploy_deb/perception_combo_ros
-colcon build --base-paths common_interface ../slam/interface node_src --packages-up-to lidar_3d_detection \
+cd Nav_D20/perception_combo_ros
+colcon build --base-paths common_interface node_src/lidar_3d_detection --packages-up-to lidar_3d_detection \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87
 source install/setup.bash
 ros2 launch lidar_3d_detection lidar_3d_detection.launch.py model_dir:=$HOME/dogperc/models/nusc_pp_dyn
 ```
 
-## 9. 车上部署（deploy_deb、deb 包，P8）
+## 9. 车上部署（机器人团队的感知树、deb 包，P8）
 
-`deploy_deb` 是车上真实部署的代码树，按车上仓库的样子组织：
-- `perception_combo_ros/common_interface/seres_interface/ros/`：接口包 `common_interface`、`nav2_interface`、`perception_interface`；
-- `perception_combo_ros/node_src/lidar_3d_detection/`：节点包；
-- `slam/interface/kygi665_msgs`：INSPVAX 消息。
+**2026-11-14 起节点并进机器人团队的感知**（人定：Nav_D20 里的感知是最新的）。以前我们自己有一棵 `deploy_deb`，按车上仓库的样子
+放了接口包的一份拷贝和节点；现在节点就在机器人团队的感知树里，`deploy_deb` 删掉了：
+- `Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/`：节点包（`$L`），原来 Nav_D20 里那份旧的、缺文件的拷贝换成了这份；
+- `Nav_D20/perception_combo_ros/common_interface/seres_interface/ros/`：机器人团队感知自己那份接口包，节点用它的
+  `perception_interface`（加了我们的 `LidarObject*` 三条）和 `kygi665_msgs`；
+- 机器人团队的编译脚本（`build_perception.sh`、`build_perception_crosscompile.sh`）的节点列表里加了 `lidar_3d_detection`，
+  启动脚本 `cfg/start_nav_perception_bg.sh` 也起它（`bin/start_lidar_3d_detection.sh`），装在同一个感知目录里；
+- 单独的 deb（`$L/scripts/build_deb.sh`，`/opt/seres/perception`、`lidar-3d-detection.service`）还能打，从同一棵树编；狗上换成
+  我们那套导航（`/opt/seres/nav_cw`）时节点在感知服务里跑，单独的服务停掉（`tools/deploy/nav_cw.sh`）。
 
-怎么用见那里的 [README](../deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/README.md)。
+怎么用见那里的 [README](../Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/README.md)。
 
-**一份代码**（2026-11-01 起）：算法仓库的 `deploy/` 已删掉，`deploy_deb` 不再是镜像，C++ 只有 `$L` 这一份（第 7 节）。和算法仓库的对齐靠：
+**一份代码**（2026-11-01 起）：算法仓库的 `deploy/` 已删掉，C++ 只有 `$L` 这一份（第 7 节；2026-11-14 起在 Nav_D20 的感知里）。和算法仓库的对齐靠：
 - 对 Python 的逐段测试和回放比较：在算法仓库里不带 ROS 编 `$L`、跑 CTest（第 7 节）；
 - `python tools/deploy/check_deploy_deb.py`，`test_deploy_deb_config_follows_python` 每次跑：
   - 配置除了末尾 7 个部署键（`model_dir`、四个话题名、8 号狗的天线接法 `ins_azimuth_offset_deg` 0 和 `ins_lever_arm`），等于 `export_cpp_config.py --robot kygi` 的输出（`kygi` 预设是 0921 天线接反时的 180，给金标准数据和那批包的回放用；狗上 1016 起接正，T40 在狗上改过，2026-11-13 起仓库里的部署配置也是接正的）。改了 Python 的参数就用 `--write` 重写；
-  - Nav_D20 的 `perception_interface` 有同样的 `LidarObject*` 消息（规划订阅）；
-  - `deploy_deb/slam/interface/kygi665_msgs` 的消息和仓库根目录的 `kygi665_msgs`（Python 读的）相同；
+  - 规划那份 `perception_interface`（`Nav_D20/seres_interface`）和感知那份的 `LidarObject*` 一样（节点发、规划收）；
+  - 感知那份 `kygi665_msgs` 的消息和仓库根目录的 `kygi665_msgs`（Python 读的）字段相同；
 - `objects_bag.py` 用 `perception_interface` 的消息文件读 `LidarObjectArray`（T29–T31 录的 `dog_perception_msgs/ObjectArray` 也还能读）。
 
 节点 `lidar_3d_detection` 是车上的写法：glog 日志、`Init()`、话题名在配置里；
@@ -518,7 +523,7 @@ colcon 那一步和真机运行要在板上做（T31）。
 - **ID 比较**：循环播放时 `same_ids_frames` 很低（59 遍里 426 / 1587 帧），但每遍都在差不多同一帧开始不同。原因是在线的到达顺序和 bag 不完全一样，一帧略有不同，多出一条暂定轨迹，后面的 ID 全部顺延一位。`objects_bag.py` 加了 `same_tracks_frames`：不看编号，按类别和世界系位置比报出来的轨迹；
 - **读文件**：`sync_deploy_deb.py`（现在的 `check_deploy_deb.py`）、`soak_report.py`、`cut_bag.py` 读文件都指定 UTF-8（T31 碰到 C locale 读中文注释崩溃）。
 
-**Foxglove 实时看**：板上循环播 bag，连着板子的本机（192.168.123.55，直连板子的 192.168.123.100）用 Foxglove 看检测结果。步骤见 [README](../deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/README.md) 的"用 Foxglove 看"：
+**Foxglove 实时看**：板上循环播 bag，连着板子的本机（192.168.123.55，直连板子的 192.168.123.100）用 Foxglove 看检测结果。步骤见 [README](../Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/README.md) 的"用 Foxglove 看"：
 - 板上 `scripts/orin_foxglove.sh <bag>`：先停掉在跑的服务；节点开 `publish_tf`、`publish_cloud`；加 foxglove_bridge（端口 8765）；循环播放；结束时把服务起回来；
 - 本机 Foxglove 连 `ws://192.168.123.100:8765`，导入布局 `foxglove/lidar_3d_detection.json`：
   - 3D：显示系 `camera_init`，检测器的输入点云、框、ID、预测路径（原始点云可以勾上）；
@@ -558,7 +563,7 @@ ssh dog 'sudo -n apt-get install -y patchelf'
 ssh dog 'cd ~/dogperc/repo && python3 tools/deploy/build_engines.py \
     --model-dir ~/dogperc/models/nusc_pp_dyn --precision fp16 --opt-pillars 10000'
 # 车上的 DDS 直接写进包里的 /etc/default（2026-11-04 复核起 build_deb.sh 有这三个选项），装上就是域 0 + CycloneDDS
-ssh dog 'cd ~/dogperc/repo && deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/scripts/build_deb.sh \
+ssh dog 'cd ~/dogperc/repo && Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/scripts/build_deb.sh \
     --model ~/dogperc/models/nusc_pp_dyn --service-user root --no-enable-service \
     --ros-domain-id 0 --rmw rmw_cyclonedds_cpp --cyclonedds-uri file:///opt/ros/cyclonedds.xml \
     --out ~/dogperc/deb'
@@ -609,7 +614,7 @@ ssh dog 'sudo -n sed -i \
 | `tools/deploy/compare_backends.py` | 多个后端逐段、逐框比较，查门槛；`--dump` / `dump:` 跨机器比较 |
 | `tools/deploy/pillar_stats.py` | 柱数分布，定 P_max |
 | `tools/dog/run_sequence.py --exported` | 导出的检测器跑完整流水线，结果给 `pipeline_eval.py` |
-| `$L`（`deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/`） | C++ 只有这一份：库 `lidar3d`、GoogleTest 对齐测试、`lidar_3d_replay`（第 7 节），ROS 2 节点和 `lidar_3d_bag_replay`（第 8 节），打 deb（第 9 节） |
+| `$L`（`Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/`） | C++ 只有这一份：库 `lidar3d`、GoogleTest 对齐测试、`lidar_3d_replay`（第 7 节），ROS 2 节点和 `lidar_3d_bag_replay`（第 8 节），打 deb（第 9 节） |
 | `tools/deploy/export_cpp_config.py` | 从 Python 的 dataclass 写 C++ 的参数 YAML |
 | `tools/deploy/dump_golden.py` | C++ 对齐测试用的 golden 数据（模拟器序列加每一段的 Python 输出） |
 | `tools/deploy/cpp_parity.py` | 真实录制上 Python 和 C++ 比：参考运行、比较、转 results.pkl、延迟汇总 |
@@ -622,9 +627,9 @@ ssh dog 'sudo -n sed -i \
 | `$L/scripts/orin_check.sh` | 环境报告 |
 | `tools/deploy/sync_to_orin.sh` | 代码、模型（不带 `engines.json`；`--engines <主机名>` 加上那台机器的引擎）、帧、参考检测、原始录制、bag 同步到板上的 `~/dogperc` |
 | `$L/scripts/orin_soak.sh` | 板上长时间回放：装好的节点、循环播放、录包、负载、内存和 tegrastats（T30、T31） |
-| `deploy_deb/` | 车上部署的代码树（第 9 节）；`$L/scripts/build_deb.sh` 在板上打 deb，`$L/scripts/sync_to_orin.sh` 只同步这棵树到 `~/seres_ws` |
-| `tools/deploy/check_deploy_deb.py` | `deploy_deb` 的配置是否等于 Python 导出的（`--write` 重写），`kygi665_msgs` 是否一致 |
+| `Nav_D20/perception_combo_ros/` | 机器人团队的感知树，我们的节点在 `node_src/lidar_3d_detection`（第 9 节）；`$L/scripts/build_deb.sh` 在板上打 deb，`$L/scripts/sync_to_orin.sh` 只同步 `common_interface` 和节点到 `~/seres_ws` |
+| `tools/deploy/check_deploy_deb.py` | 节点的配置是否等于 Python 导出的（`--write` 重写），`kygi665_msgs`、`LidarObject*` 是否一致（名字是放在 `deploy_deb` 时起的） |
 | `$L/scripts/orin_clocks.sh` | 锁频了没有（CPU、GPU 的最低 / 最高 / 当前频率，功耗模式）；没锁时节点慢 2–3 倍 |
 | `$L/packaging/fastdds_large_buffers.xml` | Fast DDS 8 MB socket 缓冲（T33），`FASTRTPS_DEFAULT_PROFILES_FILE` 用；README "DDS" |
-| `deploy_deb/.../scripts/orin_foxglove.sh`、`foxglove/lidar_3d_detection.json` | 板上循环播 bag 加 foxglove_bridge；本机 Foxglove 的布局 |
+| `$L/scripts/orin_foxglove.sh`、`foxglove/lidar_3d_detection.json` | 板上循环播 bag 加 foxglove_bridge；本机 Foxglove 的布局 |
 | `tools/deploy/foxglove_probe.py` | 不开 GUI 查 foxglove_bridge：发了哪些话题、订几秒各收到多少条（只用标准库，板上能跑） |
