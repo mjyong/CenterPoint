@@ -11,6 +11,9 @@ nav_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # bag 和 Nav_D20 并列：在本仓库是 d20car_predict/bags0921，放进 CenterPoint 后是仓库根上的 bags0921。
 default_bag="$(cd "${nav_root}/.." && pwd)/bags0921/rosbag2_2026_09_21-16_41_27"
 loc_config="${nav_root}/slam/lightning-lm-master/config/default_d20.yaml"
+# NAV_STACK_ROOT（nav-dev 镜像里，Nav_D20/docker/run.sh 设的）：感知、定位、规划从 build_stack.sh 编的各自前缀起；没设就是上面的 micromamba
+# shellcheck disable=SC1091
+source "${nav_root}/planning/script/nav_env.sh"
 geo_lib="${nav_root}/slam/lightning-lm-master/thirdparty/geographiclib/X86/lib"
 log_dir=/tmp/nav_stack_debug
 
@@ -31,10 +34,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-lidar_bin="${install_base}/lidar_seg/lib/lidar_seg/lidar_seg"
-grid_bin="${install_base}/grid_map_memory_node/lib/grid_map_memory_node/grid_map_memory_node"
-loc_bin="${install_base}/lightning/lib/lightning/run_loc_online"
-plan_bin="${install_base}/planning/lib/planning/planning"
+lidar_bin="$(nav_bin nav_perception lidar_seg lidar_seg)"
+grid_bin="$(nav_bin nav_perception grid_map_memory_node grid_map_memory_node)"
+loc_bin="$(nav_bin slam lightning run_loc_online)"
+plan_bin="$(nav_bin planning planning planning)"
 for f in "${lidar_bin}" "${grid_bin}" "${loc_bin}" "${bag}/metadata.yaml" "${loc_config}"; do
   if [[ ! -e "${f}" ]]; then
     echo "缺少: ${f}"
@@ -49,7 +52,8 @@ fi
 export MAMBA_ROOT_PREFIX="${prefix}/root"
 export CONDA_BUILD=0
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
-export SERES_PERCEPTION_INSTALL_DIR="${install_base}"
+export SERES_PERCEPTION_INSTALL_DIR="${NAV_STACK_ROOT:+${NAV_STACK_ROOT}/nav_perception}"
+SERES_PERCEPTION_INSTALL_DIR="${SERES_PERCEPTION_INSTALL_DIR:-${install_base}}"
 # LOC_MAP_PATH=<定位地图目录>、LOC_INS_ONLY=1：换定位地图 / INS 直出，见 lightning 的 scripts/loc_debug_config.sh
 # LOC_INS_YAW_OFFSET：INS 朝向偏置，没设就按 bag 的录制日期定（0921 那批天线接反 180，1016 起 0；T48 用错了，狗头反了）
 # shellcheck disable=SC1091
@@ -60,14 +64,11 @@ echo "INS 朝向偏置 ${LOC_INS_YAW_OFFSET:-配置里的值}（bag $(basename "
 loc_config="$(loc_debug_config "${loc_config}")" || exit 1
 export config_path="${loc_config}"
 export PLANNING_TIMEOUT_WALL_CLOCK=1
-export LD_LIBRARY_PATH="${geo_lib}:${env_prefix}/lib:/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-
-set +u
-eval "$("${prefix}/micromamba" shell hook -s bash)"
-micromamba activate "${env_prefix}"
-# shellcheck disable=SC1090
-source "${install_base}/setup.bash"
-set -u
+# micromamba 的库只在老环境里要；镜像里 acados 在 /opt/acados/lib（ldconfig 过）
+env_lib="${env_prefix}/lib"
+[[ -n "${NAV_STACK_ROOT:-}" ]] && env_lib=/opt/acados/lib
+export LD_LIBRARY_PATH="${geo_lib}:${env_lib}:/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+nav_env_setup
 # 车型：PLANNING_VIN，默认 d20/001（新版机器人团队的默认是 d30/001，T48）
 # shellcheck disable=SC1091
 source "${nav_root}/planning/script/planning_vin.sh"
@@ -98,11 +99,11 @@ echo "bag=${bag}"
 echo "日志 ${log_dir}"
 echo "链路: bag 的顶激光/IMU/INSPVAX -> lidar_seg -> /map/occupancy_grid，定位 -> /lightning/odom -> planning"
 
-"${lidar_bin}" >"${log_dir}/lidar_seg.log" 2>&1 &
+( nav_exec nav_perception "${lidar_bin}" ) >"${log_dir}/lidar_seg.log" 2>&1 &
 pids+=($!)
-"${grid_bin}" >"${log_dir}/grid_map.log" 2>&1 &
+( nav_exec nav_perception "${grid_bin}" ) >"${log_dir}/grid_map.log" 2>&1 &
 pids+=($!)
-"${loc_bin}" >"${log_dir}/loc.log" 2>&1 &
+( nav_exec slam "${loc_bin}" ) >"${log_dir}/loc.log" 2>&1 &
 pids+=($!)
 sleep 3
 
@@ -122,6 +123,15 @@ if [[ -n "${PERCEPTION_CMD:-}" ]]; then
   bash -c "${PERCEPTION_CMD}" >"${log_dir}/perception.log" 2>&1 &
   pids+=($!)
   echo "感知节点：${PERCEPTION_CMD}"
+elif [[ -n "${LIVE_PERCEPTION_MODEL:-}" ]]; then
+  # 镜像里（NAV_STACK_ROOT）：我们的感知节点用仓库的部署配置现场算目标；包里录的改名避开（BAG_PLAY_EXTRA 没给时）
+  [[ -n "${NAV_STACK_ROOT:-}" ]] || { echo "LIVE_PERCEPTION_MODEL 要在 nav-dev 镜像里用（Nav_D20/docker/run.sh）"; exit 1; }
+  perc_config="${nav_root}/../deploy_deb/perception_combo_ros/node_src/lidar_3d_detection/config/lidar_3d_detection.yaml"
+  ( nav_exec perception ros2 launch lidar_3d_detection lidar_3d_detection.launch.py config:="${perc_config}" \
+      model_dir:="${LIVE_PERCEPTION_MODEL}" ) >"${log_dir}/perception.log" 2>&1 &
+  pids+=($!)
+  echo "感知节点：我们的 lidar_3d_detection（${perc_config}，模型 ${LIVE_PERCEPTION_MODEL}）"
+  [[ -n "${BAG_PLAY_EXTRA:-}" ]] || play_args+=(--remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects)
 fi
 ros2 bag play "${play_args[@]}" "${bag}" >"${log_dir}/bag.log" 2>&1 &
 bag_pid=$!
@@ -129,7 +139,7 @@ pids+=("${bag_pid}")
 
 if [[ "${with_planning}" -eq 1 ]]; then
   sleep 2
-  "${plan_bin}" >"${log_dir}/planning.log" 2>&1 &
+  ( nav_exec planning "${plan_bin}" ) >"${log_dir}/planning.log" 2>&1 &
   pids+=($!)
 fi
 

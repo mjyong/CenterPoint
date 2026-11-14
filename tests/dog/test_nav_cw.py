@@ -113,3 +113,25 @@ def test_configure_points_the_configs_at_the_map(tmp_path):
 def test_configure_needs_a_site_map(tmp_path):
     r = subprocess.run(["bash", SCRIPT, "configure", str(tmp_path), str(tmp_path)], capture_output=True, text=True)
     assert r.returncode == 1 and "no global_map.yaml" in r.stdout
+
+
+def test_configure_edits_the_installed_copy_not_the_sources(tmp_path):
+    prefix = tmp_path / "nav_cw"
+    rel = "planning/robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt"
+    files = {}
+    for where in ("src/Nav_D20", "install/planning/planning/lib"):
+        f = prefix / where / rel
+        f.parent.mkdir(parents=True)
+        f.write_text("confs{\n    global_map_manager_conf{\n    }\n}\n")
+        (f.parents[3] / "default_robot_vin").write_text("d30/001\n")
+        files[where] = f
+    loc = prefix / "install/slam/lightning/share/lightning/config/default_d20.yaml"
+    loc.parent.mkdir(parents=True)
+    loc.write_text("  map_path: /x\n")
+    m = tmp_path / "map"
+    m.mkdir()
+    (m / "global_map.yaml").write_text("floors: []\n")
+    r = subprocess.run(["bash", SCRIPT, "configure", str(prefix), str(m)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "startup_map_dir" in files["install/planning/planning/lib"].read_text()
+    assert "startup_map_dir" not in files["src/Nav_D20"].read_text()

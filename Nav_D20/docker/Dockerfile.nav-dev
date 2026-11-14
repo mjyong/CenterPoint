@@ -1,0 +1,72 @@
+# One environment for the server's replays: perception (ours, and the robot team's ground segmentation and local
+# grid), localization and planning build and run here together, in one ROS graph. It is dog 8's where that matters:
+# Ubuntu 22.04, ROS 2 Humble from apt, CycloneDDS, CUDA 12.6, TensorRT 10.3 (nvcr.io/nvidia/tensorrt:24.08-py3 has
+# the versions of the Orin's JetPack 6.1; it is also dogperc-dev's base, so it is already on the server). The
+# packages below are the dog's build dependencies too (T55, T56).
+# Each module builds into its own prefix against its own interface copies: Nav_D20/docker/build_stack.sh.
+#
+#   docker build -t nav-dev -f Nav_D20/docker/Dockerfile.nav-dev Nav_D20/docker \
+#       [--build-arg UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu] \
+#       [--build-arg ROS_APT=https://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu] [--build-arg GITHUB=<a GitHub mirror>]
+#   bash Nav_D20/docker/run.sh bash Nav_D20/docker/build_stack.sh
+#   NAV_GPU=5 bash Nav_D20/docker/run.sh bash Nav_D20/planning/script/replay_planning_check.sh <name> <x> <y> [--bag ...]
+FROM nvcr.io/nvidia/tensorrt:24.08-py3
+
+ARG UBUNTU_MIRROR=
+ARG ROS_APT=http://packages.ros.org/ros2/ubuntu
+ARG ROS_KEY=https://raw.githubusercontent.com/ros/rosdistro/master/ros.key
+ARG GITHUB=https://github.com
+ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN if [[ -n "${UBUNTU_MIRROR}" ]]; then \
+        sed -i -E "s#https?://(archive|security)\.ubuntu\.com/ubuntu#${UBUNTU_MIRROR}#g" /etc/apt/sources.list; fi \
+ && apt-get update && apt-get install -y --no-install-recommends curl gnupg2 ca-certificates lsb-release git \
+ && curl -fsSL "${ROS_KEY}" -o /usr/share/keyrings/ros-archive-keyring.gpg \
+ && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] ${ROS_APT} jammy main" \
+        > /etc/apt/sources.list.d/ros2.list \
+ && rm -rf /var/lib/apt/lists/*
+
+# ROS 2 Humble and what the four modules find_package (their CMakeLists / package.xml, T55's list)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake ninja-build python3-colcon-common-extensions python3-pip \
+        ros-humble-ros-base ros-humble-rmw-cyclonedds-cpp ros-humble-rosbag2 ros-humble-rosbag2-storage-mcap \
+        ros-humble-launch-ros ros-humble-ament-lint-auto ros-humble-ament-lint-common \
+        ros-humble-grid-map-core ros-humble-grid-map-ros ros-humble-grid-map-octomap ros-humble-grid-map-msgs \
+        ros-humble-octomap ros-humble-octomap-msgs ros-humble-pcl-conversions ros-humble-pcl-msgs ros-humble-pcl-ros \
+        ros-humble-cv-bridge ros-humble-tf2-ros ros-humble-tf2-eigen ros-humble-tf2-geometry-msgs \
+        ros-humble-tf2-sensor-msgs ros-humble-message-filters ros-humble-kdl-parser ros-humble-urdf \
+        ros-humble-diagnostic-msgs ros-humble-visualization-msgs ros-humble-plotjuggler-msgs \
+        libpcl-dev libceres-dev libgoogle-glog-dev libgflags-dev libprotobuf-dev protobuf-compiler libyaml-cpp-dev \
+        liburdfdom-dev libfcl-dev liboctomap-dev libopencv-dev libeigen3-dev libgl1-mesa-dev libglew-dev \
+        libgtest-dev zlib1g-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# From source, the versions the server's micromamba environment had (planning/docs/ONBOARDING.md): OSQP 0.6.3
+# (planning uses the 0.6 interface), OsqpEigen 0.10.0, acados 0.5.1; g2o; Livox-SDK2 (livox_ros_driver2 links it)
+ARG OSQP_REF=v0.6.3
+ARG OSQP_EIGEN_REF=v0.10.0
+ARG ACADOS_REF=v0.5.1
+ARG G2O_REF=20230806_git
+ARG LIVOX_SDK2_REF=v1.2.5
+RUN set -e; b() { cmake -S "$1" -B "$1/build" -G Ninja -DCMAKE_BUILD_TYPE=Release "${@:2}" \
+        && cmake --build "$1/build" && cmake --install "$1/build"; } \
+ && git clone --depth 1 --branch "${OSQP_REF}" --recurse-submodules --shallow-submodules "${GITHUB}/osqp/osqp" /tmp/osqp \
+ && b /tmp/osqp \
+ && git clone --depth 1 --branch "${OSQP_EIGEN_REF}" "${GITHUB}/robotology/osqp-eigen" /tmp/osqp-eigen \
+ && b /tmp/osqp-eigen -DBUILD_TESTING=OFF \
+ && git clone --depth 1 --branch "${ACADOS_REF}" --recurse-submodules --shallow-submodules "${GITHUB}/acados/acados" /tmp/acados \
+ && b /tmp/acados -DACADOS_WITH_QPOASES=ON -DCMAKE_INSTALL_PREFIX=/opt/acados \
+ && git clone --depth 1 --branch "${G2O_REF}" "${GITHUB}/RainerKuemmerle/g2o" /tmp/g2o \
+ && b /tmp/g2o -DG2O_BUILD_APPS=OFF -DG2O_BUILD_EXAMPLES=OFF -DBUILD_UNITTESTS=OFF \
+ && git clone --depth 1 --branch "${LIVOX_SDK2_REF}" "${GITHUB}/Livox-SDK/Livox-SDK2" /tmp/livox \
+ && b /tmp/livox \
+ && rm -rf /tmp/osqp /tmp/osqp-eigen /tmp/acados /tmp/g2o /tmp/livox \
+ && echo /opt/acados/lib > /etc/ld.so.conf.d/acados.conf && ldconfig
+
+# the repository's Python tools (planning_mcap_viz, bag_on_map, objects_in_map, the yield gate's golden data)
+RUN python3 -m pip install --no-cache-dir "numpy==1.26.4" "scipy>=1.8" "rosbags>=0.9" mcap pyyaml
+
+# like the dog: CycloneDDS. Domain 42 so that a container started with --net host could not reach the dog's 0;
+# run.sh gives each container its own network anyway.
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ROS_DOMAIN_ID=42 LIBRARY_PATH=/opt/acados/lib HOME=/tmp

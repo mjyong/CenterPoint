@@ -189,6 +189,8 @@ Tracking 的状态（`src/runnable/mission/mission_state_machine/mission_fsm_bas
 
 命令都在 CenterPoint 仓库根目录执行。
 
+**统一的环境（T58 起）**：`Nav_D20/docker/Dockerfile.nav-dev`（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），感知（我们的和机器人团队的）、定位、规划都在里面编和跑：`bash Nav_D20/docker/run.sh bash Nav_D20/docker/build_stack.sh`，回放 `bash Nav_D20/docker/run.sh bash Nav_D20/planning/script/replay_planning_check.sh …`（`LIVE_PERCEPTION_MODEL=<引擎目录>` 现场重算感知）。每个模块编进自己的前缀、用自己那份接口包：机器人团队每个模块带一份，几份不一样（kygi665_msgs 的 RTK 固定解 seres_interface 是 58、slam/interface 是 55），不能合成一个工作区。T58 验过以后它是默认，下面的 micromamba 是备用。
+
 **编译环境**：规划是 ROS 2 Humble 的 C++ 节点（acados、Ceres、g2o、OSQP 0.6、grid_map、OctoMap、PCL、CUDA）。狗上的 aarch64 包走官方镜像和 `bash build.sh -arm`；这台机器连不上那个镜像仓库，本机调试用 `/public/zjst/robot/planning_humble_env`：
 - `env/`：micromamba 的 robostack-humble（加 grid_map、octomap、PCL、OpenCV 5、Ceres、g2o、glog、Eigen、Protobuf）；
 - 源码装进同一前缀的 acados 0.5.1、OSQP 0.6.3（规划用 0.6 的接口，不能换 1.0）、OsqpEigen 0.10.0；

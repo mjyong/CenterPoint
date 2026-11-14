@@ -24,16 +24,11 @@ shift 3
 nav_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 repo_root="$(cd "${nav_root}/.." && pwd)"
 out="${repo_root}/work_dirs/planning_io_${name}"
-prefix=/public/zjst/robot/planning_humble_env
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
-export MAMBA_ROOT_PREFIX="${prefix}/root"
-export CONDA_BUILD=0
-set +u
-eval "$("${prefix}/micromamba" shell hook -s bash)"
-micromamba activate "${prefix}/env"
+# 环境：nav-dev 镜像里（NAV_STACK_ROOT）用 build_stack.sh 编的各模块前缀，否则 micromamba（nav_env.sh）
 # shellcheck disable=SC1091
-source "${prefix}/colcon/install/setup.bash"
-set -u
+source "${nav_root}/planning/script/nav_env.sh"
+nav_env_setup
 
 rm -rf "${out}"
 mkdir -p "$(dirname "${out}")"

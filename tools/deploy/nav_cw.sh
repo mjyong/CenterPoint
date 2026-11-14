@@ -87,9 +87,12 @@ need_units() {
 configure() {   # configure <prefix> <map dir>
   local prefix="$1" map="${2%/}" loc plan vin
   [[ -f "${map}/global_map.yaml" ]] || { echo "${map}: no global_map.yaml (a site map directory)"; exit 1; }
-  loc="$(find "${prefix}" -path '*lightning/config/default_d20.yaml' | head -1)"
-  plan="$(find "${prefix}" -path '*robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt' | head -1)"
-  vin="$(find "${prefix}" -path '*robot_factory/default_robot_vin' | head -1)"
+  # the installed copies (build_stack.sh: <prefix>/install/<module>), never the sources under <prefix>/src
+  local base="${prefix}"
+  [[ -d "${prefix}/install" ]] && base="${prefix}/install"
+  loc="$(find "${base}" -path '*lightning/config/default_d20.yaml' -not -path '*/src/*' | head -1)"
+  plan="$(find "${base}" -path '*robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt' -not -path '*/src/*' | head -1)"
+  vin="$(find "${base}" -path '*robot_factory/default_robot_vin' -not -path '*/src/*' | head -1)"
   [[ -n "${loc}" && -n "${plan}" && -n "${vin}" ]] || { echo "${prefix}: lightning config, d20/001 planning_conf or default_robot_vin not found"; exit 1; }
   sed -i -E "s|^([[:space:]]*map_path:[[:space:]]*).*|\1${map}|" "${loc}"
   awk -v map="${map}" '
