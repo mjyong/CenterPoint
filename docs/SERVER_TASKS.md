@@ -166,7 +166,7 @@
 | T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 完成，已复核（2026-11-14）：狗上的 -dev 和 ROS 包都齐，只缺 g2o、acados、OsqpEigen，源码都在服务器上，不用人下载。和狗上的接口两处不同，其中 App 发目标的 /nav/navigation 多了 nav_mode，要人定 |
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步，已复核（2026-11-14）：编、装、地图、服务都过了。复核发现影子模式按原来的做法不生效（规划不读命令行参数），已改；启动脚本的库路径、App 盘快满、App 的地图切换、演练的共享内存四件事交给 T59 |
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T59 | 半天 | 任务已写好 |
-| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径，App 地图 follow（只放 ad68517c）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 4 步：App 目录放回 ad68517c 后 /userdata 只剩 7.1 MB，不到 20 MB，演练没做 |
+| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径，App 地图 follow（只放 ad68517c）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 4 步，已复核（2026-11-14）：第 0–3 步都对。ad68517c 一份 391 MB，App 的盘放不下（只剩 7.1 MB）；第 4 步改成在 App 目录放软链接，从第 4 步接着做 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
 
@@ -9622,9 +9622,19 @@ sudo 用 sudo -n。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T59
      grep -nE "pub_cmd_vel|pub_motion|sub_map_switch" <装好的 communication_conf>；cat /opt/seres/nav_cw/nav_cw.env；nav_cw.sh speed show
    抄下来。再 speed off、appmap follow（人定 follow），switches 再抄一次（appmap follow、NAV_CW_SLAM_ARGS 没了）；shadow on 留着给第 5 步
    （rehearsal on 没有影子模式不肯起）。
-4. App 地图（人定 follow，只放 ad68517c）：/userdata/config/robot_service/map/ 里我们的只有 ad68517c 一张（a70c6db6 不在：T56 拷到一半
-   删了的，确认没有残留）；du -sh 它、df -h /userdata 抄下来；Avail 不到 20 MB 就停下报（App 的盘满了会影响机器人的服务）。
-   App 里选不选得到 ad68517c 人去看（不改 App 的数据库）。
+4. App 地图（人定 follow，只放 ad68517c）。App 的盘 /userdata 只有 433 MB，ad68517c 拷一份 378 MB 只剩 7.1 MB（T59 第一次停在这）：
+   App 目录里放一个软链接，指到 /opt/seres/nav_cw/maps/ 那份，不占 /userdata（T59 复核）。
+   - 先确认读这个目录的进程不在容器里（容器里软链接指不到 /opt）：
+       sudo -n docker ps 2>/dev/null | head；
+       sudo -n bash -c 'for p in /proc/[0-9]*; do r=$(readlink $p/root 2>/dev/null) || continue; [[ $r == / ]] && continue;
+         echo "${p#/proc/} root=$r $(tr "\0" " " < $p/cmdline | cut -c1-100)"; done' | head -20
+     都是空的（没有容器里的进程）才往下；有的话抄下来，停下；
+   - sudo -n ln -s /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 /userdata/config/robot_service/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+     ls -la /userdata/config/robot_service/map/；df -h /userdata（可用还是 385 MB 左右）；
+     ls /userdata/config/robot_service/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13/{global_map.yaml,3d/index.txt,2d/1780551612/semantic.osm}
+     三个都在；
+   - 换回：sudo -n rm /userdata/config/robot_service/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13（删的是软链接本身：不加 -r，末尾不带 /）；
+   - App 里选不选得到 ad68517c 人去看（不改 App 的数据库）。
 5. 演练（域 42，共享内存开着；狗停着、人知道）。下面的 ros2 命令都用 root 跑（机器人的共享内存是 root 的 iox-roudi，nvidia 的进程拿到的
    数据不全，T40），环境：
      E='source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/planning/setup.bash; export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml'
@@ -9699,6 +9709,28 @@ rehearsal on 的输出；bag info；演练的日志（60 s 那次切换前后；
 **第 4 步，停下。** ad68517c 在 `/opt/seres/nav_cw/maps/` 是 378 MB。第 0 步它还在 App 目录里时，`/userdata` 可用 7.1 MB。按上一版任务文字，这份拷贝在 19:35 删掉了：现在 App 目录只剩 c1adbe7b（5.9 MB），可用 385 MB，a70c6db6 没有。没有再拷回去，拷回去就是第 0 步那 7.1 MB，机器人团队的四个服务正在跑。
 
 开关留在第 3 步给演练的状态：shadow on、appmap follow、speed off。cw-planning 是 inactive，影子话题要等它起来才发。`status` 仍是 `running: theirs`。1112 还在狗上 `/home/nvidia/bags/1112_t40`。
+
+
+### T59 复核（2026-11-14）
+
+第 0–3 步都对：三个 unit 都读 `nav_cw.env`，`cw-slam` 带 `$$NAV_CW_SLAM_ARGS`；启动脚本里机器人团队的库目录只给云台和回充（他们的
+`lib/` 里是 glog 0.6、gflags、octomap 1.10，和我们链的系统版本不一样，原来那样放在最前面确实会混用）；按启动脚本的真实环境 `ldd`，
+三个节点都 0 行；开关都对。停在第 4 步也对。
+
+1. **ad68517c 一份就放不下**：`/userdata` 433 MB，这张图 391 MB（定位的点云 `3d/` 189 MB、`2d/` 里的 `map.pgm` 117 MB、建图的
+   `session/` 85 MB），放进去只剩 7.1 MB。"App 少放一张"也不够。改成在 App 目录放一个**软链接**指到 `/opt/seres/nav_cw/maps/` 那份：
+   - 不占 `/userdata`；内容是全的：App 发 `/map/switch` 时规划照这个路径读 2D 和人行横道，定位比 UUID（同一张就不动）；换回机器人团队的
+     服务以后，他们的定位要是照 App 切到 ad68517c，也读得到点云；
+   - 前提是读这个目录的进程不在容器里（容器里看不到 `/opt`），第 4 步先查；
+   - 退路：只拷 `global_map.yaml` 和 `2d/`（约 118 MB），规划够用；他们的定位切过去时没有 `3d/index.txt` 会忽略（`onMapSwitch`）。
+   **人：软链接行不行（App 那边会不会不认）。**
+2. 19:35 那次删 App 目录里的 ad68517c，是照任务改之前的文字（那时写着 ignore 就删）做的；删的是我们自己的拷贝，没碍事，`/userdata`
+   回到 385 MB 可用。以后任务改了，开工前先 `git pull` 再看一遍。
+3. `switches` 的速度一行印成 `0.8 m/s0.8`：`${v:-…}` 在 v 有值时展开成 v 本身，叠了一次。改了；测试改成比整行。
+4. 第 0 步 86 passed、1 skipped：跑的那台没有 g++ 和 Eigen（`test_yield_gate_cpp`），不是问题。
+5. 留给演练的状态是对的：shadow on、appmap follow、speed off，我们的三个没起，`running: theirs`；1112 还在狗上。
+
+T59 从第 4 步接着做（第 4 步已改成软链接）。
 
 ---
 

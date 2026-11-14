@@ -44,7 +44,7 @@ ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original'    # 换回（�
 | 服务器 | `10.36.136.7` | `ssh dog` 经反向隧道到狗（`DEPLOY_ORIN.md` 第 1 节：端口 5038，用户 `nvidia`）；拷回录包，跑分析 |
 | 狗边上的本机 | 连着狗 | 维持隧道；跑 Foxglove 桌面版（连狗的 8765，不在一个网段就 `ssh -N -L 8765:127.0.0.1:8765 nvidia@<狗>`） |
 | 8 号狗 | Orin，L4T R36.4.0，`tegra-ubuntu` | 跑导航；CycloneDDS 只绑 eth1，域 0，`/opt/ros/cyclonedds.xml` |
-| App | 手机 | 看狗的位置和状态、遥控、选地图。App 最后发的 `/map/switch` 是 latched 的，我们的规划和定位一起来就照它切图：`appmap follow`（默认）时 **App 当前地图必须是仓库版的 ad68517c**；`appmap ignore` 时我们不听 App 的，一直用站点地图（App 上显示的位置就不准了）。人定（2026-11-14）用 follow，App 目录里只放 ad68517c 一张；ignore 是 App 选不到它时的退路 |
+| App | 手机 | 看狗的位置和状态、遥控、选地图。App 最后发的 `/map/switch` 是 latched 的，我们的规划和定位一起来就照它切图：`appmap follow`（默认）时 **App 当前地图必须是仓库版的 ad68517c**；`appmap ignore` 时我们不听 App 的，一直用站点地图（App 上显示的位置就不准了）。人定（2026-11-14）用 follow。App 的盘只有 433 MB，放不下这张图（391 MB），App 目录里是指到 `/opt/seres/nav_cw/maps/` 的软链接（T59 复核）；ignore 是 App 选不到它时的退路 |
 | 遥控器 | 人手里 | 人接管。和规划的指令谁优先由机器人团队的运控决定，第一次上板先试（第 8 节第 1 步） |
 | 急停 | 专人拿着 | 狗走的时候一直拿着，不干别的 |
 | Foxglove | 本机 | 看（第 6 节）、发目标；不能发别的 |

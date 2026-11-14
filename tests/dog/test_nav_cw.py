@@ -384,7 +384,7 @@ def test_speed_caps_only_the_mppi(root):
     assert "max_vx: 0.8" in mppi and "reference_velocity: 0.8" in mppi and "max_vy: 0.5" in mppi
     assert 'NAV_CW_SPEED="0.8"' in root.env.read_text() and "restart cw-planning.service" in root.calls()
     assert root("speed", "fast").returncode == 2
-    assert "speed cap:        0.8 m/s" in root("switches").stdout
+    assert "  speed cap:        0.8 m/s\n" in root("switches").stdout             # once (T59: "0.8 m/s0.8")
     root("speed", "0.5")                                  # a second cap: the kept file stays the installed one
     r = root("speed", "off")
     assert r.returncode == 0, r.stdout + r.stderr

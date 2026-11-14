@@ -361,7 +361,7 @@ switches() {
   fi
   echo "  perception debug: $([[ -n "$(env_get LIDAR3D_ARGS)" ]] && echo "on ($(env_get LIDAR3D_ARGS))" || echo off)"
   local v; v="$(env_get NAV_CW_SPEED)"
-  echo "  speed cap:        ${v:+${v} m/s}${v:-off (repository value)}"
+  if [[ -n "${v}" ]]; then echo "  speed cap:        ${v} m/s"; else echo "  speed cap:        off (repository value)"; fi
   if [[ -n "$(env_get NAV_CW_REHEARSAL)" ]]; then
     echo "  REHEARSAL ON:     ours on domain $(env_get ROS_DOMAIN_ID), the robot team's navigation stopped (nav_cw.sh rehearsal off)"
   fi
