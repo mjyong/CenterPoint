@@ -146,6 +146,10 @@ configure() {   # configure <prefix> <map dir>
   comm="$(find "${base}" -path '*robot_factory/d20/001/planning_conf/communication_conf.pb.txt' -not -path '*/src/*' | head -1)"
   [[ -n "${loc}" && -n "${plan}" && -n "${vin}" ]] || { echo "${prefix}: lightning config, d20/001 planning_conf or default_robot_vin not found"; exit 1; }
   sed -i -E "s|^([[:space:]]*map_path:[[:space:]]*).*|\1${map}|" "${loc}"
+  # localization's map cloud (18.6 MB for ad68517c) and its /map grid (117 MB) are more than the robot's shared memory
+  # takes (iceoryx chunks of 16 MB: the publish throws and the localization did not start, T59); nothing of ours
+  # reads them (planning: enable_global_map_reload false; Foxglove shows the planner's overview of the map)
+  sed -i -E "s/^([[:space:]]*(publish_map_cloud|publish_occ_grid):[[:space:]]*)true/\1false/" "${loc}"
   awk -v map="${map}" '
     /^[[:space:]]*startup_map_dir:/ { next }
     { print }
@@ -157,6 +161,7 @@ configure() {   # configure <prefix> <map dir>
     echo "debug topics: $(grep -E '^[[:space:]]*(pub_flag|enable_global_map_pub):' "${comm}" | tr -s ' ' | tr '\n' ' ')"
   fi
   echo "localization: $(grep -m1 -E '^[[:space:]]*map_path:' "${loc}" | sed 's/^ *//')  (${loc})"
+  echo "              $(grep -E '^[[:space:]]*(publish_map_cloud|publish_occ_grid):' "${loc}" | sed 's/#.*//' | tr -s ' ' | tr '\n' ' ')"
   echo "planning:     $(grep -m1 startup_map_dir "${plan}" | sed 's/^ *//')  (${plan})"
   echo "vehicle:      $(cat "${vin}")"
 }

@@ -165,8 +165,9 @@
 | T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 完成，已复核（2026-11-14）：起来就读站点地图、没放行在人行横道上的处理、GPU 起点间隙都验了（T51 卡住那次 270/354 → 95/3109）。狗上的 App 只有 c1adbe7b，没有人行横道文件 |
 | T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 完成，已复核（2026-11-14）：狗上的 -dev 和 ROS 包都齐，只缺 g2o、acados、OsqpEigen，源码都在服务器上，不用人下载。和狗上的接口两处不同，其中 App 发目标的 /nav/navigation 多了 nav_mode，要人定 |
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步，已复核（2026-11-14）：编、装、地图、服务都过了。复核发现影子模式按原来的做法不生效（规划不读命令行参数），已改；启动脚本的库路径、App 盘快满、App 的地图切换、演练的共享内存四件事交给 T59 |
-| T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T59 | 半天 | 任务已写好 |
-| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步：共享内存不串域，图也对；定位发 18.6 MB 的块超出 iceoryx 的 16 MB，默认定位没起来。四个导航服务已起回 |
+| T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T61 | 半天 | 任务已写好 |
+| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
+| T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 任务已写好 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
 
@@ -9752,6 +9753,69 @@ ok  mode_switch_node  SUBSCRIPTION  not on /map/switch
 **第 5 步 d，停下。** 播放器同时带上定位的前缀，`kygi665_msgs/msg/INSPVAX` 能解析，`play.log` 里 Ignoring 是 0。定位读了 ad68517c，接着发地图时 iceoryx 报 `MEPOO__MEMPOOL_GETCHUNK_CHUNK_IS_TOO_LARGE`，块大小 18594925 字节（约 18.6 MB），配置里最大的池是 16777216（16 MB），一共 10 次。然后 `启动默认定位异常: failed to publish message`，定位线程退出，`/lightning/odom` 没有数据，规划一直 `/lightning/odom timeout`、`mission_state: fault`。Foxglove 在域 42：crosswalk、path_tracking、occmap、影子的 motion 各约 160 条，odom 是 0。温度平均 52.0 °C、最高 56.7 °C。没有 `PUBLISHER_LIST_FULL` / `SUBSCRIBER_LIST_FULL`。
 
 回放停掉以后 `rehearsal off`。除了那四个导航服务，别的服务重启次数没有变；那四个也是 0 → 0，都回到 active。`shadow off`。最后的 switches：shadow off、appmap ignore、speed off，没有 REHEARSAL ON。1112 还在狗上。
+
+
+### T59 续 复核（2026-11-14）
+
+第 4 步、第 5 步 a–c 都对：域 42 的探针域 0 一条也没收到（共享内存按域隔开），`rehearsal on` 的图六行都 ok，播放器带上定位的前缀
+才能解析 `INSPVAX`（`Ignoring` 0），这个处理得好；停下时 `rehearsal off`、四个服务都起回来、别的服务重启次数没变。
+
+**这次演练抓到了一个上狗必炸的问题**（只有用共享内存演练才看得到，不用共享内存就漏了）：
+1. 定位起来先发地图点云 `/lightning/map_cloud`：ad68517c 的 `global.pcd` 474 万点，0.5 m 体素以后约 58 万点 × 32 字节 = 18.6 MB，
+   机器人的 iceoryx 一块最大 16 MB，发不出去就抛异常，`startDefaultLocalization` 接住以后定位线程就退出了，没有 odom。
+   同一个函数接着还要发 `/map` 栅格：10293 × 11412 格 = 117 MB，一样发不出去（这个函数自己 catch 了，只记错误）。
+2. 规划的 `/planning/debug/global_map_manager/occmap` 也是整张图（0.1 m，117 MB），有新的订阅者就发。Foxglove 的布局显示这一层，
+   现场一连上规划就会在发布时抛异常、没人接住，规划进程退出。演练的探针没订这个话题，所以没炸出来。
+3. 机器人团队自己用的 c1adbe7b 只有 5.9 MB，所以他们没碰到；以后换大图一样会出（值得告诉他们：iceoryx 16 MB 一块，发布失败会抛异常）。
+
+修了（仓库）：
+- `nav_cw.sh configure` 把装好的定位配置里 `publish_map_cloud`、`publish_occ_grid` 设成 false：我们的东西都不读这两个
+  （规划 `enable_global_map_reload: false`；Foxglove 看规划的缩略图）；
+- 定位 `loc_system.cc`：发地图点云失败只记错误，不再让定位退出（两处）；
+- 规划：载入地图时算一份缩略（`global_map_manager/map_overview.h`，k×k 取最坏，最多 400 万格；ad68517c 是 0.6 m、1716 × 1902、3.3 MB），
+  调试话题发它；发布失败只记错误。`map_overview.h` 单独编、测（`tests/dog/test_map_overview.py`，含方向和整张图的大小）。
+后两处要重编规划和定位，交给 T61；装好以后要重跑 `configure`、`apply`（重装会盖掉装好的配置）。
+
+---
+
+## T61 重编规划和定位（大消息），再演练（接 T59 第 5 步）
+
+```text
+任务 T61（T59 续复核以后）。为什么：狗上的共享内存（iox-roudi）一块最大 16 MB；ad68517c 的地图点云 18.6 MB、栅格 117 MB，定位发不出去
+就退出了（T59）；规划的全局栅格调试话题 117 MB，Foxglove 一订规划就会退出。仓库里修了三处（T59 续复核）。规矩同 T59：只写
+/opt/seres/nav_cw/、/home/nvidia/、/tmp/nav_cw_rehearsal/；演练时 Agent 用 nav_cw.sh rehearsal on / off 停、起机器人团队的四个导航服务，
+别的服务不动；演练只用域 42；sudo -n。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T61
+
+0. git pull；pytest（T58 第 0 步那九个文件，再加 tests/dog/test_map_overview.py；91 passed）。ssh dog true；
+   sudo -n bash /opt/seres/nav_cw/nav_cw.sh status → running: theirs（不是就停下问）。
+1. 源码：rsync Nav_D20/{planning,slam,docker} 到 /opt/seres/nav_cw/src/Nav_D20/（同 T56 第 2 步）；记下 git rev-parse HEAD；
+   grep -n "map cloud not published" .../slam/lightning-lm-master/src/core/system/loc_system.cc（两行）、
+   grep -n "overview()" .../planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.cc（一行）确认是新的。
+2. 重编（只编 slam、planning；build 目录还在 /opt/seres/nav_cw/build，应该是增量的）：环境同 T56 第 3 步，
+     nice -n 19 ionice -c3 bash /opt/seres/nav_cw/src/Nav_D20/docker/build_stack.sh /opt/seres/nav_cw slam planning 2>&1 | tail -40
+   记下用时（增量还是全编）；tegrastats 同 T56。编不过：抄前 30 行，停下（是我们新改的那几处就报上来）。
+   ldd（带 T56 第 3 步的 LD_LIBRARY_PATH）：planning、mode_switch_node 的 not found 是 0。两个 install 的 version.txt 写日期和 git sha。
+3. 装好的配置被重编盖掉了，重新写：
+     sudo -n bash /opt/seres/nav_cw/nav_cw.sh configure /opt/seres/nav_cw /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+   输出里要有 "publish_map_cloud: false publish_occ_grid: false"、pub_flag true、enable_global_map_pub true；
+     sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on；apply；switches（shadow on、appmap ignore、speed off，没有 NOT APPLIED）。
+4. 演练：照 T59 第 5 步 a、c、d、e 做（b 的探针 T59 做过了，不用再做），另外看：
+   - rehearsal on 以后 30 s：journalctl -u cw-slam --since "$T0" | grep -cE "MEPOO|CHUNK_IS_TOO_LARGE" 是 0，没有"启动默认定位异常"；
+     sudo -n bash -c "$E; export ROS_DOMAIN_ID=42; timeout 10 ros2 topic hz /lightning/odom" 有频率（bag 放起来以后）；
+   - journalctl -u cw-planning：有 "GlobalMapManager: overview 1716x1902 at 0.6 m"；
+   - foxglove_probe.py 的话题再加 /planning/debug/global_map_manager/occmap、/lightning/odom：前一个至少 1 条，后一个有数；
+     之后 systemctl show -p NRestarts cw-planning cw-slam 和 rehearsal on 之后一样（Foxglove 订了全局栅格，规划没有重启）；
+   - 整个演练里 journalctl --since "$T0" | grep -E "CHUNK_IS_TOO_LARGE|LIST_FULL" 是 0；
+   - 其余同 T59：回放（包里的目标、切换、指令改名）、5 s 后发目标、60 s 学 App 发 c1adbe7b 的 /map/switch 和 /map/file_update（都不许切）、
+     tegrastats；收尾 rehearsal off、重启次数对比、shadow off、switches。
+5. 服务器上看：同 T59 第 6 步（check_planning_mcap.py、planning_mcap_viz.py、objects_in_map.py 要 extrinsic OK、规划日志、odom、tegrastats）。
+6. 提交：data/reports/T61/、work_dirs/t61_rehearsal（录包 LFS）、本文档。
+
+停止条件：第 2 步编不过或 ldd 有 not found；第 4 步 rehearsal on 失败、odom 还是没有、有 CHUNK_IS_TOO_LARGE、规划因为 Foxglove 重启；
+第 5 步 WRONG。任何一步停下，rehearsal 开着就先 rehearsal off。
+报告（写进"T61 结果"）：重编用时和最后 40 行；ldd；configure 和 switches 的输出；演练的日志（定位起来那段、规划的 overview 一行、
+60 s 那两条前后）、Foxglove 探针、重启次数、objects_in_map、tegrastats。
+```
 
 ---
 

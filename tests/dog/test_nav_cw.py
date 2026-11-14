@@ -160,7 +160,8 @@ def test_configure_points_the_configs_at_the_map(tmp_path):
     vin = prefix / "planning/lib/planning/robot_factory/default_robot_vin"
     for f in (loc, plan, vin):
         f.parent.mkdir(parents=True, exist_ok=True)
-    loc.write_text("system:\n  map_path: /opt/seres/nav/data/ad68517c\n  with_ins: true\n")
+    loc.write_text("system:\n  map_path: /opt/seres/nav/data/ad68517c\n  with_ins: true\n"
+                   "  publish_map_cloud: true # 是否发布地图点云\n  publish_occ_grid: true\n")
     plan.write_text('confs{\n    global_map_manager_conf{\n        input_dir: "/../../data/astar_pgm/"\n'
                     '        startup_map_dir: "/old"\n    }\n}\n')
     vin.write_text("d30/001\n")
@@ -170,6 +171,8 @@ def test_configure_points_the_configs_at_the_map(tmp_path):
     r = subprocess.run(["bash", SCRIPT, "configure", str(prefix), str(m) + "/"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "  map_path: %s\n" % m in loc.read_text() and "with_ins: true" in loc.read_text()
+    # too big for the robot's shared memory (T59): off
+    assert "  publish_map_cloud: false # 是否发布地图点云\n" in loc.read_text() and "  publish_occ_grid: false\n" in loc.read_text()
     p = plan.read_text()
     assert p.count("startup_map_dir") == 1 and 'startup_map_dir: "%s"' % m in p
     assert p.index("global_map_manager_conf") < p.index("startup_map_dir") < p.index("input_dir")

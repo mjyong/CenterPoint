@@ -268,9 +268,15 @@ bool LocSystem::Init(const std::string& yaml_path, bool publish_occ_grid, bool p
                     pcl::toROSMsg(*sampled_cloud, map_msg);
                     map_msg.header.stamp = node_->now();
                     map_msg.header.frame_id = "map";
-                    for (int i = 0; i < 3; i++) {
-                        pub_map_cloud_->publish(map_msg);
-                        sleep(1);
+                    // ours (T59 review): a debug cloud too big to publish (the dog's shared memory takes 16 MB chunks)
+                    // must not stop the localization
+                    try {
+                        for (int i = 0; i < 3; i++) {
+                            pub_map_cloud_->publish(map_msg);
+                            sleep(1);
+                        }
+                    } catch (const std::exception& e) {
+                        LOG(ERROR) << "[INS only] map cloud not published: " << e.what();
                     }
                     LOG(INFO) << "[INS only] Published map cloud: " << map_cloud->size() << " -> "
                               << sampled_cloud->size() << " points.";
@@ -532,9 +538,15 @@ bool LocSystem::Init(const std::string& yaml_path, bool publish_occ_grid, bool p
                 pcl::toROSMsg(*sampled_cloud, map_msg);
                 map_msg.header.stamp = node_->now();
                 map_msg.header.frame_id = "map";
-                for (int i = 0; i < 3; i++) {
-                    pub_map_cloud_->publish(map_msg);
-                    sleep(1);
+                // ours (T59 review): a debug cloud too big to publish (the dog's shared memory takes 16 MB chunks)
+                // must not stop the localization
+                try {
+                    for (int i = 0; i < 3; i++) {
+                        pub_map_cloud_->publish(map_msg);
+                        sleep(1);
+                    }
+                } catch (const std::exception& e) {
+                    LOG(ERROR) << "map cloud not published: " << e.what();
                 }
                 LOG(INFO) << "Published map cloud: " << map_cloud->size() << " -> " << sampled_cloud->size()
                           << " points.";

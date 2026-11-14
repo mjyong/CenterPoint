@@ -239,10 +239,24 @@ bool RosDebugBridge::Publish() {
     if (gmm) {
       const size_t cur_count = global_occmap_pub_->get_subscription_count();
       if (cur_count > last_global_occmap_sub_count_) {
+        // the coarse copy (GlobalMapManager::overview, at most 4 M cells): the full site map is 117 MB, more than
+        // the dog's shared memory takes (16 MB chunks; a bigger publish throws, T59 review)
+        const auto &ov = gmm->overview();
         nav_msgs::msg::OccupancyGrid occmap_msg;
-        grid_map::GridMapRosConverter::toOccupancyGrid(
-            gmm->global_map(), "obstacle", 255.0, 0.0, occmap_msg);   // 255 = free, as above
-        global_occmap_pub_->publish(std::move(occmap_msg));
+        occmap_msg.header.frame_id = "map";
+        occmap_msg.header.stamp = node_->now();
+        occmap_msg.info.resolution = ov.resolution;
+        occmap_msg.info.width = ov.width;
+        occmap_msg.info.height = ov.height;
+        occmap_msg.info.origin.position.x = ov.origin_x;
+        occmap_msg.info.origin.position.y = ov.origin_y;
+        occmap_msg.info.origin.orientation.w = 1.0;
+        occmap_msg.data = ov.data;
+        try {
+          global_occmap_pub_->publish(std::move(occmap_msg));
+        } catch (const std::exception &e) {   // a debug topic never stops the planner
+          AERROR << "global occmap not published: " << e.what();
+        }
       }
       last_global_occmap_sub_count_ = cur_count;
     }

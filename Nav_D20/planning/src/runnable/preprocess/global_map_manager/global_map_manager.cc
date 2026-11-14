@@ -57,7 +57,20 @@ bool GlobalMapManager::Init(PlanningEntry *planning_entry) {
       crosswalks_.clear();   // nothing half-read from that map's OSM
     }
   }
+  BuildOverview();
   return true;
+}
+
+void GlobalMapManager::BuildOverview() {
+  if (!map_loaded_ || !global_map_.exists("obstacle")) {
+    overview_ = MapOverview();
+    return;
+  }
+  const grid_map::Position max_corner = global_map_.getPosition() + 0.5 * global_map_.getLength().matrix();
+  overview_ = BuildMapOverview(global_map_.get("obstacle"), global_map_.getResolution(), max_corner.x(),
+                               max_corner.y(), 4000000);
+  AINFO << "GlobalMapManager: overview " << overview_.width << "x" << overview_.height << " at "
+        << overview_.resolution << " m";
 }
 
 bool GlobalMapManager::Proc() {
@@ -295,6 +308,7 @@ bool GlobalMapManager::ReloadMap(const std::string &map_dir) {
     return false;
   }
   map_dirty_ = true;
+  BuildOverview();
   return true;
 }
 

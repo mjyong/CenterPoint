@@ -199,7 +199,7 @@ Foxglove 的桥（`nav_cw_foxglove.sh`，以 root 跑，带白名单：不限的
 
 | 层 / 面板 | 看什么 | 正常 | 不对说明 |
 |---|---|---|---|
-| `/planning/debug/global_map_manager/occmap` | 全局栅格（站点地图） | 和路网对得上 | 地图不对（App 选错图） |
+| `/planning/debug/global_map_manager/occmap` | 站点地图的缩略（规划载入时算，ad68517c 是 0.6 m；整张 0.1 m 有 117 MB，狗上的共享内存发不了） | 和路网对得上 | 地图不对 |
 | `/map/occupancy_grid` | 感知的局部障碍栅格 | 10 x 10 m 跟着狗，车、墙在对的地方 | 感知或外参问题；断流时规划会暂停 |
 | `/planning/debug/cost_map_production/occmap` | 规划的代价地图 | 障碍外有膨胀 | |
 | `/planning/debug/path_tracking` | 全局路径、局部参考、MPPI 的优化路径 | 沿路，经过人行横道 | 路径穿墙：地图或定位 |
@@ -215,7 +215,7 @@ Foxglove 的桥（`nav_cw_foxglove.sh`，以 root 跑，带白名单：不限的
 
 full 级别多看的：
 
-- 定位：`ins_path`（INS）和 `lio_path`（激光里程计）应该叠在一起；`current_scan_world` 应该贴在 `map_cloud` 上；
+- 定位：`ins_path`（INS）和 `lio_path`（激光里程计）应该叠在一起；`current_scan_world` 应该贴着路网走。`map_cloud` 和 `/map` 在狗上不发（ad68517c 的分别是 18.6 MB、117 MB，超过共享内存 16 MB 一块，`configure` 关了，T59）；
 - 感知：`tracks` 和 `predictions` 是感知自己的框和预测（`camera_init` 系，不在狗的 TF 树里：3D 面板的显示坐标系选 `camera_init` 看；
   开了 `debug perception` 也只有 `camera_init → lidar_det`）。规划实际用的车位置看 `/planning/debug/crosswalk`（已经转到 map）。
 

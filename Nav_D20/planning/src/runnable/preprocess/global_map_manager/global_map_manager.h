@@ -2,6 +2,7 @@
 #include "grid_map_core/grid_map_core.hpp"
 #include "src/algorithm/grid_path_planner/grid_path_planner.h"
 #include "src/common/path2d.h"
+#include "src/runnable/preprocess/global_map_manager/map_overview.h"
 #include "src/runnable/preprocess/preprocess_base.h"
 #include "third_party/osm_map/osm_parser.h"
 #include <opencv2/core.hpp>
@@ -45,6 +46,9 @@ public:
   // crosswalk polygons of the loaded map's OSM (map frame); they do not change the obstacle layers.
   // The yield gate checks vehicles where the global path crosses one (docs/PLANNING_INTEGRATION.md)
   const std::vector<std::vector<Eigen::Vector2d>> &crosswalks() const { return crosswalks_; }
+  // a coarse copy of the obstacle layer (at most 4 M cells), built when a map loads: what the debug topic publishes
+  // (the full site map is 117 MB, more than the dog's shared memory takes; T59 review)
+  const MapOverview &overview() const { return overview_; }
 
 private:
   bool LoadPGMMap(const std::string &pgm_file_path,
@@ -68,6 +72,8 @@ private:
 
   lanelet::osm::OsmParser osm_parser_;
   std::vector<std::vector<Eigen::Vector2d>> crosswalks_;
+  MapOverview overview_;
+  void BuildOverview();
 };
 
 } // namespace preprocess
