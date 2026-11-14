@@ -35,6 +35,7 @@ venv/
 !work_dirs/planning_io_t51_switch/**/metadata.yaml
 !work_dirs/planning_io_t52_cross/**/metadata.yaml
 !work_dirs/planning_io_t53_1112/**/metadata.yaml
+!work_dirs/t61_rehearsal/**/metadata.yaml
 *.sh
 !data/reports/**/*.sh
 *.pth

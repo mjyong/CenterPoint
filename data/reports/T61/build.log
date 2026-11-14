@@ -1,0 +1,532 @@
+START 2026-11-14T20:53:49+08:00
+== slam: kygi665_msgs,rhr_interface,nav2_interface,common_interface (from Nav_D20/seres_interface)
+[1.937s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[1.937s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[1.938s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[2.133s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'rhr_interface' is in: /opt/seres/nav_cw/install/slam/rhr_interface
+	'kygi665_msgs' is in: /opt/seres/nav_cw/install/slam/kygi665_msgs
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding kygi665_msgs rhr_interface
+
+This may be promoted to an error in a future release of colcon-override-check.
+Starting >>> common_interface
+Starting >>> kygi665_msgs
+Finished <<< common_interface [2.91s]
+Starting >>> rhr_interface
+Finished <<< kygi665_msgs [3.51s]
+Starting >>> nav2_interface
+Finished <<< rhr_interface [2.99s]
+Finished <<< nav2_interface [2.95s]
+
+Summary: 4 packages finished [8.25s]
+== slam: novatel_oem7_msgs,basic,livox_ros_driver2 (from Nav_D20/slam)
+[1.742s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[1.742s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[1.742s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[1.877s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'livox_ros_driver2' is in: /opt/seres/nav_cw/install/slam/livox_ros_driver2
+	'novatel_oem7_msgs' is in: /opt/seres/nav_cw/install/slam/novatel_oem7_msgs
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding livox_ros_driver2 novatel_oem7_msgs
+
+This may be promoted to an error in a future release of colcon-override-check.
+Starting >>> basic
+Starting >>> livox_ros_driver2
+Finished <<< basic [1.13s]
+Starting >>> novatel_oem7_msgs
+Finished <<< livox_ros_driver2 [3.34s]
+Finished <<< novatel_oem7_msgs [3.31s]
+
+Summary: 3 packages finished [5.99s]
+== slam: lightning (from Nav_D20/slam)
+[1.776s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[1.777s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[1.777s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> lightning
+--- stderr: lightning
+In file included from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/lightning_math.hpp:22,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/s2.hpp:6,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/nav_state.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.h:19,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.cc:5:
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/options.h: In function ‘void lightning::debug::SigHandle(int)’:
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/options.h:27:27: warning: unused parameter ‘sig’ [-Wunused-parameter]
+   27 | inline void SigHandle(int sig) {
+      |                       ~~~~^~~
+In file included from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.h:19,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.cc:5:
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h: In constructor ‘lightning::Keyframe::Keyframe(long unsigned int, lightning::CloudPtr, lightning::NavState)’:
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h:76:14: warning: ‘lightning::Keyframe::state_’ will be initialized after [-Wreorder]
+   76 |     NavState state_;  // 卡尔曼滤波器状态
+      |              ^~~~~~
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h:71:9: warning:   ‘lightning::SE3 lightning::Keyframe::pose_lio_’ [-Wreorder]
+   71 |     SE3 pose_lio_;  // 前端的pose
+      |         ^~~~~~~~~
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h:22:5: warning:   when initialized here [-Wreorder]
+   22 |     Keyframe(unsigned long id, CloudPtr cloud, NavState state)
+      |     ^~~~~~~~
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.cc: In member function ‘void lightning::LocSystem::MonitorIMUFrameRate(double, double)’:
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.cc:1119:12: warning: unused variable ‘sys_interval’ [-Wunused-variable]
+ 1119 |     double sys_interval = sys_time - last_imu_sys_time_;
+      |            ^~~~~~~~~~~~
+In file included from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/s2.hpp:6,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/nav_state.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/common/keyframe.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.h:19,
+                 from /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/system/loc_system.cc:5:
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/lightning_math.hpp: In instantiation of ‘std::pair<_FIter, _FIter> lightning::math::cos_sinc_sqrt(const scalar&) [with scalar = double]’:
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/lightning_math.hpp:275:55:   required from here
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/lightning_math.hpp:240:34: note: parameter passing for argument of type ‘std::pair<double, double>’ when C++17 is enabled changed to match C++14 in GCC 10.1
+  240 | inline std::pair<scalar, scalar> cos_sinc_sqrt(const scalar& x2) {
+      |                                  ^~~~~~~~~~~~~
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/lightning_math.hpp: In function ‘cos_sinc_sqrt’:
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/lightning_math.hpp:273:12: note: parameter passing for argument of type ‘struct pair’ when C++17 is enabled changed to match C++14 in GCC 10.1
+  273 | inline SO3 exp(const Vec3d& vec, const double& scale = 1) {
+      |            ^
+/usr/include/pcl-1.12/pcl/sample_consensus/impl/prosac.hpp: In function ‘toms748_solve’:
+/usr/include/pcl-1.12/pcl/sample_consensus/impl/prosac.hpp:54: note: parameter passing for argument of type ‘struct pair’ when C++17 is enabled changed to match C++14 in GCC 10.1
+   54 | pcl::ProgressiveSampleConsensus<PointT>::computeModel (int debug_verbosity_level)
+      | 
+/usr/include/boost/math/tools/fraction.hpp: In member function ‘operator()’:
+/usr/include/boost/math/tools/fraction.hpp:121:20: note: parameter passing for argument of type ‘struct pair’ when C++17 is enabled changed to match C++14 in GCC 10.1
+  121 |    value_type v = g();
+      |                    ^
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/lio/imu_processing.hpp: In function ‘cos_sinc_sqrt’:
+/opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/src/core/lio/imu_processing.hpp:301:13: note: parameter passing for argument of type ‘struct pair’ when C++17 is enabled changed to match C++14 in GCC 10.1
+  301 | inline void ImuProcess::Process(const MeasureGroup &meas, ESKF &kf_state, CloudPtr &scan) {
+      |             ^
+---
+[Processing: lightning]
+[Processing: lightning]
+[Processing: lightning]
+[Processing: lightning]
+[Processing: lightning]
+[Processing: lightning]
+[Processing: lightning]
+[Processing: lightning]
+[Processing: lightning]
+[Processing: lightning]
+[Processing: lightning]
+Finished <<< lightning [5min 42s]
+
+Summary: 1 package finished [5min 44s]
+  1 package had stderr output: lightning
+== planning: nav2_interface,common_interface,mc_interface,perception_interface,rte_interface,rhr_interface (from Nav_D20/seres_interface)
+[1.493s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[1.494s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[1.494s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[1.778s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'mc_interface' is in: /opt/seres/nav_cw/install/planning/mc_interface
+	'nav2_interface' is in: /opt/seres/nav_cw/install/planning/nav2_interface
+	'perception_interface' is in: /opt/seres/nav_cw/install/planning/perception_interface
+	'rte_interface' is in: /opt/seres/nav_cw/install/planning/rte_interface
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding mc_interface nav2_interface perception_interface rte_interface
+
+This may be promoted to an error in a future release of colcon-override-check.
+Starting >>> common_interface
+Starting >>> mc_interface
+Finished <<< common_interface [2.83s]
+Starting >>> rhr_interface
+Finished <<< mc_interface [3.14s]
+Starting >>> rte_interface
+Finished <<< rhr_interface [2.05s]
+Starting >>> nav2_interface
+Finished <<< nav2_interface [3.42s]
+Starting >>> perception_interface
+Finished <<< rte_interface [6.70s]
+Finished <<< perception_interface [2.37s]
+
+Summary: 6 packages finished [12.2s]
+== planning: nav_interface (from Nav_D20/planning/third_party)
+[1.790s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[1.790s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[1.790s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> nav_interface
+Finished <<< nav_interface [2.15s]
+
+Summary: 1 package finished [3.32s]
+== planning: planning (from Nav_D20/planning)
+[1.412s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[1.412s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[1.412s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> planning
+--- stderr: planning
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.cc:7:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.cc:7:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/algorithm/teb_planner/teb_planner.h:4,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/algorithm/target_follow_planner/target_follow_planner.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/following/following.h:5,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/following/following.cc:1:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/main.cc:10:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_entry.cc:7:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_factory.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_factory.cc:8:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_state_machine/mission_fsm_base_ctx.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_state_machine/mission_fsm_base_ctx.cc:7:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_state_machine/mission_fsm_base_ctx.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_state_machine/mission_fsm_base.cc:8:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/recharging/fsm/recharging_fsm_base_ctx.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/recharging/fsm/recharging_fsm_base.cc:8:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/recharging/fsm/recharging_fsm_base_ctx.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/recharging/fsm/recharging_fsm_base_ctx.cc:7:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/recharging/recharging.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/recharging/recharging.cc:7:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/skill/skill.h:5,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/skill/skill.cc:1:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/tracking/tracking.h:12,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/tracking/tracking.cc:7:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/preprocess/collision_checker/collision_checker.h:2,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/preprocess/preprocess_entry.h:10,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/preprocess/preprocess_entry.cc:7:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/preprocess/cost_map_production/cost_map_production.h:3,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/preprocess/cost_map_production/cost_map_production.cc:1:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/algorithm/grid_path_planner/grid_path_planner.h:4,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/preprocess/global_map_manager/global_map_manager.h:3,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/preprocess/global_map_manager/global_map_manager.cc:1:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/preprocess/collision_checker/collision_checker.h:2,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/preprocess/preprocess_factory.cc:8:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/d20_ptz_bridge/d20_ptz_bridge.h:5,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/d20_ptz_bridge/d20_ptz_bridge.cc:1:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/r11_head_bridge/r11_head_bridge.h:7,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/r11_head_bridge/r11_head_bridge.cc:1:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_bridge/following_bridge.cc:4:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_bridge/recharging_bridge.cc:4:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/util/tf_buffer.h:2,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.h:7,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_bridge/ros_bridge.cc:1:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_bridge/skill_bridge.cc:4:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_entry.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/entry/planning_entry.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_bridge/tracking_bridge.cc:4:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.h:4,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.cc:1:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+/usr/bin/ld: warning: libopencv_imgproc.so.4.5d, needed by /opt/ros/humble/lib/libgrid_map_ros.so, may conflict with libopencv_imgproc.so.408
+/usr/bin/ld: warning: libopencv_core.so.4.5d, needed by /opt/ros/humble/lib/libgrid_map_ros.so, may conflict with libopencv_core.so.408
+/usr/bin/ld: warning: libopencv_imgcodecs.so.4.5d, needed by /opt/ros/humble/lib/libcv_bridge.so, may conflict with libopencv_imgcodecs.so.408
+---
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+Finished <<< planning [16min 16s]
+
+Summary: 1 package finished [16min 17s]
+  1 package had stderr output: planning
+done: /opt/seres/nav_cw/install/{slam,planning}
+END 2026-11-14T21:16:37+08:00 rc=0

@@ -167,7 +167,7 @@
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步，已复核（2026-11-14）：编、装、地图、服务都过了。复核发现影子模式按原来的做法不生效（规划不读命令行参数），已改；启动脚本的库路径、App 盘快满、App 的地图切换、演练的共享内存四件事交给 T59 |
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T61 | 半天 | 任务已写好 |
 | T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
-| T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 任务已写好 |
+| T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成：定位不再因大消息退出，odom 约 100 Hz；缩略图 1716×1902 一条；Foxglove 订了全局栅格，规划没有重启；外参 OK。演练后 running: theirs |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
 
@@ -9816,6 +9816,47 @@ ok  mode_switch_node  SUBSCRIPTION  not on /map/switch
 报告（写进"T61 结果"）：重编用时和最后 40 行；ldd；configure 和 switches 的输出；演练的日志（定位起来那段、规划的 overview 一行、
 60 s 那两条前后）、Foxglove 探针、重启次数、objects_in_map、tegrastats。
 ```
+
+### T61 结果
+
+做完了。定位发不出大消息也不再退出，odom 有了；规划的全局栅格调试话题是 0.6 m 的缩略（一条，3.3 MB 量级），Foxglove 订上以后规划没有重启。外参 OK。演练结束是 `running: theirs`，shadow off、appmap ignore、speed off，没有 REHEARSAL ON。
+
+**第 0 步。** `3af3220`。pytest 87 passed，4 skipped（这台机器没有 g++ 和 Eigen 3：`test_yield_gate_cpp` 和 `test_map_overview.py` 的三则，同 T59 复核第 4 条）。`nav_cw.sh status` 是 `running: theirs`。
+
+**第 1–2 步。** 源码 rsync 到狗上，`loc_system.cc` 两处 `map cloud not published`，`ros_debug_bridge.cc` 一处 `overview()`。增量重编（`/opt/seres/nav_cw/build` 还在）：20:53:49–21:16:37，一共 22 分 48 秒。接口包几秒；lightning 5 分 44 秒；planning 16 分 17 秒。`rc=0`。planning 的 stderr 是 boost 头文件过时和 OpenCV 4.5/4.8 的链接警告，不是错误。tegrastats 287 条：CPU 平均 61.9 °C、最高 62.9 °C，GPU 平均 47.4 °C、最高 48.2 °C。`ldd`（deps 的 `LD_LIBRARY_PATH` 再 source 各自的 `setup.bash`）：planning、mode_switch_node 的 `not found` 都是 0。两个 `version.txt` 是 2026-11-14、`3af32206ed8cdae83d1f651305d50cec797d538e`。全文 `data/reports/T61/build.log`。
+
+**第 3 步。** `nav_cw.sh` 换成这份（sha256 `211a9612…`）。configure：
+
+```text
+debug topics:  enable_global_map_pub: true  pub_flag: true
+localization: map_path: /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+              publish_map_cloud: false   publish_occ_grid: false
+planning:     startup_map_dir: "/opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13"
+vehicle:      d20/001
+```
+
+`shadow on`、`apply`、`switches`：shadow on、appmap ignore、speed off，没有 NOT APPLIED。三个 cw 服务这时还没起。
+
+**第 4 步。** `iox-roudi` 仍是 root 的 pid 1630。`rehearsal on` 的图六行都 ok，他们四个导航停了，我们三个起来了。
+
+定位：`默认定位模式已启动`，没有 `启动默认定位异常`，`MEPOO|CHUNK_IS_TOO_LARGE` 是 0。第一遍回放是在 30 秒 INS 超时之后才放的，定位用了 YAML 位姿，NDT 对不上，没有 odom。停掉播放、重启 cw-slam 和 cw-planning，包已经在放：`Setting init pose from INS (RTK_FIXED, skip NDT)`，`/lightning/odom` 约 100 Hz。
+
+规划：`GlobalMapManager: overview 1716x1902 at 0.6 m`，`startup map … 5 crosswalks`，车型 d20/001。
+
+Foxglove：`foxglove_bridge on 8765, domain 42`。探针 12 秒：`/planning/debug/global_map_manager/occmap` 1 条，`/lightning/odom` 1194 条，crosswalk / path_tracking / 局部代价地图各约 239 条，影子的 motion 240 条。探针前后 `cw-planning`、`cw-slam` 的 `NRestarts` 都是 0。
+
+60 秒学 App 发 c1adbe7b 的 `/map/switch` 和 `/map/file_update`。`ros2 topic pub --once` 会等一个订阅者，规划在 ignore 下不订这两个话题，所以第一次卡住了；改成 `-w 0` 发出去。之后规划日志里 `Map switch`、`Map update` 是 0，定位日志里 `收到 /map/switch` 是 0，人行横道还是启动时那 5 个。整个演练 `CHUNK_IS_TOO_LARGE|LIST_FULL` 是 0。
+
+狗上的 `ros2 bag record` 没有 mcap 插件（只有 sqlite3），录包是 sqlite3。第一遍因此没录上。第二遍 `rehearsal on` 之后马上放包：又是 `RTK_FIXED` 初始化，overview 那一行还在，`SWITCH_SENT` 21:32:46，`PLAY_DONE` 21:34:31。`rehearsal off` 之后四个导航服务都是 active，`running: theirs`。`shadow off`。从第一遍之前到第二遍之后，在跑的服务重启次数一个都没变（含那四个导航服务；手动 stop/start 不计 `NRestarts`）。
+
+**第 5 步。** 录包 84117 条、177 秒。`/lightning/odom` 16556，影子的 `/nav_cw/shadow/cmd_vel` 3337，全局 occmap 1 条。`/cmd_vel` 没有，这是影子模式。sqlite 转 mcap 时 `kygi665_msgs`、`mc_interface/msg/Motion`、`perception_interface`、`rhr_interface` 不在 rosbags 的类型表里，这四类话题留在 sqlite 里，mcap 是其余话题。
+
+- `objects_in_map.py`（sqlite，exit 0）：4 条静止车，配置的 −90° 漂移中位 0.12 m、4/4 还在 0.5 m 内，另外三个朝向 0/4。`extrinsic OK`。
+- `check_planning_mcap.py`：2 个 PROBLEM。odom 在 0.1 秒有一次 784.5 m 的初始化跳变（viz 把它标成定位初始化，丢掉前 13 帧）；局部代价地图里足迹被占 2259/3499。没有一串跳变。
+- `planning_mcap_viz.py`：165.4 秒，5 个人行横道（这段路上附近 0 个），全局图 1 条。规划 `mission_state`：active 3217、standstill 507、passive 1、standby 1，没有 fault。`CMD` 2488 条，头两条 vx 0.179、0.232，中位 vx 0.41。人行横道日志是启动时那 5 个加一行 `crosswalk yield on, rule wait`，60 秒那两条之后没有再装地图。包放完时有一次输入超时，任务暂停。
+- tegrastats（第二遍播放）：167 条，CPU 平均 52.9 °C、最高 55.1 °C，GPU 平均 44.0 °C、最高 45.0 °C。
+
+狗上的录包和 1112 已删。原文在 `data/reports/T61/`，录包在 `work_dirs/t61_rehearsal/`（mcap 和 sqlite 走 LFS，viz 是普通文件）。
 
 ---
 

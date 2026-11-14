@@ -1,0 +1,84 @@
+START 2026-11-14T19:36:45+08:00
+==== start perception ====
+==== start slam ====
+==== start planning ====
+==== graph at 10s ====
+-- /mc/motion_control --
+Unknown topic '/mc/motion_control'
+-- /cmd_vel --
+Unknown topic '/cmd_vel'
+-- shadow mc --
+Type: mc_interface/msg/Motion
+
+Publisher count: 1
+
+Node name: planning
+Node namespace: /
+Topic type: mc_interface/msg/Motion
+Endpoint type: PUBLISHER
+GID: 01.10.88.59.65.ac.9b.f9.ee.18.9a.a9.00.00.20.03.00.00.00.00.00.00.00.00
+QoS profile:
+  Reliability: RELIABLE
+  History (Depth): KEEP_LAST (10)
+  Durability: VOLATILE
+  Lifespan: Infinite
+  Deadline: Infinite
+  Liveliness: AUTOMATIC
+  Liveliness lease duration: Infinite
+
+Subscription count: 0
+
+-- /map/switch --
+Unknown topic '/map/switch'
+GRAPH_OK
+==== foxglove ====
+{
+ "server": {
+  "name": "",
+  "capabilities": [
+   "clientPublish",
+   "connectionGraph"
+  ]
+ },
+ "channels": {
+  "/clicked_point": "geometry_msgs/msg/PointStamped",
+  "/foxglove_bridge/sysinfo": "foxglove.SystemInfo",
+  "/fused_point_cloud": "sensor_msgs/msg/PointCloud2",
+  "/goal_pose": "geometry_msgs/msg/PoseStamped",
+  "/initialpose": "geometry_msgs/msg/PoseWithCovarianceStamped",
+  "/lightning/odom": "nav_msgs/msg/Odometry",
+  "/map/occupancy_grid": "nav_msgs/msg/OccupancyGrid",
+  "/nav_cw/shadow/cmd_vel": "geometry_msgs/msg/Twist",
+  "/nav_cw/shadow/mc/motion_control": "mc_interface/msg/Motion",
+  "/perception/lidar_3d/objects": "perception_interface/msg/LidarObjectArray",
+  "/planning/debug/collision_checker": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/cost_map_production/occmap": "nav_msgs/msg/OccupancyGrid",
+  "/planning/debug/crosswalk": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/diagnostic": "diagnostic_msgs/msg/DiagnosticArray",
+  "/planning/debug/global_map_manager/occmap": "nav_msgs/msg/OccupancyGrid",
+  "/planning/debug/goal_pose": "visualization_msgs/msg/Marker",
+  "/planning/debug/path_tracking": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/plotjuggler/string": "std_msgs/msg/String",
+  "/tf": "tf2_msgs/msg/TFMessage",
+  "/tf_static": "tf2_msgs/msg/TFMessage"
+ },
+ "received": {
+  "/planning/debug/crosswalk": 0,
+  "/planning/debug/path_tracking": 0,
+  "/planning/debug/cost_map_production/occmap": 0,
+  "/lightning/odom": 0,
+  "/nav_cw/shadow/mc/motion_control": 0
+ },
+ "seconds": 10.0,
+ "missing": [],
+ "silent": [
+  "/planning/debug/crosswalk",
+  "/planning/debug/path_tracking",
+  "/planning/debug/cost_map_production/occmap",
+  "/lightning/odom",
+  "/nav_cw/shadow/mc/motion_control"
+ ],
+ "passed": false
+}
+==== record and play ====
+GOAL_SENT 2026-11-14T19:37:26+08:00

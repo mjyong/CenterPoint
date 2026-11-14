@@ -1,0 +1,29 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1794663097.032239200] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1794663097.035670688] [rosbag2_storage]: Opened database '/home/nvidia/bags/t61_rehearsal/t61_rehearsal_0.db3' for READ_WRITE.
+[INFO] [1794663097.037952096] [rosbag2_recorder]: Listening for topics...
+[INFO] [1794663097.037993632] [rosbag2_recorder]: Event publisher thread: Starting
+[INFO] [1794663097.049331936] [rosbag2_recorder]: Subscribed to topic '/tf'
+[INFO] [1794663097.051387328] [rosbag2_recorder]: Subscribed to topic '/rhr/topic/event_info'
+[INFO] [1794663097.053411424] [rosbag2_recorder]: Subscribed to topic '/planning/debug/plotjuggler/string'
+[INFO] [1794663097.055328512] [rosbag2_recorder]: Subscribed to topic '/lightning/odom'
+[INFO] [1794663097.057779584] [rosbag2_recorder]: Subscribed to topic '/planning/debug/teb_planner'
+[INFO] [1794663097.059471520] [rosbag2_recorder]: Subscribed to topic '/nav_cw/shadow/cmd_vel'
+[INFO] [1794663097.060730720] [rosbag2_recorder]: Subscribed to topic '/map/occupancy_grid'
+[INFO] [1794663097.062227328] [rosbag2_recorder]: Subscribed to topic '/nav_cw/shadow/mc/motion_control'
+[INFO] [1794663097.063851392] [rosbag2_recorder]: Subscribed to topic '/planning/debug/path_tracking'
+[INFO] [1794663097.065929696] [rosbag2_recorder]: Subscribed to topic '/perception/lidar_3d/objects'
+[INFO] [1794663097.067563168] [rosbag2_recorder]: Subscribed to topic '/planning/debug/collision_checker'
+[INFO] [1794663097.069434400] [rosbag2_recorder]: Subscribed to topic '/planning/debug/goal_pose'
+[INFO] [1794663097.070807168] [rosbag2_recorder]: Subscribed to topic '/planning/debug/cost_map_production/occmap'
+[INFO] [1794663097.072412352] [rosbag2_recorder]: Subscribed to topic '/planning/debug/crosswalk'
+[INFO] [1794663097.074136640] [rosbag2_recorder]: Subscribed to topic '/planning/debug/following'
+[INFO] [1794663097.075837824] [rosbag2_recorder]: Subscribed to topic '/rhr/topic/alarm_info'
+[INFO] [1794663097.077879136] [rosbag2_recorder]: Subscribed to topic '/planning/debug/diagnostic'
+[INFO] [1794663097.079257536] [rosbag2_recorder]: Subscribed to topic '/planning/debug/global_map_manager/occmap'
+[INFO] [1794663097.079436704] [rosbag2_recorder]: Recording...
+[INFO] [1794663100.123602144] [rosbag2_recorder]: Subscribed to topic '/rte/rdap/rtk/inspvax'
+[INFO] [1794663105.825471424] [rosbag2_recorder]: Subscribed to topic '/goal_pose'
+[INFO] [1794663163.268892704] [rosbag2_recorder]: Subscribed to topic '/map/switch'
+[INFO] [1794663275.038510016] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[INFO] [1794663275.041124512] [rosbag2_recorder]: Event publisher thread: Exiting
+[INFO] [1794663275.041303040] [rosbag2_recorder]: Recording stopped

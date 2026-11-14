@@ -1,0 +1,44 @@
+{
+ "server": {
+  "name": "",
+  "capabilities": [
+   "clientPublish",
+   "connectionGraph"
+  ]
+ },
+ "channels": {
+  "/clicked_point": "geometry_msgs/msg/PointStamped",
+  "/foxglove_bridge/sysinfo": "foxglove.SystemInfo",
+  "/fused_point_cloud": "sensor_msgs/msg/PointCloud2",
+  "/goal_pose": "geometry_msgs/msg/PoseStamped",
+  "/initialpose": "geometry_msgs/msg/PoseWithCovarianceStamped",
+  "/lightning/odom": "nav_msgs/msg/Odometry",
+  "/map/occupancy_grid": "nav_msgs/msg/OccupancyGrid",
+  "/nav_cw/shadow/cmd_vel": "geometry_msgs/msg/Twist",
+  "/nav_cw/shadow/mc/motion_control": "mc_interface/msg/Motion",
+  "/perception/lidar_3d/objects": "perception_interface/msg/LidarObjectArray",
+  "/planning/debug/collision_checker": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/cost_map_production/occmap": "nav_msgs/msg/OccupancyGrid",
+  "/planning/debug/crosswalk": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/diagnostic": "diagnostic_msgs/msg/DiagnosticArray",
+  "/planning/debug/global_map_manager/occmap": "nav_msgs/msg/OccupancyGrid",
+  "/planning/debug/goal_pose": "visualization_msgs/msg/Marker",
+  "/planning/debug/path_tracking": "visualization_msgs/msg/MarkerArray",
+  "/planning/debug/plotjuggler/string": "std_msgs/msg/String",
+  "/tf": "tf2_msgs/msg/TFMessage",
+  "/tf_static": "tf2_msgs/msg/TFMessage"
+ },
+ "received": {
+  "/planning/debug/crosswalk": 143,
+  "/planning/debug/path_tracking": 143,
+  "/planning/debug/cost_map_production/occmap": 144,
+  "/lightning/odom": 0,
+  "/nav_cw/shadow/mc/motion_control": 144
+ },
+ "seconds": 8.0,
+ "missing": [],
+ "silent": [
+  "/lightning/odom"
+ ],
+ "passed": false
+}

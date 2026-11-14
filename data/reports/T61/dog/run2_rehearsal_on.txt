@@ -1,0 +1,25 @@
+switches (/opt/seres/nav_cw/nav_cw.env; installed: /opt/seres/nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/communication_conf.pb.txt):
+  shadow:           on (commands to /nav_cw/shadow/cmd_vel, /nav_cw/shadow/mc/motion_control)
+  appmap:           ignore (listening on /nav_cw/map/switch; localization: map_switch_topic:=/nav_cw/map/switch)
+  perception debug: off
+  speed cap:        off (repository value)
+  REHEARSAL ON:     ours on domain 42, the robot team's navigation stopped (nav_cw.sh rehearsal off)
+rehearsal: stopping the robot team's navigation, ours on domain 42...
+graph (shadow on, appmap ignore):
+  ok    planning     PUBLISHER         not on /mc/motion_control
+  ok    planning     PUBLISHER         not on /cmd_vel
+  ok    planning     PUBLISHER         on /nav_cw/shadow/mc/motion_control
+  ok    planning     SUBSCRIPTION      not on /map/switch
+  ok    planning     SUBSCRIPTION      not on /map/file_update
+  ok    mode_switch_node SUBSCRIPTION      not on /map/switch
+robot team's:
+  lidar-3d-detection.service   inactive
+  nav_perception.service       inactive
+  slam.service                 inactive
+  planning.service             inactive
+ours (/opt/seres/nav_cw):
+  cw-nav-perception.service    active
+  cw-slam.service              active
+  cw-planning.service          active
+running: ours
+rehearsal on: play the bag on domain 42 (ROS_DOMAIN_ID=42, the robot's CYCLONEDDS_URI, as root)

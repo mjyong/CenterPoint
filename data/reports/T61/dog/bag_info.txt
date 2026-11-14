@@ -1,0 +1,17 @@
+
+Files:             1112_t40_0.db3
+Bag size:          5.5 GiB
+Storage id:        sqlite3
+Duration:          167.656197152s
+Start:             Nov 12 2026 18:59:04.317702368 (1794481144.317702368)
+End:               Nov 12 2026 19:01:51.973899520 (1794481311.973899520)
+Messages:          52692
+Topic information: Topic: /rte/rdap/rtk/inspvax | Type: kygi665_msgs/msg/INSPVAX | Count: 16765 | Serialization Format: cdr
+                   Topic: /rte/rdap/rtk/imus/data_raw | Type: sensor_msgs/msg/Imu | Count: 16766 | Serialization Format: cdr
+                   Topic: /robot/topic/rdap/top_point_cloud2 | Type: sensor_msgs/msg/PointCloud2 | Count: 1676 | Serialization Format: cdr
+                   Topic: /robot/topic/rdap/right_sensor_camera | Type: foxglove_msgs/msg/CompressedVideo | Count: 3954 | Serialization Format: cdr
+                   Topic: /robot/topic/rdap/front_sensor_camera | Type: foxglove_msgs/msg/CompressedVideo | Count: 3954 | Serialization Format: cdr
+                   Topic: /robot/topic/rdap/rear_sensor_camera | Type: foxglove_msgs/msg/CompressedVideo | Count: 3954 | Serialization Format: cdr
+                   Topic: /robot/topic/rdap/left_sensor_camera | Type: foxglove_msgs/msg/CompressedVideo | Count: 3954 | Serialization Format: cdr
+                   Topic: /perception/lidar_3d/objects | Type: perception_interface/msg/LidarObjectArray | Count: 1669 | Serialization Format: cdr
+

@@ -1,0 +1,6 @@
+switches (/opt/seres/nav_cw/nav_cw.env; installed: /opt/seres/nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/communication_conf.pb.txt):
+  shadow:           on (commands to /nav_cw/shadow/cmd_vel, /nav_cw/shadow/mc/motion_control)
+  appmap:           ignore (listening on /nav_cw/map/switch; localization: map_switch_topic:=/nav_cw/map/switch)
+  perception debug: off
+  speed cap:        off (repository value)
+cw-planning.service not running: takes effect when it starts

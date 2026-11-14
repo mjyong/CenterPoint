@@ -1,0 +1,8 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1794663100.023860320] [rosbag2_storage]: Opened database '/home/nvidia/bags/1112_t40/1112_t40_0.db3' for READ_ONLY.
+[INFO] [1794663100.023980512] [rosbag2_player]: Set rate to 1
+[INFO] [1794663100.062461792] [rosbag2_player]: Adding keyboard callbacks.
+[INFO] [1794663100.062566400] [rosbag2_player]: Press SPACE for Pause/Resume
+[INFO] [1794663100.062591616] [rosbag2_player]: Press CURSOR_RIGHT for Play Next Message
+[INFO] [1794663100.062610752] [rosbag2_player]: Press CURSOR_UP for Increase Rate 10%
+[INFO] [1794663100.062626720] [rosbag2_player]: Press CURSOR_DOWN for Decrease Rate 10%
+[INFO] [1794663100.063569056] [rosbag2_storage]: Opened database '/home/nvidia/bags/1112_t40/1112_t40_0.db3' for READ_ONLY.

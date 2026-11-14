@@ -1,0 +1,7 @@
+work_dirs/t61_rehearsal/sqlite: 1670 object messages, 16556 odometry; 2 messages with no odometry within 0.3 s (the gate counts them stale)
+4 static vehicle tracks (the dog moved median 8.3 m, turned median 59 deg while each was seen)
+  det -> base_link yaw  -90.0 deg: cars wander median 0.12 m in the map, 4 of 4 still (< 0.5 m)  (configured)  <- best
+  det -> base_link yaw    0.0 deg: cars wander median 2.38 m in the map, 0 of 4 still (< 0.5 m)
+  det -> base_link yaw   90.0 deg: cars wander median 3.56 m in the map, 0 of 4 still (< 0.5 m)
+  det -> base_link yaw  180.0 deg: cars wander median 2.33 m in the map, 0 of 4 still (< 0.5 m)
+extrinsic OK: the configured yaw keeps parked cars still

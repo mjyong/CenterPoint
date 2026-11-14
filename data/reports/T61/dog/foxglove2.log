@@ -1,0 +1,6 @@
+foxglove_bridge on 8765, domain 42; topics: "^/planning/debug/(path_tracking|goal_pose|collision_checker|crosswalk|diagnostic)$", "^/planning/debug/(cost_map_production|global_map_manager)/occmap$", "^/planning/debug/plotjuggler/string$", "^/map/occupancy_grid$", "^/fused_point_cloud$", "^/lightning/odom$", "^/cmd_vel$", "^/perception/lidar_3d/objects$", "^/goal_pose$", "^/clicked_point$", "^/initialpose$", "^/tf$", "^/tf_static$", "^/mc/motion_control$", "^/nav_cw/shadow/(cmd_vel|mc/motion_control)$"
+[INFO] [1794656293.915015616] [foxglove_bridge]: Starting foxglove_bridge (humble, 3.6.0@)
+[2026-11-14T11:38:13Z ERROR foxglove] Failed to bind port: Address already in use (os error 98)
+terminate called after throwing an instance of 'std::runtime_error'
+  what():  Couldn't initialize websocket server: Bind Error
+[ros2run]: Aborted

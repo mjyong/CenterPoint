@@ -1,0 +1,11 @@
+--- /opt/ros/cyclonedds.xml	2026-10-09 17:53:31.911108128 +0800
++++ /tmp/nav_cw_rehearsal/cyclonedds.xml	2026-11-14 19:36:45.203721600 +0800
+@@ -4,7 +4,7 @@
+             xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/iceoryx/etc/cyclonedds.xsd">
+     <Domain Id="any">
+ 		<SharedMemory>
+-			<Enable>true</Enable>
++			<Enable>false</Enable>
+ 			<LogLevel>info</LogLevel>
+ 		</SharedMemory>
+         <General>

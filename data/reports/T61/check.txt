@@ -1,0 +1,16 @@
+work_dirs/t61_rehearsal/t61.mcap: 11 topics, 27053 transforms
+  /lightning/odom                                  nav_msgs/msg/Odometry                 16556 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid             1676 msgs  frames base_link
+  /nav_cw/shadow/cmd_vel                           geometry_msgs/msg/Twist                3337 msgs  frames -
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid             3499 msgs  frames base_link
+  /planning/debug/crosswalk                        visualization_msgs/msg/MarkerArray     3499 msgs  frames map
+  /planning/debug/diagnostic                       diagnostic_msgs/msg/DiagnosticArray    3499 msgs  frames planning
+  /planning/debug/global_map_manager/occmap        nav_msgs/msg/OccupancyGrid                1 msgs  frames map
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker          3339 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     3499 msgs  frames map
+  /planning/debug/plotjuggler/string               std_msgs/msg/String                    3499 msgs  frames -
+  /tf                                              tf2_msgs/msg/TFMessage                20055 msgs  frames -
+PROBLEM /lightning/odom: not a walking robot: 1 jumps > 1 m (largest 784.5 m; from 0.1 s to 0.1 s); path 914 m, net 784 m over 165.5 s
+PROBLEM /planning/debug/cost_map_production/occmap: the robot stands on an obstacle (>= 10% of its footprint) in 2259 of 3499 grids; the local planner will not plan from there
+NOTE display: /map/occupancy_grid, /planning/debug/cost_map_production/occmap are all drawn in base_link: the planes tilt with the robot and cut through each other in Foxglove (blinking); open tools/planning_mcap_viz.py's output instead
+2 problems
