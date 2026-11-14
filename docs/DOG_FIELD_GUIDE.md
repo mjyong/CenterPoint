@@ -118,27 +118,26 @@ INS /rte/rdap/rtk/inspvax、IMU           │                                   
 
 ### 3.2 回放和演练（域 42，不碰狗的域 0）
 
-在狗上演练和服务器上回放用同一套程序。狗上（T56 第 7 步是完整的做法）：
+狗上演练用的就是现场那三个 `cw-*` 服务、机器人原来的 CycloneDDS 配置（开着共享内存），只是在域 42 上、喂的是包（T59 第 5 步是完整的做法）：
 
 ```bash
-# 关了共享内存的 CycloneDDS 配置副本：机器人的 iox-roudi 不被我们的进程占（T40 它的发布者表满过），也不用担心共享内存跨域
-cp /opt/ros/cyclonedds.xml /tmp/nav_cw_rehearsal/cyclonedds.xml     # 再把 SharedMemory 的 Enable 改成 false
-export ROS_DOMAIN_ID=42 CYCLONEDDS_URI=file:///tmp/nav_cw_rehearsal/cyclonedds.xml
-export PLANNING_TIMEOUT_WALL_CLOCK=1                       # 回放旧包：超时按收到的时刻算（ONBOARDING.md）
-# 环境其余同 cw-*.service（systemctl cat cw-planning 看 Environment= 和 LD_LIBRARY_PATH）
-sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on          # 演练也开着：规划不在 /mc/motion_control 上发
-bash /opt/seres/nav_cw/start/<cw-nav-perception 的启动脚本>   # 只起 lidar_seg、grid_map_memory_node、lidar_3d_detection
-ros2 launch lightning model_switch_launch.py rviz:=false map_switch_topic:=/nav_cw/map/switch
-ros2 run planning planning
-ros2 topic info -v /mc/motion_control                      # 不许有 planning
-ros2 bag play <包> --clock --remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects   # 用现场重算的目标
-ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped "{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}"
+sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on           # 演练必须开着：规划不在 /mc/motion_control 上发
+sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal on        # nav_cw.env 写 ROS_DOMAIN_ID=42、PLANNING_TIMEOUT_WALL_CLOCK=1；
+                                                             # 停机器人团队的四个导航服务，起我们的三个，在域 42 上查图
+E='source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/planning/setup.bash; export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml ROS_DOMAIN_ID=42'
+sudo -n bash -c "$E; ros2 bag play <包> --clock --remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects /map/switch:=/bag/map/switch /cmd_vel:=/bag/cmd_vel /mc/motion_control:=/bag/mc/motion_control"
+sudo -n bash -c "$E; ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped '{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}'"
+sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal off       # 我们的停、他们的起回来，nav_cw.env 里域 42 那两项去掉
 ```
 
-T59 第 5 步是完整的做法。演练不能用 `cw-*.service` 起：它们 `Conflicts=` 机器人团队的服务，一起就把人家的停了。
-Foxglove 也可以看域 42：`sudo -n env ROS_DOMAIN_ID=42 CYCLONEDDS_URI=file:///tmp/nav_cw_rehearsal/cyclonedds.xml bash /opt/seres/nav_cw/nav_cw_foxglove.sh`
-（变量写在 sudo 后面：sudo 会清掉前面设的环境变量，桥就落到域 0 上了）。
-服务器上回放：`Nav_D20/planning/script/replay_planning_check.sh`（nav-dev 镜像，T58）。
+- 包里录的目标、地图切换、指令都改名避开：目标用我们现场重算的；切换和指令是录的时候的，不能当成现在的；
+- `PLANNING_TIMEOUT_WALL_CLOCK=1`：回放旧包时规划的超时按收到消息的时刻算（ONBOARDING.md），只在演练时设；
+- 用 root 跑 ros2 命令：机器人的共享内存是 root 的 `iox-roudi`，`nvidia` 的进程拿到的数据不全（T40）；
+- 第一次用共享内存演练前先验它不串域（T59 第 5 步 b：域 42 发、域 0 收不到）；
+- `rehearsal on` 开着时 `use-new` 不肯执行，`switches` 显示 REHEARSAL ON；我们的服务在域 0 上跑着时 `rehearsal on` 也不肯执行。
+
+Foxglove：`rehearsal on` 时 `sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh` 自己从 `nav_cw.env` 读到域 42；别的时候要看域 42 就
+`sudo -n env ROS_DOMAIN_ID=42 bash …`（变量写在 sudo 后面：sudo 会清掉前面设的环境变量）。服务器上回放：`Nav_D20/planning/script/replay_planning_check.sh`（nav-dev 镜像，T58）。
 
 ---
 
@@ -175,6 +174,7 @@ Foxglove 也可以看域 42：`sudo -n env ROS_DOMAIN_ID=42 CYCLONEDDS_URI=file:
 | `shadow on / off` | 影子模式：规划照常算，`/cmd_vel` 和 `/mc/motion_control` 改发到 `/nav_cw/shadow/cmd_vel`、`/nav_cw/shadow/mc/motion_control`，**狗不按规划走**；人用遥控遛狗，Foxglove 里比。改的是装好的 `communication_conf` 里 `pub_cmd_vel`、`pub_motion` 的名字（规划不读命令行参数：`rclcpp::init(0, nullptr)`，`--ros-args -r` 没用）；重启后到 ROS 图里查，规划还在发 `/mc/motion_control` 就把 `cw-planning` 停掉、退出 3 | 重启 `cw-planning`（任务没了，重发目标） |
 | `appmap follow / ignore` | ignore：规划（`communication_conf` 的 `sub_map_switch`）和定位（launch 参数 `map_switch_topic`）改听 `/nav_cw/map/switch`，App 的 `/map/switch` 不再让它们换图，一直在 `configure` 设的站点地图上；follow：跟 App | 重启 `cw-slam`（重新收敛）、`cw-planning` |
 | `apply` | 把 `nav_cw.env` 里的开关（`NAV_CW_SHADOW`、`NAV_CW_APPMAP`、`NAV_CW_SPEED`）再写进装好的配置：重装会把仓库的配置放回来，开关本身不会丢；`use-new` 换之前自己也写一遍；`switches` 里出现 NOT APPLIED 就是没写进去 | 重启我们在跑的 `cw-slam`、`cw-planning` |
+| `rehearsal on / off` | 演练：on 在 `nav_cw.env` 写 `ROS_DOMAIN_ID=42`、`PLANNING_TIMEOUT_WALL_CLOCK=1`，停机器人团队的四个导航服务，起我们的三个、在域 42 上查图（要影子模式开着；我们的在域 0 上跑着时不肯）；off 换回去、去掉那两项（第 3.2 节） | 演练期间狗没有导航 |
 | `check` | 查 ROS 图：谁在发 `/mc/motion_control`、`/cmd_vel`、影子话题，谁在听 `/map/switch`，和上面两个开关对不对；`use-new` 换完自己也查，对不上就换回 | 无 |
 | `speed <m/s> / off / show` | 限速：改装好的 `mission_conf` 里 MPPI 的 `max_vx`（仓库 3.0）和巡航 `reference_velocity`（仓库 1.5）；第一次限速时原文件存成 `mission_conf.pb.txt.repo`，`off` 放回 | 重启 `cw-planning` |
 | `debug planning on / off` | 规划的调试话题（`/planning/debug/*`，`pub_flag`），马上生效（服务 `/planning/debug/set_pub_flag`）。`configure` 已经默认打开（`NAV_CW_DEBUG=0` 装的时候不开） | 规划多发几十 KB/s |

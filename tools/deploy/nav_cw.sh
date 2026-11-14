@@ -35,6 +35,12 @@
 #                                           the switches (use-new runs it too)
 #   sudo bash nav_cw.sh apply               write the switches kept in nav_cw.env into the installed configs again
 #                                           (after a reinstall; use-new does it before it starts ours)
+#   sudo bash nav_cw.sh rehearsal on|off    on: our units on ROS domain 42 (ROS_DOMAIN_ID=42 and
+#                                           PLANNING_TIMEOUT_WALL_CLOCK=1 in nav_cw.env), the robot team's four
+#                                           navigation services stopped, for replaying a bag through exactly what
+#                                           runs in the field (the robot's DDS config, shared memory); needs shadow
+#                                           on, refuses while ours run on domain 0; checks the graph on domain 42.
+#                                           off: theirs back, the keys removed. use-new refuses while it is on.
 #   sudo bash nav_cw.sh debug planning on|off     the planner's debug topics, at once (/planning/debug/set_pub_flag)
 #   sudo bash nav_cw.sh debug perception on|off   lidar_3d_detection's debug cloud and its TF camera_init ->
 #                                           lidar_det (restarts cw-nav-perception: the local grid stops a few s)
@@ -177,6 +183,10 @@ ros_env() {
   set -u
   export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
   export CYCLONEDDS_URI="${CYCLONEDDS_URI:-file:///opt/ros/cyclonedds.xml}"
+  # the domain our units run on: 42 during a rehearsal (nav_cw.env), else the robot's
+  local d
+  d="$(env_get ROS_DOMAIN_ID)"
+  export ROS_DOMAIN_ID="${d:-${ROS_DOMAIN_ID:-0}}"
 }
 
 mission_conf() {
@@ -352,6 +362,9 @@ switches() {
   echo "  perception debug: $([[ -n "$(env_get LIDAR3D_ARGS)" ]] && echo "on ($(env_get LIDAR3D_ARGS))" || echo off)"
   local v; v="$(env_get NAV_CW_SPEED)"
   echo "  speed cap:        ${v:+${v} m/s}${v:-off (repository value)}"
+  if [[ -n "$(env_get NAV_CW_REHEARSAL)" ]]; then
+    echo "  REHEARSAL ON:     ours on domain $(env_get ROS_DOMAIN_ID), the robot team's navigation stopped (nav_cw.sh rehearsal off)"
+  fi
 }
 
 case "${1:-status}" in
@@ -395,8 +408,43 @@ case "${1:-status}" in
   speed) shift; speed "$@" ;;
   switches) switches ;;
   status) status ;;
+  rehearsal)
+    case "${2:-}" in
+      on)
+        need_units
+        [[ "$(env_get NAV_CW_SHADOW)" == on ]] || { echo "rehearsal needs shadow on (nav_cw.sh shadow on)"; exit 1; }
+        [[ "$(running)" != ours ]] || { echo "ours run on the robot's domain: nav_cw.sh use-original first"; exit 1; }
+        env_set ROS_DOMAIN_ID 42
+        env_set PLANNING_TIMEOUT_WALL_CLOCK 1
+        env_set NAV_CW_REHEARSAL on
+        apply_switches || exit 1
+        switches
+        echo "rehearsal: stopping the robot team's navigation, ours on domain 42..."
+        if switch "${ORIG[@]}" -- "${NEW[@]}" && check_or_stop; then
+          status
+          echo "rehearsal on: play the bag on domain 42 (ROS_DOMAIN_ID=42, the robot's CYCLONEDDS_URI, as root)"
+        else
+          echo "ours did not come up on domain 42: last log lines"
+          for u in "${NEW[@]}"; do echo "== ${u}"; "${JOURNALCTL}" -u "${u}" -n 15 --no-pager 2>/dev/null || true; done
+          echo "putting the robot team's back..."
+          switch "${NEW[@]}" -- "${ORIG[@]}" || true
+          env_set ROS_DOMAIN_ID ""; env_set PLANNING_TIMEOUT_WALL_CLOCK ""; env_set NAV_CW_REHEARSAL ""
+          status || true
+          exit 1
+        fi ;;
+      off)
+        echo "rehearsal off: ours stopped, the robot team's back..."
+        r=0
+        switch "${NEW[@]}" -- "${ORIG[@]}" || r=1
+        env_set ROS_DOMAIN_ID ""; env_set PLANNING_TIMEOUT_WALL_CLOCK ""; env_set NAV_CW_REHEARSAL ""
+        switches
+        status || r=1
+        exit "${r}" ;;
+      *) echo "rehearsal on|off"; exit 2 ;;
+    esac ;;
   use-new)
     need_units
+    if [[ -n "$(env_get NAV_CW_REHEARSAL)" ]]; then echo "a rehearsal is on (domain 42): nav_cw.sh rehearsal off first"; exit 1; fi
     apply_switches || exit 1      # the switches into the installed configs before ours start
     switches
     echo "switching to ours..."
@@ -416,5 +464,5 @@ case "${1:-status}" in
     switch "${NEW[@]}" -- "${ORIG[@]}" || { status || true; exit 1; }
     status ;;
   configure) shift; configure "$@" ;;
-  *) sed -n '2,47p' "$0"; exit 2 ;;
+  *) sed -n '2,53p' "$0"; exit 2 ;;
 esac

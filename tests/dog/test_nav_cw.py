@@ -33,6 +33,7 @@ esac
 # the config's output names. Every call is logged to $STATE/log.
 GRAPH = r"""#!/bin/bash
 echo "ros2 $*" >> "$STATE/log"
+echo "domain ${ROS_DOMAIN_ID:-unset}" >> "$STATE/domains"
 [[ "$1 $2" == "topic info" ]] || exit 0
 topic="${@: -1}"
 conf=$(find "$NAV_CW_ROOT/install" -name communication_conf.pb.txt 2>/dev/null | head -1)
@@ -417,3 +418,43 @@ def test_use_new_writes_the_switches_in_before_starting_ours(dog, tmp_path):
     comm = (tmp_path / "nav_cw" / CONF_DIR / "communication_conf.pb.txt").read_text()
     assert '"/nav_cw/shadow/mc/motion_control"' in comm
     assert "ok    planning     PUBLISHER         not on /mc/motion_control" in r.stdout
+
+
+def test_a_rehearsal_runs_ours_on_domain_42_in_place_of_their_navigation(dog, tmp_path):
+    env = tmp_path / "nav_cw" / "nav_cw.env"
+    r = dog("rehearsal", "on")
+    assert r.returncode == 1 and "rehearsal needs shadow on" in r.stdout          # never without shadow mode
+    assert all(dog.states()[u] == "active" for u in ORIG)
+    env.write_text('NAV_CW_SHADOW="on"\n')
+    r = dog("rehearsal", "on")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert all(dog.states()[u] == "inactive" for u in ORIG) and all(dog.states()[u] == "active" for u in NEW)
+    e = env.read_text()
+    assert 'ROS_DOMAIN_ID="42"' in e and 'PLANNING_TIMEOUT_WALL_CLOCK="1"' in e and 'NAV_CW_REHEARSAL="on"' in e
+    assert "domain 42" in (tmp_path / "state" / "domains").read_text()           # the graph checked on domain 42
+    assert "ok    planning     PUBLISHER         not on /mc/motion_control" in r.stdout
+    assert "REHEARSAL ON" in dog("switches").stdout
+    r = dog("use-new")
+    assert r.returncode == 1 and "rehearsal off first" in r.stdout
+    r = dog("rehearsal", "off")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert all(dog.states()[u] == "active" for u in ORIG) and all(dog.states()[u] == "inactive" for u in NEW)
+    assert "ROS_DOMAIN_ID" not in env.read_text() and "NAV_CW_REHEARSAL" not in env.read_text()
+    assert 'NAV_CW_SHADOW="on"' in env.read_text() and "running: theirs" in r.stdout
+
+
+def test_no_rehearsal_while_ours_drive_the_dog(dog, tmp_path):
+    (tmp_path / "nav_cw" / "nav_cw.env").write_text('NAV_CW_SHADOW="on"\n')
+    assert dog("use-new").returncode == 0
+    r = dog("rehearsal", "on")
+    assert r.returncode == 1 and "use-original first" in r.stdout
+    assert all(dog.states()[u] == "active" for u in NEW)
+
+
+def test_a_rehearsal_that_does_not_come_up_puts_theirs_back(dog, tmp_path):
+    env = tmp_path / "nav_cw" / "nav_cw.env"
+    env.write_text('NAV_CW_SHADOW="on"\n')
+    r = dog("rehearsal", "on", broken=["cw-slam.service"])
+    assert r.returncode == 1 and "running: theirs" in r.stdout
+    assert all(dog.states()[u] == "active" for u in ORIG)
+    assert "ROS_DOMAIN_ID" not in env.read_text()

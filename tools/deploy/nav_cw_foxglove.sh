@@ -41,9 +41,14 @@ source /opt/ros/humble/setup.bash
 # shellcheck disable=SC1090
 [[ -f "${prefix}/install/planning/setup.bash" ]] && source "${prefix}/install/planning/setup.bash"
 set -u
-# the robot's DDS (T34: CycloneDDS, its config, domain 0 unless set)
+# the robot's DDS (T34: CycloneDDS, its config, domain 0 unless set); during a rehearsal (nav_cw.sh rehearsal on) the
+# domain our units run on, from nav_cw.env
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 export CYCLONEDDS_URI="${CYCLONEDDS_URI:-file:///opt/ros/cyclonedds.xml}"
+if [[ -z "${ROS_DOMAIN_ID:-}" && -f "${prefix}/nav_cw.env" ]]; then
+  d="$(sed -n 's/^ROS_DOMAIN_ID="\(.*\)"$/\1/p' "${prefix}/nav_cw.env" | tail -1)"
+  [[ -n "${d}" ]] && export ROS_DOMAIN_ID="${d}"
+fi
 echo "foxglove_bridge on ${port}, domain ${ROS_DOMAIN_ID:-0}; topics: ${list}"
 exec ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:="${port}" \
   -p "topic_whitelist:=[${list}]" \
