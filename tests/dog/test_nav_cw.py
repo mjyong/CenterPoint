@@ -111,6 +111,27 @@ def test_configure_points_the_configs_at_the_map(tmp_path):
     assert vin.read_text().strip() == "d20/001"
 
 
+def test_configure_points_localization_at_the_share_copy_the_launch_reads(tmp_path):
+    prefix = tmp_path / "nav_cw"
+    share = prefix / "install/slam/lightning/share/lightning/config/default_d20.yaml"
+    lib = prefix / "install/slam/lightning/lib/lightning/config/default_d20.yaml"
+    plan = prefix / "install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt"
+    vin = prefix / "install/planning/planning/lib/planning/robot_factory/default_robot_vin"
+    for f in (share, lib, plan, vin):
+        f.parent.mkdir(parents=True, exist_ok=True)
+        if f.name.endswith(".yaml"):
+            f.write_text("  map_path: /old\n")
+    plan.write_text("confs{\n    global_map_manager_conf{\n    }\n}\n")
+    vin.write_text("d30/001\n")
+    m = tmp_path / "map"
+    m.mkdir()
+    (m / "global_map.yaml").write_text("floors: []\n")
+    r = subprocess.run(["bash", SCRIPT, "configure", str(prefix), str(m)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "map_path: %s" % m in share.read_text()
+    assert "map_path: /old" in lib.read_text()
+
+
 def test_configure_needs_a_site_map(tmp_path):
     r = subprocess.run(["bash", SCRIPT, "configure", str(tmp_path), str(tmp_path)], capture_output=True, text=True)
     assert r.returncode == 1 and "no global_map.yaml" in r.stdout

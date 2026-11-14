@@ -109,7 +109,9 @@ configure() {   # configure <prefix> <map dir>
   # the installed copies (build_stack.sh: <prefix>/install/<module>), never the sources under <prefix>/src
   local base="${prefix}"
   [[ -d "${prefix}/install" ]] && base="${prefix}/install"
-  loc="$(find "${base}" -path '*lightning/config/default_d20.yaml' -not -path '*/src/*' | head -1)"
+  # lightning's launch reads the share copy (get_package_share_directory). The install also has one under lib/.
+  loc="$(find "${base}" -path '*lightning/share/*/config/default_d20.yaml' -not -path '*/src/*' | head -1)"
+  [[ -n "${loc}" ]] || loc="$(find "${base}" -path '*lightning/config/default_d20.yaml' -not -path '*/src/*' | head -1)"
   plan="$(find "${base}" -path '*robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt' -not -path '*/src/*' | head -1)"
   vin="$(find "${base}" -path '*robot_factory/default_robot_vin' -not -path '*/src/*' | head -1)"
   comm="$(find "${base}" -path '*robot_factory/d20/001/planning_conf/communication_conf.pb.txt' -not -path '*/src/*' | head -1)"
