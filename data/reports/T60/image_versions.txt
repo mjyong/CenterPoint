@@ -1,0 +1,17 @@
+aarch64
+gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+Build cuda_12.6.r12.6/compiler.34714021_0
+/opt/ros/humble/setup.bash
+cmake
+libOsqpEigen.so
+libOsqpEigen.so.0.10.0
+libg2o_core.so
+libg2o_core.so.0.1
+libg2o_core.so.0.1.0
+libg2o_csparse_extension.so
+libg2o_csparse_extension.so.0.1
+libg2o_csparse_extension.so.0.1.0
+libg2o_ext_freeglut_minimal.so
+/usr/bin/colcon
+/usr/local/bin/cmake
+cmake version 3.27.7

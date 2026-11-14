@@ -1,0 +1,52 @@
+=== nproc ===
+64
+=== free ===
+               total        used        free      shared  buff/cache   available
+Mem:            1007         112         330           7         564         881
+Swap:              7           7           0
+=== df ===
+df: /var/lib/docker: No such file or directory
+Filesystem                Size  Used Avail Use% Mounted on
+/dev/sdc3                 877G  824G  8.9G  99% /
+cqzjst.seres.cn:/mnt/hpc  950T  262T  689T  28% /public
+cqzjst.seres.cn:/mnt/hpc  950T  262T  689T  28% /public
+=== docker root ===
+ Server Version: 27.3.1
+ Storage Driver: vfs
+ Operating System: Ubuntu 22.04.5 LTS
+ Docker Root Dir: /zjst/sekj_tech/docker
+=== docker version ===
+Client: Docker Engine - Community
+ Version:           27.3.1
+ API version:       1.47
+ Go version:        go1.22.7
+ Git commit:        ce12230
+ Built:             Fri Sep 20 11:41:00 2024
+ OS/Arch:           linux/amd64
+ Context:           default
+
+Server: Docker Engine - Community
+ Engine:
+  Version:          27.3.1
+  API version:      1.47 (minimum version 1.24)
+  Go version:       go1.22.7
+  Git commit:       41ca978
+  Built:            Fri Sep 20 11:41:00 2024
+  OS/Arch:          linux/amd64
+  Experimental:     false
+ containerd:
+  Version:          1.7.23
+  GitCommit:        57f17b0a6295a39009d861b89e3b3b87b005ca27
+ runc:
+  Version:          1.1.14
+  GitCommit:        v1.1.14-0-g2c9f560
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        de40ad0
+=== pytest ===
+90 passed, 1 skipped (tests/dog/test_yield_gate_cpp.py: needs g++ and Eigen 3). 91 collected.
+=== docker root df ===
+Filesystem                     Size  Used Avail Use% Mounted on
+cqzjst.seres.cn:/mnt/hpc/zjst  950T  262T  689T  28% /zjst
+Docker Root Dir: /zjst/sekj_tech/docker (vfs). /var/lib/docker does not exist.
+work_dirs disk /dev/sdc3 avail 8.9G; /public and docker root each 689T. Combined free >> 60G. Compile tree will be a symlink onto /public because the work_dirs disk has under 10G.

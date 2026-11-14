@@ -1,0 +1,5 @@
+ssh dog (localhost:5038) after the rootfs copy: TCP connects, then
+"Connection timed out during banner exchange".
+Direct 192.168.122.100 port 22 is closed from this server.
+Last successful ssh was before the tar, status running: theirs.
+NEEDED, the install file list, the step 7 dry-run, and shutdown were not run.

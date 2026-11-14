@@ -1,0 +1,11 @@
+# R36 (release), REVISION: 4.0, GCID: 37537400, BOARD: generic, EABI: aarch64, DATE: Fri Sep 13 04:36:44 UTC 2024
+# KERNEL_VARIANT: oot
+TARGET_USERSPACE_LIB_DIR=nvidia
+TARGET_USERSPACE_LIB_DIR_PATH=usr/lib/aarch64-linux-gnu/nvidia
+Ubuntu 22.04.4 LTS
+5.15.148-rt-tegra
+gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+Build cuda_12.6.r12.6/compiler.34714021_0
+libnvinfer10	10.3.0.30-1+cuda12.5
+ros-humble-rclcpp	16.0.11-1jammy.20241128.035217
+dpkg packages: 3459, sha256 of the list: cd063d3941786909

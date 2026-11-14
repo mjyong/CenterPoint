@@ -1,0 +1,29 @@
+# R36 (release), REVISION: 4.0, GCID: 37537400, BOARD: generic, EABI: aarch64, DATE: Fri Sep 13 04:36:44 UTC 2024
+# KERNEL_VARIANT: oot
+TARGET_USERSPACE_LIB_DIR=nvidia
+TARGET_USERSPACE_LIB_DIR_PATH=usr/lib/aarch64-linux-gnu/nvidia
+Ubuntu 22.04.4 LTS
+5.15.148-rt-tegra
+gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+Build cuda_12.6.r12.6/compiler.34714021_0
+libnvinfer10	10.3.0.30-1+cuda12.5
+ros-humble-rclcpp	16.0.11-1jammy.20241128.035217
+dpkg packages: 3459, sha256 of the list: cd063d3941786909
+sizes on the dog, before the excludes:
+21M	/etc
+14G	/opt
+17G	/usr
+18G	/var
+12K	/opt/containerd
+32K	/opt/factory
+32K	/opt/factory_backup
+3.6G	/opt/nvidia
+232M	/opt/ota_package
+450M	/opt/ros
+8.7G	/opt/seres
+717M	/opt/tztek
+tar of the dog's / -> /public/zjst/robot/dog8_rootfs/dog8_rootfs_20261114.tar
+22G	/public/zjst/robot/dog8_rootfs/dog8_rootfs_20261114.tar
+f8fc11136d300d66a46968213c6a3c3e6c0b0a888bd10d0c61438529426d7216  /public/zjst/robot/dog8_rootfs/dog8_rootfs_20261114.tar
+sha256:d812e4dee22d2b1b8ff047ef3d0e0e41692fddb108a656dd53d01e0c314d5cd0
+image dog8-rootfs:20261114 (dog8-rootfs:latest)

@@ -1,0 +1,13 @@
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+installing: arm64 OK
+emulators: python3.10, qemu-aarch64
+supported includes linux/arm64
+
+/proc/sys/fs/binfmt_misc/qemu-aarch64:
+enabled
+interpreter /usr/bin/qemu-aarch64
+flags: POCF
+(F is set, so qemu works inside containers.)
+
+The --rm cleanup then exited 125: vfs failed to unlink the container root
+(directory not empty under /zjst/sekj_tech/docker/vfs). Registration itself succeeded.

@@ -1,0 +1,86 @@
+== ldd planning
+not_found 0
+== ldd mode_switch_node
+not_found 0
+== ldd lidar_seg
+not_found 0
+== ldd grid_map_memory_node
+not_found 0
+== ldd lidar_3d_detection
+not_found 0
+== incremental touch tracking.cc
+Sun Nov 15 04:06:30 CST 2026
+Sun Nov 15 04:06:31 CST 2026
+== planning: nav2_interface,common_interface,mc_interface,perception_interface,rte_interface,rhr_interface (from Nav_D20/seres_interface)
+[6.037s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[6.038s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[6.038s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[6.515s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'perception_interface' is in: /opt/seres/nav_cw/install/planning/perception_interface
+	'rte_interface' is in: /opt/seres/nav_cw/install/planning/rte_interface
+	'mc_interface' is in: /opt/seres/nav_cw/install/planning/mc_interface
+	'nav2_interface' is in: /opt/seres/nav_cw/install/planning/nav2_interface
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding mc_interface nav2_interface perception_interface rte_interface
+
+This may be promoted to an error in a future release of colcon-override-check.
+Starting >>> common_interface
+Starting >>> mc_interface
+Starting >>> rhr_interface
+Starting >>> rte_interface
+Finished <<< rhr_interface [8.12s]
+Finished <<< common_interface [8.59s]
+Starting >>> nav2_interface
+Starting >>> perception_interface
+Finished <<< mc_interface [9.02s]
+Finished <<< rte_interface [14.3s]
+Finished <<< nav2_interface [9.01s]
+Finished <<< perception_interface [10.2s]
+
+Summary: 6 packages finished [24.2s]
+== planning: nav_interface (from Nav_D20/planning/third_party)
+[3.264s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[3.265s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[3.265s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> nav_interface
+Finished <<< nav_interface [8.36s]
+
+Summary: 1 package finished [11.1s]
+== planning: planning (from Nav_D20/planning)
+[3.126s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[3.127s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[3.127s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> planning
+--- stderr: planning
+In file included from /usr/include/boost/math/tools/cxx03_warn.hpp:9,
+                 from /usr/include/boost/math/constants/constants.hpp:11,
+                 from /usr/include/boost/geometry/util/math.hpp:29,
+                 from /usr/include/boost/geometry/core/radian_access.hpp:33,
+                 from /usr/include/boost/geometry/geometry.hpp:51,
+                 from /usr/include/boost/geometry.hpp:17,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/common/structures.h:8,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/mission_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/tracking/tracking.h:12,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/mission/tracking/tracking.cc:7:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+/usr/bin/ld: warning: libopencv_imgproc.so.4.5d, needed by /opt/ros/humble/lib/libgrid_map_ros.so, may conflict with libopencv_imgproc.so.408
+/usr/bin/ld: warning: libopencv_core.so.4.5d, needed by /opt/ros/humble/lib/libgrid_map_ros.so, may conflict with libopencv_core.so.408
+/usr/bin/ld: warning: libopencv_imgcodecs.so.4.5d, needed by /opt/ros/humble/lib/libcv_bridge.so, may conflict with libopencv_imgcodecs.so.408
+---
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+Finished <<< planning [2min 33s]
+
+Summary: 1 package finished [2min 36s]
+  1 package had stderr output: planning
+done: /opt/seres/nav_cw/install/{planning}
+Sun Nov 15 04:10:14 CST 2026
+incremental_done

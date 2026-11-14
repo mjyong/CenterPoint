@@ -1,0 +1,61 @@
+== nav_perception: all (from Nav_D20/perception_combo_ros/common_interface)
+Finished <<< UtilsTest [30.2s]
+Finished <<< kygi665_msgs [2min 18s]
+Finished <<< common_interface [2min 50s]
+Finished <<< seres_proto [1min 20s]
+Finished <<< nav2_interface [4min 55s]
+Finished <<< mc_interface [2min 17s]
+Finished <<< interfaces [3min 49s]
+Finished <<< perception_interface [3min 59s]
+Finished <<< nav_interface [7min 4s]
+Finished <<< robot_interface [5min 21s]
+Finished <<< rte_interface [12min 59s]
+Summary: 11 packages finished [13min 33s]
+== nav_perception: lidar_seg,grid_map_memory_node,lidar_3d_detection (from Nav_D20/perception_combo_ros/node_src)
+Finished <<< lidar_seg [6min 21s]
+Finished <<< grid_map_memory_node [7min 15s]
+Finished <<< lidar_3d_detection [8min 40s]
+Summary: 3 packages finished [8min 43s]
+== slam: kygi665_msgs,rhr_interface,nav2_interface,common_interface (from Nav_D20/seres_interface)
+Finished <<< rhr_interface [2min 10s]
+Finished <<< kygi665_msgs [2min 12s]
+Finished <<< common_interface [2min 25s]
+Finished <<< nav2_interface [4min 52s]
+Summary: 4 packages finished [7min 22s]
+== slam: novatel_oem7_msgs,basic,livox_ros_driver2 (from Nav_D20/slam)
+Finished <<< basic [2min 45s]
+Finished <<< livox_ros_driver2 [4min 11s]
+Finished <<< novatel_oem7_msgs [5min 18s]
+Summary: 3 packages finished [5min 21s]
+== slam: lightning (from Nav_D20/slam)
+Finished <<< lightning [12min 24s]
+Summary: 1 package finished [12min 27s]
+== planning: nav2_interface,common_interface,mc_interface,perception_interface,rte_interface,rhr_interface (from Nav_D20/seres_interface)
+Finished <<< rhr_interface [2min 3s]
+Finished <<< common_interface [2min 18s]
+Finished <<< mc_interface [3min 21s]
+Finished <<< perception_interface [4min 26s]
+Finished <<< nav2_interface [5min 21s]
+Finished <<< rte_interface [16min 6s]
+Summary: 6 packages finished [16min 10s]
+== planning: nav_interface (from Nav_D20/planning/third_party)
+Finished <<< nav_interface [1min 57s]
+Summary: 1 package finished [2min 1s]
+== planning: planning (from Nav_D20/planning)
+Summary: 0 packages finished [1min 53s]
+--- planning retry: osqp cmake was mode 0700 ---
+== planning: nav2_interface,common_interface,mc_interface,perception_interface,rte_interface,rhr_interface (from Nav_D20/seres_interface)
+Finished <<< rhr_interface [9.65s]
+Finished <<< common_interface [10.1s]
+Finished <<< mc_interface [10.4s]
+Finished <<< rte_interface [19.5s]
+Finished <<< nav2_interface [9.96s]
+Finished <<< perception_interface [10.8s]
+Summary: 6 packages finished [26.8s]
+== planning: nav_interface (from Nav_D20/planning/third_party)
+Finished <<< nav_interface [8.46s]
+Summary: 1 package finished [11.3s]
+== planning: planning (from Nav_D20/planning)
+Finished <<< planning [9min 53s]
+Summary: 1 package finished [9min 56s]
+done: /opt/seres/nav_cw/install/{planning}

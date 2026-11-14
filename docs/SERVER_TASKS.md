@@ -169,7 +169,7 @@
 | T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
 | T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成，已复核（2026-11-14）：定位不再因大消息退出，odom 约 100 Hz；缩略图一条、Foxglove 订了规划没重启；外参 OK。复核加了：use-new 等 odom（INS 30 s 没固定解定位起不来）、bag_to_mcap.py（狗上录的是 sqlite3） |
 | T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 任务已写好 |
-| T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
+| T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 三个模块编过了（规划第一次 osqp 的 cmake 是 0700，打开后再编）。ldd not found 0。增量 2 分 33 秒。拷完以后隧道不回 SSH banner，狗上的对照、dry-run 和关机没做成 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -9978,6 +9978,37 @@ Foxglove：`foxglove_bridge on 8765, domain 42`。探针 12 秒：`/planning/deb
 报告（写进"T60 结果"）：host.txt；QEMU 注册；tar 的大小、用时、versions；镜像里看到的版本；每个阶段的用时（和狗上的并排）；
 第 6 步的比较；增量编译的时间；第 7 步 dry-run 的文件数。
 ```
+
+### T60 结果
+
+三个模块在 `dog8-rootfs:20261114` 里编过了。五个二进制都是 aarch64，`ldd` 的 `not found` 都是 0。规划第一次没编过：osqp 和 qdldl 的 cmake 是 nvidia 的 0700，服务器用户读不到；`run_arm64.sh` 在容器里先把这两个目录打开再降回调用者，然后规划编过。拷完根文件系统以后，`ssh dog`（`localhost:5038`）能连上 TCP，但等不到 SSH banner。狗上的 NEEDED、文件清单、第 7 步 dry-run，以及关机，都没做成。
+
+**第 0 步。** 拉下来是 `d3a2957`（源码按这个拷的；编的过程中分支到了 `c404fd6`，T58 的 `packages.cmake` 不在这次编的树里）。pytest 90 passed，1 skipped（没有 g++ 和 Eigen 3，`test_yield_gate_cpp.py`，同 T59 复核第 4 条）。nproc 64，内存 1007 GB、可用约 887 GB，`NAV_JOBS=64`。`work_dirs` 所在盘只剩 8.9 GB，编译树是 `work_dirs/nav_cw_arm64` → `/public/zjst/robot/t60_nav_cw_arm64`。Docker 根目录是 `/zjst/sekj_tech/docker`（vfs），`/var/lib/docker` 不存在；`/public` 和 Docker 盘各有 689 TB。全文 `data/reports/T60/host.txt`。
+
+**第 1 步。** `tonistiigi/binfmt --install arm64` 打印 `installing: arm64 OK`。`/proc/sys/fs/binfmt_misc/qemu-aarch64` 是 enabled，flags `POCF`（有 F）。`--rm` 清容器时 vfs 报 `directory not empty`，退出 125；注册本身是好的。binfmt 那个容器一直停在 Removal In Progress。
+
+**第 2 步。** 21:45–22:49，约 64 分钟（tar、清单、校验大约 40 分钟，`docker import` 大约 24 分钟）。tar 22 GB，清单合计 21.62 GiB（usr 15.40、opt 4.82、根上的 log 1.28），没有密钥，没到 40 GB。`/public/zjst/robot/dog8_rootfs` 是 750。版本：L4T R36 rev 4.0，Ubuntu 22.04.4，内核 5.15.148-rt-tegra，gcc 11.4.0，CUDA 12.6，libnvinfer10 10.3.0.30，rclcpp 16.0.11，dpkg 3459 个，清单 sha256 前 16 位 `cd063d3941786909`。`data/reports/T60/versions.txt`。
+
+**第 3 步。** 镜像里：aarch64，gcc 11.4.0，CUDA 12.6，`/usr/bin/colcon`，cmake 是 `/usr/local/bin/cmake` 3.27.7。狗上 `which cmake` 也是这一份；任务里写的 3.22.1 是 apt 那份，不在 PATH 前面。deps 里有 g2o、OsqpEigen。
+
+**第 4–5 步。** 源码 `d3a29574acfe2dc6e2004f68a3b4dd5cab013f3c`。和狗上 T56 并排（狗上是 `-j4`，这里是 `-j64`，QEMU）：
+
+| 阶段 | 狗上 T56 | 这次 |
+|---|---|---|
+| 感知接口 | 16 分 48 秒 | 13 分 33 秒 |
+| lidar_seg / grid_map / lidar_3d | 8 分 56 秒 | 8 分 43 秒 |
+| slam 接口 | 3 分 29 秒 | 7 分 22 秒 |
+| novatel / basic / livox | 4 分 39 秒 | 5 分 21 秒 |
+| lightning | 18 分 7 秒 | 12 分 27 秒 |
+| 规划接口 | 4 分 27 秒 | 16 分 10 秒，重试 27 秒 |
+| nav_interface | 9 秒 | 2 分 1 秒，重试 11 秒 |
+| planning | 6 分 31 秒 | 第一次 1 分 50 秒失败，打开 cmake 后 9 分 53 秒 |
+
+失败的是 `find_package(osqp)`。文件在镜像里：`/opt/seres/nav_cw/deps/lib/cmake/osqp/osqp-config.cmake`，还有 qdldl 那一份，都是 `0700`、属主 uid 1000。不是排除多了。`run_arm64.sh` 改成 root 先 `chmod -R a+rX` 这两个目录，再用 `setpriv` 降到调用者。重试 `rc=0`。vfs 每次 `docker run` 都整份复制 22 GB，起来要大约 50 分钟；编完 `--rm` 会卡在删不掉的目录上，日志已经齐了就停掉客户端。全文 `data/reports/T60/build_full.txt`。
+
+**第 6 步。** `file`：planning、mode_switch_node、lidar_seg、grid_map_memory_node、lidar_3d_detection 都是 ELF 64-bit ARM aarch64。`ldd`（source 各模块的 `setup.bash`）`not found` 都是 0，`data/reports/T60/ldd_*.txt`。服务器这边的 NEEDED 在 `data/reports/T60/needed_server.txt`。三个 `install/<模块>/version.txt`：`2026-11-15`、`d3a29574acfe2dc6e2004f68a3b4dd5cab013f3c`、`built on the server in dog8-rootfs:20261114 (QEMU)`。增量：touch `tracking.cc` 之后 planning 2 分 33 秒（04:06:31–04:10:14，含接口包的重查）。狗上的 `readelf`、文件清单没对上：03:15 起 banner 超时，`data/reports/T60/dog_side.txt`。
+
+**第 7 步。** dry-run 没跑，没有会变的文件数。以后真装：`status` 是 theirs → `rsync -a --delete --chown=root:root` 到 `/opt/seres/nav_cw/install/` → `nav_cw.sh configure`（地图路径、车型、调试话题会被盖掉）→ `nav_cw.sh apply`（开关在 `nav_cw.env`，apply 写回；`use-new` 前也写一遍）→ `switches` 不能有 NOT APPLIED。
 
 ---
 

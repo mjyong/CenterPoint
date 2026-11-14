@@ -36,11 +36,17 @@ env_args=()
 for e in "${envs[@]}"; do env_args+=(-e "${e}"); done
 tty=()
 [[ -t 0 && -t 1 ]] && tty=(-it)
+# osqp and qdldl ship mode 0700 cmake files owned by the dog's nvidia. find_package cannot
+# read them as the server uid. Open those two directories, then drop to the caller.
+uid="$(id -u)"
+gid="$(id -g)"
 cmd=(docker run --rm "${tty[@]}" --platform linux/arm64 --network none
-     -u "$(id -u):$(id -g)" --tmpfs /tmp:exec,mode=1777 --tmpfs /var/tmp:exec,mode=1777 --tmpfs /run
+     --tmpfs /tmp:exec,mode=1777 --tmpfs /var/tmp:exec,mode=1777 --tmpfs /run
      -v "${work}/src:/opt/seres/nav_cw/src" -v "${work}/build:/opt/seres/nav_cw/build"
      -v "${work}/install:/opt/seres/nav_cw/install" -v "${work}/log:/opt/seres/nav_cw/log"
-     -w /opt/seres/nav_cw "${env_args[@]}" "${NAV_ARM64_IMAGE:-dog8-rootfs:latest}" "$@")
+     -w /opt/seres/nav_cw "${env_args[@]}" "${NAV_ARM64_IMAGE:-dog8-rootfs:latest}"
+     bash -c 'chmod -R a+rX /opt/seres/nav_cw/deps/lib/cmake/osqp /opt/seres/nav_cw/deps/lib/cmake/qdldl && exec setpriv --reuid="$1" --regid="$2" --clear-groups --inh-caps=-all -- "${@:3}"' \
+     bash "${uid}" "${gid}" "$@")
 if [[ -n "${NAV_DRY_RUN:-}" ]]; then
   printf '%q ' "${cmd[@]}"
   echo
