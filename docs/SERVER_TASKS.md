@@ -166,7 +166,7 @@
 | T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 完成，已复核（2026-11-14）：狗上的 -dev 和 ROS 包都齐，只缺 g2o、acados、OsqpEigen，源码都在服务器上，不用人下载。和狗上的接口两处不同，其中 App 发目标的 /nav/navigation 多了 nav_mode，要人定 |
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步，已复核（2026-11-14）：编、装、地图、服务都过了。复核发现影子模式按原来的做法不生效（规划不读命令行参数），已改；启动脚本的库路径、App 盘快满、App 的地图切换、演练的共享内存四件事交给 T59 |
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T59 | 半天 | 任务已写好 |
-| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径，App 地图 follow（只放 ad68517c）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 任务已写好 |
+| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径，App 地图 follow（只放 ad68517c）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 4 步：App 目录放回 ad68517c 后 /userdata 只剩 7.1 MB，不到 20 MB，演练没做 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
 
@@ -9683,6 +9683,22 @@ sudo 用 sudo -n。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T59
 rehearsal on 的输出；bag info；演练的日志（60 s 那次切换前后；ignore 那次的图和日志）、objects_in_map、tegrastats、iceoryx.txt；
 前后服务的重启次数；最后的 switches。
 ```
+
+### T59 结果
+
+停在第 4 步。第 0–3 步做了。App 目录里放回 ad68517c 会让 `/userdata` 只剩 7.1 MB，不到任务写的 20 MB，域 42 演练没做。
+
+**第 0 步。** `e806489`。pytest 86 passed，1 skipped（`test_yield_gate_cpp` 要 g++ 和 Eigen 3，这台机器没有）。`nav_cw.sh status` 是 `running: theirs`。当时 `/userdata` 已用 393 MB、可用 7.1 MB、99%，App 目录里是 ad68517c 和 c1adbe7b。全文在 `data/reports/T59/before.txt`。
+
+**第 1 步。** `nav_cw.sh`、`nav_cw_foxglove.sh` 换成 `e806489`（sha256 `45281fa8…`、`ffc3c625…`）。定位的 launch 是带 `map_switch_topic` 的那份，原件备份成 `$L.t56`。装完再跑了一次 `shadow on`、`appmap follow`：还是 shadow on、appmap follow、speed off，三个 cw 服务没起，`status` 仍是 `running: theirs`。
+
+**第 2 步。** 三个 unit 都有 `EnvironmentFile=-/opt/seres/nav_cw/nav_cw.env`。cw-slam 的 ExecStart 末尾是 `$$NAV_CW_SLAM_ARGS`。`systemctl cat` 在 `data/reports/T59/`。启动脚本的全局 `LD_LIBRARY_PATH` 没有 `/opt/seres/nav_perception/lib`，这个目录只加在云台和回充的子 shell 里。按启动脚本的环境 `ldd`：lidar_seg、grid_map_memory_node、lidar_3d_detection 的 `not found` 和 `/opt/seres/nav_perception/` 都是 0 行（`ldd.txt`）。
+
+**第 3 步。** 全文 `switches.txt`。`appmap ignore` 时 `sub_map_switch` 是 `/nav_cw/map/switch`，`NAV_CW_SLAM_ARGS=map_switch_topic:=/nav_cw/map/switch`。速度 0.8 时 MPPI `max_vx` 和 `reference_velocity` 都是 0.8；`speed off` 放回 3.0 和 1.5。`appmap follow` 之后 `sub_map_switch` 是 `/map/switch`，`NAV_CW_SLAM_ARGS` 没了。`switches` 里速度那一行在有上限时印成 `0.8 m/s0.8`（显示叠了两次，配置本身是 0.8）。三个 cw 服务都没起。
+
+**第 4 步，停下。** ad68517c 在 `/opt/seres/nav_cw/maps/` 是 378 MB。第 0 步它还在 App 目录里时，`/userdata` 可用 7.1 MB。按上一版任务文字，这份拷贝在 19:35 删掉了：现在 App 目录只剩 c1adbe7b（5.9 MB），可用 385 MB，a70c6db6 没有。没有再拷回去，拷回去就是第 0 步那 7.1 MB，机器人团队的四个服务正在跑。
+
+开关留在第 3 步给演练的状态：shadow on、appmap follow、speed off。cw-planning 是 inactive，影子话题要等它起来才发。`status` 仍是 `running: theirs`。1112 还在狗上 `/home/nvidia/bags/1112_t40`。
 
 ---
 

@@ -1,0 +1,62 @@
+==== shadow on ====
+switches (/opt/seres/nav_cw/nav_cw.env; installed: /opt/seres/nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/communication_conf.pb.txt):
+  shadow:           on (commands to /nav_cw/shadow/cmd_vel, /nav_cw/shadow/mc/motion_control)
+  appmap:           follow
+  perception debug: off
+  speed cap:        off (repository value)
+cw-planning.service not running: takes effect when it starts
+==== appmap ignore ====
+switches (/opt/seres/nav_cw/nav_cw.env; installed: /opt/seres/nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/communication_conf.pb.txt):
+  shadow:           on (commands to /nav_cw/shadow/cmd_vel, /nav_cw/shadow/mc/motion_control)
+  appmap:           ignore (listening on /nav_cw/map/switch; localization: map_switch_topic:=/nav_cw/map/switch)
+  perception debug: off
+  speed cap:        off (repository value)
+cw-slam.service not running: takes effect when it starts
+cw-planning.service not running: takes effect when it starts
+==== speed 0.8 ====
+cw-planning.service not running: takes effect when it starts
+ MPPI max_vx: 0.8
+ MPPI reference_velocity: 0.8
+==== switches (ignore, 0.8) ====
+switches (/opt/seres/nav_cw/nav_cw.env; installed: /opt/seres/nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/communication_conf.pb.txt):
+  shadow:           on (commands to /nav_cw/shadow/cmd_vel, /nav_cw/shadow/mc/motion_control)
+  appmap:           ignore (listening on /nav_cw/map/switch; localization: map_switch_topic:=/nav_cw/map/switch)
+  perception debug: off
+  speed cap:        0.8 m/s0.8
+CONF /opt/seres/nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/communication_conf.pb.txt
+13:        sub_map_switch              { name: "/nav_cw/map/switch" }
+18:        pub_cmd_vel                 { name: "/nav_cw/shadow/cmd_vel"             queue_size: 10 }
+19:        pub_motion                  { name: "/nav_cw/shadow/mc/motion_control"   queue_size: 10 }
+==== env ====
+NAV_CW_SHADOW="on"
+NAV_CW_APPMAP="ignore"
+NAV_CW_SLAM_ARGS="map_switch_topic:=/nav_cw/map/switch"
+NAV_CW_SPEED="0.8"
+==== speed show ====
+ MPPI max_vx: 0.8
+ MPPI reference_velocity: 0.8
+==== speed off ====
+cw-planning.service not running: takes effect when it starts
+ MPPI max_vx: 3.0
+ MPPI reference_velocity: 1.5
+==== appmap follow ====
+switches (/opt/seres/nav_cw/nav_cw.env; installed: /opt/seres/nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/communication_conf.pb.txt):
+  shadow:           on (commands to /nav_cw/shadow/cmd_vel, /nav_cw/shadow/mc/motion_control)
+  appmap:           follow
+  perception debug: off
+  speed cap:        off (repository value)
+cw-slam.service not running: takes effect when it starts
+cw-planning.service not running: takes effect when it starts
+==== switches (follow, off) ====
+switches (/opt/seres/nav_cw/nav_cw.env; installed: /opt/seres/nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/communication_conf.pb.txt):
+  shadow:           on (commands to /nav_cw/shadow/cmd_vel, /nav_cw/shadow/mc/motion_control)
+  appmap:           follow
+  perception debug: off
+  speed cap:        off (repository value)
+==== env after follow ====
+NAV_CW_SHADOW="on"
+==== conf after follow ====
+13:        sub_map_switch              { name: "/map/switch" }
+18:        pub_cmd_vel                 { name: "/nav_cw/shadow/cmd_vel"             queue_size: 10 }
+19:        pub_motion                  { name: "/nav_cw/shadow/mc/motion_control"   queue_size: 10 }
+DONE

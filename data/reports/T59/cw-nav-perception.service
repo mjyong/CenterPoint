@@ -1,0 +1,31 @@
+# /etc/systemd/system/cw-nav-perception.service
+[Unit]
+Description=nav_cw perception
+After=network.target
+Conflicts=nav_perception.service
+Conflicts=lidar-3d-detection.service
+
+[Service]
+EnvironmentFile=-/opt/seres/nav_cw/nav_cw.env
+Type=simple
+User=root
+Group=root
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+Environment=LD_LIBRARY_PATH=/opt/seres/nav_cw/deps/usr/lib/aarch64-linux-gnu:/opt/seres/nav_cw/deps/usr/lib:/opt/seres/nav_cw/deps/lib:/opt/seres/nav_cw/deps/opt/acados/lib:/usr/local/cuda/lib64
+Environment=PERCEPTION_INSTALL_DIR=/opt/seres/nav_cw/install/nav_perception
+Environment=SERES_PERCEPTION_INSTALL_DIR=/opt/seres/nav_cw/install/nav_perception
+Environment=LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model
+Environment=LIDAR3D_LOCK_CLOCKS=1
+ExecStart=/opt/seres/nav_cw/start/start_nav_perception_bg.sh
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=15
+Restart=no
+TimeoutStartSec=60
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cw-nav-perception
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,5 @@
+/public/zjst/robot/cp_data/1112_t40: 16765 INSPVAX (100% good, 100% RTK fixed), 168 s; track in the map frame (origin 29.731405, 106.783891): start (-414.4, 665.7), end (-414.5, 665.7), x -423..-377, y 651..667, 120 m long
+/perception/lidar_3d/objects: 1669 messages; vehicles per message: max 5, frames with a vehicle 51%, with a moving one 38%; nearest vehicle: median 19.8 m, min 2.1 m
+
+map ad68517c-e845-42a4-b5dd-a6b7c6d2af13:2d/1780551612/map.png: 100% of the track inside the map, 53% within 0.5 m of a route cell
+  goal for replay_planning_check.sh: -386.9 655.3 (54 m along the track, 29 m from its start)

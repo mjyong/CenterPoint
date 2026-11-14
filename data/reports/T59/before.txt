@@ -1,0 +1,44 @@
+==== status ====
+robot team's:
+  lidar-3d-detection.service   active
+  nav_perception.service       active
+  slam.service                 active
+  planning.service             active
+ours (/opt/seres/nav_cw):
+  cw-nav-perception.service    inactive
+  cw-slam.service              inactive
+  cw-planning.service          inactive
+running: theirs
+==== df ====
+Filesystem       Size  Used Avail Use% Mounted on
+/dev/nvme0n1p15  433M  393M  7.1M  99% /userdata
+/dev/nvme0n1p1   937G  101G  789G  12% /
+/dev/nvme0n1p1   937G  101G  789G  12% /
+==== app maps ====
+total 16
+drwxr-xr-x 4 root   root   4096 Nov 14 18:39 .
+drwxr-xr-x 6 root   root   4096 Oct 14 19:45 ..
+drwxrwxr-x 6 nvidia nvidia 4096 Nov 12 09:54 ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+drwxr-xr-x 5 root   root   4096 Oct 14 19:17 c1adbe7b-2e5e-4e83-ba30-e164914033c4
+==== nav_perception lib ====
+total 1136
+drwxr-xr-x  2 root root   4096 Oct  9 18:01 .
+drwxr-xr-x 22 root root   4096 Nov  3 14:28 ..
+lrwxrwxrwx  1 root root     23 Oct  9 12:31 libdynamicedt3d.so -> libdynamicedt3d.so.1.10
+lrwxrwxrwx  1 root root     25 Oct  9 12:31 libdynamicedt3d.so.1.10 -> libdynamicedt3d.so.1.10.0
+-rw-r--r--  1 root root  57808 Oct  9 12:31 libdynamicedt3d.so.1.10.0
+lrwxrwxrwx  1 root root     26 Oct  9 12:31 libgflags_nothreads.so -> libgflags_nothreads.so.2.2
+lrwxrwxrwx  1 root root     28 Oct  9 12:31 libgflags_nothreads.so.2.2 -> libgflags_nothreads.so.2.2.2
+-rw-r--r--  1 root root 165176 Oct  9 12:31 libgflags_nothreads.so.2.2.2
+lrwxrwxrwx  1 root root     16 Oct  9 12:31 libgflags.so -> libgflags.so.2.2
+lrwxrwxrwx  1 root root     18 Oct  9 12:31 libgflags.so.2.2 -> libgflags.so.2.2.2
+-rw-r--r--  1 root root 165648 Oct  9 12:31 libgflags.so.2.2.2
+lrwxrwxrwx  1 root root     12 Oct  9 12:31 libglog.so -> libglog.so.1
+-rw-r--r--  1 root root 282288 Oct  9 12:31 libglog.so.0.6.0
+lrwxrwxrwx  1 root root     16 Oct  9 12:31 libglog.so.1 -> libglog.so.0.6.0
+lrwxrwxrwx  1 root root     18 Oct  9 12:31 liboctomap.so -> liboctomap.so.1.10
+lrwxrwxrwx  1 root root     20 Oct  9 12:31 liboctomap.so.1.10 -> liboctomap.so.1.10.0
+-rw-r--r--  1 root root 441952 Oct  9 12:31 liboctomap.so.1.10.0
+lrwxrwxrwx  1 root root     19 Oct  9 12:31 liboctomath.so -> liboctomath.so.1.10
+lrwxrwxrwx  1 root root     21 Oct  9 12:31 liboctomath.so.1.10 -> liboctomath.so.1.10.0
+-rw-r--r--  1 root root  30568 Oct  9 12:31 liboctomath.so.1.10.0

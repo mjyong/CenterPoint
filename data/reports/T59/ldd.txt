@@ -1,0 +1,19 @@
+==== ldd ====
+== /opt/seres/nav_cw/install/nav_perception/lidar_seg/lib/lidar_seg/lidar_seg
+NONE
+== /opt/seres/nav_cw/install/nav_perception/grid_map_memory_node/lib/grid_map_memory_node/grid_map_memory_node
+NONE
+== /opt/seres/nav_cw/install/nav_perception/lidar_3d_detection/lib/lidar_3d_detection/lidar_3d_detection
+NONE
+==== a70 ====
+c1adbe7b-2e5e-4e83-ba30-e164914033c4
+==== bag leftovers ====
+5.5G	/home/nvidia/bags/1112_t40
+==== slam exec ====
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/slam/setup.bash; ros2 launch lightning model_switch_launch.py rviz:=false $$NAV_CW_SLAM_ARGS'
+Restart=on-failure
+RestartSec=5s
+==== envfile ====
+EnvironmentFile=-/opt/seres/nav_cw/nav_cw.env
+EnvironmentFile=-/opt/seres/nav_cw/nav_cw.env
+EnvironmentFile=-/opt/seres/nav_cw/nav_cw.env

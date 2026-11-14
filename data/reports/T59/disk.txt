@@ -1,0 +1,11 @@
+==== step 0, map still in the App dir (before.txt) ====
+/dev/nvme0n1p15  433M  393M  7.1M  99% /userdata
+ad68517c-e845-42a4-b5dd-a6b7c6d2af13 and c1adbe7b-2e5e-4e83-ba30-e164914033c4
+
+==== step 4 ====
+source map: 378M  /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+App dir now: 5.9M  /userdata/config/robot_service/map/c1adbe7b-2e5e-4e83-ba30-e164914033c4
+a70c6db6: not present
+/dev/nvme0n1p15  433M   15M  385M   4% /userdata
+
+Putting ad68517c back is the step-0 state: Avail 7.1M, under 20M. Not copied back.
