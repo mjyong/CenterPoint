@@ -1,0 +1,10 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1794666061.893115355] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1794666061.908685046] [rosbag2_recorder]: Listening for topics...
+[INFO] [1794666061.908806577] [rosbag2_recorder]: Recording...
+[INFO] [1794666061.910342321] [rosbag2_recorder]: Event publisher thread: Starting
+[INFO] [1794666065.071229736] [rosbag2_recorder]: Subscribed to topic '/lightning/current_scan_world'
+[INFO] [1794666065.073728630] [rosbag2_recorder]: Subscribed to topic '/lightning/map_cloud'
+[INFO] [1794666065.073752706] [rosbag2_recorder]: All requested topics are subscribed. Stopping discovery...
+[INFO] [1794666246.866745600] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[INFO] [1794666246.913683753] [rosbag2_recorder]: Event publisher thread: Exiting
+[INFO] [1794666246.913827336] [rosbag2_recorder]: Recording stopped

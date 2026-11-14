@@ -1,0 +1,3 @@
+88 passed
+EIGEN_DIR=/public/zjst/robot/planning_humble_env/env/include/eigen3
+without EIGEN_DIR: 87 passed, 1 skipped (tests/dog/test_yield_gate_cpp.py, no Eigen at /usr/include/eigen3)

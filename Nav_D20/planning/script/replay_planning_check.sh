@@ -32,7 +32,14 @@ nav_env_setup
 
 rm -rf "${out}"
 mkdir -p "$(dirname "${out}")"
-stamp="$(date +%s)"
+# 镜像里 /tmp 是 vfs，stat 的 mtime 比容器时钟慢几分钟（T58），不能拿 date 去比。
+# 记下开跑前最新一份 glog 的 mtime，结束后只收比它新的。
+prev_glog=0
+for f in /tmp/planning.*.log.INFO.*; do
+  [[ -f "${f}" ]] || continue
+  m="$(stat -c %Y "${f}")"
+  (( m > prev_glog )) && prev_glog="${m}"
+done
 ros2 bag record -s mcap -o "${out}" \
   /lightning/odom /map/occupancy_grid /tf /tf_static \
   /planning/debug/cost_map_production/occmap /planning/debug/global_map_manager/occmap \
@@ -81,8 +88,12 @@ mkdir -p "${out}/logs"
 cp /tmp/nav_stack_debug/*.log "/tmp/replay_${name}_record.txt" "/tmp/replay_${name}_record_heavy.txt" \
    "/tmp/replay_${name}_stack.txt" "${out}/logs/" 2>/dev/null || true
 plan_log=""
+best=0
 for f in /tmp/planning.*.log.INFO.*; do
-  if [[ -f "${f}" && "$(stat -c %Y "${f}")" -ge "${stamp}" ]]; then
+  [[ -f "${f}" ]] || continue
+  m="$(stat -c %Y "${f}")"
+  if (( m > prev_glog && m >= best )); then
+    best="${m}"
     plan_log="${f}"
   fi
 done

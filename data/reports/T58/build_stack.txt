@@ -1,0 +1,60 @@
+--- stderr: lidar_seg
+** WARNING ** io features related to pcap will be disabled
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_CUDA_COMPILER
+    CMAKE_POLICY_VERSION_MINIMUM
+
+
+---
+[Processing: grid_map_memory_node, lidar_3d_detection, lidar_seg]
+Finished <<< lidar_seg [58.2s]
+--- stderr: grid_map_memory_node
+** WARNING ** io features related to pcap will be disabled
+** WARNING ** io features related to png will be disabled
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_CUDA_COMPILER
+    CMAKE_POLICY_VERSION_MINIMUM
+Finished <<< grid_map_memory_node [1min 5s]
+
+
+In file included from /repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:41:
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/../include/logging.h: In static member function ‘static bool grid_map::Logger::Init(const string&, const string&, bool, int, int, int)’:
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/../include/logging.h:18:26: warning: unused parameter ‘max_log_size’ [-Wunused-parameter]
+   18 |                      int max_log_size = 10,
+      |                      ~~~~^~~~~~~~~~~~~~~~~
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/../include/logging.h:19:26: warning: unused parameter ‘max_num_logs’ [-Wunused-parameter]
+   19 |                      int max_num_logs = 10) {
+      |                      ~~~~^~~~~~~~~~~~~~~~~
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp: In member function ‘void GridMapTask::processDepthForGrid(sensor_msgs::msg::Image_<std::allocator<void> >::SharedPtr, sensor_msgs::msg::PointCloud2_<std::allocator<void> >::SharedPtr, sensor_msgs::msg::PointCloud2_<std::allocator<void> >::SharedPtr)’:
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:410:16: warning: unused variable ‘start_system_time’ [-Wunused-variable]
+  410 |         double start_system_time = this->now().seconds();
+      |                ^~~~~~~~~~~~~~~~~
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp: In member function ‘bool GridMapTask::getSyncData(double, sensor_msgs::msg::Image_<std::allocator<void> >::SharedPtr&, sensor_msgs::msg::CompressedImage_<std::allocator<void> >::SharedPtr&)’:
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:496:14: warning: variable ‘rgb_found’ set but not used [-Wunused-but-set-variable]
+  496 |         bool rgb_found = false;
+      |              ^~~~~~~~~
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp: In member function ‘std::tuple<std::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >, std::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >, std::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >, nav_msgs::msg::OccupancyGrid_<std::allocator<void> > > GridMapTask::grid_generate_point_cloud_and_grid(const cv::Mat&, const cv::Mat&, const cv::Mat&, const Header&, bool, std::vector<cv::Point_<float> >&, std::vector<int>&)’:
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:1490:83: warning: unused parameter ‘mask’ [-Wunused-parameter]
+ 1490 |     grid_generate_point_cloud_and_grid(const cv::Mat& depth_image, const cv::Mat& mask,
+      |                                                                    ~~~~~~~~~~~~~~~^~~~
+/repo/Nav_D20/perception_combo_ros/node_src/GridMapTask/src/grid_map_memory_node.cpp:1492:95: warning: unused parameter ‘depth_only_mode’ [-Wunused-parameter]
+ 1492 |                                                     const std_msgs::msg::Header& header, bool depth_only_mode,
+      |                                                                                          ~~~~~^~~~~~~~~~~~~~~
+---
+Finished <<< lidar_3d_detection [1min 8s]
+--- stderr: lidar_3d_detection
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_POLICY_VERSION_MINIMUM
+
+
+---
+
+Summary: 3 packages finished [1min 9s]
+  3 packages had stderr output: grid_map_memory_node lidar_3d_detection lidar_seg
+done: /repo/build/nav_dev/install/{planning,slam,nav_perception}

@@ -17,6 +17,8 @@ exec docker run --rm "${tty[@]}" --gpus "\"device=${NAV_GPU:-0}\"" --shm-size 8g
   -v "${repo}:/repo" -w /repo \
   -v "/public:/public:$([[ -n "${NAV_PUBLIC_RW:-}" ]] && echo rw || echo ro)" \
   -e NAV_STACK_ROOT=/repo/build/nav_dev/install \
+  ${NAV_DRY_RUN:+-e NAV_DRY_RUN="${NAV_DRY_RUN}"} ${NAV_JOBS:+-e NAV_JOBS="${NAV_JOBS}"} \
+  ${NAV_WORKERS:+-e NAV_WORKERS="${NAV_WORKERS}"} ${NAV_CUDA_ARCH:+-e NAV_CUDA_ARCH="${NAV_CUDA_ARCH}"} \
   ${LOC_MAP_PATH:+-e LOC_MAP_PATH="${LOC_MAP_PATH}"} ${MAP_SWITCH:+-e MAP_SWITCH="${MAP_SWITCH}"} \
   ${PLANNING_STARTUP_MAP:+-e PLANNING_STARTUP_MAP="${PLANNING_STARTUP_MAP}"} \
   ${LOC_INS_YAW_OFFSET:+-e LOC_INS_YAW_OFFSET="${LOC_INS_YAW_OFFSET}"} ${LOC_INS_ONLY:+-e LOC_INS_ONLY="${LOC_INS_ONLY}"} \

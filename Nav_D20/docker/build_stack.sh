@@ -29,6 +29,14 @@ modules=("$@")
 [[ ${#modules[@]} -gt 0 ]] || modules=(planning slam nav_perception)
 arch="${NAV_CUDA_ARCH:-$([[ "$(uname -m)" == aarch64 ]] && echo 87 || echo 89)}"
 jobs="${NAV_JOBS:-$(nproc)}"
+# nvcr tensorrt images export OPAL_PREFIX=/opt/hpcx/ompi and put /usr/local/mpi/bin on PATH.
+# Those headers are not in the image. PCL pulls VTK, VTK runs FindMPI, and cmake stops on the
+# missing include. Drop that prefix when it is not installed; apt OpenMPI (if present) is then used.
+if [[ -n "${OPAL_PREFIX:-}" && ! -e "${OPAL_PREFIX}/lib/x86_64-linux-gnu/openmpi/include/mpi.h" && ! -e "${OPAL_PREFIX}/include/mpi.h" ]]; then
+  unset OPAL_PREFIX
+  PATH="$(echo "${PATH}" | tr ':' '\n' | grep -v '/usr/local/mpi' | paste -sd: -)"
+  export PATH
+fi
 common=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5)
 cuda=(-DCMAKE_CUDA_ARCHITECTURES="${arch}" -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc)
 acados=()

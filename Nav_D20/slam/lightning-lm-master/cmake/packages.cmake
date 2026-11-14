@@ -26,6 +26,13 @@ else()
 endif()
 set(GeographicLib_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/thirdparty/geographiclib/${GEOGRAPHICLIB_ARCH_DIR}/include)
 set(GeographicLib_LIBRARIES ${PROJECT_SOURCE_DIR}/thirdparty/geographiclib/${GEOGRAPHICLIB_ARCH_DIR}/lib/libGeographicLib.so)
+# The binary needs libGeographicLib.so.26 at run time. It is not on the default linker path, and the
+# package did not install it, so ldd reported it missing after setup.bash.
+install(FILES
+    ${PROJECT_SOURCE_DIR}/thirdparty/geographiclib/${GEOGRAPHICLIB_ARCH_DIR}/lib/libGeographicLib.so
+    ${PROJECT_SOURCE_DIR}/thirdparty/geographiclib/${GEOGRAPHICLIB_ARCH_DIR}/lib/libGeographicLib.so.26
+    ${PROJECT_SOURCE_DIR}/thirdparty/geographiclib/${GEOGRAPHICLIB_ARCH_DIR}/lib/libGeographicLib.so.26.1.1
+    DESTINATION lib)
 find_package (livox_ros_driver2 REQUIRED)
 find_package (basic REQUIRED)
 find_package (nav2_interface REQUIRED)

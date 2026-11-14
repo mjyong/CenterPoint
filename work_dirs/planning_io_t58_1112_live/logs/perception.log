@@ -1,0 +1,17 @@
+[INFO] [launch]: All log files can be found below /tmp/.ros/log/2026-11-14-15-02-31-036996-d5605ae37f73-824
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [lidar_3d_detection-1]: process started with pid [975]
+[lidar_3d_detection-1] I1114 15:02:31.362123   975 logging.h:30] Lidar 3D detection logger initialized. Log directory: /tmp/lidar_3d_detection_logs
+[lidar_3d_detection-1] I1114 15:02:31.645891   975 lidar_3d_detection.cpp:145] lidar_3d_detection up: config /repo/Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/config/lidar_3d_detection.yaml, model /repo/data/deploy/T58/model_x86 (fp16, GPU), lidar /robot/topic/rdap/top_point_cloud2, inspvax /rte/rdap/rtk/inspvax, imu /rte/rdap/rtk/imus/data_raw, objects /perception/lidar_3d/objects
+[lidar_3d_detection-1] I1114 15:02:32.106805   975 lidar_3d_detection.cpp:113] ENU origin 29.73741039 106.77960768 217.52
+[lidar_3d_detection-1] I1114 15:02:32.225589   975 lidar_3d_detection.cpp:212] 22 dets, 0 tracks | preprocess_ms 12.7 det_gpu_ms 52.5 det_post_ms 2.9 track_ms 0.0 predict_ms 0.0 total_ms 69.2 callback_max_ms 85.8 | clouds 1 frames 1 skipped 0
+[lidar_3d_detection-1] I1114 15:02:33.346513   975 lidar_3d_detection.cpp:212] 18 dets, 0 tracks | preprocess_ms 8.3 det_gpu_ms 2.5 det_post_ms 2.6 track_ms 0.0 predict_ms 0.0 total_ms 13.9 callback_max_ms 22.3 | clouds 1 frames 1 skipped 13
+[lidar_3d_detection-1] I1114 15:02:35.542630   975 lidar_3d_detection.cpp:212] 21 dets, 1 tracks | preprocess_ms 6.1 det_gpu_ms 2.4 det_post_ms 2.5 track_ms 0.0 predict_ms 0.0 total_ms 11.2 callback_max_ms 40.8 | clouds 2 frames 2 skipped 20
+[lidar_3d_detection-1] I1114 15:02:36.771637   975 lidar_3d_detection.cpp:212] 19 dets, 1 tracks | preprocess_ms 6.6 det_gpu_ms 18.0 det_post_ms 2.7 track_ms 0.0 predict_ms 0.0 total_ms 27.3 callback_max_ms 34.4 | clouds 2 frames 2 skipped 10
+[lidar_3d_detection-1] I1114 15:02:37.845155   975 lidar_3d_detection.cpp:212] 23 dets, 0 tracks | preprocess_ms 7.2 det_gpu_ms 2.3 det_post_ms 2.5 track_ms 0.0 predict_ms 0.0 total_ms 12.1 callback_max_ms 35.8 | clouds 3 frames 3 skipped 8
+[lidar_3d_detection-1] I1114 15:02:38.960114   975 lidar_3d_detection.cpp:212] 16 dets, 0 tracks | preprocess_ms 25.3 det_gpu_ms 2.8 det_post_ms 2.7 track_ms 0.0 predict_ms 0.0 total_ms 30.9 callback_max_ms 38.0 | clouds 4 frames 4 skipped 7
+[lidar_3d_detection-1] I1114 15:02:40.543504   975 lidar_3d_detection.cpp:212] 24 dets, 0 tracks | preprocess_ms 8.4 det_gpu_ms 2.3 det_post_ms 2.6 track_ms 0.0 predict_ms 0.0 total_ms 13.4 callback_max_ms 24.7 | clouds 3 frames 3 skipped 13
+[lidar_3d_detection-1] I1114 15:02:42.140249   975 lidar_3d_detection.cpp:212] 20 dets, 0 tracks | preprocess_ms 6.4 det_gpu_ms 2.4 det_post_ms 2.5 track_ms 0.0 predict_ms 0.0 total_ms 11.4 callback_max_ms 42.0 | clouds 2 frames 2 skipped 14
+[lidar_3d_detection-1] I1114 15:02:43.142973   975 lidar_3d_detection.cpp:212] 17 dets, 0 tracks | preprocess_ms 6.3 det_gpu_ms 2.3 det_post_ms 2.6 track_ms 0.0 predict_ms 0.0 total_ms 11.4 callback_max_ms 21.2 | clouds 3 frames 3 skipped 7
+[lidar_3d_detection-1] I1114 15:02:44.268558   975 lidar_3d_detection.cpp:212] 20 dets, 0 tracks | preprocess_ms 11.5 det_gpu_ms 16.5 det_post_ms 3.8 track_ms 0.0 predict_ms 0.0 total_ms 31.8 callback_max_ms 46.3 | clouds 5 frames 5 skipped 6
+[lidar_3d_detection-1] I1114 15:02:45.952955   975 lidar_3d_detection.cpp:212] 28 dets, 0 tracks | preprocess_ms 7.1 det_gpu_ms 12.8 det_post_ms 2.4 track_ms 0.0 predict_ms 0.0 total_ms 22.4 callback_max_ms 29.5 | clouds 3 frames 3 skipped 14

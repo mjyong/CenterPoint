@@ -1,0 +1,2 @@
+work_dirs/planning_io_t58_1112_live: 30 object messages, 16426 odometry; 0 messages with no odometry within 0.3 s (the gate counts them stale)
+no static vehicle track seen for 20+ frames while the dog moved >= 1 m or turned >= 15 deg: nothing to check (try --any-motion)

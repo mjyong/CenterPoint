@@ -1,0 +1,11 @@
+INS 朝向偏置 180（bag rosbag2_2026_09_21-16_41_27）
+定位临时配置 /tmp/loc_debug_qy6UDK.yaml： map_path: /repo/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13  ins_only_mode: false   ins_yaw_offset: 180  
+规划起来就读的地图：/repo/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+规划车型 d20/001（PLANNING_ROOT_DIR=/tmp/nav_stack_debug/planning_root_map）
+ROS_DOMAIN_ID=42
+bag=/repo/bags0921/rosbag2_2026_09_21-16_41_27
+日志 /tmp/nav_stack_debug
+链路: bag 的顶激光/IMU/INSPVAX -> lidar_seg -> /map/occupancy_grid，定位 -> /lightning/odom -> planning
+已启动 pid: 22059 22060 22061 22188 22330
+Ctrl-C 会停掉 bag、感知、定位和规划。
+bag 放完了，停掉其余进程

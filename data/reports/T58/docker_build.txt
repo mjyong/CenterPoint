@@ -1,0 +1,20 @@
+#9 930.2 Fetched 51.3 MB in 4s (13.6 MB/s)
+#9 930.2 Reading package lists...
+#9 932.0 Reading package lists...
+#9 933.3 Building dependency tree...
+#9 933.5 Reading state information...
+#9 933.7 libopenmpi-dev is already the newest version (4.1.2-2ubuntu1).
+#9 933.7 libopenmpi-dev set to manually installed.
+#9 933.7 0 upgraded, 0 newly installed, 0 to remove and 98 not upgraded.
+#9 DONE 934.0s
+
+#10 exporting to image
+#10 exporting layers
+#10 exporting layers 140.4s done
+#10 writing image sha256:205edc80d77a4443473b75170cf49e364d42c9743c7b7ad797089455d93bb442 0.0s done
+#10 naming to docker.io/library/nav-dev 0.0s done
+#10 DONE 140.7s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "ROS_KEY") (line 18)
+BUILD_EXIT:0

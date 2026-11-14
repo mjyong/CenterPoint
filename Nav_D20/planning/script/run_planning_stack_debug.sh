@@ -133,7 +133,8 @@ elif [[ -n "${LIVE_PERCEPTION_MODEL:-}" ]]; then
   echo "感知节点：我们的 lidar_3d_detection（${perc_config}，模型 ${LIVE_PERCEPTION_MODEL}）"
   [[ -n "${BAG_PLAY_EXTRA:-}" ]] || play_args+=(--remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects)
 fi
-ros2 bag play "${play_args[@]}" "${bag}" >"${log_dir}/bag.log" 2>&1 &
+# bag 路径放在 --remap 前面：ros2 bag play 的 --remap 会把后面的位置参数也吃掉（T58 现场感知那次没放成）
+ros2 bag play "${bag}" "${play_args[@]}" >"${log_dir}/bag.log" 2>&1 &
 bag_pid=$!
 pids+=("${bag_pid}")
 

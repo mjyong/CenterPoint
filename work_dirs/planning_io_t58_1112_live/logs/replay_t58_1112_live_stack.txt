@@ -1,0 +1,12 @@
+INS 朝向偏置 0（bag 1112_t40）
+定位临时配置 /tmp/loc_debug_2EwLzG.yaml： map_path: /repo/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13  ins_only_mode: false   ins_yaw_offset: 0  
+规划起来就读的地图：/repo/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+规划车型 d20/001（PLANNING_ROOT_DIR=/tmp/nav_stack_debug/planning_root_map）
+ROS_DOMAIN_ID=42
+bag=/public/zjst/robot/cp_data/1112_t40
+日志 /tmp/nav_stack_debug
+链路: bag 的顶激光/IMU/INSPVAX -> lidar_seg -> /map/occupancy_grid，定位 -> /lightning/odom -> planning
+感知节点：我们的 lidar_3d_detection（/repo/Nav_D20/perception_combo_ros/node_src/lidar_3d_detection/config/lidar_3d_detection.yaml，模型 /repo/data/deploy/T58/model_x86）
+已启动 pid: 632 633 634 824 825 990
+Ctrl-C 会停掉 bag、感知、定位和规划。
+bag 放完了，停掉其余进程

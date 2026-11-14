@@ -1,0 +1,4 @@
+ros2 bag info: /planning/debug/crosswalk  visualization_msgs/msg/MarkerArray  1438
+align 时一条（ns=state 的字，ns=crosswalks 当前人行横道框，scale.x=0.25）：
+  state: align (stale), perception stale
+  box: (77.33, 221.76) (107.74, 211.20) (106.16, 206.11) (75.70, 216.88)

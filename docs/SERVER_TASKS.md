@@ -169,7 +169,7 @@
 | T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
 | T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成，已复核（2026-11-14）：定位不再因大消息退出，odom 约 100 Hz；缩略图一条、Foxglove 订了规划没重启；外参 OK。复核加了：use-new 等 odom（INS 30 s 没固定解定位起不来）、bag_to_mcap.py（狗上录的是 sqlite3） |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
-| T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
+| T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -10079,3 +10079,35 @@ App 上的狗画在 c1adbe7b 上，位置不准，不用管；位置看 Foxglove
 报告（写进"T58 结果"）：镜像和改了什么；三个模块编译的最后几行和 ldd；和 T54 的对照表；1112 现场感知的 report、perception.log、
 objects_in_map 全文、crosswalk_vehicles 最大值。
 ```
+
+## T58 结果
+
+**停在第 4 步。** 镜像能编、能和 T54 对上同一次过马路。1112 现场感知的节点加载了已有的 TensorRT 10.3 引擎并算出了目标，大约 30 帧之后不再发 `/perception/lidar_3d/objects`（GPU 0 和空闲的 GPU 5 各一次，一样）。`objects_in_map.py` 不是 WRONG，是没有够长的静止车轨迹，给不出外参结论。没有改外参，也没有把镜像改成以后回放的默认环境。
+
+镜像 `nav-dev` `sha256:205edc80d77a`，底是本机已有的 `nvcr.io/nvidia/tensorrt:24.08-py3`。apt 用了清华镜像，GitHub 用了 `https://ghfast.top/https://github.com`（直连 HTTP/2 克隆 osqp 失败），克隆强制 HTTP/1.1。底镜像的 `OPAL_PREFIX=/opt/hpcx/ompi` 会让 PCL 的 FindMPI 去找不存在的头文件，镜像里改成 `OPAL_PREFIX=/usr`，`build_stack.sh` 在头文件不在时也丢掉这个前缀。pytest：没设 `EIGEN_DIR` 是 87 passed、1 skipped；`EIGEN_DIR=/public/zjst/robot/planning_humble_env/env/include/eigen3` 之后 `test_yield_gate_cpp.py` 也过，合计 88 passed。
+
+编译（`data/reports/T58/build_stack.txt`，前缀在 `/public`，根分区放不下）：`Finished <<< planning [1min 58s]`，`Finished <<< lightning [2min 48s]`，`Finished <<< lidar_seg [58.2s]`，`Finished <<< grid_map_memory_node [1min 5s]`，`Finished <<< lidar_3d_detection [1min 8s]`，最后 `done: .../install/{planning,slam,nav_perception}`。六个二进制各自 source 模块的 `setup.bash` 之后 `ldd` 的 `not found` 都是 0（`ldd.txt`）。定位原来缺 `libGeographicLib.so.26`，装进了 slam 的 `lib/`。
+
+和 T54 的 `report_cross`：
+
+| | T54（micromamba） | T58（nav-dev） |
+|---|---|---|
+| 车型 | d20/001 | d20/001，`startup map … 5 crosswalks` |
+| mission_state | active 3075，passive 1，standby 1，standstill 31 | active 1399，passive 1，standby 1，standstill 18，没有 fault |
+| CMD | 2979，中位 0.748 / 0.000 / 0.000，vx>0.05 70% | 1340，中位 0.429 / 0.000 / 0.000，vx>0.05 72%；p90 1.428（T54 1.438），最大 1.916（T54 1.952） |
+| local planner | 零指令 163/3075（5%）；solver failed 96 | 零指令 89/1399（6%）；solver failed 59 |
+| Crosswalk yield | approach（停 39.3 m）→ align stale → 没放行上了人行横道（0.083 m）→ wait（0.543 m）→ cross（1.523 m）→ none | approach（39.2 m）→ align stale → 没放行（0.645 m）→ wait（0.504 m）→ cross（1.506 m）→ none。align 到 cross 的 CMD 66 条，vx、vy 都是 0 |
+| odom / heading / 贴图 | 初始化跳 142.9 m；heading 中位 1°；odom−INS 0.33 m | 初始化跳 142.8 m（两次 >1 m）；heading 中位 1°；odom−INS 0.33 m；贴图中位 49%（T54 那次报告没记贴图百分比） |
+
+状态顺序一样，定位没有跑飞，solver failed 没有多一截。周期大约少一半（规划循环更慢），中位 vx 低、高速段的 p90 和最大速度同 T54。`/planning/debug/crosswalk` 1438 条。align 时一条：状态字 `align (stale), perception stale`，当前人行横道框 (77.33, 221.76) (107.74, 211.20) (106.16, 206.11) (75.70, 216.88)。
+
+第 4 步。引擎是 `data/deploy/nusc_pp_dyn/machines/gpu1` 拷到 `data/deploy/T58/model_x86`（不提交），容器里直接加载，fp16、GPU，没有在容器里重建。1112 在 ad68517c 上的目标是 −386.9 655.3（`bag_on_map.txt`）。回放 `t58_1112_live`：车型 d20/001，INS 偏置 0，startup map 5 条人行横道，这一带附近 0 条，没有 fault。`/perception/lidar_3d/objects` 30 条。节点日志停在开跑后大约 14 秒（`perception_lines.txt` 是前 5 行；GPU 时间 2–18 ms，不是卡在推理上）。`objects_in_map.py` 全文：
+
+```text
+work_dirs/planning_io_t58_1112_live: 30 object messages, 16426 odometry; 0 messages with no odometry within 0.3 s (the gate counts them stale)
+no static vehicle track seen for 20+ frames while the dog moved >= 1 m or turned >= 15 deg: nothing to check (try --any-motion)
+```
+
+`/viz/state` 的 `planning.crosswalk_vehicles` 最大是 0（T53 用包里录的目标，最大 5）。节点算法代码没改。
+
+回放是在已经建好的容器里 `docker exec` 的。`docker create` 在这台机器的 vfs 上要二十多分钟，没有为每一次回放再 `docker run`。

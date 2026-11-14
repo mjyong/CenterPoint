@@ -7,7 +7,8 @@
 #
 #   docker build -t nav-dev -f Nav_D20/docker/Dockerfile.nav-dev Nav_D20/docker \
 #       [--build-arg UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu] \
-#       [--build-arg ROS_APT=https://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu] [--build-arg GITHUB=<a GitHub mirror>]
+#       [--build-arg ROS_APT=https://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu] \
+#       [--build-arg GITHUB=https://ghfast.top/https://github.com]
 #   bash Nav_D20/docker/run.sh bash Nav_D20/docker/build_stack.sh
 #   NAV_GPU=5 bash Nav_D20/docker/run.sh bash Nav_D20/planning/script/replay_planning_check.sh <name> <x> <y> [--bag ...]
 FROM nvcr.io/nvidia/tensorrt:24.08-py3
@@ -49,23 +50,35 @@ ARG OSQP_EIGEN_REF=v0.10.0
 ARG ACADOS_REF=v0.5.1
 ARG G2O_REF=20230806_git
 ARG LIVOX_SDK2_REF=v1.2.5
-RUN set -e; b() { cmake -S "$1" -B "$1/build" -G Ninja -DCMAKE_BUILD_TYPE=Release "${@:2}" \
+# GitHub's HTTP/2 drops the clone on this network (curl 16). HTTP/1.1, and when GITHUB is a mirror,
+# rewrite submodule URLs too (osqp, acados) so they do not go back to github.com.
+RUN git config --global http.version HTTP/1.1 \
+ && if [[ "${GITHUB}" != "https://github.com" ]]; then \
+      git config --global url."${GITHUB}/".insteadOf "https://github.com/"; fi \
+ && set -e; b() { cmake -S "$1" -B "$1/build" -G Ninja -DCMAKE_BUILD_TYPE=Release "${@:2}" \
         && cmake --build "$1/build" && cmake --install "$1/build"; } \
- && git clone --depth 1 --branch "${OSQP_REF}" --recurse-submodules --shallow-submodules "${GITHUB}/osqp/osqp" /tmp/osqp \
+ && clone() { local i dest="${@: -1}"; for i in 1 2 3; do git clone "$@" && return 0; echo "clone failed ($i): ${dest}"; rm -rf "${dest}"; sleep 8; done; return 1; } \
+ && clone --depth 1 --branch "${OSQP_REF}" --recurse-submodules --shallow-submodules "${GITHUB}/osqp/osqp" /tmp/osqp \
  && b /tmp/osqp \
- && git clone --depth 1 --branch "${OSQP_EIGEN_REF}" "${GITHUB}/robotology/osqp-eigen" /tmp/osqp-eigen \
+ && clone --depth 1 --branch "${OSQP_EIGEN_REF}" "${GITHUB}/robotology/osqp-eigen" /tmp/osqp-eigen \
  && b /tmp/osqp-eigen -DBUILD_TESTING=OFF \
- && git clone --depth 1 --branch "${ACADOS_REF}" --recurse-submodules --shallow-submodules "${GITHUB}/acados/acados" /tmp/acados \
+ && clone --depth 1 --branch "${ACADOS_REF}" --recurse-submodules --shallow-submodules "${GITHUB}/acados/acados" /tmp/acados \
  && b /tmp/acados -DACADOS_WITH_QPOASES=ON -DCMAKE_INSTALL_PREFIX=/opt/acados \
- && git clone --depth 1 --branch "${G2O_REF}" "${GITHUB}/RainerKuemmerle/g2o" /tmp/g2o \
+ && clone --depth 1 --branch "${G2O_REF}" "${GITHUB}/RainerKuemmerle/g2o" /tmp/g2o \
  && b /tmp/g2o -DG2O_BUILD_APPS=OFF -DG2O_BUILD_EXAMPLES=OFF -DBUILD_UNITTESTS=OFF \
- && git clone --depth 1 --branch "${LIVOX_SDK2_REF}" "${GITHUB}/Livox-SDK/Livox-SDK2" /tmp/livox \
+ && clone --depth 1 --branch "${LIVOX_SDK2_REF}" "${GITHUB}/Livox-SDK/Livox-SDK2" /tmp/livox \
  && b /tmp/livox \
  && rm -rf /tmp/osqp /tmp/osqp-eigen /tmp/acados /tmp/g2o /tmp/livox \
  && echo /opt/acados/lib > /etc/ld.so.conf.d/acados.conf && ldconfig
 
 # the repository's Python tools (planning_mcap_viz, bag_on_map, objects_in_map, the yield gate's golden data)
 RUN python3 -m pip install --no-cache-dir "numpy==1.26.4" "scipy>=1.8" "rosbags>=0.9" mcap pyyaml
+
+# The base image points MPI at HPC-X (/opt/hpcx/ompi), which is not unpacked here. PCL's VTK runs
+# FindMPI and stops. apt's OpenMPI is what the headers match; drop the HPC-X prefix and its mpicc.
+RUN apt-get update && apt-get install -y --no-install-recommends libopenmpi-dev && rm -rf /var/lib/apt/lists/*
+ENV OPAL_PREFIX=/usr \
+    PATH=/opt/tensorrt/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/ucx/bin
 
 # like the dog: CycloneDDS. Domain 42 so that a container started with --net host could not reach the dog's 0;
 # run.sh gives each container its own network anyway.

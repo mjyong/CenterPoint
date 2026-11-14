@@ -46,11 +46,15 @@ nav_bin() {
 nav_exec() {
   local m=$1
   shift
+  # The planning prefix's setup.bash exports PLANNING_ROOT_DIR to the install tree (default vin d30).
+  # The replay script has already pointed it at a temp root for d20 and the startup map. Keep that.
+  local saved_root="${PLANNING_ROOT_DIR:-}"
   if [[ -n "${NAV_STACK_ROOT:-}" ]]; then
     set +u
     # shellcheck disable=SC1090
     source "${NAV_STACK_ROOT}/${m}/setup.bash"
     set -u
   fi
+  [[ -n "${saved_root}" ]] && export PLANNING_ROOT_DIR="${saved_root}"
   exec "$@"
 }
