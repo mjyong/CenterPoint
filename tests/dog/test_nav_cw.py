@@ -34,6 +34,11 @@ esac
 GRAPH = r"""#!/bin/bash
 echo "ros2 $*" >> "$STATE/log"
 echo "domain ${ROS_DOMAIN_ID:-unset}" >> "$STATE/domains"
+if [[ "$1 $2" == "topic echo" ]]; then   # odometry from our localization, unless $STATE/no_odom
+  [[ -e "$STATE/no_odom" ]] && exit 1
+  "$SYSTEMCTL" is-active --quiet cw-slam.service || exit 1
+  exit 0
+fi
 [[ "$1 $2" == "topic info" ]] || exit 0
 topic="${@: -1}"
 conf=$(find "$NAV_CW_ROOT/install" -name communication_conf.pb.txt 2>/dev/null | head -1)
@@ -479,3 +484,11 @@ def test_ours_ignore_the_apps_map_unless_told_to_follow(dog, tmp_path):
     assert '"/nav_cw/map/switch"' in comm and '"/nav_cw/map/file_update"' in comm
     assert 'NAV_CW_SLAM_ARGS="map_switch_topic:=/nav_cw/map/switch"' in (tmp_path / "nav_cw" / "nav_cw.env").read_text()
     assert "ok    mode_switch_node SUBSCRIPTION      not on /map/switch" in r.stdout
+
+
+def test_use_new_puts_theirs_back_without_odometry(dog, tmp_path):
+    """the localization waits 30 s for an RTK-fixed INS and then starts from the yaml pose (T61): no odometry"""
+    (tmp_path / "state" / "no_odom").write_text("")
+    r = dog("use-new")
+    assert r.returncode == 1 and "no /lightning/odom within" in r.stdout and "running: theirs" in r.stdout
+    assert all(dog.states()[u] == "active" for u in ORIG) and all(dog.states()[u] == "inactive" for u in NEW)

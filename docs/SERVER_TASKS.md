@@ -167,7 +167,7 @@
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步，已复核（2026-11-14）：编、装、地图、服务都过了。复核发现影子模式按原来的做法不生效（规划不读命令行参数），已改；启动脚本的库路径、App 盘快满、App 的地图切换、演练的共享内存四件事交给 T59 |
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T61 | 半天 | 任务已写好 |
 | T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
-| T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成：定位不再因大消息退出，odom 约 100 Hz；缩略图 1716×1902 一条；Foxglove 订了全局栅格，规划没有重启；外参 OK。演练后 running: theirs |
+| T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成，已复核（2026-11-14）：定位不再因大消息退出，odom 约 100 Hz；缩略图一条、Foxglove 订了规划没重启；外参 OK。复核加了：use-new 等 odom（INS 30 s 没固定解定位起不来）、bag_to_mcap.py（狗上录的是 sqlite3） |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
 
@@ -9858,6 +9858,29 @@ Foxglove：`foxglove_bridge on 8765, domain 42`。探针 12 秒：`/planning/deb
 
 狗上的录包和 1112 已删。原文在 `data/reports/T61/`，录包在 `work_dirs/t61_rehearsal/`（mcap 和 sqlite 走 LFS，viz 是普通文件）。
 
+
+### T61 复核（2026-11-14）
+
+都对。定位不再因为大消息退出（`CHUNK_IS_TOO_LARGE` 0），odom 约 100 Hz；规划 `overview 1716x1902 at 0.6 m`，Foxglove 订了全局栅格一条，
+规划、定位都没重启；60 s 学 App 发的两条都没让我们切图；外参 **OK**（−90°，4 条静止车漂移中位 0.12 m，4/4；这次目标是我们的感知
+在狗上现场重算的，T56 说这是定论）；前后重启次数一个没变。演练这一步（T56 起的）可以算过了。
+
+几处：
+1. **INS 30 s**：第一遍包放晚了，定位等 RTK 固定解 30 s 没等到，就从配置里的位姿 (−109.9, 400.6) 起，NDT 一直对不上，没有 odom。
+   现场一样：use-new 时 INS 还不是固定解（室内、刚开机、遮挡），我们的定位就起不来。改了：`nav_cw.sh use-new` 换完等
+   `/lightning/odom`（`NAV_CW_ODOM_WAIT`，默认 45 s），没有就换回原来的、打出 cw-slam 里初始化那几行（测试加了一条）；T57 第 1 步先看
+   `ins_status` 3、`pos_type` 56（定位用的就是这两个数，`loc_system.cc`）。
+2. **录包是 sqlite3**：狗上的 ros2 bag 没有 mcap 插件。转 mcap 时 rosbags 不认 kygi665_msgs、mc_interface、perception_interface、
+   rhr_interface，这些话题丢了。加了 `Nav_D20/planning/tools/bag_to_mcap.py`：定义从仓库来（`bag_on_map.typestore(all_packages=True)`
+   注册 `Nav_D20/seres_interface/ros` 下全部的包，rte_interface 有几个文件夹了不换行空格，顺手处理了），消息原样拷，认不出的列出来
+   （`tests/dog/test_bag_to_mcap.py`）。DOG_FIELD_GUIDE.md 第 9 节、T57 第 3、5 步改了。
+3. **`ros2 topic pub --once` 等订阅者**：ignore 时没人订 `/map/switch`，`--once` 会一直等；要 `-w 0`（T61 自己发现、改了）。写进文档。
+4. **足迹被占 2259/3499、standstill 507**：不是狗上编的问题。T53 在服务器上回放同一个包也是 2162/3090：1112 是人遥控走的，一半路段
+   不在路网格子上（`bag_on_map`：53% 在路网 0.5 m 内），规划把路网外当障碍。换一个走在路网上的包才看得出规划本身的好坏（T57 现场的录包）。
+5. pytest 那台还是没有 g++ 和 Eigen：`test_map_overview.py` 没在那台跑；我这边跑过（3 passed）。
+
+下一步是 T57（人在现场）。
+
 ---
 
 ## T60 服务器上的 arm64 编译环境：狗的根文件系统做成镜像，QEMU 里编
@@ -9937,11 +9960,16 @@ App 上的狗画在 c1adbe7b 上，位置不准，不用管；位置看 Foxglove
 服务器上开着 Foxglove 或者能看 journalctl。
 
 1. ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status' → running: theirs。
+   INS 要先是 RTK 固定解（我们的定位起来以后只等 30 s，等不到就从配置里的位姿起，对不上地图、没有 odom，T61）：
+     ssh dog "sudo -n bash -c 'source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/slam/setup.bash; export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml; timeout 5 ros2 topic echo --once /rte/rdap/rtk/inspvax' | grep -A1 -E 'ins_status|pos_type'"
+   要 ins_status 3、pos_type 56；不是就在空旷处等一会儿再看。
    开关：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed 0.3'（第 2c 步前不 shadow，摸运控要真发），switches 抄下来
    （appmap ignore，没有 NOT APPLIED、没有 REHEARSAL ON）。
-2. 换：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'。15 s 内没起稳它会自己换回原来的并退出 1（抄输出，停下）。
+2. 换：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'。15 s 内没起稳、图和开关对不上、45 s 内没有 /lightning/odom，
+   它都会自己换回原来的并退出 1（抄输出，停下；没有 odom 多半是 INS 还不是固定解）。
    成功后看（journalctl -u <服务> -n 50）：
-   - cw-slam：定位收敛（没有 fault、没有一直重定位）；
+   - cw-slam："Setting init pose from INS (RTK_FIXED, skip NDT)"，没有"定位初始化超时"、没有 CHUNK_IS_TOO_LARGE；定位收敛（没有 fault、
+     没有一直重定位）；
    - cw-planning："startup map … 5 crosswalks"、"Tracking: crosswalk yield on, rule wait"；之后不许有 "Map switch"、"Map update"
      （appmap ignore；有就是没生效：换回，停下）；use-new 的输出里图那几行都是 ok（planning、mode_switch_node 不在 /map/switch 上）；
    - lidar-3d-detection：每秒一行，10 Hz 左右；
@@ -9956,15 +9984,18 @@ App 上的狗画在 c1adbe7b 上，位置不准，不用管；位置看 Foxglove
      人用遥控把狗遛到人行横道前、停下、转向对面、走过去；Foxglove 里看状态 approach → align → wait / go → cross、
      影子的指令曲线；有车经过时看红框和 waiting for。看完 shadow off；
    - 然后 speed 0.5（第 4 步 a 用），b、c 前人定要不要 0.8。
-3. 录包（每次测试一个，名字 1113_cw_<n>；话题用 DOG_FIELD_GUIDE.md 第 9 节那张表，多了 /mc/motion_control 和影子的两个）：ros2 bag record（域 0）1112 那些话题，加上 /lightning/odom、/cmd_vel、
-   /planning/debug/plotjuggler/string、/planning/debug/path_tracking、/map/occupancy_grid、/perception/lidar_3d/objects。
+3. 录包（每次测试一个，名字 <日期>_cw_<n>；话题用 DOG_FIELD_GUIDE.md 第 9 节那张表）：ros2 bag record（域 0，root）。狗上的 ros2 bag
+   没有 mcap 插件，录出来是 sqlite3（T61），不要加 -s mcap。
 4. 测（每次都：人在 Foxglove 里发人行横道对面的目标；Foxglove 里看 /planning/debug/crosswalk 的状态字和车框（红框是门控在等的车）、
    右边"规划的数"里的 crosswalk_*；Agent 同时跟着 journalctl -u cw-planning -f | grep "Crosswalk yield"，报状态）：
    a. 空的人行横道：应该 approach → align（转到面朝对面）→ go → cross → none；狗在入口前停下、转向、走过去，中间不停；
    b. 同事开车低速（≤ 10 km/h）从左边、再从右边经过：车在可能经过的范围里时应该 wait（理由 vehicle），车过去以后 go；
    c. 正常车流：看等多久、有没有不该放的时候放了（人判断）。
    任何时候人觉得不对就急停；Agent 记下时间。
-5. 每次测完：停录，拷回服务器 /public/zjst/robot/cp_data/，跑 planning_mcap_viz.py、objects_in_map.py。
+5. 每次测完：停录，拷回服务器 /public/zjst/robot/cp_data/；
+     python Nav_D20/planning/tools/bag_to_mcap.py <录包> <录包>_mcap      （每个话题都转过去，有 LEFT OUT 就抄下来）
+     python Nav_D20/planning/tools/planning_mcap_viz.py <录包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
+     python Nav_D20/planning/tools/objects_in_map.py <录包>            （sqlite 直接读）
 6. 换回：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original' → running: theirs；App 里狗正常。
    开关放回：speed off、shadow off、switches（下次 use-new 不带着限速）。
 7. 提交：报告（每次测试的状态序列、等了多久、人的判断、急停了没有）、录包的 viz，写进"T57 结果"。

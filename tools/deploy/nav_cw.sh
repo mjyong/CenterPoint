@@ -7,7 +7,10 @@
 #
 #   sudo bash nav_cw.sh status          which set is running
 #   sudo bash nav_cw.sh use-new         stop theirs, start ours; if one of ours is not up and steady after
-#                                       NAV_CW_WAIT s (default 15), put theirs back and exit 1
+#                                       NAV_CW_WAIT s (default 15), the ROS graph does not match the switches, or
+#                                       no /lightning/odom comes within NAV_CW_ODOM_WAIT s (default 45: the
+#                                       localization waits 30 s for an RTK-fixed INS, then starts from the yaml
+#                                       pose and does not match the map, T61), put theirs back and exit 1
 #   sudo bash nav_cw.sh use-original    stop ours, start theirs
 #   bash nav_cw.sh configure <prefix> <map dir>
 #                                       at install time (T56): point our localization (map_path) and planning
@@ -68,6 +71,7 @@ OWN_SWITCH=/nav_cw/map/switch
 APP_UPDATE=/map/file_update
 OWN_UPDATE=/nav_cw/map/file_update
 VERIFY_WAIT="${NAV_CW_VERIFY_WAIT:-20}"   # [s] for the restarted node to show up in the ROS graph
+ODOM_WAIT="${NAV_CW_ODOM_WAIT:-45}"       # [s] for our localization's first odometry after use-new (0: do not wait)
 PERCEPTION_DEBUG_ARGS="-p publish_cloud:=true -p publish_tf:=true"
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"   # the tests put a fake one here
 JOURNALCTL="${JOURNALCTL:-journalctl}"
@@ -350,6 +354,22 @@ check() {
     sleep 2
   done
 }
+# wait_odom: our localization's first /lightning/odom within ODOM_WAIT s
+wait_odom() {
+  (( ODOM_WAIT > 0 )) || return 0
+  ros_env
+  echo "waiting up to ${ODOM_WAIT} s for /lightning/odom..."
+  if timeout "${ODOM_WAIT}" "${ROS2}" topic echo --once /lightning/odom nav_msgs/msg/Odometry > /dev/null 2>&1; then
+    echo "  odometry: ok"
+    return 0
+  fi
+  echo "  no /lightning/odom within ${ODOM_WAIT} s. cw-slam says:"
+  "${JOURNALCTL}" -u cw-slam.service -n 200 --no-pager 2>/dev/null |
+    grep -E "初始化超时|RTK|NDT|异常|init pose" | tail -8 || true
+  echo "  (the INS has to be RTK fixed within 30 s of the start, or the localization starts from the yaml pose)"
+  return 1
+}
+
 # check, and when shadow is on but the planner still publishes the dog's commands: stop it
 check_or_stop() {
   if check; then return 0; fi
@@ -463,7 +483,12 @@ case "${1:-status}" in
     echo "switching to ours..."
     if switch "${ORIG[@]}" -- "${NEW[@]}"; then
       status
-      check_or_stop || { echo "putting the robot team's back..."; switch "${NEW[@]}" -- "${ORIG[@]}" || true; status || true; exit 1; }
+      if ! check_or_stop || ! wait_odom; then
+        echo "putting the robot team's back..."
+        switch "${NEW[@]}" -- "${ORIG[@]}" || true
+        status || true
+        exit 1
+      fi
     else
       echo "ours did not come up: last log lines"
       for u in "${NEW[@]}"; do echo "== ${u}"; "${JOURNALCTL}" -u "${u}" -n 15 --no-pager 2>/dev/null || true; done
@@ -477,5 +502,5 @@ case "${1:-status}" in
     switch "${NEW[@]}" -- "${ORIG[@]}" || { status || true; exit 1; }
     status ;;
   configure) shift; configure "$@" ;;
-  *) sed -n '2,55p' "$0"; exit 2 ;;
+  *) sed -n '2,58p' "$0"; exit 2 ;;
 esac

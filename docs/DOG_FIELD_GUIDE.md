@@ -102,7 +102,8 @@ INS /rte/rdap/rtk/inspvax、IMU           │                                   
 
 ### 3.1 每次上板
 
-1. 狗站着、在 ad68517c 那片；急停在人手里；`switches` 里 appmap 是 ignore。
+1. 狗站着、在 ad68517c 那片、在空旷处；急停在人手里；`switches` 里 appmap 是 ignore。**INS 要先是 RTK 固定解**（`/rte/rdap/rtk/inspvax`
+   的 `ins_status` 3、`pos_type` 56）：我们的定位起来以后只等 30 s，等不到就从配置里的位姿起，对不上地图、没有 odom（T61）。
 2. `nav_cw.sh status` → `running: theirs`；`nav_cw.sh switches` 看开关（第 5 节），第一次上板要影子模式、限速。
 3. `nav_cw.sh use-new`。成功后看日志（`journalctl -u <服务> -n 50`）：
 
@@ -126,10 +127,13 @@ sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal on        # nav_cw.env 写 RO
                                                              # 停机器人团队的四个导航服务，起我们的三个，在域 42 上查图
 E='source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/planning/setup.bash; export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml ROS_DOMAIN_ID=42'
 sudo -n bash -c "$E; ros2 bag play <包> --clock --remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects /map/switch:=/bag/map/switch /cmd_vel:=/bag/cmd_vel /mc/motion_control:=/bag/mc/motion_control"
-sudo -n bash -c "$E; ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped '{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}'"
+sudo -n bash -c "$E; ros2 topic pub -w 0 --once /goal_pose geometry_msgs/msg/PoseStamped '{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}'"
 sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal off       # 我们的停、他们的起回来，nav_cw.env 里域 42 那两项去掉
 ```
 
+- `rehearsal on` 以后 30 s 内就把包放起来：定位只等 30 s 的 INS 固定解，晚了它从配置里的位姿起、对不上（T61）；晚了就
+  `systemctl restart cw-slam cw-planning`，包放着的时候它们重新起；
+- `ros2 topic pub` 加 `-w 0`：`--once` 默认等到有订阅者才发，没人订的话题（比如 ignore 时的 `/map/switch`）会一直等（T61）；
 - 包里录的目标、地图切换、指令都改名避开：目标用我们现场重算的；切换和指令是录的时候的，不能当成现在的；
 - `PLANNING_TIMEOUT_WALL_CLOCK=1`：回放旧包时规划的超时按收到消息的时刻算（ONBOARDING.md），只在演练时设；
 - 用 root 跑 ros2 命令：机器人的共享内存是 root 的 `iox-roudi`，`nvidia` 的进程拿到的数据不全（T40）；
@@ -282,19 +286,21 @@ Foxglove 只能发 `/goal_pose`。一层一层来，前一层过了再下一层�
 狗上（域 0，录，不发）：
 
 ```bash
-ros2 bag record -s mcap -o /home/nvidia/bags/<日期>_cw_<n> \
+ros2 bag record -o /home/nvidia/bags/<日期>_cw_<n> \
   /robot/topic/rdap/top_point_cloud2 /rte/rdap/rtk/inspvax /rte/rdap/rtk/imus/data_raw \
   /lightning/odom /map/occupancy_grid /perception/lidar_3d/objects /goal_pose \
   /cmd_vel /mc/motion_control /nav_cw/shadow/cmd_vel /nav_cw/shadow/mc/motion_control \
   /planning/debug/crosswalk /planning/debug/path_tracking /planning/debug/plotjuggler/string /tf /tf_static
 ```
 
-（T57 第 3 步是同一张表；激光和 INS 要录上，回来才能重算感知。）拷回服务器 `/public/zjst/robot/cp_data/`，然后：
+（T57 第 3 步是同一张表；激光和 INS 要录上，回来才能重算感知。用 root 录：机器人的共享内存是 root 的，T40。）狗上的 ros2 bag 没有
+mcap 插件，录出来是 sqlite3（`.db3`，T61），不要加 `-s mcap`。拷回服务器 `/public/zjst/robot/cp_data/`，然后：
 
 ```bash
-python Nav_D20/planning/tools/check_planning_mcap.py <包>          # 规划的输入输出、状态
-python Nav_D20/planning/tools/planning_mcap_viz.py <包> --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
-python Nav_D20/planning/tools/objects_in_map.py <包>               # 外参：要 extrinsic OK
+python Nav_D20/planning/tools/bag_to_mcap.py <包> <包>_mcap        # 每个话题都转（定义从仓库来）；有 LEFT OUT 就是还有不认的类型
+python Nav_D20/planning/tools/check_planning_mcap.py <包>_mcap     # 规划的输入输出、状态
+python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
+python Nav_D20/planning/tools/objects_in_map.py <包>               # sqlite 直接读；外参：要 extrinsic OK
 journalctl -u cw-planning --since "<开始>" --until "<结束>" > planning.log   # 狗上，状态变化的那些行
 ```
 
@@ -304,6 +310,7 @@ journalctl -u cw-planning --since "<开始>" --until "<结束>" > planning.log  
 
 | 现象 | 先看 | 多半是 |
 |---|---|---|
+| `use-new` 退出 1，`no /lightning/odom within 45 s` | 它打出的 cw-slam 那几行（"定位初始化超时"、NDT） | INS 不是 RTK 固定解：等到固定解（`ins_status` 3、`pos_type` 56）再 `use-new`；它已经换回原来的了 |
 | `use-new` 退出 1 | 它打出的三个服务最后 15 行 | 库没找到（`LD_LIBRARY_PATH`）、配置读不到；它已经换回原来的了 |
 | `startup map … 0 crosswalks` 或 `Map switch` 到别的图 | `switches` 的 appmap；`check` | appmap 是 follow（App 发的是 c1adbe7b），或者 ignore 没写进装好的配置（NOT APPLIED：`apply`）；换回 |
 | `shadow on` 退出 3，`SHADOW NOT IN EFFECT` | 它打出的图 | 装的规划没按配置改话题名（版本不对？）；它已经把 `cw-planning` 停了，别再起，查清楚 |

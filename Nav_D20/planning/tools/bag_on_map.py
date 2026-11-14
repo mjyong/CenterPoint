@@ -26,22 +26,34 @@ INSPVAX = "/rte/rdap/rtk/inspvax"
 OBJECTS = "/perception/lidar_3d/objects"
 KYGI_MSGS = os.path.join(ROOT, "kygi665_msgs", "msg")
 PERCEPTION_MSGS = os.path.join(ROOT, "Nav_D20", "seres_interface", "ros", "perception_interface", "msg")
+# the robot team's other message packages (mc_interface/Motion, rhr_interface, nav2_interface ...): a bag recorded on
+# the dog carries them (T61: a conversion without them dropped those topics)
+SERES_MSGS = os.path.join(ROOT, "Nav_D20", "seres_interface", "ros")
 LOC_CONFIG = os.path.join(ROOT, "Nav_D20", "slam", "lightning-lm-master", "config", "default_d20.yaml")
 
 
-def typestore():
+def typestore(all_packages=False, quiet=False):
+    """ROS 2 Humble's types plus kygi665_msgs and perception_interface; with all_packages also every other package
+    under Nav_D20/seres_interface/ros (for converting a whole bag recorded on the dog)."""
     from rosbags.typesys import Stores, get_types_from_msg, get_typestore
     ts = get_typestore(Stores.ROS2_HUMBLE)
+    packages = [(KYGI_MSGS, "kygi665_msgs"), (PERCEPTION_MSGS, "perception_interface")]
+    if all_packages:
+        for d in sorted(glob.glob(os.path.join(SERES_MSGS, "*", "msg"))):
+            pkg = os.path.basename(os.path.dirname(d))
+            if pkg not in ("kygi665_msgs", "perception_interface"):
+                packages.append((d, pkg))
     types = {}
-    for folder, pkg in ((KYGI_MSGS, "kygi665_msgs"), (PERCEPTION_MSGS, "perception_interface")):
+    for folder, pkg in packages:
         for f in sorted(glob.glob(os.path.join(folder, "*.msg"))):
             name = "%s/msg/%s" % (pkg, os.path.splitext(os.path.basename(f))[0])
-            text = open(f, encoding="utf-8").read()
+            text = open(f, encoding="utf-8").read().replace("\u00a0", " ")   # some of theirs have no-break spaces
             text = text.replace("kygi665_msgs/", "kygi665_msgs/msg/") if pkg == "kygi665_msgs" else text
             try:
                 types.update(get_types_from_msg(text, name))
             except Exception as e:   # noqa: BLE001  (a message this tool does not need)
-                print("  (type %s not registered: %s)" % (name, e))
+                if not quiet:
+                    print("  (type %s not registered: %s)" % (name, e))
     ts.register(types)
     return ts
 
