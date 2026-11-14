@@ -163,8 +163,9 @@
 | T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 完成，已复核（2026-11-13）：编过，门控 38787 帧 0 差；回放状态切换对。复核发现：没放行、狗的中心进了人行横道就直接过（回放里是录包的狗自己走上去的，狗上定位跳一下也会这样），已改成离入口 1.5 m 内还当在路口等；外参链加了检查工具 |
 | T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 完成，已复核（2026-11-13）：GPU 版贴边也不卡了（切图回放 3%）；狗上录的真实目标进了门控（最多 5 辆）。1112 那一带没有人行横道；狗上的地图 c1adbe7b 只有 47 m 见方。复核发现：狗上的规划配置是旧版本的，我们的程序读不了（会起不来），上狗要用仓库的配置加狗上的取值 |
 | T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 任务已写好（T53 做完再做） |
-| T55 | 用机器人团队的交叉编译镜像编规划、定位、感知（仓库的代码和配置）；装到狗上 /opt/seres/nav_cw（原来的不动），地图换成仓库的，写 cw-*.service；在狗上用域 42 放 1112 演练一遍（我们的感知用仓库配置重算目标，验外参）。不切换 | Agent | T54、镜像 | 3 小时 | 任务已写好（等镜像） |
-| T56 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T55 | 半天 | 任务已写好 |
+| T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 任务已写好 |
+| T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 任务已写好 |
+| T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T56 | 半天 | 任务已写好 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -9022,8 +9023,8 @@ C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 �
 - 代码和配置都用仓库的（仓库是最新的），不搬狗上的取值；只改路径（地图、车型），`tools/deploy/nav_cw.sh configure`；
 - 机器人团队同意了：规划、定位、感知一起装到另一个目录，原来的服务关掉、原版不动，换和换回各一条命令（`nav_cw.sh`）；
 - 狗上的地图换成仓库里的（规划加了 `startup_map_dir`，起来就读，不靠 App 切图）；
-- 1112 的天线是接正的（INS、点云都对）。第 3 条说的是包里的目标：那是狗上我们的感知节点当时用旧配置（180°）现场算的（T40：18:59:23 节点自己报了不一致，19:25 才改配置重启）。所以 T55 在狗上用仓库配置把 1112 重算一遍，验外参。
-- 编译：机器人团队的交叉编译镜像（sysroot 和狗一样是 L4T R36.4.0），服务器连不上他们的镜像仓库，要一份 `docker save` 的 tar。任务 T55、T56。
+- 1112 的天线是接正的（INS、点云都对）。第 3 条说的是包里的目标：那是狗上我们的感知节点当时用旧配置（180°）现场算的（T40：18:59:23 节点自己报了不一致，19:25 才改配置重启）。所以 T56 在狗上用仓库配置把 1112 重算一遍，验外参。
+- 编译：机器人团队的交叉编译镜像（sysroot 和狗一样是 L4T R36.4.0），服务器连不上他们的镜像仓库，要一份 `docker save` 的 tar。**2026-11-14：镜像暂时拿不到，人定改在狗上编**：缺的依赖人在连着狗的本机下（`tools/deploy/nav_cw_fetch.py`，验 SHA256），只解到 `/opt/seres/nav_cw/deps`，系统里不装。任务 T55（只读列清单）、T56（编、装、演练）、T57（现场）。
 
 ### T52 复核（2026-11-13）
 
@@ -9194,7 +9195,7 @@ crosswalk_vehicles 的最大值；b 做没做、为什么。
      python Nav_D20/planning/tools/objects_in_map.py work_dirs/planning_io_t53_1112 --any-motion | tee -a data/reports/T54/objects_in_map.txt
    - 要 "extrinsic OK"，配置的 −90° 那行 "<- best"，抄四行的数（median 和 "k of n still"）；
    - 两次都 "nothing to check"：写明，再试 --min-frames 10；
-   - "WRONG"：不要改配置里的外参，抄全文，接着做（这批目标本身有问题，不算定论；定论在 T55 第 6 步：狗上用仓库配置把 1112 重算一遍）。
+   - "WRONG"：不要改配置里的外参，抄全文，接着做（这批目标本身有问题，不算定论；定论在 T56 第 7 步：狗上用仓库配置把 1112 重算一遍）。
    改正以后录的包：ls -la /public/zjst/robot/cp_data/，看有没有 2026-11-12 19:25 以后录的、带 /perception/lidar_3d/objects 的
    （ros2 bag info 看话题和开始时间）。有的话挑一个，同 T53 第 3、4a 步：bag_on_map.py 找图和目标，LOC_INS_YAW_OFFSET=0 回放
    （名字 t54_fixed），再对它跑 objects_in_map.py（先不加 --any-motion）。这次是定论：WRONG 就停下报告。没有这样的包就写"没有"。
@@ -9230,91 +9231,158 @@ CMD 统计；report_switch 的 local planner 那一行、mission_state；objects
 
 ---
 
-## T55 交叉编译三样，装到狗上另一个目录，换地图，写服务，域 42 演练（不切换）
+## T55 狗上缺什么（只读），列下载清单
 
 ```text
-任务 T55（T54 做完、拿到机器人团队的交叉编译镜像以后做）。人定（2026-11-13）：规划、定位、感知（地面分割 lidar_seg 和局部栅格
-grid_map_memory_node）都用仓库的代码和配置，装到狗上另一个目录 /opt/seres/nav_cw，原来的不动；换和换回各一条命令
-（tools/deploy/nav_cw.sh）；狗上的地图换成仓库里的（Nav_D20/map/*.zip）。机器人团队已同意。
-这一轮：编、装、写服务、在狗上用域 42 演练。不切换（切换在 T56，人在现场）。
-狗上的规矩：只往 /opt/seres/nav_cw/、/etc/systemd/system/cw-*.service、/userdata/config/robot_service/map/（先备份）、
-/home/nvidia/bags/ 写；不 apt；原来的服务和它们的文件不动、不停；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。
-仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T55
+任务 T55（T54 做完再做；狗要在线）。人定（2026-11-14）：机器人团队的交叉编译镜像暂时拿不到，改成在狗上编。缺的依赖由人在连着狗的本机
+下载（比服务器快），传到狗上。规矩不变：狗上不 apt install、不 dpkg -i；依赖只用 dpkg-deb -x 解到我们的目录
+/opt/seres/nav_cw/deps，源码包编进同一个目录。系统里什么都不装、不升级，原来的服务和文件不动。这一轮只读，只列清单，不往狗上写。
+仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T55。每步前 ssh dog true。
 
-0. git pull；pytest（同 T54 第 0 步，62 passed）。
-   镜像：docker images | grep jetpack6.1-crosscompile-aarch64-x86。没有：停下，报告"等镜像"（人去向机器人团队要 docker save 的 tar，
-   放到 /public 下，docker load）。机器人团队的脚本假定 sysroot 在镜像里的 /l4t/jetson_arm64_sysroot（JetPack 6.1 = L4T R36.4.0，
-   和狗一样），先 docker run --rm <镜像> ls /l4t/jetson_arm64_sysroot/opt/ros/humble 看在不在。
-1. 交叉编译（镜像里，仓库挂进去；照机器人团队各自的 -arm 步骤，只把安装前缀换掉）：
-   - 规划：Nav_D20/planning/build.sh 的 build_arm（seres_interface 接口包、third_party/nav_interface、planning）；
-   - 定位：bash Nav_D20/slam/build_l4t.sh -arm（lightning，含 mode_switch_node）；
-   - 感知：Nav_D20/perception_combo_ros/build_perception_crosscompile.sh，只要 lidar_seg 和 grid_map_memory_node（别的包能跳就跳）；
-   - 产物放 build/nav_cw/{planning,slam,nav_perception}，目录结构和狗上的 /opt/seres/nav/planning、/opt/seres/nav/slam、
-     /opt/seres/nav_perception 一样（狗上的启动命令按那个结构写）；
-   - 依赖照 planning/build.sh 打包时的做法收：ld-linux-aarch64.so.1 --list 列出的 sysroot 里的库拷进各自的 lib/（planning 是
-     lib/planning/lib），--list 里 "not found" 要是 0；setup.bash、local_setup.*、*.cmake、_local_setup_util_sh.py 里的 sysroot 路径换成
-     /opt/ros/humble、安装前缀换成 /opt/seres/nav_cw/<名>（同 build.sh 的 sed）；
-   - 每个目录写 version.txt（日期、git rev-parse HEAD）；
-   - 打包：tar -C build -czf build/nav_cw.tar.gz nav_cw，外加 tools/deploy/nav_cw.sh、Nav_D20/map/*.zip。
-   编不过：我们的补丁（Nav_D20/PATCHES.md 里的文件）就改，写进 PATCHES.md；别的停下，抄错误前 30 行。
-   报告：各自编译的最后 30 行，三个主程序（planning、mode_switch_node、lidar_seg、grid_map_memory_node）的 --list 里 not found 的行数。
-2. 狗在线（ssh dog true）。/opt/seres/nav_cw 已经存在就停下问（不覆盖）。
-     scp build/nav_cw.tar.gz tools/deploy/nav_cw.sh Nav_D20/map/*.zip dog:/tmp/
-     ssh dog 'sudo -n tar -C /opt/seres -xzf /tmp/nav_cw.tar.gz && sudo -n cp /tmp/nav_cw.sh /opt/seres/nav_cw/ && df -h /'
-3. 地图（人定：狗上的地图换成仓库的）：
-   - 两张 zip 解到 /opt/seres/nav_cw/maps/<id>/（我们的服务用这份）；
-   - App 的地图目录 /userdata/config/robot_service/map/：同名的目录先 sudo -n mv 成 <id>.orig-20261113，再把仓库的拷进去；没有同名的直接拷。
-     换回用：删掉拷进去的、把 .orig-20261113 改回来（写进报告，T56 用不上就不动它）；
-   - ls -la 两处，抄进报告；App 里能不能选到这两张图问人（不改 App 的数据库或配置）。
-4. 配置（其余都是仓库的，不改）：
-     ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh configure /opt/seres/nav_cw /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13'
-   抄输出（定位的 map_path、规划的 startup_map_dir、车型 d20/001）。规划的 PLANNING_TIMEOUT_WALL_CLOCK 不设（那是回放用的）。
-5. 服务（/etc/systemd/system/，sudo -n tee 写）。照原来三个 unit 的样子（T51 dog_stack.txt 里抄了 ExecStart、User、WorkingDirectory、
-   Environment；systemctl cat 再看一遍），路径换成 /opt/seres/nav_cw/...，Environment（CycloneDDS、URI，域不设 = 0）照抄，各加一行
-   Conflicts=<原来那个>.service（systemd 不会让两个同时跑），Restart 照抄：
-   - cw-planning.service：ExecStart 同 planning.service，source /opt/seres/nav_cw/planning/share/planning/local_setup.bash；
-   - cw-slam.service：ExecStart 同 slam.service，source /opt/seres/nav_cw/slam/setup.bash，ros2 launch lightning model_switch_launch.py rviz:=false；
-     launch 里配置路径来自安装目录（nav_cw 里那份 default_d20.yaml），确认 config_path 指到 /opt/seres/nav_cw；
-   - cw-nav-perception.service：启动脚本照 /opt/seres/nav_perception/start/start_nav_perception_bg.sh（仓库里是
-     Nav_D20/perception_combo_ros/cfg/start_nav_perception_bg.sh）写一份到 /opt/seres/nav_cw/nav_perception/start/：lidar_seg 和
-     grid_map_memory_node 用 /opt/seres/nav_cw/nav_perception 的；ptz_data_detection_2d、perception_recharge 照旧从 /opt/seres/nav_perception
-     起（只读用它们的程序，云台检测和回充不能因为换了我们的就断）；SERES_PERCEPTION_INSTALL_DIR 给我们的两个指 nav_cw。
-   不 enable。sudo -n systemctl daemon-reload。三个 unit 全文和启动脚本存进 data/reports/T55/。
-   ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status' → "running: theirs"（不是就停下）。
-6. 演练（域 42；狗停着、人知道；原来的服务照常在域 0 跑）：
-   - 1112 拷到狗上 /home/nvidia/bags/1112_t40（5.9 GB）；
-   - 起四样（mkdir -p /tmp/nav_cw_rehearsal，日志都放那）：环境同 cw-*.service（source、LD_LIBRARY_PATH、CycloneDDS），再加
-     ROS_DOMAIN_ID=42、PLANNING_TIMEOUT_WALL_CLOCK=1（bag 的时间）：cw-nav-perception 的启动脚本（只要 lidar_seg、grid_map_memory_node，
-     不起云台和回充）、ros2 launch lightning model_switch_launch.py rviz:=false、ros2 run planning planning、我们的感知第二个实例
-     （lidar-3d-detection.service 的 ExecStart，ROS_DOMAIN_ID=42，配置用狗上装好的那份：T54 第 5 步核过和仓库一致，偏置 0）；
-     定位用的是 mode_switch_node（狗上的入口；服务器回放一直用的是 run_loc_online），日志里看它起来了、读了 nav_cw 的地图；
-   - ROS_DOMAIN_ID=42 ros2 bag record -s mcap -o /home/nvidia/bags/t55_rehearsal <replay_planning_check.sh 第 41–47 行那些话题>；
-   - ROS_DOMAIN_ID=42 ros2 bag play /home/nvidia/bags/1112_t40 --clock --remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects；
-     开始放 5 s 后发目标：bag_on_map.py 给 ad68517c 的目标（T53 修过以后不再是起点；服务器上先跑一遍拿到），
-     ROS_DOMAIN_ID=42 ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped "{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}"；
-   - 放的同时 tegrastats --interval 1000 > /tmp/nav_cw_rehearsal/tegrastats.txt（CPU、GPU、温度：狗上原来那套也在跑，是两套的量）；
-   - 放完停掉；/tmp/nav_cw_rehearsal 和录包拷回服务器 work_dirs/t55_rehearsal/（录包走 LFS），狗上的录包和 1112 删掉。
-7. 服务器上看演练的录包：
-     python Nav_D20/planning/tools/check_planning_mcap.py work_dirs/t55_rehearsal/<录包> | tee data/reports/T55/check.txt
-     python Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/t55_rehearsal --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
-     python Nav_D20/planning/tools/objects_in_map.py work_dirs/t55_rehearsal/<录包> | tee data/reports/T55/objects_in_map.txt
-   - planning 日志：车型 d20/001、"startup map … 5 crosswalks"、mission_state 没有 fault、CMD 有往前的；local planner 那一行（check 或 viz 的 note）；
-   - 定位：odom 有没有跳、朝向（viz 的 heading）；
-   - objects_in_map：这次目标是我们的感知用偏置 0 现场重算的，是定论：要 "extrinsic OK"。WRONG 就停下，T56 不做；
-   - tegrastats：CPU 平均和最高、GPU 平均、最高温度。
-8. 提交：data/reports/T55/、work_dirs/t55_rehearsal（录包 LFS，viz/ 普通文件）、本文档。不提交 build/。
+1. 要哪些（从仓库算）：Nav_D20 里 planning、slam/lightning-lm-master（cmake/packages.cmake）、perception_combo_ros/node_src 下
+   lidar_seg 和 GridMapTask（grid_map_memory_node）的 CMakeLists.txt 和 package.xml，列出 find_package / depend 的全部名字。
+   复核时数过一遍：
+   - Ubuntu：Eigen3、OpenCV、PCL、Ceres、glog、gflags、Protobuf（含 protoc）、OpenMP、yaml-cpp、urdfdom、fcl、octomap、OpenGL；
+   - ROS：grid_map_core、grid_map_ros、grid_map_octomap、octomap_msgs、pcl_conversions、cv_bridge、tf2*、kdl_parser、urdf、rosbag2_cpp、
+     rosbag2_storage、diagnostic_msgs、std_srvs、lifecycle_msgs、plotjuggler_msgs、message_filters、tf2_sensor_msgs；
+   - 源码：acados 0.5.1（带子模块 blasfeo、hpipm）、OsqpEigen 0.10.0；OSQP 0.6 不用（planning/third_party/osqp/lib_arm 里有 aarch64 的静态库）；
+     g2o 用 ros-humble-libg2o；
+   - 仓库里自己编的接口包：seres_interface 下的、slam/interface 下的（kygi665_msgs、novatel_oem7_msgs）、planning/third_party/nav_interface。
+   存 data/reports/T55/deps_from_repo.txt（名字 → 哪个包要它）。
+2. 狗上有什么（只读）：
+     ssh dog 'dpkg-query -W -f="\${Package} \${Version} \${Status}\n" > /tmp/t55_dpkg.txt; cat /tmp/t55_dpkg.txt' > data/reports/T55/dog_dpkg.txt
+     ssh dog 'ls /opt/ros/humble/share | sort' > data/reports/T55/dog_ros_share.txt
+     ssh dog 'ls /etc/apt/sources.list /etc/apt/sources.list.d/; cat /etc/apt/sources.list.d/* 2>/dev/null | grep -v "^#"; ls -la /var/lib/apt/lists | head -30'
+   对第 1 步的每个名字判断"能直接编"（头文件和 cmake 配置都在：系统的 -dev 包装着，或 /opt/ros/humble/share/<名>/cmake 在）、
+   "只有运行库"、"没有"。存 data/reports/T55/dog_deps.txt（名字、狗上的包和版本、判断）。
+3. 接口一致（重要）：我们编的是机器人团队 11-12 的接口，狗上装的是 seres-interface 1.0.1（10-29）。我们的规划和狗上别的程序
+   （运动控制、App、事件）之间收发的消息，定义要一字不差，否则 DDS 上对不上。只读拷狗上装的接口定义：
+     ssh dog 'dpkg -L seres-interface | grep -E "\.(msg|srv|action)$"' > /tmp/t55_iface.txt
+     （再 scp 这些文件回来，按包名放 /tmp/t55_dog_iface/<包>/<msg|srv|action>/）
+   和仓库里同名的比（Nav_D20/seres_interface 下、slam/interface 下）：diff -r，存 data/reports/T55/iface_diff.txt。
+   规划订阅和发布的话题（communication_conf.pb.txt 里的 sub_* / pub_*）用到的类型，有一个对不上就写清楚是哪个话题、哪个字段，
+   停下（这要和机器人团队对）。我们新加的 LidarObject* 狗上本来就没有，不算。
+4. 下载清单：
+   - "只有运行库"和"没有"的 Ubuntu / ROS 包：先在狗上让 apt 只算不装（不用 sudo，不改任何东西）：
+       ssh dog 'apt-get install --print-uris -qq --no-install-recommends -o Debug::NoLocking=1 <包名…> 2>&1' > data/reports/T55/print_uris.txt
+     要 -dev 包（如 libpcl-dev、libyaml-cpp-dev、liburdfdom-dev、libfcl-dev、liboctomap-dev、libprotobuf-dev、protobuf-compiler、
+     libgflags-dev）和 ROS 包（ros-humble-grid-map-core、ros-humble-grid-map-ros、ros-humble-grid-map-octomap、ros-humble-octomap-msgs、
+     ros-humble-libg2o、ros-humble-plotjuggler-msgs…）。
+     · 狗上的 apt 列表里没有、或者算出来要升级狗上已经装了的 ros-humble-* / 系统库（print_uris 里出现已装包的新版本）：不要那个结果。
+       ROS 的改到 snapshots.ros.org 找和狗上 ros-humble-rclcpp 版本一致的那天（http://snapshots.ros.org/humble/<日期>/ubuntu
+       dists/jammy/main/binary-arm64/Packages.gz 里看版本），Ubuntu 的到 ports.ubuntu.com 的 jammy / jammy-updates 找和狗上运行库同版本
+       的 -dev；在服务器上下 Packages.gz 查（小文件），拼出 URL 和 SHA256；
+   - 源码：服务器上 /public/zjst/robot/planning_humble_env 里有没有当时编 acados、OsqpEigen 的源码目录（find -maxdepth 4 -iname "*acados*" -o
+     -iname "*osqp*eigen*"）。有：tar 打包（acados 带子模块），放 /public/zjst/robot/nav_cw_src/，T56 从服务器传。没有：清单里加
+     https://github.com/robotology/osqp-eigen/archive/refs/tags/v0.10.0.tar.gz name=osqp-eigen-v0.10.0.tar.gz，acados v0.5.1 和
+     它两个子模块在那个版本钉的提交（git ls-remote 或浅克隆看 .gitmodules 和 gitlink）各一个 archive URL，name= 写清楚；
+   - 写 data/reports/T55/fetch_urls.txt：一行一个，格式见 tools/deploy/nav_cw_fetch.py（apt 的 'URL' 名字 大小 SHA256:… 原样可以用，
+     自己拼的写 URL sha256=… name=…）。算一下总大小。
+5. 报告停在这里（写进"T55 结果"）：deps 的判断表、接口 diff 的结论、fetch_urls.txt 的行数和总大小，再写给人的一段话：
+     在连着狗的本机：python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_downloads
+       （国内镜像快就加 --rewrite http://ports.ubuntu.com/ubuntu-ports=https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports，
+        ROS 快照没有镜像就直接下）
+     最后一行要是 "N of N files"；然后 scp -r nav_cw_downloads nvidia@<狗>:/home/nvidia/，在狗上 cd 进去 sha256sum -c SHA256SUMS。
+6. 提交：data/reports/T55/、本文档。
 
-停止条件：第 0 步没有镜像；第 1 步不是我们文件的编不过；第 2 步目录已存在；第 5 步 status 不是 theirs；第 7 步 WRONG。
-报告（写进"T55 结果"）：编译和依赖（not found 行数）；狗上装了什么、多大；地图两处的 ls；configure 输出；三个 unit 和启动脚本；
-演练的 planning、定位、objects_in_map、tegrastats 的数；地图的换回方法。
+停止条件：狗不在线；第 3 步规划用到的话题类型对不上。
 ```
 
 ---
 
-## T56 现场：换成我们的，过人行横道，换回
+## T56 狗上编三样，装到另一个目录，换地图，写服务，域 42 演练（不切换）
 
 ```text
-任务 T56（T55 通过以后，人在现场）。人和 Agent 一起做；每一步 Agent 先说要做什么，人说可以再做。
+任务 T56（T55 的文件已经在狗上 /home/nvidia/nav_cw_downloads、sha256sum -c 全 OK 以后做）。人定（2026-11-13、14）：规划、定位、
+感知（lidar_seg、grid_map_memory_node）都用仓库的代码和配置，在狗上编，装到 /opt/seres/nav_cw，原来的不动；换和换回各一条命令
+（tools/deploy/nav_cw.sh）；狗上的地图换成仓库里的。机器人团队已同意。
+狗上的规矩：只往 /opt/seres/nav_cw/、/etc/systemd/system/cw-*.service、/userdata/config/robot_service/map/（先备份）、/home/nvidia/
+写；不 apt、不 dpkg -i；原来的服务和它们的文件不动、不停；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。狗要停着（编译占 CPU）。
+仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T56
+
+0. git pull；pytest（同 T54 第 0 步，再加 tests/dog/test_nav_cw_fetch.py；66 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
+   ssh dog 'cd /home/nvidia/nav_cw_downloads && sha256sum -c --quiet SHA256SUMS && echo ALL OK'
+1. 依赖解到 /opt/seres/nav_cw/deps（不装进系统）：
+   - 每个 .deb：sudo -n dpkg-deb -x <deb> /opt/seres/nav_cw/deps（只解，不进 dpkg 的数据库）；
+   - 解出来的 cmake 配置、.pc 里写死的绝对路径：只改"在 deps 里有、系统里没有"的那些（比如 /opt/ros/humble/include/grid_map_core 改成
+     /opt/seres/nav_cw/deps/opt/ros/humble/include/grid_map_core），指向系统 ROS 的别动。写个小脚本（放 /opt/seres/nav_cw/tools/，
+     存一份进 data/reports/T56/），改了哪些文件哪几行记下来；
+   - 源码（T55 的 tar 或下载的 archive）：解到 /opt/seres/nav_cw/src/deps/，cmake -DCMAKE_INSTALL_PREFIX=/opt/seres/nav_cw/deps，
+     Release。OsqpEigen 的 osqp 指 Nav_D20/planning/third_party/osqp/lib_arm/cmake；acados 按它的 README；选项照服务器那次的（T55 找到的源码目录里 build/CMakeCache.txt 的
+     ACADOS_* 那几项；没有就用默认，只开 ACADOS_WITH_QPOASES 和 BLASFEO_TARGET=ARMV8A_ARM_CORTEX_A57）。
+2. 代码：服务器 rsync -a --delete --rsync-path='sudo -n rsync' Nav_D20/{planning,slam,perception_combo_ros,seres_interface} \
+       dog:/opt/seres/nav_cw/src/Nav_D20/
+   （经隧道；只要源码，不要 work_dirs、map 的 zip）。记下 git rev-parse HEAD。
+3. 编（狗上原生编，低优先级，别把狗上正在跑的服务饿着）：
+     source /opt/ros/humble/setup.bash
+     D=/opt/seres/nav_cw/deps
+     export CMAKE_PREFIX_PATH=$D/opt/ros/humble:$D/usr:$D:${CMAKE_PREFIX_PATH:-}  AMENT_PREFIX_PATH=$D/opt/ros/humble:$AMENT_PREFIX_PATH
+     export PKG_CONFIG_PATH=$D/usr/lib/aarch64-linux-gnu/pkgconfig:$D/usr/share/pkgconfig:$D/lib/pkgconfig
+     export LD_LIBRARY_PATH=$D/usr/lib/aarch64-linux-gnu:$D/usr/lib:$D/lib:$D/opt/ros/humble/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}
+     export PATH=$D/usr/bin:/usr/local/cuda/bin:$PATH  MAKEFLAGS=-j4
+     nice -n 19 ionice -c3 colcon build --parallel-workers 2 ...（--cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=87
+       -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc）
+   顺序和安装目录（--build-base 放 /opt/seres/nav_cw/build/<名>）：
+   - 接口：seres_interface、slam/interface、planning/third_party/nav_interface → --install-base /opt/seres/nav_cw/interface；
+   - 规划（--packages-up-to planning，先 source 接口的 install/setup.bash）→ /opt/seres/nav_cw/planning；
+   - 定位 lightning（含 mode_switch_node）→ /opt/seres/nav_cw/slam；
+   - 感知 lidar_seg、grid_map_memory_node → /opt/seres/nav_cw/nav_perception。
+   编的时候另开 tegrastats --interval 5000 记温度；CPU 温度上 85 °C 就先停一会儿。
+   编不过：缺头文件、缺库：回 T55 的清单补（写清楚缺什么，停下让人再下）；我们的补丁（PATCHES.md 里的文件）编不过就改，写进 PATCHES.md；
+   别的停下，抄错误前 30 行。
+   编完：对 planning、mode_switch_node、lidar_seg、grid_map_memory_node 各跑 ldd（带上面的 LD_LIBRARY_PATH），"not found" 要是 0。
+   每个安装目录写 version.txt（日期、git sha）。
+4. 地图（人定：狗上的地图换成仓库的）：Nav_D20/map 的两张 zip 传到狗上，解到 /opt/seres/nav_cw/maps/<id>/；App 的地图目录
+   /userdata/config/robot_service/map/ 里同名的先 sudo -n mv 成 <id>.orig-<日期>，再拷进去；没有同名的直接拷。换回的办法写进报告。
+   App 里能不能选到问人（不改 App 的数据库或配置）。
+5. 配置（其余都是仓库的，不改）：sudo -n cp tools/deploy/nav_cw.sh 到 /opt/seres/nav_cw/，然后
+     sudo -n bash /opt/seres/nav_cw/nav_cw.sh configure /opt/seres/nav_cw /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+   抄输出。规划的 PLANNING_TIMEOUT_WALL_CLOCK 不设（回放用的）。
+6. 服务（/etc/systemd/system/，sudo -n tee 写）：照原来三个 unit（systemctl cat；T51 的 dog_stack.txt）写 cw-planning、cw-slam、
+   cw-nav-perception，路径换成 /opt/seres/nav_cw/...，Environment 照抄（CycloneDDS、URI，域不设 = 0），再加
+   LD_LIBRARY_PATH（第 3 步那串的 deps 部分在前）；各加 Conflicts=<原来那个>.service；Restart 照抄。
+   - cw-planning：source /opt/ros/humble/setup.bash、/opt/seres/nav_cw/interface/setup.bash、/opt/seres/nav_cw/planning/share/planning/local_setup.bash；
+     ros2 run planning planning；
+   - cw-slam：source 接口和 /opt/seres/nav_cw/slam/setup.bash；ros2 launch lightning model_switch_launch.py rviz:=false；确认它读的
+     default_d20.yaml 是 nav_cw 里那份；
+   - cw-nav-perception：启动脚本照 Nav_D20/perception_combo_ros/cfg/start_nav_perception_bg.sh 写一份到
+     /opt/seres/nav_cw/nav_perception/start/：lidar_seg、grid_map_memory_node 用 nav_cw 的（SERES_PERCEPTION_INSTALL_DIR 指 nav_cw）；
+     ptz_data_detection_2d、perception_recharge 照旧从 /opt/seres/nav_perception 起（只读用它们的程序，云台检测和回充不能断）。
+   不 enable。sudo -n systemctl daemon-reload。三个 unit 和启动脚本全文存进 data/reports/T56/。
+   sudo -n bash /opt/seres/nav_cw/nav_cw.sh status → "running: theirs"（不是就停下）。
+7. 演练（域 42；狗停着、人知道；原来的服务照常在域 0 跑）：同原 T55 的做法——
+   - 1112 拷到狗上 /home/nvidia/bags/1112_t40；
+   - mkdir -p /tmp/nav_cw_rehearsal；环境同 cw-*.service，再加 ROS_DOMAIN_ID=42、PLANNING_TIMEOUT_WALL_CLOCK=1：起 cw-nav-perception
+     的启动脚本（只要 lidar_seg、grid_map_memory_node）、ros2 launch lightning model_switch_launch.py rviz:=false、ros2 run planning planning、
+     我们的感知第二个实例（lidar-3d-detection.service 的 ExecStart，ROS_DOMAIN_ID=42，狗上那份配置：T54 第 5 步核过，偏置 0）；
+     定位是 mode_switch_node（服务器回放一直用 run_loc_online，这是第一次跑狗上的入口），日志里看它起来了、读了 nav_cw 的地图；
+   - ROS_DOMAIN_ID=42 ros2 bag record -s mcap -o /home/nvidia/bags/t56_rehearsal <replay_planning_check.sh 第 41–47 行那些话题>；
+   - ROS_DOMAIN_ID=42 ros2 bag play /home/nvidia/bags/1112_t40 --clock --remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects；
+     5 s 后发目标（bag_on_map.py 给 ad68517c 的目标，服务器上先跑一遍拿到）：
+     ROS_DOMAIN_ID=42 ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped "{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}"；
+   - 同时 tegrastats --interval 1000 > /tmp/nav_cw_rehearsal/tegrastats.txt（两套一起跑的量）；
+   - 放完停掉；/tmp/nav_cw_rehearsal 和录包拷回服务器 work_dirs/t56_rehearsal/（录包走 LFS），狗上的录包和 1112 删掉。
+8. 服务器上看演练：
+     python Nav_D20/planning/tools/check_planning_mcap.py work_dirs/t56_rehearsal/<录包> | tee data/reports/T56/check.txt
+     python Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/t56_rehearsal --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
+     python Nav_D20/planning/tools/objects_in_map.py work_dirs/t56_rehearsal/<录包> | tee data/reports/T56/objects_in_map.txt
+   - planning：车型 d20/001、"startup map … 5 crosswalks"、mission_state 没有 fault、有往前的 CMD、local planner 那一行；
+   - 定位：odom 跳不跳、朝向；
+   - objects_in_map：这次目标是我们的感知用偏置 0 现场重算的，是定论：要 "extrinsic OK"。WRONG 就停下，T57 不做；
+   - tegrastats：CPU 平均和最高、GPU 平均、最高温度。
+9. 提交：data/reports/T56/、work_dirs/t56_rehearsal（录包 LFS，viz/ 普通文件）、本文档。
+
+停止条件：第 0 步文件不全；第 3 步缺依赖（列出来让人补）或不是我们文件的编不过；第 6 步 status 不是 theirs；第 8 步 WRONG。
+报告（写进"T56 结果"）：deps 解了哪些、改了哪些路径；编译各自最后 30 行和用了多久、温度；ldd not found 行数；狗上装了什么、多大；
+地图两处的 ls 和换回办法；configure 输出；三个 unit 和启动脚本；演练的 planning、定位、objects_in_map、tegrastats 的数。
+```
+
+---
+
+## T57 现场：换成我们的，过人行横道，换回
+
+```text
+任务 T57（T56 通过以后，人在现场）。人和 Agent 一起做；每一步 Agent 先说要做什么，人说可以再做。
 准备：狗在 ad68517c 那片（要测的人行横道路线从它上面过：6、13、32、38 号，人定哪一个）；有人拿急停；App 里选 ad68517c；
 服务器上开着 Foxglove 或者能看 journalctl。
 
@@ -9334,5 +9402,5 @@ grid_map_memory_node）都用仓库的代码和配置，装到狗上另一个目
    任何时候人觉得不对就急停；Agent 记下时间。
 5. 每次测完：停录，拷回服务器 /public/zjst/robot/cp_data/，跑 planning_mcap_viz.py、objects_in_map.py。
 6. 换回：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original' → running: theirs；App 里狗正常。
-7. 提交：报告（每次测试的状态序列、等了多久、人的判断、急停了没有）、录包的 viz，写进"T56 结果"。
+7. 提交：报告（每次测试的状态序列、等了多久、人的判断、急停了没有）、录包的 viz，写进"T57 结果"。
 ```
