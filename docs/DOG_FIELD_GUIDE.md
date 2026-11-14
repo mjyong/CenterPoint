@@ -167,13 +167,14 @@ Foxglove 也可以看域 42：`sudo -n env ROS_DOMAIN_ID=42 CYCLONEDDS_URI=file:
 
 ## 5. 调试开关
 
-都在狗上用 `sudo -n bash /opt/seres/nav_cw/nav_cw.sh …`；改的是 `/opt/seres/nav_cw/nav_cw.env`（三个 cw unit 读）或装好的那份配置（`communication_conf`、`mission_conf`），只重启相关的那个服务（没在跑就下次起来生效）；
+都在狗上用 `sudo -n bash /opt/seres/nav_cw/nav_cw.sh …`；开关存在 `/opt/seres/nav_cw/nav_cw.env`（三个 cw unit 读），程序从配置里读的再写进装好的那份配置（`communication_conf`、`mission_conf`），只重启相关的那个服务（没在跑就下次起来生效）；
 `switches` 看当前设了什么。不影响机器人团队的服务。
 
 | 开关 | 做什么 | 代价 |
 |---|---|---|
 | `shadow on / off` | 影子模式：规划照常算，`/cmd_vel` 和 `/mc/motion_control` 改发到 `/nav_cw/shadow/cmd_vel`、`/nav_cw/shadow/mc/motion_control`，**狗不按规划走**；人用遥控遛狗，Foxglove 里比。改的是装好的 `communication_conf` 里 `pub_cmd_vel`、`pub_motion` 的名字（规划不读命令行参数：`rclcpp::init(0, nullptr)`，`--ros-args -r` 没用）；重启后到 ROS 图里查，规划还在发 `/mc/motion_control` 就把 `cw-planning` 停掉、退出 3 | 重启 `cw-planning`（任务没了，重发目标） |
 | `appmap follow / ignore` | ignore：规划（`communication_conf` 的 `sub_map_switch`）和定位（launch 参数 `map_switch_topic`）改听 `/nav_cw/map/switch`，App 的 `/map/switch` 不再让它们换图，一直在 `configure` 设的站点地图上；follow：跟 App | 重启 `cw-slam`（重新收敛）、`cw-planning` |
+| `apply` | 把 `nav_cw.env` 里的开关（`NAV_CW_SHADOW`、`NAV_CW_APPMAP`、`NAV_CW_SPEED`）再写进装好的配置：重装会把仓库的配置放回来，开关本身不会丢；`use-new` 换之前自己也写一遍；`switches` 里出现 NOT APPLIED 就是没写进去 | 重启我们在跑的 `cw-slam`、`cw-planning` |
 | `check` | 查 ROS 图：谁在发 `/mc/motion_control`、`/cmd_vel`、影子话题，谁在听 `/map/switch`，和上面两个开关对不对；`use-new` 换完自己也查，对不上就换回 | 无 |
 | `speed <m/s> / off / show` | 限速：改装好的 `mission_conf` 里 MPPI 的 `max_vx`（仓库 3.0）和巡航 `reference_velocity`（仓库 1.5）；第一次限速时原文件存成 `mission_conf.pb.txt.repo`，`off` 放回 | 重启 `cw-planning` |
 | `debug planning on / off` | 规划的调试话题（`/planning/debug/*`，`pub_flag`），马上生效（服务 `/planning/debug/set_pub_flag`）。`configure` 已经默认打开（`NAV_CW_DEBUG=0` 装的时候不开） | 规划多发几十 KB/s |
@@ -224,7 +225,7 @@ full 级别多看的：
 
 **仓库是源头**。狗上改装好的那份只为现场快速试；试好的值抄下来（文件、行、旧值、新值、为什么）回来改仓库、提交，
 下次装（T56 的第 2、3、5 步）就带上了。狗站着的时候改，改完重启对应的服务。
-改了代码要重编：狗上编（T56 第 3 步，一个多小时，占狗的 CPU），或者在服务器上狗的系统镜像里编（T60：`Nav_D20/docker/dog_rootfs.sh`、`run_arm64.sh`，QEMU，不占狗）。重装会盖掉装好的配置：之后要重跑 `nav_cw.sh configure`、重设开关（T60 第 7 步）。
+改了代码要重编：狗上编（T56 第 3 步，一个多小时，占狗的 CPU），或者在服务器上狗的系统镜像里编（T60：`Nav_D20/docker/dog_rootfs.sh`、`run_arm64.sh`，QEMU，不占狗）。重装会盖掉装好的配置：之后要重跑 `nav_cw.sh configure`、再 `nav_cw.sh apply` 把开关写回去（T60 第 7 步）。
 
 | 模块 | 文件（装好的；`find /opt/seres/nav_cw/install/<模块> -name <文件> -not -path '*/src/*'`） | 常调的 | 生效 |
 |---|---|---|---|

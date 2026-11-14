@@ -9410,7 +9410,7 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 写；不 apt、不 dpkg -i；原来的服务和它们的文件不动、不停；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。狗要停着（编译占 CPU）。
 仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T56
 
-0. git pull；pytest（同 T58 第 0 步；82 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
+0. git pull；pytest（同 T58 第 0 步；84 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
    源码包传到狗上：scp /public/zjst/robot/nav_cw_src/* dog:/home/nvidia/nav_cw_downloads/（先 ssh dog mkdir -p），两边 sha256sum 对一下。
 1. 依赖（T55：狗上的 -dev 和 ROS 包都齐，Livox SDK 在 /usr/local，不用 .deb）：只编三个源码包，装到 /opt/seres/nav_cw/deps（不装进系统）：
    - g2o 20230806_git、acados 0.5.1（含 blasfeo、hpipm）、OsqpEigen 0.10.0：解到 /opt/seres/nav_cw/src/deps/，cmake -DCMAKE_INSTALL_PREFIX=/opt/seres/nav_cw/deps，
@@ -9540,7 +9540,8 @@ vehicle:      d20/001
 
 编、装、地图、configure、服务都做对了；deps 只有 15 MB、没进系统；`ldd` 0 个 not found；温度最高 64 °C。`configure` 改了
 `lib/` 下那份、launch 读 `share/` 那份，这个抓得好（399ec41，测试 14 passed）。停在第 6 步也对：原来的服务是 17:55 nvidia 用 sudo
-停的（连激光、相机驱动、云台、视频），不是我们的东西停的，我们不去起它们。**要人确认是谁停的、什么时候恢复**。
+停的（连激光、相机驱动、云台、视频），不是我们的东西停的，我们不去起它们。**人说明（2026-11-14）：是人自己停的，为了编得快，
+编完就重启了。**
 
 复核发现的：
 
@@ -9581,13 +9582,14 @@ vehicle:      d20/001
 ## T59 补完 T56：开关、unit、库路径、App 地图，域 42 演练
 
 ```text
-任务 T59（T56 复核以后）。人定（2026-11-14）：App 地图用 follow，App 目录里只放 ad68517c（a70c6db6 不放）。狗上的规矩同 T56：只写 /opt/seres/nav_cw/、/etc/systemd/system/cw-*.service、
+任务 T59（T56 复核以后）。人定（2026-11-14）：App 地图用 follow，App 目录里只放 ad68517c（a70c6db6 不放）；ignore 做成配置开关
+（nav_cw.sh appmap，存在 nav_cw.env 里，use-new / apply 写进装好的配置），演练里两种都验。狗上的规矩同 T56：只写 /opt/seres/nav_cw/、/etc/systemd/system/cw-*.service、
 /userdata/config/robot_service/map/ 里我们拷进去的那份、/home/nvidia/、/tmp/nav_cw_rehearsal/；不 apt、不 dpkg -i；机器人团队的服务和文件
-不动、不停、不起（现在它们是停着的：谁停的人去问，我们不管）；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。
+不动、不停、不起；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。
 仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T59
 
-0. git pull；pytest（同 T58 第 0 步；82 passed）。ssh dog true。记下：
-     sudo -n bash /opt/seres/nav_cw/nav_cw.sh status       （我们的三个有 active 的：停下问；原来的停着照做）
+0. git pull；pytest（同 T58 第 0 步；84 passed）。ssh dog true。记下：
+     sudo -n bash /opt/seres/nav_cw/nav_cw.sh status       （要 running: theirs：T56 时人停过、编完已重启；不是就停下问）
      df -h /userdata /opt；ls -la /userdata/config/robot_service/map/；ls -la /opt/seres/nav_perception/lib | head -60
    全部存 data/reports/T59/before.txt。
 1. 脚本和 launch（服务器 → 狗）：
@@ -9637,6 +9639,11 @@ vehicle:      d20/001
    - Foxglove 桥：sudo -n env ROS_DOMAIN_ID=42 CYCLONEDDS_URI=file:///tmp/nav_cw_rehearsal/cyclonedds.xml bash /opt/seres/nav_cw/nav_cw_foxglove.sh；
      foxglove_probe.py 同 T56，话题再加 /nav_cw/shadow/mc/motion_control；
    - tegrastats --interval 1000 同 T56（这次机器人的服务停着，数字偏低，报告里写明）；
+   - ignore 也验一次（不用放包，只起定位和规划，环境同上）：先停掉定位和规划；sudo -n bash /opt/seres/nav_cw/nav_cw.sh appmap ignore
+     （nav_cw.env 里 NAV_CW_APPMAP、NAV_CW_SLAM_ARGS，communication_conf 的 sub_map_switch 变 /nav_cw/map/switch，抄下来）；
+     定位带 map_switch_topic:=/nav_cw/map/switch 起，规划照常起；查图：/map/switch 上 planning、mode_switch_node 都不订，
+     /nav_cw/map/switch 上都订；再发一条 latched 的 /map/switch，这次指向 c1adbe7b（完整目录名看第 0 步的 ls）：规划、定位日志里都不许
+     有切换。停掉；appmap follow，switches 看回到 follow；
    - 放完停掉所有演练进程；sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow off；switches 抄下来（shadow off、appmap follow、speed off）；
      /tmp/nav_cw_rehearsal 和录包拷回服务器 work_dirs/t59_rehearsal/，狗上的录包和 1112 删掉。
 6. 服务器上看（同 T56 第 8 步）：check_planning_mcap.py（/cmd_vel 那行缺是对的：影子模式，指令在 /nav_cw/shadow/cmd_vel）、
@@ -9646,7 +9653,7 @@ vehicle:      d20/001
 
 停止条件：第 0 步我们的服务有 active 的；第 2 步 ldd 不是 0 行；第 5 步图不对（规划还在发 /mc/motion_control）；第 6 步 WRONG。
 报告（写进"T59 结果"）：第 0 步的 df 和两个 ls；四个文件改前改后；ldd；第 3 步的输出；第 4 步的 du、df；演练的图、日志（60 s 那次
-切换前后）、objects_in_map、tegrastats；最后的 switches。
+切换前后；ignore 那次的图和日志）、objects_in_map、tegrastats；最后的 switches。
 ```
 
 ---
@@ -9661,7 +9668,7 @@ vehicle:      d20/001
 可以改的：Nav_D20/docker/（dog_rootfs.sh、run_arm64.sh；build_stack.sh 只在编不过、又确定是环境的问题时改，写进 PATCHES.md）。
 模块的源码不改。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T60
 
-0. git pull；pytest（T58 第 0 步那九个文件，再加 tests/dog/test_dog_rootfs.py；85 passed）。
+0. git pull；pytest（T58 第 0 步那九个文件，再加 tests/dog/test_dog_rootfs.py；87 passed）。
    nproc；free -g；df -h <work_dirs 所在盘> /var/lib/docker /public（三处合起来要 60 GB 以上空闲：tar、镜像、编译树各 10–20 GB）；
    docker version。存 data/reports/T60/host.txt。
 1. QEMU（每次服务器重启后要再做一次）：
@@ -9705,7 +9712,8 @@ vehicle:      d20/001
 7. 装回狗上怎么做（这次只 dry-run，不改狗上的东西）：
      rsync -n -a --delete --itemize-changes --rsync-path='sudo -n rsync' $W/install/ dog:/opt/seres/nav_cw/install/ | tail -50
    报会变的文件数。写下以后真装的步骤：我们的服务停着（status 是 theirs）→ 去掉 -n、加 --chown=root:root → 重跑 nav_cw.sh configure
-   （装好的配置会被覆盖：地图路径、车型、调试话题）→ 开关重设（shadow、appmap、speed 改的是装好的配置）→ nav_cw.sh switches、check。
+   （装好的配置会被覆盖：地图路径、车型、调试话题）→ nav_cw.sh apply（开关存在 nav_cw.env 里，不会丢，apply 把它们写回装好的配置；
+   use-new 换之前也自己写一遍）→ switches 不许有 NOT APPLIED。
 8. 提交：data/reports/T60/（不提交 tar、镜像、编译树）、本文档；改了 Nav_D20/docker/ 的脚本一起提交。
 
 停止条件：第 1 步注册不了；第 2 步查到密钥或超过 40 GB；第 5 步编不过；第 6 步 not found 不是 0 或 NEEDED 不一样。
@@ -9781,7 +9789,7 @@ vehicle:      d20/001
 
 0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py tests/dog/test_yield_gate_cpp.py \
        tests/dog/test_bag_on_map.py tests/dog/test_objects_in_map.py tests/dog/test_nav_cw.py tests/dog/test_nav_cw_fetch.py \
-       tests/dog/test_nav_stack_env.py -q | tail -1   （82 passed）
+       tests/dog/test_nav_stack_env.py -q | tail -1   （84 passed）
    docker images | grep -E "nvidia/tensorrt.*24.08|dogperc-dev"（底镜像在本机）。
 1. 镜像：
      docker build -t nav-dev -f Nav_D20/docker/Dockerfile.nav-dev Nav_D20/docker 2>&1 | tail -40 | tee data/reports/T58/docker_build.txt

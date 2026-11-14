@@ -16,7 +16,8 @@
 #                                       NAV_CW_DEBUG=0 keeps the repository's off)
 #
 # Switches for debugging on the dog (docs/DOG_FIELD_GUIDE.md). Kept in <root>/nav_cw.env (NAV_CW_ROOT, default
-# /opt/seres/nav_cw), which our units read (EnvironmentFile); each restarts only the unit it concerns, if it runs:
+# /opt/seres/nav_cw), which our units read (EnvironmentFile), and written into the installed configs where the
+# programs read them there (apply_switches); each restarts only the unit it concerns, if it runs:
 #   sudo bash nav_cw.sh shadow on|off       the planner runs but its commands go to /nav_cw/shadow/cmd_vel and
 #                                           /nav_cw/shadow/mc/motion_control: the dog does not move by them; walk
 #                                           it with the remote and compare. The installed communication_conf's
@@ -32,6 +33,8 @@
 #                                           argument map_switch_topic, NAV_CW_SLAM_ARGS); restarts both, checks
 #   sudo bash nav_cw.sh check               who publishes the dog's commands and who listens to /map/switch, against
 #                                           the switches (use-new runs it too)
+#   sudo bash nav_cw.sh apply               write the switches kept in nav_cw.env into the installed configs again
+#                                           (after a reinstall; use-new does it before it starts ours)
 #   sudo bash nav_cw.sh debug planning on|off     the planner's debug topics, at once (/planning/debug/set_pub_flag)
 #   sudo bash nav_cw.sh debug perception on|off   lidar_3d_detection's debug cloud and its TF camera_init ->
 #                                           lidar_det (restarts cw-nav-perception: the local grid stops a few s)
@@ -181,25 +184,36 @@ mission_conf() {
     2> /dev/null | head -1
 }
 
-speed() {   # speed <m/s> | off | show
-  local conf
-  conf="$(mission_conf)"
-  [[ -n "${conf}" ]] || { echo "no installed mission_conf under ${ROOT}/install"; exit 1; }
-  if [[ "${1:-show}" == off ]]; then
-    [[ -f "${conf}.repo" ]] && mv "${conf}.repo" "${conf}"
-    env_set NAV_CW_SPEED ""
-    restart_if_active cw-planning.service
-  elif [[ "${1:-show}" != show ]]; then
-    [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "speed: a number in m/s (e.g. 0.8), off or show"; exit 2; }
-    [[ -f "${conf}.repo" ]] || cp -p "${conf}" "${conf}.repo"      # the installed values, for speed off
-    # in the MPPI block: the first max_vx (dynamic_constraints) and reference_velocity_critic's reference_velocity
-    awk -v v="$1" '
+# cap_speed <conf> <m/s | off>: MPPI's max_vx and cruise reference_velocity; the first cap keeps the installed file as
+# <conf>.repo, off puts it back
+cap_speed() {
+  local conf=$1 v=$2
+  if [[ "${v}" == off ]]; then
+    if [[ -f "${conf}.repo" ]]; then mv "${conf}.repo" "${conf}"; fi
+    return 0
+  fi
+  [[ -f "${conf}.repo" ]] || cp -p "${conf}" "${conf}.repo"
+  # in the MPPI block: the first max_vx (dynamic_constraints) and reference_velocity_critic's reference_velocity
+  awk -v v="${v}" '
       /mppi_planner_conf/ { mppi = 1 }
       mppi && !dmax && /^[[:space:]]*max_vx:/ { sub(/max_vx:.*/, "max_vx: " v); dmax = 1 }
       mppi && /reference_velocity_critic/ { rvc = 1 }
       rvc && !dref && /^[[:space:]]*reference_velocity:/ { sub(/reference_velocity:.*/, "reference_velocity: " v); dref = 1 }
       { print }' "${conf}" > "${conf}.tmp" && mv "${conf}.tmp" "${conf}"
+}
+
+speed() {   # speed <m/s> | off | show
+  local conf
+  conf="$(mission_conf)"
+  [[ -n "${conf}" ]] || { echo "no installed mission_conf under ${ROOT}/install"; exit 1; }
+  if [[ "${1:-show}" == off ]]; then
+    env_set NAV_CW_SPEED ""
+    cap_speed "${conf}" off
+    restart_if_active cw-planning.service
+  elif [[ "${1:-show}" != show ]]; then
+    [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "speed: a number in m/s (e.g. 0.8), off or show"; exit 2; }
     env_set NAV_CW_SPEED "$1"
+    cap_speed "${conf}" "$1"
     restart_if_active cw-planning.service
   fi
   awk '/mppi_planner_conf/ { m = 1 } m && /^[[:space:]]*max_vx:/ && !a { print "  MPPI " $0; a = 1 }
@@ -215,7 +229,31 @@ comm_conf() {
 topic_name() { sed -n -E "s/^[[:space:]]*$2[[:space:]]*\\{[[:space:]]*name:[[:space:]]*\"([^\"]*)\".*/\\1/p" "$1" | head -1; }
 set_topic_name() {   # set_topic_name <conf> <field> <name>
   sed -i -E "s|^([[:space:]]*$2[[:space:]]*\\{[[:space:]]*name:[[:space:]]*)\"[^\"]*\"|\\1\"$3\"|" "$1"
-  [[ "$(topic_name "$1" "$2")" == "$3" ]] || { echo "could not set $2 to $3 in $1"; exit 1; }
+  [[ "$(topic_name "$1" "$2")" == "$3" ]] || { echo "could not set $2 to $3 in $1"; return 1; }
+}
+
+# The switches are kept in nav_cw.env (NAV_CW_SHADOW=on, NAV_CW_APPMAP=ignore, NAV_CW_SPEED=<m/s>; not set: off,
+# follow, no cap) and written into the installed configs here: shadow and appmap in communication_conf, the speed cap
+# in mission_conf, appmap's launch argument for the localization in NAV_CW_SLAM_ARGS. A reinstall puts the
+# repository's configs back; use-new (and apply) write the switches in again, so they hold across installs.
+apply_switches() {
+  local conf mission
+  conf="$(comm_conf)"
+  mission="$(mission_conf)"
+  [[ -n "${conf}" && -n "${mission}" ]] || { echo "no installed communication_conf / mission_conf under ${ROOT}/install"; return 1; }
+  if [[ "$(env_get NAV_CW_SHADOW)" == on ]]; then
+    set_topic_name "${conf}" pub_cmd_vel "${SHADOW_CMD}" && set_topic_name "${conf}" pub_motion "${SHADOW_MC}" || return 1
+  else
+    set_topic_name "${conf}" pub_cmd_vel /cmd_vel && set_topic_name "${conf}" pub_motion /mc/motion_control || return 1
+  fi
+  if [[ "$(env_get NAV_CW_APPMAP)" == ignore ]]; then
+    set_topic_name "${conf}" sub_map_switch "${OWN_SWITCH}" || return 1
+    env_set NAV_CW_SLAM_ARGS "map_switch_topic:=${OWN_SWITCH}"
+  else
+    set_topic_name "${conf}" sub_map_switch "${APP_SWITCH}" || return 1
+    env_set NAV_CW_SLAM_ARGS ""
+  fi
+  cap_speed "${mission}" "$(env_get NAV_CW_SPEED | grep . || echo off)"
 }
 shadow_state() {
   local conf; conf="$(comm_conf)"
@@ -302,9 +340,15 @@ check_or_stop() {
 }
 
 switches() {
-  echo "switches (${ENVFILE}, $(comm_conf)):"
-  echo "  shadow:           $(shadow_state)$([[ "$(shadow_state)" == on ]] && echo " (commands to ${SHADOW_CMD}, ${SHADOW_MC})")"
-  echo "  appmap:           $(appmap_state)$([[ "$(appmap_state)" == ignore ]] && echo " (listening on ${OWN_SWITCH}; localization: $(env_get NAV_CW_SLAM_ARGS))")"
+  local want_shadow want_appmap
+  want_shadow="$(env_get NAV_CW_SHADOW | grep . || echo off)"
+  want_appmap="$(env_get NAV_CW_APPMAP | grep . || echo follow)"
+  echo "switches (${ENVFILE}; installed: $(comm_conf)):"
+  echo "  shadow:           ${want_shadow}$([[ "${want_shadow}" == on ]] && echo " (commands to ${SHADOW_CMD}, ${SHADOW_MC})")"
+  echo "  appmap:           ${want_appmap}$([[ "${want_appmap}" == ignore ]] && echo " (listening on ${OWN_SWITCH}; localization: $(env_get NAV_CW_SLAM_ARGS))")"
+  if [[ "$(shadow_state)" != "${want_shadow}" || "$(appmap_state)" != "${want_appmap}" ]]; then
+    echo "  NOT APPLIED: the installed config has shadow $(shadow_state), appmap $(appmap_state) (a reinstall?): nav_cw.sh apply"
+  fi
   echo "  perception debug: $([[ -n "$(env_get LIDAR3D_ARGS)" ]] && echo "on ($(env_get LIDAR3D_ARGS))" || echo off)"
   local v; v="$(env_get NAV_CW_SPEED)"
   echo "  speed cap:        ${v:+${v} m/s}${v:-off (repository value)}"
@@ -312,30 +356,33 @@ switches() {
 
 case "${1:-status}" in
   shadow)
-    conf="$(comm_conf)"
-    [[ -n "${conf}" ]] || { echo "no installed communication_conf under ${ROOT}/install"; exit 1; }
     case "${2:-}" in
-      on) set_topic_name "${conf}" pub_cmd_vel "${SHADOW_CMD}"; set_topic_name "${conf}" pub_motion "${SHADOW_MC}" ;;
-      off) set_topic_name "${conf}" pub_cmd_vel /cmd_vel; set_topic_name "${conf}" pub_motion /mc/motion_control ;;
+      on) env_set NAV_CW_SHADOW on ;;
+      off) env_set NAV_CW_SHADOW "" ;;
       *) echo "shadow on|off"; exit 2 ;;
     esac
+    apply_switches || exit 1
     switches
     restart_if_active cw-planning.service
     if is_active cw-planning.service; then check_or_stop || exit $?; fi ;;
   appmap)
-    conf="$(comm_conf)"
-    [[ -n "${conf}" ]] || { echo "no installed communication_conf under ${ROOT}/install"; exit 1; }
     case "${2:-}" in
-      follow) set_topic_name "${conf}" sub_map_switch "${APP_SWITCH}"; env_set NAV_CW_SLAM_ARGS "" ;;
-      ignore) set_topic_name "${conf}" sub_map_switch "${OWN_SWITCH}"
-              env_set NAV_CW_SLAM_ARGS "map_switch_topic:=${OWN_SWITCH}" ;;
+      follow) env_set NAV_CW_APPMAP "" ;;
+      ignore) env_set NAV_CW_APPMAP ignore ;;
       *) echo "appmap follow|ignore"; exit 2 ;;
     esac
+    apply_switches || exit 1
     switches
     restart_if_active cw-slam.service
     restart_if_active cw-planning.service
     if is_active cw-planning.service || is_active cw-slam.service; then check_or_stop || exit $?; fi ;;
   check) check_or_stop || exit $? ;;
+  apply)
+    apply_switches || exit 1
+    switches
+    restart_if_active cw-slam.service
+    restart_if_active cw-planning.service
+    if is_active cw-planning.service || is_active cw-slam.service; then check_or_stop || exit $?; fi ;;
   debug)
     case "${2:-}/${3:-}" in
       planning/on | planning/off)
@@ -350,6 +397,8 @@ case "${1:-status}" in
   status) status ;;
   use-new)
     need_units
+    apply_switches || exit 1      # the switches into the installed configs before ours start
+    switches
     echo "switching to ours..."
     if switch "${ORIG[@]}" -- "${NEW[@]}"; then
       status
@@ -367,5 +416,5 @@ case "${1:-status}" in
     switch "${NEW[@]}" -- "${ORIG[@]}" || { status || true; exit 1; }
     status ;;
   configure) shift; configure "$@" ;;
-  *) sed -n '2,46p' "$0"; exit 2 ;;
+  *) sed -n '2,47p' "$0"; exit 2 ;;
 esac

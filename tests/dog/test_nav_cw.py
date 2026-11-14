@@ -57,6 +57,35 @@ exit 0
 """
 
 
+COMM = """confs{
+    ros_bridge_conf{
+        sub_map_switch              { name: "/map/switch" }
+        sub_goal_pose               { name: "/goal_pose"           queue_size: 10 }
+        pub_cmd_vel                 { name: "/cmd_vel"             queue_size: 10 }
+        pub_motion                  { name: "/mc/motion_control"   queue_size: 10 }
+        pub_flag: true
+    }
+}
+"""
+
+
+MISSION = ("teb_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    reference_velocity: 2.0\n  }\n}\n"
+           "mppi_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    max_vy: 0.5\n  }\n"
+           "  reference_velocity_critic{\n    enabled: true\n    reference_velocity: 1.5\n  }\n}\n")
+CONF_DIR = "install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf"
+
+
+def _install(nav_cw):
+    """the planning configs of an install (what a reinstall puts back)"""
+    conf = nav_cw / CONF_DIR
+    conf.mkdir(parents=True, exist_ok=True)
+    (conf / "mission_conf.pb.txt").write_text(MISSION)
+    (conf / "communication_conf.pb.txt").write_text(COMM)
+    for f in conf.glob("*.repo"):
+        f.unlink()
+    return conf
+
+
 @pytest.fixture
 def dog(tmp_path):
     state = tmp_path / "state"
@@ -71,6 +100,7 @@ def dog(tmp_path):
         (state / u).write_text("active")
     for u in NEW:
         (state / (u + ".unit")).write_text("")
+    _install(tmp_path / "nav_cw")
 
     def run(*args, broken=()):
         (state / "broken").write_text("".join(u + "\n" for u in broken))
@@ -252,29 +282,13 @@ def test_the_full_level_lets_the_hidden_layers_through():
     assert hidden and not [t for t in hidden if not any(re.search(p, t) for p in patterns)]
 
 
-COMM = """confs{
-    ros_bridge_conf{
-        sub_map_switch              { name: "/map/switch" }
-        sub_goal_pose               { name: "/goal_pose"           queue_size: 10 }
-        pub_cmd_vel                 { name: "/cmd_vel"             queue_size: 10 }
-        pub_motion                  { name: "/mc/motion_control"   queue_size: 10 }
-        pub_flag: true
-    }
-}
-"""
 
 
 @pytest.fixture
 def root(tmp_path):
     """an installed tree (mission_conf, communication_conf), the fake systemctl (cw-planning running) and the fake
     ros2 graph"""
-    conf = tmp_path / "nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf"
-    conf.mkdir(parents=True)
-    (conf / "mission_conf.pb.txt").write_text(
-        "teb_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    reference_velocity: 2.0\n  }\n}\n"
-        "mppi_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    max_vy: 0.5\n  }\n"
-        "  reference_velocity_critic{\n    enabled: true\n    reference_velocity: 1.5\n  }\n}\n")
-    (conf / "communication_conf.pb.txt").write_text(COMM)
+    conf = _install(tmp_path / "nav_cw")
     state = tmp_path / "state"
     state.mkdir()
     (state / "cw-planning.service").write_text("active")
@@ -289,6 +303,7 @@ def root(tmp_path):
             env["FAKE_OLD_PLANNER"] = "1"
         return subprocess.run(["bash", SCRIPT, *args], capture_output=True, text=True, env=env)
 
+    run.reinstall = lambda: _install(tmp_path / "nav_cw")
     run.conf = conf / "mission_conf.pb.txt"
     run.comm = conf / "communication_conf.pb.txt"
     run.env = tmp_path / "nav_cw" / "nav_cw.env"
@@ -304,12 +319,14 @@ def test_shadow_mode_renames_the_planners_command_topics_and_checks_the_graph(ro
     assert 'pub_cmd_vel                 { name: "/nav_cw/shadow/cmd_vel"' in c
     assert 'pub_motion                  { name: "/nav_cw/shadow/mc/motion_control"' in c
     assert "queue_size: 10" in c.split("pub_motion")[1].split("\n")[0]           # the rest of the line kept
+    assert 'NAV_CW_SHADOW="on"' in root.env.read_text()
     assert "restart cw-planning.service" in root.calls() and "shadow:           on" in r.stdout
     assert "ok    planning     PUBLISHER         not on /mc/motion_control" in r.stdout
     assert "ok    planning     PUBLISHER         on /nav_cw/shadow/mc/motion_control" in r.stdout
     r = root("shadow", "off")
     assert r.returncode == 0, r.stdout + r.stderr
     assert root.comm.read_text() == COMM and "shadow:           off" in r.stdout
+    assert "NAV_CW_SHADOW" not in root.env.read_text()
     assert "ok    planning     PUBLISHER         on /mc/motion_control" in r.stdout
 
 
@@ -329,6 +346,7 @@ def test_appmap_ignore_moves_both_off_the_apps_switch(root):
     assert r.returncode == 0, r.stdout + r.stderr
     assert 'sub_map_switch              { name: "/nav_cw/map/switch" }' in root.comm.read_text()
     assert 'NAV_CW_SLAM_ARGS="map_switch_topic:=/nav_cw/map/switch"' in root.env.read_text()
+    assert 'NAV_CW_APPMAP="ignore"' in root.env.read_text()
     assert "restart cw-slam.service" in root.calls() and "restart cw-planning.service" in root.calls()
     assert "ok    planning     SUBSCRIPTION      not on /map/switch" in r.stdout
     assert "ok    mode_switch_node SUBSCRIPTION      not on /map/switch" in r.stdout
@@ -372,3 +390,30 @@ def test_speed_caps_only_the_mppi(root):
     c = root.conf.read_text().split("mppi_planner_conf")[1]
     assert "max_vx: 3.0" in c and "reference_velocity: 1.5" in c
     assert "NAV_CW_SPEED" not in root.env.read_text() and "off (repository value)" in root("switches").stdout
+
+
+def test_the_switches_hold_across_a_reinstall(root):
+    """a reinstall (T60 step 7) puts the repository's configs back; the switches kept in nav_cw.env go in again"""
+    (root.state / "cw-planning.service").write_text("inactive")
+    for args in (("shadow", "on"), ("appmap", "ignore"), ("speed", "0.8")):
+        assert root(*args).returncode == 0
+    root.reinstall()
+    assert "NOT APPLIED" in root("switches").stdout
+    r = root("apply")
+    assert r.returncode == 0, r.stdout + r.stderr
+    c = root.comm.read_text()
+    assert '"/nav_cw/shadow/mc/motion_control"' in c and '"/nav_cw/map/switch"' in c
+    assert "max_vx: 0.8" in root.conf.read_text().split("mppi_planner_conf")[1]
+    assert "NOT APPLIED" not in r.stdout
+    root("speed", "off")
+    assert root.conf.read_text() == MISSION
+
+
+def test_use_new_writes_the_switches_in_before_starting_ours(dog, tmp_path):
+    env = tmp_path / "nav_cw" / "nav_cw.env"
+    env.write_text('NAV_CW_SHADOW="on"\n')
+    r = dog("use-new")
+    assert r.returncode == 0, r.stdout + r.stderr
+    comm = (tmp_path / "nav_cw" / CONF_DIR / "communication_conf.pb.txt").read_text()
+    assert '"/nav_cw/shadow/mc/motion_control"' in comm
+    assert "ok    planning     PUBLISHER         not on /mc/motion_control" in r.stdout
