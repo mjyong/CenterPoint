@@ -30,6 +30,7 @@ public:
 private:
   void OnGoal(const geometry_msgs::msg::PointStamped::SharedPtr msg);
   void PathTrackingDebug();
+  void CrosswalkDebug();   // ours: /planning/debug/crosswalk
   void GoalPose(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
   void TEBDebug();
   void FollowingDebug();
@@ -57,6 +58,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_debug_string_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
       path_tracking_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr crosswalk_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
       pub_diagnostic_msg_;
 

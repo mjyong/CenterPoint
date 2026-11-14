@@ -1,4 +1,6 @@
 #include "src/runnable/communication/ros_debug_bridge/ros_debug_bridge.h"
+#include <algorithm>
+#include <cmath>
 #include "src/common/util/debug_datas.h"
 #include "src/common/util/diagnostic.h"
 #include "src/common/util/rosbag_recorder.h"
@@ -41,6 +43,8 @@ bool RosDebugBridge::Init(PlanningEntry *planning_entry) {
       node_->create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
           "/planning/debug/diagnostic", 1);
 
+  // ours (T55 review): the crosswalk yield as the planner sees it, for Foxglove on the dog (planning_live.json)
+  crosswalk_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>("/planning/debug/crosswalk", 1);
   path_tracking_pub_ =
       node_->create_publisher<visualization_msgs::msg::MarkerArray>(
           "/planning/debug/path_tracking", 1);
@@ -202,6 +206,7 @@ bool RosDebugBridge::Publish() {
   tf2_msg.transforms = tf_msg;
   RosbagRecorder::Instance()->add(tf2_msg, "/tf", "tf2_msgs/msg/TFMessage");
   PathTrackingDebug();
+  CrosswalkDebug();
   if (!goal_pose_marker_.header.frame_id.empty()) {   // none before the first /goal_pose (an empty frame_id)
     goal_pose_marker_.header.stamp = DebugStamp();
     goal_pose_pub_->publish(goal_pose_marker_);
@@ -252,6 +257,129 @@ void RosDebugBridge::SetPubFlag(
   response->success = true;
   response->message = pub_flag_ ? "pub_flag enabled" : "pub_flag disabled";
   AINFO << "SetPubFlag: " << response->message;
+}
+
+namespace {
+std_msgs::msg::ColorRGBA CwColor(float r, float g, float b, float a) {
+  std_msgs::msg::ColorRGBA c;
+  c.r = r;
+  c.g = g;
+  c.b = b;
+  c.a = a;
+  return c;
+}
+}  // namespace
+
+// ours (T55 review): in the map frame, the crosswalks near the robot (the one it is at or heading to coloured by the
+// mode: approach yellow, align / wait red, go / cross green), perception's vehicles where the gate places them
+// (red: the gate waits for it; an arrow for the velocity) and a line of text over the robot (mode, reason, how many
+// it waits for). If the extrinsic were wrong the boxes would miss the vehicles' cells in the cost map.
+void RosDebugBridge::CrosswalkDebug() {
+  using planning::mission::CrosswalkYieldOutput;
+  auto *mission_tracking = dynamic_cast<planning::mission::Tracking *>(
+      planning_entry_->mission_entry_ptr()->GetMissionPtr(MissionConf::Tracking));
+  auto *gmm = planning_entry_->preprocess_entry_ptr()->global_map_manager();
+  if (mission_tracking == nullptr || gmm == nullptr) return;
+  const auto odometry = planning_entry_->communication_entry_ptr()->MainBridge()->odometry();
+  if (!odometry) return;
+  const double rx = odometry->pose.position.x(), ry = odometry->pose.position.y();
+  const CrosswalkYieldOutput &o = mission_tracking->crosswalk_yield();
+  visualization_msgs::msg::MarkerArray arr;
+  VisualizationUtil::appendDeleteAll(&arr);
+  int32_t id = 1;
+  auto base = [&](const std::string &ns, int32_t type) {
+    visualization_msgs::msg::Marker m;
+    m.header.frame_id = "map";
+    m.ns = ns;
+    m.id = id++;
+    m.type = type;
+    m.action = visualization_msgs::msg::Marker::ADD;
+    m.pose.orientation.w = 1.0;
+    return m;
+  };
+  std_msgs::msg::ColorRGBA mode_color = CwColor(0.6f, 0.6f, 0.6f, 0.8f);
+  switch (o.mode) {
+    case CrosswalkYieldOutput::kApproach: mode_color = CwColor(1.0f, 0.85f, 0.1f, 0.95f); break;
+    case CrosswalkYieldOutput::kAlign:
+    case CrosswalkYieldOutput::kWait: mode_color = CwColor(1.0f, 0.2f, 0.2f, 0.95f); break;
+    case CrosswalkYieldOutput::kGo:
+    case CrosswalkYieldOutput::kCross: mode_color = CwColor(0.2f, 0.9f, 0.3f, 0.95f); break;
+    default: break;
+  }
+  const auto &crosswalks = gmm->crosswalks();
+  for (size_t k = 0; k < crosswalks.size(); ++k) {
+    const auto &poly = crosswalks[k];
+    if (poly.empty()) continue;
+    double cx = 0.0, cy = 0.0;
+    for (const auto &p : poly) {
+      cx += p.x();
+      cy += p.y();
+    }
+    cx /= poly.size();
+    cy /= poly.size();
+    if (std::hypot(cx - rx, cy - ry) > 80.0) continue;   // only those near the robot
+    const bool current = static_cast<int>(k) == o.crosswalk;
+    auto m = base("crosswalks", visualization_msgs::msg::Marker::LINE_STRIP);
+    m.scale.x = current ? 0.25 : 0.1;
+    m.color = current ? mode_color : CwColor(1.0f, 1.0f, 1.0f, 0.6f);
+    for (size_t i = 0; i <= poly.size(); ++i) {
+      geometry_msgs::msg::Point p;
+      p.x = poly[i % poly.size()].x();
+      p.y = poly[i % poly.size()].y();
+      p.z = 0.05;
+      m.points.push_back(p);
+    }
+    arr.markers.push_back(m);
+  }
+  std::vector<planning::algorithm::yield::Object> objs;
+  if (mission_tracking->crosswalk_objects_in_map(&objs)) {
+    for (const auto &ob : objs) {
+      if (ob.label != "vehicle") continue;
+      const bool waited = std::find(o.decision.ids.begin(), o.decision.ids.end(), ob.id) != o.decision.ids.end();
+      auto box = base("vehicles", visualization_msgs::msg::Marker::CUBE);
+      box.pose.position.x = ob.position.x();
+      box.pose.position.y = ob.position.y();
+      box.pose.position.z = 0.8;
+      box.pose.orientation.z = std::sin(0.5 * ob.yaw);
+      box.pose.orientation.w = std::cos(0.5 * ob.yaw);
+      box.scale.x = std::max(ob.length, 0.5);
+      box.scale.y = std::max(ob.width, 0.5);
+      box.scale.z = 1.6;
+      box.color = waited ? CwColor(1.0f, 0.15f, 0.15f, 0.6f) : CwColor(0.3f, 0.6f, 1.0f, 0.45f);
+      arr.markers.push_back(box);
+      if (ob.velocity.norm() > 0.3) {
+        auto arrow = base("vehicle_velocity", visualization_msgs::msg::Marker::ARROW);
+        geometry_msgs::msg::Point a, b;
+        a.x = ob.position.x();
+        a.y = ob.position.y();
+        a.z = b.z = 1.7;
+        b.x = a.x + ob.velocity.x();   // where it is in 1 s
+        b.y = a.y + ob.velocity.y();
+        arrow.points = {a, b};
+        arrow.scale.x = 0.15;
+        arrow.scale.y = 0.35;
+        arrow.scale.z = 0.35;
+        arrow.color = box.color;
+        arrow.color.a = 0.95f;
+        arr.markers.push_back(arrow);
+      }
+    }
+  }
+  if (o.mode != CrosswalkYieldOutput::kNone) {
+    auto text = base("state", visualization_msgs::msg::Marker::TEXT_VIEW_FACING);
+    text.pose.position.x = rx;
+    text.pose.position.y = ry;
+    text.pose.position.z = 2.0;
+    text.scale.z = 0.5;
+    text.color = mode_color;
+    text.text = std::string(planning::mission::ModeName(o.mode)) + " (" + o.decision.reason + ")" +
+                (o.decision.ids.empty() ? "" : ", waiting for " + std::to_string(o.decision.ids.size())) +
+                (o.stale ? ", perception stale" : "") + (o.unreleased ? ", on it without a go" : "");
+    arr.markers.push_back(text);
+  }
+  StampMarkers(&arr);
+  RosbagRecorder::Instance()->add(arr, "/planning/debug/crosswalk", "visualization_msgs/msg/MarkerArray");
+  crosswalk_pub_->publish(arr);
 }
 
 void RosDebugBridge::PathTrackingDebug() {

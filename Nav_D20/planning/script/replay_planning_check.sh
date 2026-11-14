@@ -36,7 +36,7 @@ stamp="$(date +%s)"
 ros2 bag record -s mcap -o "${out}" \
   /lightning/odom /map/occupancy_grid /tf /tf_static \
   /planning/debug/cost_map_production/occmap /planning/debug/global_map_manager/occmap \
-  /planning/debug/goal_pose /planning/debug/path_tracking /planning/debug/plotjuggler/string \
+  /planning/debug/goal_pose /planning/debug/path_tracking /planning/debug/plotjuggler/string /planning/debug/crosswalk \
   /planning/debug/diagnostic /planning/debug/collision_checker /planning/debug/teb_planner /planning/debug/following \
   /goal_pose /cmd_vel /map/switch \
   /rte/rdap/rtk/inspvax /rhr/topic/event_info /rhr/topic/alarm_info /perception/lidar_3d/objects \

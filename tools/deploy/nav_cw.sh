@@ -10,8 +10,10 @@
 #                                       NAV_CW_WAIT s (default 15), put theirs back and exit 1
 #   sudo bash nav_cw.sh use-original    stop ours, start theirs
 #   bash nav_cw.sh configure <prefix> <map dir>
-#                                       at install time (T55): point our localization (map_path) and planning
-#                                       (startup_map_dir) at the site map, vehicle type d20/001
+#                                       at install time (T56): point our localization (map_path) and planning
+#                                       (startup_map_dir) at the site map, vehicle type d20/001; the planner's debug
+#                                       topics on (pub_flag, enable_global_map_pub: Foxglove, nav_cw_foxglove.sh;
+#                                       NAV_CW_DEBUG=0 keeps the repository's off)
 #
 # Nothing is enabled or disabled: after a reboot the robot team's services start (they are enabled, ours are not).
 # Their units are not edited; ours carry Conflicts= on theirs, so systemd never runs both.
@@ -92,6 +94,7 @@ configure() {   # configure <prefix> <map dir>
   loc="$(find "${base}" -path '*lightning/config/default_d20.yaml' -not -path '*/src/*' | head -1)"
   plan="$(find "${base}" -path '*robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt' -not -path '*/src/*' | head -1)"
   vin="$(find "${base}" -path '*robot_factory/default_robot_vin' -not -path '*/src/*' | head -1)"
+  comm="$(find "${base}" -path '*robot_factory/d20/001/planning_conf/communication_conf.pb.txt' -not -path '*/src/*' | head -1)"
   [[ -n "${loc}" && -n "${plan}" && -n "${vin}" ]] || { echo "${prefix}: lightning config, d20/001 planning_conf or default_robot_vin not found"; exit 1; }
   sed -i -E "s|^([[:space:]]*map_path:[[:space:]]*).*|\1${map}|" "${loc}"
   awk -v map="${map}" '
@@ -100,6 +103,10 @@ configure() {   # configure <prefix> <map dir>
     /global_map_manager_conf[[:space:]]*\{/ { print "        startup_map_dir: \"" map "\"" }
   ' "${plan}" > "${plan}.tmp" && mv "${plan}.tmp" "${plan}"
   echo d20/001 > "${vin}"
+  if [[ -n "${comm}" && "${NAV_CW_DEBUG:-1}" != 0 ]]; then
+    sed -i -E 's/^([[:space:]]*(pub_flag|enable_global_map_pub):[[:space:]]*)false/\1true/' "${comm}"
+    echo "debug topics: $(grep -E '^[[:space:]]*(pub_flag|enable_global_map_pub):' "${comm}" | tr -s ' ' | tr '\n' ' ')"
+  fi
   echo "localization: $(grep -m1 -E '^[[:space:]]*map_path:' "${loc}" | sed 's/^ *//')  (${loc})"
   echo "planning:     $(grep -m1 startup_map_dir "${plan}" | sed 's/^ *//')  (${plan})"
   echo "vehicle:      $(cat "${vin}")"

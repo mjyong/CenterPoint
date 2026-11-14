@@ -136,3 +136,51 @@ def test_configure_edits_the_installed_copy_not_the_sources(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
     assert "startup_map_dir" in files["install/planning/planning/lib"].read_text()
     assert "startup_map_dir" not in files["src/Nav_D20"].read_text()
+
+
+def test_configure_turns_the_debug_topics_on(tmp_path):
+    prefix = tmp_path / "nav_cw"
+    conf = prefix / "install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf"
+    conf.mkdir(parents=True)
+    (conf / "preprocess_conf.pb.txt").write_text("confs{\n    global_map_manager_conf{\n    }\n}\n")
+    (conf / "communication_conf.pb.txt").write_text("    ros_debug_bridge_conf{\n        enable_global_map_pub: false\n"
+                                                    "        pub_flag: false\n    }\n")
+    (conf.parents[2] / "default_robot_vin").write_text("d20/001\n")   # robot_factory/
+    loc = prefix / "install/slam/lightning/share/lightning/config/default_d20.yaml"
+    loc.parent.mkdir(parents=True)
+    loc.write_text("  map_path: /x\n")
+    m = tmp_path / "map"
+    m.mkdir()
+    (m / "global_map.yaml").write_text("floors: []\n")
+    r = subprocess.run(["bash", SCRIPT, "configure", str(prefix), str(m)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    c = (conf / "communication_conf.pb.txt").read_text()
+    assert "enable_global_map_pub: true" in c and "pub_flag: true" in c
+    (conf / "communication_conf.pb.txt").write_text("        pub_flag: false\n")
+    r = subprocess.run(["bash", SCRIPT, "configure", str(prefix), str(m)], capture_output=True, text=True,
+                       env=dict(os.environ, NAV_CW_DEBUG="0"))
+    assert "pub_flag: false" in (conf / "communication_conf.pb.txt").read_text()
+
+
+def test_the_live_layout_shows_only_what_the_bridge_lets_through():
+    """planning_live.json's topics all pass nav_cw_foxglove.sh's whitelist, and the goal tool publishes /goal_pose."""
+    import json
+    import re
+    layout = json.load(open(os.path.join(ROOT, "Nav_D20", "planning", "script", "planning_live.json"), encoding="utf-8"))
+    cfg = layout["configById"]
+    topics = set(cfg["3D!live"]["topics"])
+    for k, v in cfg.items():
+        for p in v.get("paths", []):
+            topics.add(p["value"].split(".")[0])
+        for key in ("topicPath", "topicToRender"):
+            if key in v:
+                topics.add(v[key].split(".")[0])
+    assert cfg["3D!live"]["publish"]["poseTopic"] == "/goal_pose"
+    topics.add("/goal_pose")
+    script = open(os.path.join(ROOT, "tools", "deploy", "nav_cw_foxglove.sh"), encoding="utf-8").read()
+    block = script[script.index("TOPICS=("):script.index(")\nread")]
+    patterns = re.findall(r"'([^']+)'", block)
+    missing = [t for t in sorted(topics) if not any(re.search(p, t) for p in patterns)]
+    assert not missing, missing
+    assert "^/goal_pose$" in script.split("client_topic_whitelist")[1].split("\n")[0]   # only the goal
+    assert "/planning/debug/crosswalk" in topics

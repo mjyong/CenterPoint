@@ -9408,7 +9408,7 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 写；不 apt、不 dpkg -i；原来的服务和它们的文件不动、不停；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。狗要停着（编译占 CPU）。
 仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T56
 
-0. git pull；pytest（同 T58 第 0 步；72 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
+0. git pull；pytest（同 T58 第 0 步；74 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
    源码包传到狗上：scp /public/zjst/robot/nav_cw_src/* dog:/home/nvidia/nav_cw_downloads/（先 ssh dog mkdir -p），两边 sha256sum 对一下。
 1. 依赖（T55：狗上的 -dev 和 ROS 包都齐，Livox SDK 在 /usr/local，不用 .deb）：只编三个源码包，装到 /opt/seres/nav_cw/deps（不装进系统）：
    - g2o 20230806_git、acados 0.5.1（含 blasfeo、hpipm）、OsqpEigen 0.10.0：解到 /opt/seres/nav_cw/src/deps/，cmake -DCMAKE_INSTALL_PREFIX=/opt/seres/nav_cw/deps，
@@ -9437,9 +9437,10 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 4. 地图（人定：狗上的地图换成仓库的）：Nav_D20/map 的两张 zip 传到狗上，解到 /opt/seres/nav_cw/maps/<id>/；App 的地图目录
    /userdata/config/robot_service/map/ 里同名的先 sudo -n mv 成 <id>.orig-<日期>，再拷进去；没有同名的直接拷。换回的办法写进报告。
    App 里能不能选到问人（不改 App 的数据库或配置）。
-5. 配置（其余都是仓库的，不改）：sudo -n cp tools/deploy/nav_cw.sh 到 /opt/seres/nav_cw/，然后
+5. 配置（其余都是仓库的，不改）：sudo -n cp tools/deploy/nav_cw.sh tools/deploy/nav_cw_foxglove.sh 到 /opt/seres/nav_cw/，然后
      sudo -n bash /opt/seres/nav_cw/nav_cw.sh configure /opt/seres/nav_cw /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
-   抄输出。规划的 PLANNING_TIMEOUT_WALL_CLOCK 不设（回放用的）。
+   抄输出（这一步也把规划的调试话题打开：pub_flag、enable_global_map_pub；现场 Foxglove 要看）。规划的 PLANNING_TIMEOUT_WALL_CLOCK
+   不设（回放用的）。
 6. 服务（/etc/systemd/system/，sudo -n tee 写）：照原来三个 unit（systemctl cat；T51 的 dog_stack.txt）写 cw-planning、cw-slam、
    cw-nav-perception，路径换成 /opt/seres/nav_cw/...，Environment 照抄（CycloneDDS、URI，域不设 = 0），再加
    LD_LIBRARY_PATH（第 3 步那串的 deps 部分在前）；各加 Conflicts=<原来那个>.service；Restart 照抄。
@@ -9462,13 +9463,11 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
      rviz:=false、ros2 run planning planning；lidar_3d_detection 是 nav_cw 里刚编的那个（仓库的配置，偏置 0），和狗上 deb 的那个
      （域 0）同时跑，各用各的域；
      定位是 mode_switch_node（服务器回放一直用 run_loc_online，这是第一次跑狗上的入口），日志里看它起来了、读了 nav_cw 的地图；
-   - 导航目标能不能从 App 那边来（T54、T55 复核：仓库的 Navigation.action 末尾多了 nav_mode）：放 bag 之前，用狗上装的旧接口当客户端，
-     在域 42 给我们的规划发一个目标——找到狗上 seres-interface 装的前缀（dpkg -L seres-interface | grep setup.bash），
-       ROS_DOMAIN_ID=42 bash -c 'source /opt/ros/humble/setup.bash && source <那个前缀>/setup.bash && \
-         timeout 20 ros2 action send_goal /nav/navigation nav2_interface/action/Navigation \
-         "{map_uuid: test, poses: [{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}]}"'
-     再用 nav_cw 的规划前缀（新定义）发一次同样的。看规划日志有没有收到目标（Navigation / goal 相关的行）、send_goal 的输出（Goal accepted
-     还是一直等）。两次的结果都抄下：旧定义收不到就证实了，等人定要不要改；
+   - 目标用 /goal_pose（人定 2026-11-14：现场用 Foxglove 的 3D 面板发 /goal_pose，不用 App 的 /nav/navigation，所以 nav_mode 那处不用管）；
+   - Foxglove 的桥也在域 42 试一次：ROS_DOMAIN_ID=42 sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh（见第 5 步），
+     scp tools/deploy/foxglove_probe.py dog:/tmp/，狗上 python3 /tmp/foxglove_probe.py --url ws://localhost:8765 --seconds 10 --topics
+     /planning/debug/crosswalk /planning/debug/path_tracking /planning/debug/cost_map_production/occmap /lightning/odom，抄每个话题
+     收到几条（都要有）；桥停掉；
    - ROS_DOMAIN_ID=42 ros2 bag record -s mcap -o /home/nvidia/bags/t56_rehearsal <replay_planning_check.sh 第 41–47 行那些话题>；
    - ROS_DOMAIN_ID=42 ros2 bag play /home/nvidia/bags/1112_t40 --clock --remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects；
      5 s 后发目标（bag_on_map.py 给 ad68517c 的目标，服务器上先跑一遍拿到）：
@@ -9498,7 +9497,7 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 任务 T57（T56 通过以后，人在现场）。人和 Agent 一起做；每一步 Agent 先说要做什么，人说可以再做。
 准备：狗在 ad68517c 那片（要测的人行横道路线从它上面过：6、13、32、38 号，人定哪一个）；有人拿急停；App 里当前地图是
 仓库版的 ad68517c（T56 拷进 App 目录；App 最后发的 /map/switch 会一直留着，我们的服务一起来就照它切图，T54、T55 复核）；
-导航目标能从 App 发到我们的规划（T56 演练实测；nav_mode 那处按人定处理过）；
+目标用 Foxglove 发（人定 2026-11-14）：笔记本上 Foxglove 桌面版，能连到狗的 8765（不在一个网段就 ssh -N -L 8765:127.0.0.1:8765 nvidia@<狗>）；
 服务器上开着 Foxglove 或者能看 journalctl。
 
 1. ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status' → running: theirs。
@@ -9509,9 +9508,13 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
      要是 App 目录里仓库版的 ad68517c，紧跟着 "GlobalMapManager: 5 crosswalks in …"。切到 c1adbe7b 或者 0 crosswalks：换回，停下；
    - lidar-3d-detection：每秒一行，10 Hz 左右；
    - 狗在 App 里位置对、能遥控。有一条不对就换回（第 6 步），停下。
+2b. Foxglove：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh'（前台，另开一个终端留着）；Foxglove 连 ws://<狗或 127.0.0.1>:8765，
+   Layout → Import Nav_D20/planning/script/planning_live.json。看得到路网、代价地图、狗、/planning/debug/crosswalk 里的人行横道（白框；
+   正在过的那个按状态变色）。发目标：3D 面板右上的 "Publish pose"，在人行横道对面点一下、拖出朝向。只有 /goal_pose 能从 Foxglove 发。
 3. 录包（每次测试一个，名字 1113_cw_<n>）：ros2 bag record（域 0）1112 那些话题，加上 /lightning/odom、/cmd_vel、
    /planning/debug/plotjuggler/string、/planning/debug/path_tracking、/map/occupancy_grid、/perception/lidar_3d/objects。
-4. 测（每次都：人用 App 发人行横道对面的目标；Agent 跟着 journalctl -u cw-planning -f | grep "Crosswalk yield"，报状态）：
+4. 测（每次都：人在 Foxglove 里发人行横道对面的目标；Foxglove 里看 /planning/debug/crosswalk 的状态字和车框（红框是门控在等的车）、
+   右边"规划的数"里的 crosswalk_*；Agent 同时跟着 journalctl -u cw-planning -f | grep "Crosswalk yield"，报状态）：
    a. 空的人行横道：应该 approach → align（转到面朝对面）→ go → cross → none；狗在入口前停下、转向、走过去，中间不停；
    b. 同事开车低速（≤ 10 km/h）从左边、再从右边经过：车在可能经过的范围里时应该 wait（理由 vehicle），车过去以后 go；
    c. 正常车流：看等多久、有没有不该放的时候放了（人判断）。
@@ -9544,7 +9547,7 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 
 0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py tests/dog/test_yield_gate_cpp.py \
        tests/dog/test_bag_on_map.py tests/dog/test_objects_in_map.py tests/dog/test_nav_cw.py tests/dog/test_nav_cw_fetch.py \
-       tests/dog/test_nav_stack_env.py -q | tail -1   （72 passed）
+       tests/dog/test_nav_stack_env.py -q | tail -1   （74 passed）
    docker images | grep -E "nvidia/tensorrt.*24.08|dogperc-dev"（底镜像在本机）。
 1. 镜像：
      docker build -t nav-dev -f Nav_D20/docker/Dockerfile.nav-dev Nav_D20/docker 2>&1 | tail -40 | tee data/reports/T58/docker_build.txt
@@ -9572,6 +9575,8 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
    （data/loc_maps 是链到 /public 的话，容器里一样能读。）和 T54 的 report_cross 逐项对：车型、"startup map … 5 crosswalks"、
    mission_state、CMD 次数和中位、local planner 那一行、"Crosswalk yield:" 那几行、odom 有没有报、heading、贴图。抄成一张两列的表。
    明显变差的（MPPI 失败多了一截、定位跑飞、状态切换不一样）：写清楚，停下（先不切默认环境）。
+   新的调试话题（T54、T55 复核加的，Foxglove 现场用）：录包里 /planning/debug/crosswalk 有多少条（ros2 bag info），抄一条 align 或 wait 时的
+   （人行横道框、状态字）。
 4. 现场重算感知（T53 第 4 步 b 当时做不了的）：
    - 模型 data/deploy/nusc_pp_dyn（T27），本机引擎：python tools/deploy/build_engines.py --model-dir data/deploy/nusc_pp_dyn
      --stage $(hostname) --stage-out data/deploy/T58/model_x86（同 T32 第 1 步；镜像的 TensorRT 是 10.3，和建引擎的 pip 版一样；容器里

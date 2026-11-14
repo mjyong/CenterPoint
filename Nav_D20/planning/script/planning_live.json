@@ -1,0 +1,252 @@
+{
+  "configById": {
+    "3D!live": {
+      "cameraState": {
+        "perspective": false,
+        "distance": 30,
+        "phi": 0,
+        "thetaOffset": 0,
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-position",
+      "followTf": "base_link",
+      "scene": {
+        "backgroundColor": "#121418",
+        "labelScaleFactor": 1,
+        "transforms": {
+          "visible": true,
+          "showLabel": true,
+          "editable": false
+        },
+        "enableStats": false,
+        "ignoreColladaUpAxis": false,
+        "meshUpAxis": "z_up"
+      },
+      "transforms": {},
+      "layers": {
+        "grid": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "10 m grid",
+          "instanceId": "grid",
+          "layerId": "foxglove.Grid",
+          "frameId": "map",
+          "size": 400,
+          "divisions": 40,
+          "lineWidth": 0.5,
+          "color": "#ffffff1a",
+          "position": [
+            0,
+            0,
+            -0.08
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        }
+      },
+      "topics": {
+        "/planning/debug/global_map_manager/occmap": {
+          "visible": true,
+          "frameLocked": false
+        },
+        "/planning/debug/cost_map_production/occmap": {
+          "visible": true,
+          "frameLocked": false,
+          "colorMode": "custom",
+          "minColor": "#00000000",
+          "maxColor": "#e0403a99",
+          "unknownColor": "#00000000",
+          "invalidColor": "#00000000"
+        },
+        "/map/occupancy_grid": {
+          "visible": true,
+          "frameLocked": false,
+          "colorMode": "custom",
+          "minColor": "#00000000",
+          "maxColor": "#ff9f0aff",
+          "unknownColor": "#00000000",
+          "invalidColor": "#00000000"
+        },
+        "/planning/debug/path_tracking": {
+          "visible": true
+        },
+        "/planning/debug/goal_pose": {
+          "visible": true
+        },
+        "/planning/debug/collision_checker": {
+          "visible": true
+        },
+        "/planning/debug/crosswalk": {
+          "visible": true
+        },
+        "/lightning/odom": {
+          "visible": true
+        },
+        "/fused_point_cloud": {
+          "visible": false,
+          "colorField": "z",
+          "colorMode": "colormap",
+          "colorMap": "turbo",
+          "pointSize": 2
+        }
+      },
+      "publish": {
+        "type": "pose",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {},
+      "foxglovePanelTitle": "狗上实时：路网、代价地图（红）、感知栅格（橙）、路径、人行横道和门控看到的车（/planning/debug/crosswalk）"
+    },
+    "Plot!speed": {
+      "paths": [
+        {
+          "value": "/lightning/odom.twist.twist.linear.x",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "实际 vx",
+          "color": "#64d2ff"
+        },
+        {
+          "value": "/cmd_vel.linear.x",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "指令 vx",
+          "color": "#ff9f0a"
+        },
+        {
+          "value": "/cmd_vel.linear.y",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "指令 vy",
+          "color": "#bf5af2"
+        }
+      ],
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240,
+      "foxglovePanelTitle": "速度 m/s：实际 / 指令"
+    },
+    "Plot!omega": {
+      "paths": [
+        {
+          "value": "/lightning/odom.twist.twist.angular.z",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "实际 ω",
+          "color": "#64d2ff"
+        },
+        {
+          "value": "/cmd_vel.angular.z",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "指令 ω",
+          "color": "#ff9f0a"
+        }
+      ],
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240,
+      "foxglovePanelTitle": "转向 rad/s：实际 / 指令"
+    },
+    "RawMessages!debug": {
+      "topicPath": "/planning/debug/plotjuggler/string",
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "diffTopicPath": "",
+      "showFullMessageForDiff": false,
+      "expansion": "all",
+      "foxglovePanelTitle": "规划每周期的数（crosswalk_mode 0 无 1 接近 2 转向 3 等 4 放行 5 在人行横道上；crosswalk_go、crosswalk_vehicles …）"
+    },
+    "RawMessages!objects": {
+      "topicPath": "/perception/lidar_3d/objects",
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "diffTopicPath": "",
+      "showFullMessageForDiff": false,
+      "expansion": "none",
+      "foxglovePanelTitle": "感知的目标（检测系：雷达正下方地面，x 右 y 前）"
+    },
+    "DiagnosticSummary!planning": {
+      "topicToRender": "/planning/debug/diagnostic",
+      "pinnedIds": [],
+      "hardwareIdFilter": "",
+      "sortByLevel": true,
+      "foxglovePanelTitle": "规划的诊断"
+    },
+    "Tab!side": {
+      "activeTabIdx": 0,
+      "tabs": [
+        {
+          "title": "规划的数",
+          "layout": "RawMessages!debug"
+        },
+        {
+          "title": "诊断",
+          "layout": "DiagnosticSummary!planning"
+        },
+        {
+          "title": "感知目标",
+          "layout": "RawMessages!objects"
+        }
+      ]
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "first": "3D!live",
+    "second": {
+      "first": "Plot!speed",
+      "second": {
+        "first": "Plot!omega",
+        "second": "Tab!side",
+        "direction": "column",
+        "splitPercentage": 25
+      },
+      "direction": "column",
+      "splitPercentage": 22
+    },
+    "direction": "row",
+    "splitPercentage": 62
+  }
+}

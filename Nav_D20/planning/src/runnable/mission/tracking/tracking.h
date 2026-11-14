@@ -87,6 +87,10 @@ public:
   bool nav_blocked() const { return nav_blocked_; }
   // crossing at the map's crosswalks: what CrosswalkYield did this cycle (debug, T51 review)
   const CrosswalkYieldOutput &crosswalk_yield() const { return crosswalk_out_; }
+  // perception's vehicles where the gate places them in the map (the debug view, /planning/debug/crosswalk)
+  bool crosswalk_objects_in_map(std::vector<algorithm::yield::Object> *out) const {
+    return crosswalk_yield_.ObjectsInMap(out);
+  }
 
   teb_planner::TebPlanner *teb_planner() const { return teb_planner_.get(); }
   algorithm::MppiPlanner *mppi_planner() const { return mppi_planner_.get(); }

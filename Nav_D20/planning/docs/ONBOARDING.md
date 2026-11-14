@@ -253,6 +253,8 @@ python3 Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/planning_io_<名�
 
 在 Foxglove 里打开它，加载布局 `Nav_D20/planning/script/planning_viz.json`（看规划）或 `loc_viz.json`（看定位）。
 
+**狗上实时看**（不转换，直接连狗）：狗上 `sudo bash /opt/seres/nav_cw/nav_cw_foxglove.sh`（带白名单的 foxglove_bridge，只有 `/goal_pose` 能从 Foxglove 发），Foxglove 连 `ws://<狗>:8765`，导入 `Nav_D20/planning/script/planning_live.json`：路网、代价地图、感知栅格、路径、`/planning/debug/crosswalk`（人行横道按状态着色、门控看到的车、状态字），3D 面板的 "Publish pose" 发目标。规划的调试话题要 `pub_flag`（`nav_cw.sh configure` 打开）。
+
 - 一切换到 bag 的时间，摊平到地图平面，每一层一个高度；代价地图方向自动认、反的翻过来；空闲透明。
 - 左边 3D 跟着狗俯视。右边：速度（实际 / 指令）、距离（到终点、偏离全局路径、最近感知障碍）、任务状态条，下面一组标签页：
   - **规划流程**：这一周期按第 1 节的六步，每步写着当时的数和代码位置——边播边对着代码看；
