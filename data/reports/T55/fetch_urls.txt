@@ -1,0 +1,3 @@
+# 人在连着狗的本机下。只有 g2o。acados、OsqpEigen 在服务器 /public/zjst/robot/nav_cw_src/，不用下。
+# 服务器直连 github.com 超时。这份哈希是经代理下到的同一份 archive。下不动就用服务器上的 g2o-20230806_git.tar.gz。
+https://github.com/RainerKuemmerle/g2o/archive/refs/tags/20230806_git.tar.gz sha256=e717d3b96cc6d00fcbbaf637aae648c9823599e6aa8fcf4546fc9ad4034dcde5 name=g2o-20230806_git.tar.gz

@@ -1,0 +1,4 @@
+# 没有缺的 apt 包。Ubuntu 的 -dev 和要用的 ros-humble-* 狗上都装着。
+# 探过一次 ros-humble-libg2o（不装、不 update）。/var/lib/apt/lists 里没有 Ubuntu / ROS 的索引，结果是：
+E: Unable to locate package ros-humble-libg2o
+# 不用这个包。仓库镜像编的是 g2o 标签 20230806_git，见 fetch_urls.txt。

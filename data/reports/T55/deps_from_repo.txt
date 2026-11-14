@@ -1,0 +1,75 @@
+名字	谁要	怎么来
+Eigen3	planning, lightning	Ubuntu libeigen3-dev
+OpenCV	planning, lightning, grid_map_memory_node	Ubuntu libopencv-dev
+PCL	planning, lightning, lidar_seg, grid_map_memory_node	Ubuntu libpcl-dev
+Ceres	planning	Ubuntu libceres-dev
+glog	planning, lightning, lidar_seg, grid_map_memory_node	Ubuntu libgoogle-glog-dev
+gflags	planning；lightning 直接链接	Ubuntu libgflags-dev
+Protobuf	planning（含 protoc）	Ubuntu libprotobuf-dev、protobuf-compiler
+OpenMP	planning 必选；lightning 可选	g++ 自带 omp.h，运行库 libgomp1
+yaml-cpp	planning, lightning, grid_map_memory_node	Ubuntu libyaml-cpp-dev
+urdfdom	planning	Ubuntu liburdfdom-dev
+fcl	planning	Ubuntu libfcl-dev
+octomap	planning, grid_map_memory_node	Ubuntu liboctomap-dev
+OpenGL	lightning	Ubuntu libgl-dev、libopengl-dev、libgl1-mesa-dev
+tbb	lightning 直接链接，没有 find_package	Ubuntu libtbb-dev
+Boost	lightning 的头文件搜索路径	Ubuntu libboost-all-dev
+g2o	planning	源码标签 20230806_git（Dockerfile.nav-dev；不用 ros-humble-libg2o）
+Livox-SDK2	livox_ros_driver2	狗上 /usr/local 已有头文件和动态库，不另下
+CUDA	lidar_3d_detection	狗上 CUDA 12.6
+TensorRT	lidar_3d_detection	狗上 libnvinfer-dev 10.3
+ZLIB	lidar_3d_detection	Ubuntu zlib1g-dev
+acados	planning	源码 0.5.1，带子模块 blasfeo、hpipm
+osqp	planning	仓库 planning/third_party/osqp/lib_arm 的 aarch64 静态库，不另下
+OsqpEigen	planning	源码 0.10.0
+grid_map_core	planning	ROS ros-humble-grid-map-core
+grid_map_ros	planning	ROS ros-humble-grid-map-ros
+grid_map_octomap	planning	ROS ros-humble-grid-map-octomap
+octomap_msgs	planning, grid_map_memory_node	ROS ros-humble-octomap-msgs
+pcl_conversions	planning, lightning, lidar_seg, grid_map_memory_node	ROS ros-humble-pcl-conversions
+pcl_ros	lightning 的 package.xml	ROS ros-humble-pcl-ros
+cv_bridge	grid_map_memory_node	ROS ros-humble-cv-bridge
+tf2	lightning, grid_map_memory_node	ROS ros-humble-tf2
+tf2_ros	planning, lightning, grid_map_memory_node	ROS ros-humble-tf2-ros
+tf2_eigen	planning, grid_map_memory_node	ROS ros-humble-tf2-eigen
+tf2_geometry_msgs	planning, grid_map_memory_node	ROS ros-humble-tf2-geometry-msgs
+tf2_msgs	planning	ROS ros-humble-tf2-msgs
+tf2_sensor_msgs	grid_map_memory_node	ROS ros-humble-tf2-sensor-msgs
+kdl_parser	planning	ROS ros-humble-kdl-parser
+urdf	planning	ROS ros-humble-urdf
+rosbag2_cpp	planning, lightning, lidar_seg, grid_map_memory_node	ROS ros-humble-rosbag2-cpp
+rosbag2_storage	planning	ROS ros-humble-rosbag2-storage
+diagnostic_msgs	planning	ROS ros-humble-diagnostic-msgs
+std_srvs	planning, lightning, nav_interface	ROS ros-humble-std-srvs
+lifecycle_msgs	planning	ROS ros-humble-lifecycle-msgs
+plotjuggler_msgs	planning	ROS ros-humble-plotjuggler-msgs
+message_filters	lightning, lidar_seg, grid_map_memory_node	ROS ros-humble-message-filters
+visualization_msgs	lightning, lidar_seg, grid_map_memory_node	ROS ros-humble-visualization-msgs
+rclcpp	planning, lightning, lidar_seg, grid_map_memory_node, nav_interface	ROS ros-humble-rclcpp
+rclcpp_action	planning, nav_interface	ROS ros-humble-rclcpp-action
+rclcpp_components	nav_interface	ROS ros-humble-rclcpp-components
+ament_cmake	planning, lightning, lidar_seg, grid_map_memory_node, nav_interface	ROS ros-humble-ament-cmake
+std_msgs	lightning, lidar_seg, grid_map_memory_node, nav_interface	ROS ros-humble-std-msgs
+geometry_msgs	planning, lightning, lidar_seg, grid_map_memory_node, nav_interface	ROS ros-humble-geometry-msgs
+sensor_msgs	lightning, lidar_seg, grid_map_memory_node, nav_interface	ROS ros-humble-sensor-msgs
+nav_msgs	lightning, lidar_seg, grid_map_memory_node	ROS ros-humble-nav-msgs
+action_msgs	nav_interface	ROS ros-humble-action-msgs
+rcl_interfaces	planning	ROS ros-humble-rcl-interfaces
+rosidl_default_generators	lightning, nav_interface	ROS ros-humble-rosidl-default-generators
+rosidl_typesupport_c	nav_interface	ROS ros-humble-rosidl-typesupport-c
+rosidl_default_runtime	lightning 的 package.xml	ROS ros-humble-rosidl-default-runtime
+rhr_interface	planning, lightning	仓库 seres_interface，自己编
+mc_interface	planning	仓库 seres_interface，自己编
+nav2_interface	planning, lightning	仓库 seres_interface，自己编
+perception_interface	planning	仓库 seres_interface，自己编
+rte_interface	planning	仓库 seres_interface，自己编
+common_interface	planning 的 sub_map_update（PathFile）	仓库 seres_interface，自己编
+kygi665_msgs	lightning, lidar_seg	仓库 seres_interface 和 slam/interface，自己编
+novatel_oem7_msgs	lightning	仓库 slam/novatel_oem7_msgs，自己编
+nav_interface	planning, grid_map_memory_node	仓库 planning/third_party/nav_interface，自己编
+woosh_robot_msgs	planning 的 package.xml	仓库 planning/third_party/woosh_robot_msgs，自己编
+livox_ros_driver2	lightning	仓库 slam/livox_ros_driver2-master，自己编
+basic	lightning	仓库 slam/basic，自己编
+GeographicLib	lightning	仓库 thirdparty 里按架构带的 ARM 库，不另下
+scrubber_common	lightning 的 package.xml，cmake 里没有 find_package	不是这一轮要下的包
+agibot_robot	lightning 的 package.xml，cmake 里没有 find_package	不是这一轮要下的包

@@ -163,7 +163,7 @@
 | T52 | 人行横道让行接进规划以后：编接口包和规划；C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 切新地图、目标在 6 号人行横道对面，看接近、停、转、等、过的状态切换 | Agent | T51 | 1.5 小时 | 完成，已复核（2026-11-13）：编过，门控 38787 帧 0 差；回放状态切换对。复核发现：没放行、狗的中心进了人行横道就直接过（回放里是录包的狗自己走上去的，狗上定位跳一下也会这样），已改成离入口 1.5 m 内还当在路口等；外参链加了检查工具 |
 | T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 完成，已复核（2026-11-13）：GPU 版贴边也不卡了（切图回放 3%）；狗上录的真实目标进了门控（最多 5 辆）。1112 那一带没有人行横道；狗上的地图 c1adbe7b 只有 47 m 见方。复核发现：狗上的规划配置是旧版本的，我们的程序读不了（会起不来），上狗要用仓库的配置加狗上的取值 |
 | T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 完成（2026-11-14）：起来就读站点地图，6 号人行横道离入口 1.5 m 内还在等；切图回放零指令 3%（T51 是 76%）。1112 外参不定论。狗上感知偏置 0，装的图都没有人行横道 |
-| T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 任务已写好 |
+| T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 完成（2026-11-14）：缺 g2o、acados、OsqpEigen。接口用仓库各模块自己的那份。和狗上 1.0.1 比，State 多一个常量，Navigation 的 Goal 多一个字段 |
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 任务已写好 |
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T56 | 半天 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
@@ -9321,6 +9321,43 @@ CMD 统计；report_switch 的 local planner 那一行、mission_state；objects
 
 停止条件：狗不在线；第 3 步规划用到的话题类型对不上。
 ```
+
+### T55 结果
+
+2026-11-14。狗在线，只读。人定：后面单独目录部署仓库里的感知、规划、定位，接口用能编过这份代码的那一套，不跟狗上装的 `seres-interface 1.0.1` 对齐。所以第 3 步的差别记下，不因此停下。全文在 `data/reports/T55/`。
+
+各模块用自己那份（`Nav_D20/docker/build_stack.sh`）：
+
+- 规划：`seres_interface` 里的 `nav2_interface`、`common_interface`、`mc_interface`、`perception_interface`、`rte_interface`、`rhr_interface`，加上 `planning/third_party/nav_interface`。
+- 定位：`seres_interface` 里的 `kygi665_msgs`、`rhr_interface`、`nav2_interface`、`common_interface`（RTK 固定解是 58），加上 `slam` 自己的 `novatel_oem7_msgs`。不用 `slam/interface` 里那份 kygi（固定解是 55）。
+- 感知：`perception_combo_ros/common_interface`，再编 `lidar_seg`、`grid_map_memory_node`、`lidar_3d_detection`。
+
+和狗上 `seres-interface 1.0.1` 比（`iface_diff.txt`）：同名且一样 346 个，不一样 20 个。`LidarObject*` 只在仓库里，不算。`novatel_oem7_msgs` 不在这个 deb 里，在 `/opt/seres/nav/slam/`，47 个定义和仓库一样。
+
+规划和仍在跑的运控、App 之间，两处定义不一样：
+
+- `sub_motion_state` `/mc/state`，`mc_interface/msg/State`。字段没变。仓库多了常量 `FAULT_FALL_DOWN = 0x0100`。
+- `action_navigation` `/nav/navigation`，`nav2_interface/action/Navigation` 的 Goal 多了字段 `uint8 nav_mode`。这是 `action_*`，不是 `sub_*` / `pub_*`。
+
+`pub_motion` `/mc/motion_control` 的 `Motion`、`PathFile`、`BatteryStates`、`CurrentPTZ` 和狗上一样。我们的程序按仓库这份编。
+
+依赖（`deps_from_repo.txt`、`dog_deps.txt`）：Ubuntu 的 `-dev` 和要用的 ROS 包狗上都能直接编。CUDA 12.6，TensorRT `libnvinfer-dev 10.3.0.30`。Livox 的头文件和 `liblivox_lidar_sdk_shared.so` 在 `/usr/local`（2026-09-20），不另下。没有的只有三样，按 `Dockerfile.nav-dev` 从源码编，不用 `ros-humble-libg2o`：
+
+- g2o 标签 `20230806_git`。源码不在 `planning_humble_env` 里。
+- acados 0.5.1（含 blasfeo、hpipm）、OsqpEigen 0.10.0。源码在 `planning_humble_env/src/`，已打包。
+- OSQP 用仓库 `planning/third_party/osqp/lib_arm`，不另下。
+
+apt 列表是空的，ROS 源那一行也注释了。`apt-get install --print-uris ros-humble-libg2o` 是 `Unable to locate package`（`print_uris.txt`）。没有跑 `apt-get update`。
+
+`fetch_urls.txt` 1 行，903443 字节（0.9 MB），只有 g2o。acados 36 MB、OsqpEigen 123 KB、g2o 的同一份 archive 在 `/public/zjst/robot/nav_cw_src/`（不提交）。服务器直连 `github.com` 超时，g2o 这份是经代理下的，SHA256 `e717d3b96cc6d00fcbbaf637aae648c9823599e6aa8fcf4546fc9ad4034dcde5`。
+
+在连着狗的本机：
+
+```bash
+python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_downloads
+```
+
+`nav_cw_fetch.py`：按清单下载并核对 SHA256，写出给狗拷过去的目录。这次只下 g2o。最后一行要是 `1 of 1 files`。GitHub 打不开就用服务器上的 `/public/zjst/robot/nav_cw_src/g2o-20230806_git.tar.gz`。然后 `scp -r nav_cw_downloads nvidia@<狗>:/home/nvidia/`，在狗上 `cd` 进去 `sha256sum -c SHA256SUMS`。acados 和 OsqpEigen 由 T56 从服务器传。
 
 ---
 

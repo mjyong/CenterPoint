@@ -1,0 +1,408 @@
+人定（2026-11-14）：单独目录部署仓库里的感知、规划、定位。接口用各模块自己那份（Nav_D20/docker/build_stack.sh），不跟狗上 seres-interface 1.0.1 对齐。下面的 diff 是记录，不因此停下。
+
+人定：单独目录部署仓库里的感知、规划、定位，接口用各模块自己那份（build_stack.sh），不跟这份 1.0.1 对齐。下面的差别记下，不因此停下。
+seres-interface 1.0.1 的 .msg/.srv/.action：827 个，从 /opt/seres/middleware/seres_interface/share 只读拷到本机 /tmp/t55_dog_iface。
+和仓库 Nav_D20/seres_interface/ros、slam/interface、slam/novatel_oem7_msgs 里同名定义比。
+同名且内容一样：346。内容不一样：20（下面是 diff，仓库相对狗）。只在仓库、狗的这个 deb 里没有：见文末名单。LidarObject* 在这份名单里，按任务不算。
+novatel_oem7_msgs 不在 seres-interface 这个 deb 里，在 /opt/seres/nav/slam/novatel_oem7_msgs。47 个 .msg/.srv 和仓库一字不差（旁边的 .idl 是生成物）。
+规划 sub_*/pub_* 里对不上的：sub_motion_state /mc/state = mc_interface/msg/State，仓库多了常量 FAULT_FALL_DOWN = 0x0100。字段没变。
+pub_motion /mc/motion_control = mc_interface/msg/Motion，和狗上一样。MotionSkill.msg 多了常量，但 Motion 的 motion 字段是 uint32，不是 MotionSkill 这个类型。
+另外 action_navigation /nav/navigation = nav2_interface/action/Navigation，Goal 多了字段 uint8 nav_mode。这是 action_*，不是 sub_*/pub_*，diff 在下面。
+
+diff -u repo dog  calibration_interface/msg/CalibrateState.msg
+--- repo/calibration_interface/msg/CalibrateState.msg
++++ dog/calibration_interface/msg/CalibrateState.msg
+@@ -5,8 +5,7 @@
+ 
+ string uuid                         # 请求操作的id, 当请求成功，异步返回执行结果时会携带这个id返回来;
+ uint8 command                       # 请求时的命令ID：COMMAND_*
+-uint8 state                         # 详见本协议中CALIB_*
++uint8 state
+ 
+-uint32 crc                          # 可选，标定结果的crc校验码，具体校验算法由实际项目指定
+ string message                      # 可选
+ sensor_msgs/CompressedImage image   # 标定图像，可选 
+diff -u repo dog  calibration_interface/msg/File.msg
+--- repo/calibration_interface/msg/File.msg
++++ dog/calibration_interface/msg/File.msg
+@@ -1,4 +1,4 @@
+ string name         # 标定数据名称（唯一指定标定设备）
+ string format       # 文件格式，eg：json,yaml等
+ uint8[] data
+-uint32 crc          # data字段校验码，具体校验算法由实际项目指定+uint32 crc32        # data字段校验码
+diff -u repo dog  hmi_interface/srv/HmiControlRequest.srv
+--- repo/hmi_interface/srv/HmiControlRequest.srv
++++ dog/hmi_interface/srv/HmiControlRequest.srv
+@@ -6,8 +6,6 @@
+ string sn_code                                  # sn码，只有在显示二维码场景时才需要填写，其他情况为空
+ string name                                     # 调用方名称（用于日志）
+ string request_id                               # 本次请求ID；空则服务端生成代表新增一个任务,非空则替换原有相同id任务信息
+-int8 ota_process                                # ota升级进程,只有ota升级时才有效
+-string ota_error_info                           # ota升级错误信息，用于提示用户，比如电量不足等
+ ---
+ # Result                                        
+ bool  success                                   # 是否成功
+
+diff -u repo dog  hmi_interface/srv/SysControl.srv
+--- repo/hmi_interface/srv/SysControl.srv
++++ dog/hmi_interface/srv/SysControl.srv
+@@ -5,7 +5,6 @@
+ uint8 CMD_EMERGENCY  = 3    # 紧急停止
+ uint8 CMD_RESTART    = 4    # 重启
+ uint8 CMD_BRIGHTNESS = 5    # 屏幕亮度调整
+-uint8 CMD_PRE_SHUTDOWN = 6    # 预关机
+ 
+ # Request
+ uint8 cmd                   # 请求的命令类型
+
+diff -u repo dog  mc_interface/msg/MotionSkill.msg
+--- repo/mc_interface/msg/MotionSkill.msg
++++ dog/mc_interface/msg/MotionSkill.msg
+@@ -42,15 +42,13 @@
+ uint32 MOTION_LIE_BACK              = 104   # 趴下，躺姿,背部向上
+ uint32 MOTION_SQUAT                 = 105   # 蹲姿
+ uint32 MOTION_BODY_POSE             = 106   # 身体态控制(按频率实时控制)，控制频率20Hz；3个参数：vroll,vpitch,vyaw;单位：vrpy:rad/s
+-uint32 MOTION_EULER_BODY            = 107   # 身体Euler姿态控制
++uint32 MOTION_EULER_BODY            = 107   # 身体Euler控制（按速度到指定角度，执行loop次相对于0点的来回摆动），7个参数：roll,pitch,yaw，vr,vp,vy， loop；单位：rpy：rad， vrpy：rad/s 
+ uint32 MOTION_JOINTS_TARGET_POSE    = 108   # 关节目标姿态位置控制；para[]关节目标位置参数，详见具体设备关节id定义
+-uint32 MOTION_BODY_TARGET_POSE      = 109   # 身体目标姿态控制，para[]:x,y,z,roll,pitch,yaw。 x,y,z：目标位置(m)，roll,pitch,yaw：目标姿态角(rad)
+ 
+ uint32 MOTION_PICKUP_REAR_LEG       = 130   # 抬右后腿
+ uint32 MOTION_BOUND_FORWARD         = 140   # 向前弹跳
+ uint32 MOTION_BOUND_BACKWRD         = 141   # 向后弹跳
+ uint32 MOTION_BOUND_IN_PLACE        = 142   # 原地弹跳
+-uint32 MOTION_LEG_STRAIGHTEN        = 143   # 腿打直动作，完成后恢复站立姿态
+ 
+ uint32 MOTION_RAISE_HEAD_NOD        = 150   # 昂首点头
+ uint32 MOTION_RAISE_HEAD_CHEST_UP   = 151   # 昂首挺胸
+@@ -74,7 +72,6 @@
+ uint32 MOTION_HAND_STEP                     = 1025  # 前肢小踏步
+ uint32 MOTION_HAND_ENDPOINT_POSE            = 1026  # 手部末端姿态控制，para[]依次为左手右手位姿数据，共7*2个，位姿数据包含position(x,y,z)+orientation(x,y,z,w)
+ uint32 MOTION_HAND_WAVE_BYE_SIT             = 1027  # 挥手告别_坐
+-uint32 MOTION_HAND_WAVE_BYE_LIE             = 1028  # 挥手告别_趴下
+ 
+ #耳部为主
+ uint32 MOTION_EAR_RETRACT_WHOLLY            = 2000  # 双耳完全收起
+@@ -97,8 +94,7 @@
+ uint32 MOTION_EAR_INSTANT_REAR_BOUNCE       = 2027  # 双耳瞬间后弹
+ 
+ #头部为主
+-uint32 MOTION_HEAD_POSE                     = 3000  # 头部姿态控制
++uint32 MOTION_HEAD_POSE                     = 3000  # 头部姿态控制(按频率实时控制)，控制频率20Hz；3个参数：vroll,vpitch,vyaw；单位：vrpy:rad/s
+ uint32 MOTION_EULER_HEAD                    = 3001  # 头部Euler控制（按速度到指定角度，执行loop次相对于0点的来回摆动），7个参数：roll,pitch,yaw，vr,vp,vy， loop；单位：rpy：rad， vrpy：rad/s 
+ uint32 MOTION_HEAD_NODE                     = 3002  # 点头
+-uint32 MOTION_HEAD_SHAKE                    = 3003  # 摇头
+-uint32 MOTION_HEAD_SHAKE_SLOW               = 3004  # 缓摆头+uint32 MOTION_HEAD_SHAKE                    = 3003  # 摇头
+diff -u repo dog  mc_interface/msg/State.msg
+--- repo/mc_interface/msg/State.msg
++++ dog/mc_interface/msg/State.msg
+@@ -6,7 +6,6 @@
+ uint32 FAULT_JOINT_LOST_UPPER   = 0x10  # 上肢关节链路断连
+ uint32 FAULT_JOINT_LOST_LOWER   = 0x20  # 下肢关节链路断连
+ uint32 FAULT_JOINT_TORQUE_OVER_LIMIT    = 0x40  # 扭矩超限
+-uint32 FAULT_FALL_DOWN          = 0x0100 # 异常倒地
+ 
+ std_msgs/Header header
+ string uuid                             # 指令UUID， 控制端生命周期内一致，运控内部主动变更时为空
+
+diff -u repo dog  media_interface/srv/MusicCtrl.srv
+--- repo/media_interface/srv/MusicCtrl.srv
++++ dog/media_interface/srv/MusicCtrl.srv
+@@ -1,16 +1,7 @@
+ #在线音乐播放指定歌曲
+ string id # 歌曲ID
+-bool online #true在线音乐,false本地音频文件
+-string task_id #任务Id
+-uint8 action #动作类型,取值见 ACTION_*
+-uint8 ACTION_START=0 #开始
+-uint8 ACTION_PAUSE=1 #暂停
+-uint8 ACTION_RESUME=2 #恢复
++bool online #true在线音乐,flase本地音频文件
++uint8 action #0开始.1暂停,2恢复
+ 
+ ---
+-
+-uint8 result_code #响应：结果码,取值见 RESULT_*
+-uint8 RESULT_SUCCESS=0 #成功
+-uint8 RESULT_FILE_NOT_EXIST=1 #音频文件不存在
+-uint8 RESULT_FOCUS_FAILED=2 #音频焦点申请失败
+-uint8 RESULT_PLAY_ERROR=3 #播放错误
++uint8 result_code  # 响应：结果码（0 成功，非0表示错误）
+diff -u repo dog  nav2_interface/action/Navigation.action
+--- repo/nav2_interface/action/Navigation.action
++++ dog/nav2_interface/action/Navigation.action
+@@ -2,16 +2,12 @@
+ uint8 OBSTACLE_MODE_AVOID   = 0     # 避障
+ uint8 OBSTACLE_MODE_STOP    = 1     # 停障
+ 
+-uint8 NAV_MODE_POINT        = 0     # 点位/路径导航
+-uint8 NAV_MODE_UVD          = 1     # 视距导航
+-
+ string map_uuid
+-geometry_msgs/PoseStamped[] poses   # Quaternion 全0无效；NAV_MODE_UVD时point对应uvd
++geometry_msgs/PoseStamped[] poses   # Quaternion 全0无效，header为相对于第一个点时间，0无效
+ float32 speed                       # 指定导航速度，0：无效；有效时，忽略PoseStamped中时间限定
+ 
+ uint8 max_speed                     # 导航最大速度  
+-uint8 obstacle_mode                 # 避障模式， 详见本协议中 OBSTACLE_MODE_*
+-uint8 nav_mode                      # 导航模式， 详见本协议中 NAV_MODE_*
++uint8 obstacle_mode                 # 避障模式
+ 
+ ---
+ # Result
+
+diff -u repo dog  nav2_interface/action/SafetyGuard.action
+--- repo/nav2_interface/action/SafetyGuard.action
++++ dog/nav2_interface/action/SafetyGuard.action
+@@ -7,7 +7,7 @@
+ string map_uuid                     # 所属地图
+ geometry_msgs/Point[] points        # 守卫几何: 轨迹守卫=轨迹点串; 区域守卫=多边形顶点(按序连线闭合); 地图边缘守卫忽略
+ string[] hazard_sources             # 危险源类别: 如 "person", "animal"; 空: 全部
+-int32 patrol_duration_sec           # 巡逻时长(s): 0=沿路线走一整圈(回到进入点)后结束; >0=限时巡逻(走满时长后在顶点收尾结束); -1=无限巡逻
++
+ ---
+ # Result
+ string message                      # 结果描述
+
+diff -u repo dog  perception_interface/msg/PerceptionEvent.msg
+--- repo/perception_interface/msg/PerceptionEvent.msg
++++ dog/perception_interface/msg/PerceptionEvent.msg
+@@ -19,10 +19,7 @@
+ uint32 EVENT_CAR_DOOR_OPEN = 17                     # 车门开启事件
+ uint32 EVENT_PILE_MATERIAL_BOX_READY =18            # 料箱码垛准备好
+ 
+-uint32 VEHICLE_COMPLIANCE_INSPECTION = 19                # 货车停放检测
+-uint32 SIDEWALK_SAFE_PASSAGE_START_DETECTION = 20        # 人行道安全通行开始检测
+-uint32 SIDEWALK_SAFE_PASSAGE_END_DETECTION = 21          # 人行道安全通行结束检测
+ 
+ 
+ uint32 detect_cycle       #检测周期，单位ms。0:实时检测，非0：按指定周期检测
+-uint32 event_id           #待检测事件ID+uint32 event_id           # 待检测事件ID
+diff -u repo dog  perception_interface/srv/PerceptionEvent.srv
+--- repo/perception_interface/srv/PerceptionEvent.srv
++++ dog/perception_interface/srv/PerceptionEvent.srv
+@@ -3,5 +3,11 @@
+ ---
+ # Response
+ 
+-EventInfo[] event_info              # 事件信息
++builtin_interfaces/Time stamp       # 检测时间
+ 
++common_interface/GeograpicPose pose_geograpic        # 地理位置
++common_interface/GeometryPose pose_geometry          # 地图位置
++float32 distance                    # 目标与本体距离（m）
++
++sensor_msgs/CompressedImage object      # 目标图像
++common_interface/BoundingBox2D[] box    # 目标框信息
+
+diff -u repo dog  power_interface/msg/PowerMode.msg
+--- repo/power_interface/msg/PowerMode.msg
++++ dog/power_interface/msg/PowerMode.msg
+@@ -2,20 +2,8 @@
+ # Represents the current power state of the robot
+ 
+ uint8 main_mode
++uint8 emergency
+ 
+-uint8 emergency                    #当前是否有急停
+-uint8 emergency_type               #急停类型，软急停\硬急停
+-string emergency_triggered_by      #谁触发的急停(最近一次)
+-uint64 emergency_timestamp         #什么时候触发的急停(最近一次)
+-
+-bool   motor_power_enabled         #关节电机供电状态, true：供电正常,  false：供电异常
+-
+-uint8  charge_status               #充电状态
+-
+-bool   power_lock_busy             #TRUE:有节点持有电源锁,无法自动进入空闲态, FALSE:无节点持有电源锁
+-string power_lock_hold_by          #字符串展示哪些节点hold电源锁
+-
+-##################################################################################################################
+ # Main modes
+ uint8 MAIN_MODE_SHUTDOWN     = 0   # SHUTDOWN: 在PRE_SHUTDOWN阶段等待5后自动进入,硬件/外设断电、SOC关机、电池停止供电
+ uint8 MAIN_MODE_SLEEP        = 1   # SLEEP: 在PRE_SLEEP阶段等待5后自动进入,硬件/外设断电
+@@ -26,12 +14,3 @@
+ #emergency
+ uint8 EMERGENCY_EXIT  = 0
+ uint8 EMERGENCY_ENTER = 1
+-
+-uint8 EMERGENCY_TYPE_HARD   = 0    #由硬件触发的急停,即由急停按钮被按下/硬件受到破坏触发的必须经过手动操作才能恢复的急停
+-uint8 EMERGENCY_TYPE_SOFT   = 1    #由软件触发的急停,即由遥控器、云端、语音触发的可以不经过手动操作即可恢复的急停
+-
+-#charge_status
+-uint8 CHARGE_STATUS_CHARGER_NOT_CONNECTED = 0   #充电器/桩未连接
+-uint8 CHARGE_STATUS_MOVING_TO_CHARGER = 1       #充电桩寻找中
+-uint8 CHARGE_STATUS_CHARGER_CONNECTED = 2       #充电器/桩已连接
+-uint8 CHARGE_STATUS_CHARGING = 3                #充电执行中
+
+diff -u repo dog  power_interface/srv/PowerModeChangeSrv.srv
+--- repo/power_interface/srv/PowerModeChangeSrv.srv
++++ dog/power_interface/srv/PowerModeChangeSrv.srv
+@@ -8,9 +8,8 @@
+ uint8 CMD_WORK       = 2        # Enter work mode
+ uint8 CMD_EMERGENCY  = 3        # Emergency stop (cut off the power supply to the joint motor)
+ uint8 CMD_RESTART    = 4        # Restart the system
+-uint8 CMD_CHARGE_REQ = 5        # Auto Search for Charging Station and Charge
++uint8 CMD_CHARGE_REQ = 5        # Trigger charging back to the pile via APP or remote control
+ uint8 CMD_EMERGENCY_CANCLE = 6  # Cancel emergency stop (restore the power supply to the joint motor)
+-uint8 CMD_CHARGE_EXIT = 7       # Stop Charging
+ 
+ ---
+ # Response
+
+diff -u repo dog  robot_interface/msg/RobotServiceFault.msg
+--- repo/robot_interface/msg/RobotServiceFault.msg
++++ dog/robot_interface/msg/RobotServiceFault.msg
+@@ -3,7 +3,6 @@
+ int32 FAULT_TYPE_NONE = 0
+ int32 FAULT_TYPE_AGV_CHASSIS = 1    # AGV错误: 0-无异常/1-有异常
+ int32 FAULT_TYPE_LOCATE = 2         # 定位功能是否正常: 0-无异常/1-定位失败/2-定位模块无法使用
+-int32 FAULT_TYPE_FALL_DOWN = 3      # 运控检测出机器异常倒地; 0无异常/1-检测出倒地
+ 
+ int32 fault_type                    # 故障类型
+ int32 fault_value                   # 故障的值, 各种故障类型自定义的枚举
+diff -u repo dog  robot_interface/msg/RobotServiceStatus.msg
+--- repo/robot_interface/msg/RobotServiceStatus.msg
++++ dog/robot_interface/msg/RobotServiceStatus.msg
+@@ -3,7 +3,6 @@
+ int32 MODE_WBMC = 2                            # 全身运控模式
+ int32 MODE_IMC = 3                             # 下肢运控模式
+ int32 MODE_TELEOP = 4                          # 遥操模式,该模式下motionskill无效
+-int32 MODE_THRID_PARTY = 1000                  # 三方运控模式
+ 
+ int32 STATUS_NONE = 0
+ int32 STATUS_DAMP = 1                           # 阻尼中
+@@ -43,5 +42,4 @@
+ RobotTaskState[] task_states                    # 任务执行状态（注意，不是所有任务都有这个状态， 外部应用需要了才加进去）
+ string location_map_uuid                        # 使用中的地图UUID
+ common_interface/GeometryPose pose_geometry     # 地图位置， location_map_uuid为空字符串时这个字段的值没意义
+-geometry_msgs/Twist twist                       # 速度 
+-RobotStatusBits status_bits +geometry_msgs/Twist twist                       # 速度 
+diff -u repo dog  robot_interface/msg/RobotSkillMsg.msg
+--- repo/robot_interface/msg/RobotSkillMsg.msg
++++ dog/robot_interface/msg/RobotSkillMsg.msg
+@@ -1,8 +1,6 @@
+ int32 MSG_TYPE_FEEDBACK = 0     # 回调
+ int32 MSG_TYPE_COMMAND = 1      # 指令
+ int32 MSG_TYPE_RESULT = 2       # 结果
+-int32 MSG_TYPE_TASK_STATE = 3   # 任务状态;  /srcp::skill::args::SkillTask
+-int32 MSG_TYPE_TASK_EVENT = 4   # 任务事件;  /srcp::skill::args::SkillTaskEvent
+ 
+ int32 type                      # msg请求类型
+ string token                    # 执行技能的token
+
+diff -u repo dog  robot_interface/msg/RobotTaskState.msg
+--- repo/robot_interface/msg/RobotTaskState.msg
++++ dog/robot_interface/msg/RobotTaskState.msg
+@@ -1,8 +1,6 @@
+ uint32 NAV_DOING                 = 1   # 导航执行中
+ uint32 NAV_OBSTACLE_STOPPED      = 2   # 导航停障中
+ uint32 NAV_OBSTACLE_AVOIDING     = 3   # 导航绕障中
+-uint32 NAV_DONE                  = 4   # 执行成功
+-uint32 NAV_FAILED                = 5   # 执行失败
+ 
+ 
+ string skill           # 任务对应的技能
+
+diff -u repo dog  rte_interface/msg/PowerStatus.msg
+--- repo/rte_interface/msg/PowerStatus.msg
++++ dog/rte_interface/msg/PowerStatus.msg
+@@ -34,6 +34,3 @@
+ # 扩展字段用于表示额外信息;
+ # target:0x0B（电机电源）时，extended表示为电机通道ID
+ # 通道ID定义：D10:4个通道，0-3分别表示：左前-右前-左后-右后
+-# R11-A3:6个通道，0头部，1左臂，2右臂，3腰部，4左腿，5右腿
+-# target:0x0E（雷达电源）时，extended 0表示all，1表示激光雷达，2表示超声波雷达；
+-# target:0x12（相机）时，extended 0表示all，1表示单目相机，2表示深度相机；
+
+diff -u repo dog  rte_interface/msg/UwbStatus.msg
+--- repo/rte_interface/msg/UwbStatus.msg
++++ dog/rte_interface/msg/UwbStatus.msg
+@@ -5,5 +5,4 @@
+ uint8 charge_status         #0x00:idle, 0x01:charging, 0x02:charge completed
+ uint16 batt_voltage         #遥控器电池电压值,单位mV
+ uint64 rx_package_bytes     #收包统计
+-uint64 tx_package_bytes     #发包统计
+-uint8 uwb_ranging           #uwb 测距状态+uint64 tx_package_bytes     #发包统计
+diff -u repo dog  rte_interface/srv/DeviceVersion.srv
+--- repo/rte_interface/srv/DeviceVersion.srv
++++ dog/rte_interface/srv/DeviceVersion.srv
+@@ -30,5 +30,4 @@
+ # [25]:外设深度相机2版本号
+ # [26]:外设深度相机3版本号
+ # [27]:云台版本号
+-# [28]:AGV版本号
+ # 若无法查询默认0.0.0
+
+
+只在仓库、狗的 seres-interface 1.0.1 里没有的定义：
+device_info_interface/msg/RobotMode.msg
+iot_interface/srv/IotMqtt.srv
+media_interface/msg/MediaFuncState.msg
+media_interface/msg/MediaFuncStates.msg
+media_interface/msg/MusicStatus.msg
+media_interface/msg/SdcardState.msg
+novatel_oem7_msgs/msg/AccessStatus.msg
+novatel_oem7_msgs/msg/BESTGNSSPOS.msg
+novatel_oem7_msgs/msg/BESTPOS.msg
+novatel_oem7_msgs/msg/BESTUTM.msg
+novatel_oem7_msgs/msg/BESTVEL.msg
+novatel_oem7_msgs/msg/BYINS2.msg
+novatel_oem7_msgs/msg/BestExtendedSolutionStatus.msg
+novatel_oem7_msgs/msg/CORRIMU.msg
+novatel_oem7_msgs/msg/CORRIMUDATA.msg
+novatel_oem7_msgs/msg/GNSSSolutionStatus.msg
+novatel_oem7_msgs/msg/GeogatingStatus.msg
+novatel_oem7_msgs/msg/HEADING2.msg
+novatel_oem7_msgs/msg/IMURATECORRIMU.msg
+novatel_oem7_msgs/msg/INSAlignmentMode.msg
+novatel_oem7_msgs/msg/INSCONFIG.msg
+novatel_oem7_msgs/msg/INSExtendedSolutionStatus.msg
+novatel_oem7_msgs/msg/INSFrame.msg
+novatel_oem7_msgs/msg/INSOutputFrame.msg
+novatel_oem7_msgs/msg/INSPVA.msg
+novatel_oem7_msgs/msg/INSPVAX.msg
+novatel_oem7_msgs/msg/INSPVAXExtendedParams.msg
+novatel_oem7_msgs/msg/INSReceiverStatus.msg
+novatel_oem7_msgs/msg/INSResetType.msg
+novatel_oem7_msgs/msg/INSSTDEV.msg
+novatel_oem7_msgs/msg/INSSourceStatus.msg
+novatel_oem7_msgs/msg/INSUpdate.msg
+novatel_oem7_msgs/msg/InertialSolutionStatus.msg
+novatel_oem7_msgs/msg/LocalAreaStatus.msg
+novatel_oem7_msgs/msg/Oem7Header.msg
+novatel_oem7_msgs/msg/Oem7RawMsg.msg
+novatel_oem7_msgs/msg/PPPPOS.msg
+novatel_oem7_msgs/msg/PositionOrVelocityType.msg
+novatel_oem7_msgs/msg/RXSTATUS.msg
+novatel_oem7_msgs/msg/RegionRestriction.msg
+novatel_oem7_msgs/msg/Rotation.msg
+novatel_oem7_msgs/msg/RotationalOffset.msg
+novatel_oem7_msgs/msg/SolutionSource.msg
+novatel_oem7_msgs/msg/SolutionStatus.msg
+novatel_oem7_msgs/msg/SubscriptionPermission.msg
+novatel_oem7_msgs/msg/SubscriptionType.msg
+novatel_oem7_msgs/msg/SyncState.msg
+novatel_oem7_msgs/msg/TERRASTARINFO.msg
+novatel_oem7_msgs/msg/TERRASTARSTATUS.msg
+novatel_oem7_msgs/msg/TIME.msg
+novatel_oem7_msgs/msg/Translation.msg
+novatel_oem7_msgs/msg/TranslationOffset.msg
+novatel_oem7_msgs/srv/Oem7AbasciiCmd.srv
+perception_interface/msg/EventInfo.msg
+perception_interface/msg/LidarObject.msg
+perception_interface/msg/LidarObjectArray.msg
+perception_interface/msg/LidarPredictedPath.msg
+perception_interface/msg/PerceptionSwitch.msg
+perception_interface/msg/SwitchState.msg
+perception_interface/srv/PerceptionSwitch.srv
+power_interface/srv/PowerLockHoldSrv.srv
+robot_interface/msg/MotionLimit.msg
+robot_interface/msg/RobotStatusBits.msg
+rte_interface/action/DeviceSelfCheck.action
+rte_interface/msg/NavPtzTakePhotoCtrlMulti.msg
+rte_interface/msg/NavPtzTakePhotoData.msg
+rte_interface/msg/UwbFiraConfig.msg
+rte_interface/srv/DataRouteControl.srv
+scene_interface/srv/SceneCommand.srv
+sysapp_interface/msg/FactoryPlcData.msg
+voice_interface/action/VoiceAction.action

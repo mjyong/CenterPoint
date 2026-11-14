@@ -1,0 +1,74 @@
+判断依据：-dev 包装着，或 /opt/ros/humble 里有对应的 cmake。版本来自 dpkg-query。cmake 路径抽查过。
+
+能直接编（Ubuntu）
+Eigen3	libeigen3-dev 3.4.0-2ubuntu2	/usr/share/eigen3/cmake/Eigen3Config.cmake
+OpenCV	libopencv-dev 4.8.0-1-g6371ee1	/usr/lib/cmake/opencv4/OpenCVConfig.cmake（Jetson 这份，不是 Ubuntu 的 4.5）
+PCL	libpcl-dev 1.12.1+dfsg-3build1	/usr/lib/aarch64-linux-gnu/cmake/pcl/PCLConfig.cmake。grid_map 在 aarch64 上写的是 1.10，find_package(PCL 1.10) 接受 1.12
+Ceres	libceres-dev 2.0.0+dfsg1-5	/usr/lib/cmake/Ceres/CeresConfig.cmake
+glog	libgoogle-glog-dev 0.5.0+really0.4.0-2	/usr/lib/aarch64-linux-gnu/cmake/glog/glog-config.cmake
+gflags	libgflags-dev 2.2.2-2	/usr/lib/aarch64-linux-gnu/cmake/gflags/gflags-config.cmake
+Protobuf	libprotobuf-dev 3.12.4-1ubuntu7.22.04.1，protobuf-compiler 同版本，protoc 3.12.4	没有 protobuf-config.cmake；CMake 自带的 FindProtobuf 用 pkg-config 和这个编译器
+OpenMP	g++-11 11.4.0-1ubuntu1~22.04，omp.h 在 /usr/lib/gcc/aarch64-linux-gnu/11/include/omp.h，libgomp1 13.1.0-8ubuntu1~22.04
+yaml-cpp	libyaml-cpp-dev 0.7.0+dfsg-8build1	/usr/lib/aarch64-linux-gnu/cmake/yaml-cpp/yaml-cpp-config.cmake
+urdfdom	liburdfdom-dev 3.0.1-1	/usr/lib/aarch64-linux-gnu/urdfdom/cmake/urdfdom-config.cmake
+fcl	libfcl-dev 0.7.0-3	/usr/lib/aarch64-linux-gnu/cmake/fcl/fcl-config.cmake
+octomap	liboctomap-dev 1.9.7+dfsg-3	/usr/share/octomap/octomap-config.cmake。另外装着 ros-humble-octomap 1.9.8-1jammy.20241126.021226，那个 share 下没有 cmake
+OpenGL	libgl-dev 1.4.0-1，libopengl-dev 1.4.0-1，libgl1-mesa-dev 23.2.1-1ubuntu3.1~22.04.2，/usr/include/GL/gl.h
+tbb	libtbb-dev 2021.5.0-7ubuntu2
+Boost	libboost-all-dev 1.74.0.3ubuntu7
+suitesparse	libsuitesparse-dev 1:5.10.1+dfsg-4build1，libcamd2 / libcholmod3 / libcxsparse3 都是 1:5.10.1+dfsg-4build1
+zlib	zlib1g-dev 1:1.2.11.dfsg-2ubuntu9.2（lidar_3d_detection）
+CUDA	nvcc 12.6.68，/usr/local/cuda/bin/nvcc
+TensorRT	libnvinfer-dev 10.3.0.30-1+cuda12.5，libnvinfer.so.10（lidar_3d_detection）
+Livox-SDK2	/usr/local/include/livox_lidar_api.h、/usr/local/lib/liblivox_lidar_sdk_shared.so，2026-09-20。没有单独的 cmake，驱动按这个路径链。不另下 v1.2.5
+
+能直接编（ROS，share 里有 cmake；包本身带头发和库，没有单独的 -dev）
+grid_map_core	ros-humble-grid-map-core 2.0.1-1jammy.20250121.124535
+grid_map_ros	ros-humble-grid-map-ros 2.0.1-1jammy.20250207.202142
+grid_map_octomap	ros-humble-grid-map-octomap 2.0.1-1jammy.20250121.124910
+octomap_msgs	ros-humble-octomap-msgs 2.0.1-1jammy.20241128.020444
+pcl_conversions	ros-humble-pcl-conversions 2.4.5-2jammy.20241128.045232
+pcl_ros	ros-humble-pcl-ros 2.4.5-2jammy.20250121.133116
+cv_bridge	ros-humble-cv-bridge 3.2.1-1jammy.20241128.024610
+tf2	ros-humble-tf2 0.25.12-1jammy.20250121.124005
+tf2_ros	ros-humble-tf2-ros 0.25.12-1jammy.20250121.125241
+tf2_eigen	ros-humble-tf2-eigen 0.25.12-1jammy.20250121.125936
+tf2_geometry_msgs	ros-humble-tf2-geometry-msgs 0.25.12-1jammy.20250121.125937
+tf2_msgs	ros-humble-tf2-msgs 0.25.12-1jammy.20250121.123823
+tf2_sensor_msgs	ros-humble-tf2-sensor-msgs 0.25.12-1jammy.20250121.140944
+kdl_parser	ros-humble-kdl-parser 2.6.4-1jammy.20241128.004853
+urdf	ros-humble-urdf 2.6.1-1jammy.20241128.004544
+rosbag2_cpp	ros-humble-rosbag2-cpp 0.15.13-1jammy.20241128.095006
+rosbag2_storage	ros-humble-rosbag2-storage 0.15.13-1jammy.20241128.094215
+diagnostic_msgs	ros-humble-diagnostic-msgs 4.2.4-1jammy.20241128.021838
+std_srvs	ros-humble-std-srvs	share/std_srvs/cmake 在
+lifecycle_msgs	ros-humble-lifecycle-msgs 1.2.1-1jammy.20241128.010720
+plotjuggler_msgs	ros-humble-plotjuggler-msgs 0.2.3-3jammy.20241128.013224
+message_filters	ros-humble-message-filters 4.3.5-1jammy.20241128.044518
+visualization_msgs	ros-humble-visualization-msgs	share 里有
+rclcpp	ros-humble-rclcpp 16.0.11-1jammy.20241128.035217
+rclcpp_action	ros-humble-rclcpp-action	share 里有
+rclcpp_components	ros-humble-rclcpp-components 16.0.11-1jammy.20241128.043840
+ament_cmake	ros-humble-ament-cmake	share 里有
+std_msgs geometry_msgs sensor_msgs nav_msgs action_msgs rcl_interfaces	都在 /opt/ros/humble/share
+rosidl_default_generators rosidl_typesupport_c rosidl_default_runtime	都在 share
+
+没有（头文件和 cmake 都不在）。按 Nav_D20/docker/Dockerfile.nav-dev 从源码编，不用 ros-humble-libg2o
+g2o	标签 20230806_git。狗上没有。源码不在 planning_humble_env 里，进下载清单
+acados	0.5.1，带子模块 blasfeo、hpipm。狗上没有。源码在 planning_humble_env/src/acados，已打包
+OsqpEigen	0.10.0。狗上没有。源码在 planning_humble_env/src/osqp-eigen，已打包。狗上 planning 里的 libosqp.so 只是运行库
+
+仓库自带，不从 apt 下
+osqp	planning/third_party/osqp/lib_arm
+接口包	seres_interface、slam/interface、slam/novatel_oem7_msgs、planning/third_party/nav_interface、woosh_robot_msgs
+livox_ros_driver2、basic、GeographicLib	在 Nav_D20/slam 里
+
+package.xml 里有、cmake 不用，狗上也没有，这一轮不单列为要下的包
+scrubber_common
+agibot_robot
+
+apt
+/etc/apt/sources.list 是清华 ubuntu-ports jammy / jammy-updates / jammy-backports，安全更新是 ports.ubuntu.com jammy-security。
+sources.list.d 里 ros2、nvidia jetson、docker、emqx、toolchain 的行都注释掉了。
+/var/lib/apt/lists 里没有 Ubuntu 或 ROS 的 Packages 索引（只有 _webctl-dep-apt_._Packages）。
+apt-get install --print-uris ros-humble-libg2o 的结果是 E: Unable to locate package ros-humble-libg2o。没有跑 apt-get update（会改列表）。
