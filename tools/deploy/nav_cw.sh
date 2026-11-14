@@ -25,12 +25,14 @@
 #                                           calls rclcpp::init(0, nullptr)); restarts cw-planning and checks in the
 #                                           ROS graph who publishes what (if the planner still publishes
 #                                           /mc/motion_control with shadow on, it stops cw-planning, exit 3)
-#   sudo bash nav_cw.sh appmap follow|ignore   follow: our planning and localization switch maps when the App
-#                                           sends /map/switch (latched: its last one arrives at start; the App's
-#                                           current map has to be the repository's). ignore: they listen on
-#                                           /nav_cw/map/switch instead and stay on the site map configure set
-#                                           (planning: communication_conf sub_map_switch; localization: the launch
-#                                           argument map_switch_topic, NAV_CW_SLAM_ARGS); restarts both, checks
+#   sudo bash nav_cw.sh appmap ignore|follow   ignore (the default): our planning and localization listen on
+#                                           /nav_cw/map/switch and /nav_cw/map/file_update instead of the App's
+#                                           and stay on the site map configure set (planning: communication_conf
+#                                           sub_map_switch, sub_map_update; localization: the launch argument
+#                                           map_switch_topic, NAV_CW_SLAM_ARGS). follow: they switch maps when the
+#                                           App says (latched: its last /map/switch arrives at start); only for an
+#                                           App whose database knows the site map (dog 8's knows c1adbe7b only,
+#                                           T59 review). Restarts both, checks
 #   sudo bash nav_cw.sh check               who publishes the dog's commands and who listens to /map/switch, against
 #                                           the switches (use-new runs it too)
 #   sudo bash nav_cw.sh apply               write the switches kept in nav_cw.env into the installed configs again
@@ -63,6 +65,8 @@ SHADOW_CMD=/nav_cw/shadow/cmd_vel
 SHADOW_MC=/nav_cw/shadow/mc/motion_control
 APP_SWITCH=/map/switch
 OWN_SWITCH=/nav_cw/map/switch
+APP_UPDATE=/map/file_update
+OWN_UPDATE=/nav_cw/map/file_update
 VERIFY_WAIT="${NAV_CW_VERIFY_WAIT:-20}"   # [s] for the restarted node to show up in the ROS graph
 PERCEPTION_DEBUG_ARGS="-p publish_cloud:=true -p publish_tf:=true"
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"   # the tests put a fake one here
@@ -242,8 +246,8 @@ set_topic_name() {   # set_topic_name <conf> <field> <name>
   [[ "$(topic_name "$1" "$2")" == "$3" ]] || { echo "could not set $2 to $3 in $1"; return 1; }
 }
 
-# The switches are kept in nav_cw.env (NAV_CW_SHADOW=on, NAV_CW_APPMAP=ignore, NAV_CW_SPEED=<m/s>; not set: off,
-# follow, no cap) and written into the installed configs here: shadow and appmap in communication_conf, the speed cap
+# The switches are kept in nav_cw.env (NAV_CW_SHADOW=on, NAV_CW_APPMAP=follow, NAV_CW_SPEED=<m/s>; not set: off,
+# ignore, no cap) and written into the installed configs here: shadow and appmap in communication_conf, the speed cap
 # in mission_conf, appmap's launch argument for the localization in NAV_CW_SLAM_ARGS. A reinstall puts the
 # repository's configs back; use-new (and apply) write the switches in again, so they hold across installs.
 apply_switches() {
@@ -256,11 +260,13 @@ apply_switches() {
   else
     set_topic_name "${conf}" pub_cmd_vel /cmd_vel && set_topic_name "${conf}" pub_motion /mc/motion_control || return 1
   fi
-  if [[ "$(env_get NAV_CW_APPMAP)" == ignore ]]; then
+  if [[ "$(want_appmap)" == ignore ]]; then
     set_topic_name "${conf}" sub_map_switch "${OWN_SWITCH}" || return 1
+    if [[ -n "$(topic_name "${conf}" sub_map_update)" ]]; then set_topic_name "${conf}" sub_map_update "${OWN_UPDATE}" || return 1; fi
     env_set NAV_CW_SLAM_ARGS "map_switch_topic:=${OWN_SWITCH}"
   else
     set_topic_name "${conf}" sub_map_switch "${APP_SWITCH}" || return 1
+    if [[ -n "$(topic_name "${conf}" sub_map_update)" ]]; then set_topic_name "${conf}" sub_map_update "${APP_UPDATE}" || return 1; fi
     env_set NAV_CW_SLAM_ARGS ""
   fi
   cap_speed "${mission}" "$(env_get NAV_CW_SPEED | grep . || echo off)"
@@ -274,6 +280,7 @@ shadow_state() {
     *) echo "unknown (pub_motion $(topic_name "${conf}" pub_motion))" ;;
   esac
 }
+want_appmap() { [[ "$(env_get NAV_CW_APPMAP)" == follow ]] && echo follow || echo ignore; }
 appmap_state() {
   local conf; conf="$(comm_conf)"
   [[ -n "${conf}" ]] || { echo "no installed communication_conf"; return; }
@@ -319,6 +326,7 @@ check() {
       fi
       if [[ "${appmap}" == ignore ]]; then
         expect no SUBSCRIPTION planning "${APP_SWITCH}" || ok=1
+        expect no SUBSCRIPTION planning "${APP_UPDATE}" || ok=1
       else
         expect yes SUBSCRIPTION planning "${APP_SWITCH}" || ok=1
       fi
@@ -350,13 +358,13 @@ check_or_stop() {
 }
 
 switches() {
-  local want_shadow want_appmap
+  local want_shadow wanted_appmap
   want_shadow="$(env_get NAV_CW_SHADOW | grep . || echo off)"
-  want_appmap="$(env_get NAV_CW_APPMAP | grep . || echo follow)"
+  wanted_appmap="$(want_appmap)"
   echo "switches (${ENVFILE}; installed: $(comm_conf)):"
   echo "  shadow:           ${want_shadow}$([[ "${want_shadow}" == on ]] && echo " (commands to ${SHADOW_CMD}, ${SHADOW_MC})")"
-  echo "  appmap:           ${want_appmap}$([[ "${want_appmap}" == ignore ]] && echo " (listening on ${OWN_SWITCH}; localization: $(env_get NAV_CW_SLAM_ARGS))")"
-  if [[ "$(shadow_state)" != "${want_shadow}" || "$(appmap_state)" != "${want_appmap}" ]]; then
+  echo "  appmap:           ${wanted_appmap}$([[ "${wanted_appmap}" == ignore ]] && echo " (listening on ${OWN_SWITCH}; localization: $(env_get NAV_CW_SLAM_ARGS))")"
+  if [[ "$(shadow_state)" != "${want_shadow}" || "$(appmap_state)" != "${wanted_appmap}" ]]; then
     echo "  NOT APPLIED: the installed config has shadow $(shadow_state), appmap $(appmap_state) (a reinstall?): nav_cw.sh apply"
   fi
   echo "  perception debug: $([[ -n "$(env_get LIDAR3D_ARGS)" ]] && echo "on ($(env_get LIDAR3D_ARGS))" || echo off)"
@@ -380,9 +388,9 @@ case "${1:-status}" in
     if is_active cw-planning.service; then check_or_stop || exit $?; fi ;;
   appmap)
     case "${2:-}" in
-      follow) env_set NAV_CW_APPMAP "" ;;
-      ignore) env_set NAV_CW_APPMAP ignore ;;
-      *) echo "appmap follow|ignore"; exit 2 ;;
+      follow) env_set NAV_CW_APPMAP follow ;;
+      ignore) env_set NAV_CW_APPMAP "" ;;
+      *) echo "appmap ignore|follow"; exit 2 ;;
     esac
     apply_switches || exit 1
     switches
@@ -464,5 +472,5 @@ case "${1:-status}" in
     switch "${NEW[@]}" -- "${ORIG[@]}" || { status || true; exit 1; }
     status ;;
   configure) shift; configure "$@" ;;
-  *) sed -n '2,53p' "$0"; exit 2 ;;
+  *) sed -n '2,55p' "$0"; exit 2 ;;
 esac

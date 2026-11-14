@@ -23,7 +23,7 @@
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'          # running: theirs
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches'        # 开关：影子、App 地图、限速、感知调试
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on'       # 第一次：先影子模式（狗不按规划走）
-#   App 地图：appmap follow（人定 2026-11-14，默认）：App 当前地图选仓库版 ad68517c；App 里选不到时退路是 appmap ignore
+#   App 地图：appmap ignore（默认，2026-11-14）：我们不听 App 的切图，一直用站点地图 ad68517c（App 的数据库只有 c1adbe7b）
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed 0.5'       # 限速
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'         # 换成我们的（15 s 内没起稳、或 ROS 图和开关对不上，自己换回）
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh check'           # 谁在发狗的指令、谁在听 /map/switch，和开关对得上
@@ -44,7 +44,7 @@ ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original'    # 换回（�
 | 服务器 | `10.36.136.7` | `ssh dog` 经反向隧道到狗（`DEPLOY_ORIN.md` 第 1 节：端口 5038，用户 `nvidia`）；拷回录包，跑分析 |
 | 狗边上的本机 | 连着狗 | 维持隧道；跑 Foxglove 桌面版（连狗的 8765，不在一个网段就 `ssh -N -L 8765:127.0.0.1:8765 nvidia@<狗>`） |
 | 8 号狗 | Orin，L4T R36.4.0，`tegra-ubuntu` | 跑导航；CycloneDDS 只绑 eth1，域 0，`/opt/ros/cyclonedds.xml` |
-| App | 手机 | 看狗的位置和状态、遥控、选地图。App 最后发的 `/map/switch` 是 latched 的，我们的规划和定位一起来就照它切图：`appmap follow`（默认）时 **App 当前地图必须是仓库版的 ad68517c**；`appmap ignore` 时我们不听 App 的，一直用站点地图（App 上显示的位置就不准了）。人定（2026-11-14）用 follow。App 的盘只有 433 MB，放不下这张图（391 MB），App 目录里是指到 `/opt/seres/nav_cw/maps/` 的软链接（T59 复核）；ignore 是 App 选不到它时的退路 |
+| App | 手机 | 看狗的状态、遥控。App 认的是它的数据库（`/userdata/config/robot_service/db/robot_service.db`），库里只有 c1adbe7b，它发的 `/map/switch`（latched）一直是 c1adbe7b；数据库我们不改。所以 `appmap ignore`（默认，2026-11-14）：我们的规划和定位不听 App 的 `/map/switch`、`/map/file_update`，一直用站点地图 ad68517c；App 目录里什么都不放。**App 上的狗画在 c1adbe7b 上，位置不准**，看 Foxglove。换回机器人团队的服务后一切照旧 |
 | 遥控器 | 人手里 | 人接管。和规划的指令谁优先由机器人团队的运控决定，第一次上板先试（第 8 节第 1 步） |
 | 急停 | 专人拿着 | 狗走的时候一直拿着，不干别的 |
 | Foxglove | 本机 | 看（第 6 节）、发目标；不能发别的 |
@@ -102,14 +102,14 @@ INS /rte/rdap/rtk/inspvax、IMU           │                                   
 
 ### 3.1 每次上板
 
-1. 狗站着、在 ad68517c 那片；App 里当前地图是仓库版的 ad68517c；急停在人手里。
+1. 狗站着、在 ad68517c 那片；急停在人手里；`switches` 里 appmap 是 ignore。
 2. `nav_cw.sh status` → `running: theirs`；`nav_cw.sh switches` 看开关（第 5 节），第一次上板要影子模式、限速。
 3. `nav_cw.sh use-new`。成功后看日志（`journalctl -u <服务> -n 50`）：
 
    | 服务 | 要看到 | 不对 |
    |---|---|---|
    | `cw-slam` | 收敛，没有 fault，不一直重定位；读的是 `/opt/seres/nav_cw/maps/...` | 换回 |
-   | `cw-planning` | `Tracking: crosswalk yield on, rule wait`；`startup map … 5 crosswalks`；之后如果有 `Map switch: <路径>`，路径是 App 目录里仓库版的 ad68517c，紧跟 `GlobalMapManager: 5 crosswalks in …` | 切到别的图或 0 crosswalks：换回，App 里重选地图 |
+   | `cw-planning` | `Tracking: crosswalk yield on, rule wait`；`startup map … 5 crosswalks`；之后没有 `Map switch`、`Map update`（appmap ignore） | 有切换：appmap 没生效（`check` 看图），换回 |
    | `cw-nav-perception` | `lidar_3d_detection` 每秒一行、10 Hz 左右；`lidar_seg`、`grid_map_memory_node` 起来了 | 换回 |
 
 4. Foxglove（第 6 节）：狗在地图上的位置对、障碍栅格跟着狗、人行横道框在路上。
@@ -159,8 +159,8 @@ Foxglove：`rehearsal on` 时 `sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh
   Crosswalk yield: wait (vehicle) crosswalk 6, stop point in -0.02 m, entry 0.78 m, exit 7.9 m, heading error 3 deg, vehicles 2, waiting for 17
   ```
 
-- **App**：位置、电量、遥控照旧。`appmap follow` 时地图只选仓库版的 ad68517c：在 App 里切到别的图，规划和定位都会跟着切
-  （`/map/switch`）；`appmap ignore` 时 App 怎么切都不影响我们。
+- **App**：电量、遥控照旧，位置不准（画在 c1adbe7b 上）。`appmap follow` 时才跟 App：在 App 里切图，规划和定位都会跟着切
+  （`/map/switch`）；`appmap ignore`（默认）时 App 怎么切都不影响我们。
 
 ---
 
@@ -172,7 +172,7 @@ Foxglove：`rehearsal on` 时 `sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh
 | 开关 | 做什么 | 代价 |
 |---|---|---|
 | `shadow on / off` | 影子模式：规划照常算，`/cmd_vel` 和 `/mc/motion_control` 改发到 `/nav_cw/shadow/cmd_vel`、`/nav_cw/shadow/mc/motion_control`，**狗不按规划走**；人用遥控遛狗，Foxglove 里比。改的是装好的 `communication_conf` 里 `pub_cmd_vel`、`pub_motion` 的名字（规划不读命令行参数：`rclcpp::init(0, nullptr)`，`--ros-args -r` 没用）；重启后到 ROS 图里查，规划还在发 `/mc/motion_control` 就把 `cw-planning` 停掉、退出 3 | 重启 `cw-planning`（任务没了，重发目标） |
-| `appmap follow / ignore` | ignore：规划（`communication_conf` 的 `sub_map_switch`）和定位（launch 参数 `map_switch_topic`）改听 `/nav_cw/map/switch`，App 的 `/map/switch` 不再让它们换图，一直在 `configure` 设的站点地图上；follow：跟 App | 重启 `cw-slam`（重新收敛）、`cw-planning` |
+| `appmap ignore / follow` | ignore（默认）：规划（`communication_conf` 的 `sub_map_switch`、`sub_map_update`）和定位（launch 参数 `map_switch_topic`）改听 `/nav_cw/map/switch`、`/nav_cw/map/file_update`，App 的切图不再让它们换图，一直在 `configure` 设的站点地图上。follow：跟 App（只在 App 的数据库里有站点地图时用；8 号狗的没有） | 重启 `cw-slam`（重新收敛）、`cw-planning` |
 | `apply` | 把 `nav_cw.env` 里的开关（`NAV_CW_SHADOW`、`NAV_CW_APPMAP`、`NAV_CW_SPEED`）再写进装好的配置：重装会把仓库的配置放回来，开关本身不会丢；`use-new` 换之前自己也写一遍；`switches` 里出现 NOT APPLIED 就是没写进去 | 重启我们在跑的 `cw-slam`、`cw-planning` |
 | `rehearsal on / off` | 演练：on 在 `nav_cw.env` 写 `ROS_DOMAIN_ID=42`、`PLANNING_TIMEOUT_WALL_CLOCK=1`，停机器人团队的四个导航服务，起我们的三个、在域 42 上查图（要影子模式开着；我们的在域 0 上跑着时不肯）；off 换回去、去掉那两项（第 3.2 节） | 演练期间狗没有导航 |
 | `check` | 查 ROS 图：谁在发 `/mc/motion_control`、`/cmd_vel`、影子话题，谁在听 `/map/switch`，和上面两个开关对不对；`use-new` 换完自己也查，对不上就换回 | 无 |
@@ -305,7 +305,7 @@ journalctl -u cw-planning --since "<开始>" --until "<结束>" > planning.log  
 | 现象 | 先看 | 多半是 |
 |---|---|---|
 | `use-new` 退出 1 | 它打出的三个服务最后 15 行 | 库没找到（`LD_LIBRARY_PATH`）、配置读不到；它已经换回原来的了 |
-| `startup map … 0 crosswalks` 或 `Map switch` 到别的图 | App 当前地图；`switches` 的 appmap | App 选的不是仓库版 ad68517c；换回，App 里重选，或 `appmap ignore` |
+| `startup map … 0 crosswalks` 或 `Map switch` 到别的图 | `switches` 的 appmap；`check` | appmap 是 follow（App 发的是 c1adbe7b），或者 ignore 没写进装好的配置（NOT APPLIED：`apply`）；换回 |
 | `shadow on` 退出 3，`SHADOW NOT IN EFFECT` | 它打出的图 | 装的规划没按配置改话题名（版本不对？）；它已经把 `cw-planning` 停了，别再起，查清楚 |
 | `use-new` 退出 1，图那几行有 WRONG | 哪一行 | 开关和实际不符（launch 是旧的、没读 `nav_cw.env`）；它已经换回了 |
 | 狗不走、`mission_state: standstill` | `journalctl` 里的超时、`nav_blocked` | 里程计或栅格断流（暂停 1 s、恢复 3 s）；被挡；影子模式没关；限速设成了 0 |

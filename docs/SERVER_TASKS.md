@@ -166,7 +166,7 @@
 | T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 完成，已复核（2026-11-14）：狗上的 -dev 和 ROS 包都齐，只缺 g2o、acados、OsqpEigen，源码都在服务器上，不用人下载。和狗上的接口两处不同，其中 App 发目标的 /nav/navigation 多了 nav_mode，要人定 |
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步，已复核（2026-11-14）：编、装、地图、服务都过了。复核发现影子模式按原来的做法不生效（规划不读命令行参数），已改；启动脚本的库路径、App 盘快满、App 的地图切换、演练的共享内存四件事交给 T59 |
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T59 | 半天 | 任务已写好 |
-| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径，App 地图 follow（只放 ad68517c）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 4 步，已复核（2026-11-14）：第 0–3 步都对。ad68517c 一份 391 MB，App 的盘放不下（只剩 7.1 MB）；第 4 步改成在 App 目录放软链接，从第 4 步接着做 |
+| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 4 步，已复核（2026-11-14）：第 0–3 步都对。App 认数据库（只有 c1adbe7b），改用 appmap ignore（默认），App 目录不放东西；从第 4 步接着做 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
 
@@ -9018,7 +9018,7 @@ C++ 门控在 1104 的真实跟踪结果上和 Python 逐帧对；回放 0921 �
 - App 的地图目录里只有 c1adbe7b（47 m，没有 osm），开机时 App 发 `/map/switch` 切到它。
 - 狗上 `/opt/seres/nav/data/` 里的 ad68517c、a70c6db6 也没有 `semantic.osm`：标了人行横道的只有仓库里的 zip。
 - 规划（`sub_map_switch`）和定位（mode_switch_node）订 `/map/switch` 都是 `transient_local`：App 最后发的那条会一直留着，我们的服务一起来就会收到，马上从 startup 的 ad68517c 切到 c1adbe7b，没有人行横道。
-- 所以测试那天，**App 当前的地图要是仓库版的 ad68517c**（带 `semantic.osm`）：T56 把它拷进 App 的目录（先备份）；App 怎么认它、怎么选它，要问机器人团队。T57 换过去以后先看规划日志的 `Map switch` 和 `5 crosswalks`，不对就换回。
+- 所以测试那天，**App 当前的地图要是仓库版的 ad68517c**（带 `semantic.osm`）：T56 把它拷进 App 的目录（先备份）；App 怎么认它、怎么选它，要问机器人团队。T57 换过去以后先看规划日志的 `Map switch` 和 `5 crosswalks`，不对就换回。**2026-11-14 改：App 认的是数据库（只有 c1adbe7b），改成 `appmap ignore`，我们不听 App 的切图（T59 复核第 6 条）。**
 
 **T55：不用下载。**
 - 狗上的 Ubuntu -dev 和要用的 ROS 包都齐，Livox SDK 也在。
@@ -9410,7 +9410,7 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 写；不 apt、不 dpkg -i；原来的服务和它们的文件不动、不停；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。狗要停着（编译占 CPU）。
 仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T56
 
-0. git pull；pytest（同 T58 第 0 步；87 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
+0. git pull；pytest（同 T58 第 0 步；88 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
    源码包传到狗上：scp /public/zjst/robot/nav_cw_src/* dog:/home/nvidia/nav_cw_downloads/（先 ssh dog mkdir -p），两边 sha256sum 对一下。
 1. 依赖（T55：狗上的 -dev 和 ROS 包都齐，Livox SDK 在 /usr/local，不用 .deb）：只编三个源码包，装到 /opt/seres/nav_cw/deps（不装进系统）：
    - g2o 20230806_git、acados 0.5.1（含 blasfeo、hpipm）、OsqpEigen 0.10.0：解到 /opt/seres/nav_cw/src/deps/，cmake -DCMAKE_INSTALL_PREFIX=/opt/seres/nav_cw/deps，
@@ -9586,14 +9586,15 @@ vehicle:      d20/001
 
 ```text
 任务 T59（T56 复核以后）。人定（2026-11-14）：
-- App 地图用 follow，App 目录里只放 ad68517c（a70c6db6 不放）；ignore 是配置开关（nav_cw.sh appmap，存在 nav_cw.env 里），演练里两种都验；
+- App 地图用 ignore（2026-11-14 改，T59 复核第 6 条：App 认的是它的数据库，库里只有 c1adbe7b，它发的 /map/switch 一直是 c1adbe7b；
+  数据库不改）：我们的规划和定位不听 App 的 /map/switch、/map/file_update，一直用站点地图 ad68517c；App 目录里什么都不放；
 - 演练和正式运行一样：用我们的三个 cw 服务、机器人原来的 CycloneDDS 配置（开着共享内存）；演练时 Agent 停掉、演练完再起机器人团队的
   四个导航服务（planning、slam、nav_perception、lidar-3d-detection），用 nav_cw.sh rehearsal on / off 做，别的服务（驱动、App、运控）不动。
 狗上的规矩同 T56：只写 /opt/seres/nav_cw/、/etc/systemd/system/cw-*.service、/userdata/config/robot_service/map/ 里我们拷进去的那份、
 /home/nvidia/、/tmp/nav_cw_rehearsal/；不 apt、不 dpkg -i；机器人团队的服务除了上面那四个，不停、不起、不改；演练只用 ROS_DOMAIN_ID=42。
 sudo 用 sudo -n。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T59
 
-0. git pull；pytest（同 T58 第 0 步；87 passed）。ssh dog true。记下：
+0. git pull；pytest（同 T58 第 0 步；88 passed）。ssh dog true。记下：
      sudo -n bash /opt/seres/nav_cw/nav_cw.sh status       （要 running: theirs：T56 时人停过、编完已重启；不是就停下问）
      df -h /userdata /opt；ls -la /userdata/config/robot_service/map/；ls -la /opt/seres/nav_perception/lib | head -60
    全部存 data/reports/T59/before.txt。
@@ -9620,21 +9621,10 @@ sudo 用 sudo -n。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T59
 3. 开关（服务不起，只改文件）：
      sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on；appmap ignore；speed 0.8；switches
      grep -nE "pub_cmd_vel|pub_motion|sub_map_switch" <装好的 communication_conf>；cat /opt/seres/nav_cw/nav_cw.env；nav_cw.sh speed show
-   抄下来。再 speed off、appmap follow（人定 follow），switches 再抄一次（appmap follow、NAV_CW_SLAM_ARGS 没了）；shadow on 留着给第 5 步
-   （rehearsal on 没有影子模式不肯起）。
-4. App 地图（人定 follow，只放 ad68517c）。App 的盘 /userdata 只有 433 MB，ad68517c 拷一份 378 MB 只剩 7.1 MB（T59 第一次停在这）：
-   App 目录里放一个软链接，指到 /opt/seres/nav_cw/maps/ 那份，不占 /userdata（T59 复核）。
-   - 先确认读这个目录的进程不在容器里（容器里软链接指不到 /opt）：
-       sudo -n docker ps 2>/dev/null | head；
-       sudo -n bash -c 'for p in /proc/[0-9]*; do r=$(readlink $p/root 2>/dev/null) || continue; [[ $r == / ]] && continue;
-         echo "${p#/proc/} root=$r $(tr "\0" " " < $p/cmdline | cut -c1-100)"; done' | head -20
-     都是空的（没有容器里的进程）才往下；有的话抄下来，停下；
-   - sudo -n ln -s /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 /userdata/config/robot_service/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
-     ls -la /userdata/config/robot_service/map/；df -h /userdata（可用还是 385 MB 左右）；
-     ls /userdata/config/robot_service/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13/{global_map.yaml,3d/index.txt,2d/1780551612/semantic.osm}
-     三个都在；
-   - 换回：sudo -n rm /userdata/config/robot_service/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13（删的是软链接本身：不加 -r，末尾不带 /）；
-   - App 里选不选得到 ad68517c 人去看（不改 App 的数据库）。
+   抄下来。再 speed off；appmap ignore 留着（不设就是 ignore）；switches 再抄一次（shadow on、appmap ignore、speed off）；shadow on 留着给
+   第 5 步（rehearsal on 没有影子模式不肯起）。
+4. App 地图（人定 ignore）：App 目录不动、数据库不改，我们的东西都不放。ls -la /userdata/config/robot_service/map/（只有 c1adbe7b）、
+   df -h /userdata（385 MB 左右可用）抄下来。
 5. 演练（域 42，共享内存开着；狗停着、人知道）。下面的 ros2 命令都用 root 跑（机器人的共享内存是 root 的 iox-roudi，nvidia 的进程拿到的
    数据不全，T40），环境：
      E='source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/planning/setup.bash; export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml'
@@ -9651,7 +9641,7 @@ sudo 用 sudo -n。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T59
         sudo -n bash -c "$E; export ROS_DOMAIN_ID=42; timeout 8 ros2 topic pub -r 5 /nav_cw/shm_probe_int std_msgs/msg/Int64 '{data: 42}'" &
         sudo -n bash -c "$E; export ROS_DOMAIN_ID=42; timeout 8 ros2 topic pub -r 5 /nav_cw/shm_probe_str std_msgs/msg/String '{data: d42}'"; wait
       要：域 42 的两个文件里有 42、d42（发出去了），域 0 的两个里没有（没串）。域 0 收到了：停下，不演练，四个文件抄上来。
-   c. sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches（shadow on、appmap follow）；
+   c. sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches（shadow on、appmap ignore）；
       sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal on
       （nav_cw.env 写 ROS_DOMAIN_ID=42、PLANNING_TIMEOUT_WALL_CLOCK=1；停机器人团队的四个导航服务，起我们的三个，在域 42 上查图）。
       抄输出：图那几行都要 ok。退出 1 它已经换回原来的了：抄日志，停下。
@@ -9663,34 +9653,33 @@ sudo 用 sudo -n。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T59
           /map/switch:=/bag/map/switch /cmd_vel:=/bag/cmd_vel /mc/motion_control:=/bag/mc/motion_control
         （包里录的目标、地图切换、指令都改名避开：目标用我们现场重算的，切换和指令不能当成现在的；话题表里还有 /tf、/lightning/*
         就也照样改名，我们的定位自己发）；5 s 后发目标同 T56；
-      - 放到 60 s：ros2 topic pub --once --qos-durability transient_local --qos-reliability reliable /map/switch std_msgs/msg/String \
-          "{data: /userdata/config/robot_service/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13}"
-        之后 journalctl -u cw-planning --since "$T0"：规划 "Map switch: /userdata/…/ad68517c…"，紧跟 "GlobalMapManager: 5 crosswalks in …"，
-        人行横道状态接着走；journalctl -u cw-slam：定位"UUID 与当前已加载地图相同(ad68517c…)，忽略"，odom 不跳；
+      - 放到 60 s，在域 42 学 App 发两条（App 实际发的就是 c1adbe7b：它的数据库里只有这张；完整目录名看第 0 步的 ls）：
+          ros2 topic pub --once --qos-durability transient_local --qos-reliability reliable /map/switch std_msgs/msg/String \
+            "{data: /userdata/config/robot_service/map/<c1adbe7b 的完整名>}"
+          ros2 topic pub --once /map/file_update common_interface/msg/PathFile "{path: /userdata/config/robot_service/map/<c1adbe7b 的完整名>}"
+        之后 journalctl -u cw-planning --since "$T0" 里不许有 "Map switch"、"Map update"，人行横道还是 5 个、状态接着走；
+        journalctl -u cw-slam 里不许有"收到 /map/switch"；odom 不跳；
       - Foxglove：sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh（rehearsal 开着，它从 nav_cw.env 读到域 42，打出来的第一行要是
         domain 42）；foxglove_probe.py 同 T56，话题再加
         /nav_cw/shadow/mc/motion_control；
       - tegrastats --interval 1000 > /tmp/nav_cw_rehearsal/tegrastats.txt（这次是我们一套替换他们的，和现场一样的量）；
       - 放完、停录。
-   e. ignore（不用放包）：sudo -n bash /opt/seres/nav_cw/nav_cw.sh appmap ignore（重启 cw-slam、cw-planning，在域 42 上查图：/map/switch 上
-      planning、mode_switch_node 都不订）；再发一条 latched 的 /map/switch，这次指向 c1adbe7b（完整目录名看第 0 步的 ls）：之后
-      journalctl -u cw-planning、cw-slam 里都不许有切换；nav_cw.sh appmap follow（重启、查图：两个都订 /map/switch）。
-   f. 收：journalctl -u cw-nav-perception / cw-slam / cw-planning --since "$T0" 各存 /tmp/nav_cw_rehearsal/<服务>.log；
+   e. 收：journalctl -u cw-nav-perception / cw-slam / cw-planning --since "$T0" 各存 /tmp/nav_cw_rehearsal/<服务>.log；
       journalctl --since "$T0" | grep -iE "PUBLISHER_LIST_FULL|SUBSCRIBER_LIST_FULL|roudi|iceoryx" > /tmp/nav_cw_rehearsal/iceoryx.txt
       （有 *_LIST_FULL 就是共享内存的表满了，报告里写明）；
       sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal off → running: theirs（nav_cw.env 里的 ROS_DOMAIN_ID、PLANNING_TIMEOUT_WALL_CLOCK
       没了）；services_after.txt 同 a：除了那四个导航服务，别的服务的重启次数不许变，变了的列出来；
-      sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow off；switches 抄下来（shadow off、appmap follow、speed off、没有 REHEARSAL ON）；
+      sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow off；switches 抄下来（shadow off、appmap ignore、speed off、没有 REHEARSAL ON）；
       /tmp/nav_cw_rehearsal 和录包拷回服务器 work_dirs/t59_rehearsal/，狗上的录包和 1112 删掉。
 6. 服务器上看（同 T56 第 8 步）：check_planning_mcap.py（/cmd_vel 那行缺是对的：影子模式，指令在 /nav_cw/shadow/cmd_vel）、
    planning_mcap_viz.py、objects_in_map.py（要 extrinsic OK）；规划日志：车型 d20/001、"startup map … 5 crosswalks"、往前的 CMD、
-   人行横道状态序列、60 s 那次 "Map switch" 以后还是 5 个人行横道；定位：odom 跳不跳；tegrastats；iceoryx.txt。
+   人行横道状态序列、60 s 那两条以后没有 "Map switch"、"Map update"，还是 5 个人行横道；定位：odom 跳不跳；tegrastats；iceoryx.txt。
 7. 提交：data/reports/T59/、work_dirs/t59_rehearsal（录包 LFS）、本文档。
 
 停止条件：第 0 步不是 theirs；第 2 步 ldd 不是 0 行；第 5 步 b 串域、c 图不对（规划还在发 /mc/motion_control）；第 6 步 WRONG。
 任何一步停下时，rehearsal 开着就先 rehearsal off，把机器人团队的服务起回来。
 报告（写进"T59 结果"）：第 0 步的 df 和两个 ls；四个文件改前改后；ldd；第 3 步的输出；第 4 步的 du、df；第 5 步 b 的四个文件；
-rehearsal on 的输出；bag info；演练的日志（60 s 那次切换前后；ignore 那次的图和日志）、objects_in_map、tegrastats、iceoryx.txt；
+rehearsal on 的输出；bag info；演练的日志（60 s 那两条前后）、objects_in_map、tegrastats、iceoryx.txt；
 前后服务的重启次数；最后的 switches。
 ```
 
@@ -9730,7 +9719,16 @@ rehearsal on 的输出；bag info；演练的日志（60 s 那次切换前后；
 4. 第 0 步 86 passed、1 skipped：跑的那台没有 g++ 和 Eigen（`test_yield_gate_cpp`），不是问题。
 5. 留给演练的状态是对的：shadow on、appmap follow、speed off，我们的三个没起，`running: theirs`；1112 还在狗上。
 
-T59 从第 4 步接着做（第 4 步已改成软链接）。
+6. **人补充（2026-11-14），软链接这条作废**：软链接规划、定位都读得到，但 App 认的是数据库，不是目录：
+   `/userdata/config/robot_service/db/robot_service.db` 的 `map_info` 只有一行（`save_path` 是 c1adbe7b），`config.mapUuid` 也是 c1adbe7b，
+   它发的 `/map/switch` 一直是 c1adbe7b；数据库不改。所以 follow 开着时我们的规划一起来就被这条 latched 的消息切到 c1adbe7b
+   （`map_switch_callback` 无条件 `ReloadMap`），定位也会换过去（c1adbe7b 有 `index.txt`）。
+   **改用 ignore，而且做成默认**：`nav_cw.env` 里没设就是 ignore，要跟 App 才 `appmap follow`。复核时又找到规划还订着 App 的
+   `/map/file_update`（`map_update_callback` 同样 `ReloadMap`），ignore 把它也改名成 `/nav_cw/map/file_update`。App 目录里什么都不放；
+   代价是 App 上的狗画在 c1adbe7b 上，位置不准，现场看 Foxglove。换回机器人团队的服务以后一切照旧（他们跟 App，App 是 c1adbe7b）。
+
+T59 从第 4 步接着做（第 4 步改成什么都不放，第 5 步按 ignore）。接着做之前先把第 1 步的 scp 再做一次（nav_cw.sh 改了：默认 ignore、
+`/map/file_update` 也改名），然后 `nav_cw.sh apply`，`switches` 要是 shadow on、appmap ignore，没有 NOT APPLIED。
 
 ---
 
@@ -9744,7 +9742,7 @@ T59 从第 4 步接着做（第 4 步已改成软链接）。
 可以改的：Nav_D20/docker/（dog_rootfs.sh、run_arm64.sh；build_stack.sh 只在编不过、又确定是环境的问题时改，写进 PATCHES.md）。
 模块的源码不改。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T60
 
-0. git pull；pytest（T58 第 0 步那九个文件，再加 tests/dog/test_dog_rootfs.py；90 passed）。
+0. git pull；pytest（T58 第 0 步那九个文件，再加 tests/dog/test_dog_rootfs.py；91 passed）。
    nproc；free -g；df -h <work_dirs 所在盘> /var/lib/docker /public（三处合起来要 60 GB 以上空闲：tar、镜像、编译树各 10–20 GB）；
    docker version。存 data/reports/T60/host.txt。
 1. QEMU（每次服务器重启后要再做一次）：
@@ -9804,20 +9802,22 @@ T59 从第 4 步接着做（第 4 步已改成软链接）。
 ```text
 任务 T57（T56 通过以后，人在现场）。人和 Agent 一起做；每一步 Agent 先说要做什么，人说可以再做。
 现场的操作、开关、Foxglove 看什么、出问题怎么办：docs/DOG_FIELD_GUIDE.md（安全的顺序是它的第 8 节）；让行的流程：docs/CROSSWALK_YIELD_FLOW.md。
-准备：狗在 ad68517c 那片（要测的人行横道路线从它上面过：6、13、32、38 号，人定哪一个）；有人拿急停；App 里当前地图是
-仓库版的 ad68517c（T56 拷进 App 目录；App 最后发的 /map/switch 会一直留着，我们的服务一起来就照它切图，T54、T55 复核）；
+准备：狗在 ad68517c 那片（要测的人行横道路线从它上面过：6、13、32、38 号，人定哪一个）；有人拿急停；appmap ignore（默认；
+App 的数据库里只有 c1adbe7b，它发的 /map/switch 一直是 c1adbe7b，我们不听，一直用站点地图 ad68517c，T59 复核第 6 条）。
+App 上的狗画在 c1adbe7b 上，位置不准，不用管；位置看 Foxglove；
 目标用 Foxglove 发（人定 2026-11-14）：笔记本上 Foxglove 桌面版，能连到狗的 8765（不在一个网段就 ssh -N -L 8765:127.0.0.1:8765 nvidia@<狗>）；
 服务器上开着 Foxglove 或者能看 journalctl。
 
 1. ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status' → running: theirs。
-   开关：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed 0.3'（第 2c 步前不 shadow，摸运控要真发），switches 抄下来。
+   开关：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed 0.3'（第 2c 步前不 shadow，摸运控要真发），switches 抄下来
+   （appmap ignore，没有 NOT APPLIED、没有 REHEARSAL ON）。
 2. 换：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'。15 s 内没起稳它会自己换回原来的并退出 1（抄输出，停下）。
    成功后看（journalctl -u <服务> -n 50）：
    - cw-slam：定位收敛（没有 fault、没有一直重定位）；
-   - cw-planning："startup map … 5 crosswalks"、"Tracking: crosswalk yield on, rule wait"；之后如果有 "Map switch: <路径>"，那个路径
-     要是 App 目录里仓库版的 ad68517c，紧跟着 "GlobalMapManager: 5 crosswalks in …"。切到 c1adbe7b 或者 0 crosswalks：换回，停下；
+   - cw-planning："startup map … 5 crosswalks"、"Tracking: crosswalk yield on, rule wait"；之后不许有 "Map switch"、"Map update"
+     （appmap ignore；有就是没生效：换回，停下）；use-new 的输出里图那几行都是 ok（planning、mode_switch_node 不在 /map/switch 上）；
    - lidar-3d-detection：每秒一行，10 Hz 左右；
-   - 狗在 App 里位置对、能遥控。有一条不对就换回（第 6 步），停下。
+   - 狗在 Foxglove 里位置对（/lightning/odom 在 ad68517c 的路网上）、能遥控。有一条不对就换回（第 6 步），停下。
 2b. Foxglove：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh'（前台，另开一个终端留着）；Foxglove 连 ws://<狗或 127.0.0.1>:8765，
    Layout → Import Nav_D20/planning/script/planning_live.json。看得到路网、代价地图、狗、/planning/debug/crosswalk 里的人行横道（白框；
    正在过的那个按状态变色）。发目标：3D 面板右上的 "Publish pose"，在人行横道对面点一下、拖出朝向。只有 /goal_pose 能从 Foxglove 发。
@@ -9865,7 +9865,7 @@ T59 从第 4 步接着做（第 4 步已改成软链接）。
 
 0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py tests/dog/test_yield_gate_cpp.py \
        tests/dog/test_bag_on_map.py tests/dog/test_objects_in_map.py tests/dog/test_nav_cw.py tests/dog/test_nav_cw_fetch.py \
-       tests/dog/test_nav_stack_env.py -q | tail -1   （87 passed）
+       tests/dog/test_nav_stack_env.py -q | tail -1   （88 passed）
    docker images | grep -E "nvidia/tensorrt.*24.08|dogperc-dev"（底镜像在本机）。
 1. 镜像：
      docker build -t nav-dev -f Nav_D20/docker/Dockerfile.nav-dev Nav_D20/docker 2>&1 | tail -40 | tee data/reports/T58/docker_build.txt

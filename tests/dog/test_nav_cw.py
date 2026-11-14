@@ -49,6 +49,7 @@ if up cw-planning.service; then
   [[ -n "${FAKE_OLD_PLANNER:-}" ]] && pubs="/cmd_vel /mc/motion_control"
   for p in $pubs; do if [[ "$p" == "$topic" ]]; then ep planning PUBLISHER; fi; done
   if [[ "$(name sub_map_switch /map/switch)" == "$topic" ]]; then ep planning SUBSCRIPTION; fi
+  if [[ "$(name sub_map_update /map/file_update)" == "$topic" ]]; then ep planning SUBSCRIPTION; fi
 fi
 if up cw-slam.service; then
   sw=$(sed -n 's/.*map_switch_topic:=\([^" ]*\).*/\1/p' "$NAV_CW_ROOT/nav_cw.env" 2>/dev/null)
@@ -61,6 +62,7 @@ exit 0
 COMM = """confs{
     ros_bridge_conf{
         sub_map_switch              { name: "/map/switch" }
+        sub_map_update              { name: "/map/file_update" }
         sub_goal_pose               { name: "/goal_pose"           queue_size: 10 }
         pub_cmd_vel                 { name: "/cmd_vel"             queue_size: 10 }
         pub_motion                  { name: "/mc/motion_control"   queue_size: 10 }
@@ -326,7 +328,8 @@ def test_shadow_mode_renames_the_planners_command_topics_and_checks_the_graph(ro
     assert "ok    planning     PUBLISHER         on /nav_cw/shadow/mc/motion_control" in r.stdout
     r = root("shadow", "off")
     assert r.returncode == 0, r.stdout + r.stderr
-    assert root.comm.read_text() == COMM and "shadow:           off" in r.stdout
+    c = root.comm.read_text()
+    assert '{ name: "/cmd_vel"' in c and '{ name: "/mc/motion_control"' in c and "shadow:           off" in r.stdout
     assert "NAV_CW_SHADOW" not in root.env.read_text()
     assert "ok    planning     PUBLISHER         on /mc/motion_control" in r.stdout
 
@@ -345,16 +348,20 @@ def test_appmap_ignore_moves_both_off_the_apps_switch(root):
     (root.state / "cw-slam.service").write_text("active")
     r = root("appmap", "ignore")
     assert r.returncode == 0, r.stdout + r.stderr
-    assert 'sub_map_switch              { name: "/nav_cw/map/switch" }' in root.comm.read_text()
+    c = root.comm.read_text()
+    assert 'sub_map_switch              { name: "/nav_cw/map/switch" }' in c
+    assert 'sub_map_update              { name: "/nav_cw/map/file_update" }' in c     # the App's map edits too
     assert 'NAV_CW_SLAM_ARGS="map_switch_topic:=/nav_cw/map/switch"' in root.env.read_text()
-    assert 'NAV_CW_APPMAP="ignore"' in root.env.read_text()
+    assert "NAV_CW_APPMAP" not in root.env.read_text()                            # ignore is the default
     assert "restart cw-slam.service" in root.calls() and "restart cw-planning.service" in root.calls()
     assert "ok    planning     SUBSCRIPTION      not on /map/switch" in r.stdout
+    assert "ok    planning     SUBSCRIPTION      not on /map/file_update" in r.stdout
     assert "ok    mode_switch_node SUBSCRIPTION      not on /map/switch" in r.stdout
     assert "appmap:           ignore" in r.stdout
     r = root("appmap", "follow")
     assert r.returncode == 0, r.stdout + r.stderr
     assert root.comm.read_text() == COMM and "NAV_CW_SLAM_ARGS" not in root.env.read_text()
+    assert 'NAV_CW_APPMAP="follow"' in root.env.read_text()
     assert "ok    mode_switch_node SUBSCRIPTION      on /map/switch" in r.stdout
 
 
@@ -458,3 +465,14 @@ def test_a_rehearsal_that_does_not_come_up_puts_theirs_back(dog, tmp_path):
     assert r.returncode == 1 and "running: theirs" in r.stdout
     assert all(dog.states()[u] == "active" for u in ORIG)
     assert "ROS_DOMAIN_ID" not in env.read_text()
+
+
+def test_ours_ignore_the_apps_map_unless_told_to_follow(dog, tmp_path):
+    """dog 8's App knows c1adbe7b only (its database, T59 review): with no setting, use-new puts ours off the App's
+    /map/switch and /map/file_update"""
+    r = dog("use-new")
+    assert r.returncode == 0, r.stdout + r.stderr
+    comm = (tmp_path / "nav_cw" / CONF_DIR / "communication_conf.pb.txt").read_text()
+    assert '"/nav_cw/map/switch"' in comm and '"/nav_cw/map/file_update"' in comm
+    assert 'NAV_CW_SLAM_ARGS="map_switch_topic:=/nav_cw/map/switch"' in (tmp_path / "nav_cw" / "nav_cw.env").read_text()
+    assert "ok    mode_switch_node SUBSCRIPTION      not on /map/switch" in r.stdout
