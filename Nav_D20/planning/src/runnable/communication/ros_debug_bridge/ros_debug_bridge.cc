@@ -334,7 +334,7 @@ void RosDebugBridge::CrosswalkDebug() {
   std::vector<planning::algorithm::yield::Object> objs;
   if (mission_tracking->crosswalk_objects_in_map(&objs)) {
     for (const auto &ob : objs) {
-      if (ob.label != "vehicle") continue;
+      if (ob.label != "vehicle" && ob.label != "cyclist") continue;   // what the gate yields to
       const bool waited = std::find(o.decision.ids.begin(), o.decision.ids.end(), ob.id) != o.decision.ids.end();
       auto box = base("vehicles", visualization_msgs::msg::Marker::CUBE);
       box.pose.position.x = ob.position.x();

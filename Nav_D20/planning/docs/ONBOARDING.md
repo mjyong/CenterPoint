@@ -72,7 +72,7 @@ Tracking 的状态（`src/runnable/mission/mission_state_machine/mission_fsm_bas
 
 调试字符串 `/planning/debug/plotjuggler/string` 里的 `mission_type`（0 空闲、1 跟踪、2 跟随、3 回充、4 技能）和 `mission_status`（0 off、1 passive、2 standby、3 active、4 standstill、5 fault）就是这两个枚举。
 
-路口让行（有车就停、车过去再走）还没做，会用这里的 `pause()` / `resume()`，设计见 `docs/PLANNING_INTEGRATION.md`。
+过人行横道给车让行（2026-11 加的）没有用这里的 `pause()` / `resume()`：任务一直是 active，`Tracking::ApplyCrosswalk` 直接改 MPPI 的速度指令（减速、停下、原地转向、等）；从感知到输出的整个流程见 `docs/CROSSWALK_YIELD_FLOW.md`，为什么这样定见 `docs/PLANNING_INTEGRATION.md`，狗上怎么跑、怎么看见 `docs/DOG_FIELD_GUIDE.md`。
 
 ## 3. 全局地图和全局路径
 

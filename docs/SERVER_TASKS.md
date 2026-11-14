@@ -9408,7 +9408,7 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 写；不 apt、不 dpkg -i；原来的服务和它们的文件不动、不停；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。狗要停着（编译占 CPU）。
 仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T56
 
-0. git pull；pytest（同 T58 第 0 步；74 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
+0. git pull；pytest（同 T58 第 0 步；78 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
    源码包传到狗上：scp /public/zjst/robot/nav_cw_src/* dog:/home/nvidia/nav_cw_downloads/（先 ssh dog mkdir -p），两边 sha256sum 对一下。
 1. 依赖（T55：狗上的 -dev 和 ROS 包都齐，Livox SDK 在 /usr/local，不用 .deb）：只编三个源码包，装到 /opt/seres/nav_cw/deps（不装进系统）：
    - g2o 20230806_git、acados 0.5.1（含 blasfeo、hpipm）、OsqpEigen 0.10.0：解到 /opt/seres/nav_cw/src/deps/，cmake -DCMAKE_INSTALL_PREFIX=/opt/seres/nav_cw/deps，
@@ -9443,19 +9443,27 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
    不设（回放用的）。
 6. 服务（/etc/systemd/system/，sudo -n tee 写）：照原来三个 unit（systemctl cat；T51 的 dog_stack.txt）写 cw-planning、cw-slam、
    cw-nav-perception，路径换成 /opt/seres/nav_cw/...，Environment 照抄（CycloneDDS、URI，域不设 = 0），再加
-   LD_LIBRARY_PATH（第 3 步那串的 deps 部分在前）；各加 Conflicts=<原来那个>.service；Restart 照抄。
-   - cw-planning：source /opt/ros/humble/setup.bash、/opt/seres/nav_cw/install/planning/setup.bash；ros2 run planning planning；
+   LD_LIBRARY_PATH（第 3 步那串的 deps 部分在前）；各加 Conflicts=<原来那个>.service；Restart 照抄；三个都加
+   EnvironmentFile=-/opt/seres/nav_cw/nav_cw.env（调试开关：nav_cw.sh shadow / debug perception / speed 写它，没有这个文件也能起；
+   docs/DOG_FIELD_GUIDE.md 第 5 节）。
+   - cw-planning：source /opt/ros/humble/setup.bash、/opt/seres/nav_cw/install/planning/setup.bash；
+     ros2 run planning planning $$NAV_CW_PLANNING_ARGS（ExecStart 里 bash -c '...' 包着，两个 $ 是让 systemd 原样交给 bash 展开，
+     不加引号：影子模式的 --ros-args -r /cmd_vel:=... 在这里，没开时是空的）；
    - cw-slam：source /opt/ros/humble/setup.bash、/opt/seres/nav_cw/install/slam/setup.bash；ros2 launch lightning model_switch_launch.py
      rviz:=false；确认它读的 default_d20.yaml 是 /opt/seres/nav_cw/install/slam 里那份；
    - cw-nav-perception：启动脚本照 Nav_D20/perception_combo_ros/cfg/start_nav_perception_bg.sh（它现在也起 lidar_3d_detection，
      安装目录读 PERCEPTION_INSTALL_DIR）写一份到 /opt/seres/nav_cw/start/：lidar_seg、grid_map_memory_node、lidar_3d_detection 用
      /opt/seres/nav_cw/install/nav_perception 的（source 它的 setup.bash，SERES_PERCEPTION_INSTALL_DIR 指它）；lidar_3d_detection 走它的
      bin/start_lidar_3d_detection.sh，LIDAR3D_MODEL_DIR=/opt/seres/perception/lidar_3d_detection/model，LIDAR3D_LOCK_CLOCKS 和
-     /etc/default/lidar-3d-detection 里一样（先跑 bin/lock_clocks.sh）；ptz_data_detection_2d、perception_recharge 照旧从
+     /etc/default/lidar-3d-detection 里一样（先跑 bin/lock_clocks.sh），LIDAR3D_ARGS 从环境（nav_cw.env）原样传给
+     start_lidar_3d_detection.sh（nav_cw.sh debug perception on 用它开 publish_cloud、publish_tf）；ptz_data_detection_2d、perception_recharge 照旧从
      /opt/seres/nav_perception 起（只读用它们的程序，云台检测和回充不能断；我们的安装里没有这两个）。
      nav_cw.sh use-new 会把原来的 lidar-3d-detection.service 也停掉（不然两个节点发同一个话题），use-original 再起来。
    不 enable。sudo -n systemctl daemon-reload。三个 unit 和启动脚本全文存进 data/reports/T56/。
    sudo -n bash /opt/seres/nav_cw/nav_cw.sh status → "running: theirs"（不是就停下）。
+   开关试一次（不起服务，只看写对了）：sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on、speed 0.8、switches（抄输出），
+   cat /opt/seres/nav_cw/nav_cw.env、grep -n "max_vx\|reference_velocity" <规划装出来的 mission_conf>；再 shadow off、speed off
+   （放回装的那份）、switches。
 7. 演练（域 42；狗停着、人知道；原来的服务照常在域 0 跑）：同原 T55 的做法——
    - 1112 拷到狗上 /home/nvidia/bags/1112_t40；
    - mkdir -p /tmp/nav_cw_rehearsal；环境同 cw-*.service，再加 ROS_DOMAIN_ID=42、PLANNING_TIMEOUT_WALL_CLOCK=1：起 cw-nav-perception
@@ -9464,7 +9472,8 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
      （域 0）同时跑，各用各的域；
      定位是 mode_switch_node（服务器回放一直用 run_loc_online，这是第一次跑狗上的入口），日志里看它起来了、读了 nav_cw 的地图；
    - 目标用 /goal_pose（人定 2026-11-14：现场用 Foxglove 的 3D 面板发 /goal_pose，不用 App 的 /nav/navigation，所以 nav_mode 那处不用管）；
-   - Foxglove 的桥也在域 42 试一次：ROS_DOMAIN_ID=42 sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh（见第 5 步），
+   - Foxglove 的桥也在域 42 试一次：sudo -n env ROS_DOMAIN_ID=42 bash /opt/seres/nav_cw/nav_cw_foxglove.sh（变量写在 sudo 后面，
+     写在前面会被 sudo 清掉、桥落到域 0；见第 5 步），
      scp tools/deploy/foxglove_probe.py dog:/tmp/，狗上 python3 /tmp/foxglove_probe.py --url ws://localhost:8765 --seconds 10 --topics
      /planning/debug/crosswalk /planning/debug/path_tracking /planning/debug/cost_map_production/occmap /lightning/odom，抄每个话题
      收到几条（都要有）；桥停掉；
@@ -9495,12 +9504,14 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 
 ```text
 任务 T57（T56 通过以后，人在现场）。人和 Agent 一起做；每一步 Agent 先说要做什么，人说可以再做。
+现场的操作、开关、Foxglove 看什么、出问题怎么办：docs/DOG_FIELD_GUIDE.md（安全的顺序是它的第 8 节）；让行的流程：docs/CROSSWALK_YIELD_FLOW.md。
 准备：狗在 ad68517c 那片（要测的人行横道路线从它上面过：6、13、32、38 号，人定哪一个）；有人拿急停；App 里当前地图是
 仓库版的 ad68517c（T56 拷进 App 目录；App 最后发的 /map/switch 会一直留着，我们的服务一起来就照它切图，T54、T55 复核）；
 目标用 Foxglove 发（人定 2026-11-14）：笔记本上 Foxglove 桌面版，能连到狗的 8765（不在一个网段就 ssh -N -L 8765:127.0.0.1:8765 nvidia@<狗>）；
 服务器上开着 Foxglove 或者能看 journalctl。
 
 1. ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status' → running: theirs。
+   开关：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed 0.3'（第 2c 步前不 shadow，摸运控要真发），switches 抄下来。
 2. 换：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'。15 s 内没起稳它会自己换回原来的并退出 1（抄输出，停下）。
    成功后看（journalctl -u <服务> -n 50）：
    - cw-slam：定位收敛（没有 fault、没有一直重定位）；
@@ -9511,7 +9522,13 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 2b. Foxglove：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh'（前台，另开一个终端留着）；Foxglove 连 ws://<狗或 127.0.0.1>:8765，
    Layout → Import Nav_D20/planning/script/planning_live.json。看得到路网、代价地图、狗、/planning/debug/crosswalk 里的人行横道（白框；
    正在过的那个按状态变色）。发目标：3D 面板右上的 "Publish pose"，在人行横道对面点一下、拖出朝向。只有 /goal_pose 能从 Foxglove 发。
-3. 录包（每次测试一个，名字 1113_cw_<n>）：ros2 bag record（域 0）1112 那些话题，加上 /lightning/odom、/cmd_vel、
+2c. 摸清运控、影子模式（DOG_FIELD_GUIDE.md 第 8 节第 1、3 步；空场地，狗旁边没人没车，急停在手）：
+   - speed 0.3，在 2 m 外发目标，狗走起来以后依次试：遥控能不能接管、松手以后谁在发；sudo -n systemctl stop cw-planning 以后狗是停下
+     还是按最后的速度走（再 start 回来、重发目标）；急停按下、松开以后的状态。每一条写进报告；stop 以后狗不停，就记下"stop 不能当软停"；
+   - shadow on：人用遥控把狗遛到人行横道前、停下、转向对面、走过去；Foxglove 里看状态 approach → align → wait / go → cross、
+     影子的指令曲线；有车经过时看红框和 waiting for。看完 shadow off；
+   - 然后 speed 0.5（第 4 步 a 用），b、c 前人定要不要 0.8。
+3. 录包（每次测试一个，名字 1113_cw_<n>；话题用 DOG_FIELD_GUIDE.md 第 9 节那张表，多了 /mc/motion_control 和影子的两个）：ros2 bag record（域 0）1112 那些话题，加上 /lightning/odom、/cmd_vel、
    /planning/debug/plotjuggler/string、/planning/debug/path_tracking、/map/occupancy_grid、/perception/lidar_3d/objects。
 4. 测（每次都：人在 Foxglove 里发人行横道对面的目标；Foxglove 里看 /planning/debug/crosswalk 的状态字和车框（红框是门控在等的车）、
    右边"规划的数"里的 crosswalk_*；Agent 同时跟着 journalctl -u cw-planning -f | grep "Crosswalk yield"，报状态）：
@@ -9521,6 +9538,7 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
    任何时候人觉得不对就急停；Agent 记下时间。
 5. 每次测完：停录，拷回服务器 /public/zjst/robot/cp_data/，跑 planning_mcap_viz.py、objects_in_map.py。
 6. 换回：ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original' → running: theirs；App 里狗正常。
+   开关放回：speed off、shadow off、switches（下次 use-new 不带着限速）。
 7. 提交：报告（每次测试的状态序列、等了多久、人的判断、急停了没有）、录包的 viz，写进"T57 结果"。
 ```
 
@@ -9547,7 +9565,7 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 
 0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py tests/dog/test_yield_gate_cpp.py \
        tests/dog/test_bag_on_map.py tests/dog/test_objects_in_map.py tests/dog/test_nav_cw.py tests/dog/test_nav_cw_fetch.py \
-       tests/dog/test_nav_stack_env.py -q | tail -1   （74 passed）
+       tests/dog/test_nav_stack_env.py -q | tail -1   （78 passed）
    docker images | grep -E "nvidia/tensorrt.*24.08|dogperc-dev"（底镜像在本机）。
 1. 镜像：
      docker build -t nav-dev -f Nav_D20/docker/Dockerfile.nav-dev Nav_D20/docker 2>&1 | tail -40 | tee data/reports/T58/docker_build.txt

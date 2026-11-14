@@ -168,7 +168,7 @@ def test_the_live_layout_shows_only_what_the_bridge_lets_through():
     import re
     layout = json.load(open(os.path.join(ROOT, "Nav_D20", "planning", "script", "planning_live.json"), encoding="utf-8"))
     cfg = layout["configById"]
-    topics = set(cfg["3D!live"]["topics"])
+    topics = {t for t, v in cfg["3D!live"]["topics"].items() if v.get("visible", True)}   # hidden: the full level
     for k, v in cfg.items():
         for p in v.get("paths", []):
             topics.add(p["value"].split(".")[0])
@@ -178,9 +178,90 @@ def test_the_live_layout_shows_only_what_the_bridge_lets_through():
     assert cfg["3D!live"]["publish"]["poseTopic"] == "/goal_pose"
     topics.add("/goal_pose")
     script = open(os.path.join(ROOT, "tools", "deploy", "nav_cw_foxglove.sh"), encoding="utf-8").read()
-    block = script[script.index("TOPICS=("):script.index(")\nread")]
-    patterns = re.findall(r"'([^']+)'", block)
+    block = script[script.index("TOPICS=("):]
+    patterns = re.findall(r"'([^']+)'", block[:block.index("\n)\n")])
     missing = [t for t in sorted(topics) if not any(re.search(p, t) for p in patterns)]
     assert not missing, missing
     assert "^/goal_pose$" in script.split("client_topic_whitelist")[1].split("\n")[0]   # only the goal
     assert "/planning/debug/crosswalk" in topics
+
+
+def test_the_full_level_lets_the_hidden_layers_through():
+    import json
+    import re
+    layout = json.load(open(os.path.join(ROOT, "Nav_D20", "planning", "script", "planning_live.json"), encoding="utf-8"))
+    hidden = [t for t, v in layout["configById"]["3D!live"]["topics"].items() if not v.get("visible", True)]
+    script = open(os.path.join(ROOT, "tools", "deploy", "nav_cw_foxglove.sh"), encoding="utf-8").read()
+    basic = script[script.index("TOPICS=("):]
+    full = script[script.index('== full ]]'):]
+    patterns = re.findall(r"'([^']+)'", basic[:basic.index("\n)\n")]) + \
+        re.findall(r"'([^']+)'", full[:full.index("\nfi")])
+    assert hidden and not [t for t in hidden if not any(re.search(p, t) for p in patterns)]
+
+
+@pytest.fixture
+def root(tmp_path):
+    """an installed tree with a mission_conf, a fake systemctl (cw-planning running) and a fake ros2"""
+    conf = tmp_path / "nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf"
+    conf.mkdir(parents=True)
+    (conf / "mission_conf.pb.txt").write_text(
+        "teb_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    reference_velocity: 2.0\n  }\n}\n"
+        "mppi_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    max_vy: 0.5\n  }\n"
+        "  reference_velocity_critic{\n    enabled: true\n    reference_velocity: 1.5\n  }\n}\n")
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    (bin_ / "systemctl").write_text('#!/bin/bash\necho "$*" >> "%s/calls"\n'
+                                     '[[ "$1" == is-active ]] && [[ "${@: -1}" == cw-planning.service ]] && exit 0\n'
+                                     '[[ "$1" == is-active ]] && exit 3\nexit 0\n' % tmp_path)
+    (bin_ / "ros2").write_text('#!/bin/bash\necho "ros2 $*" >> "%s/calls"\n' % tmp_path)
+    for f in ("systemctl", "ros2"):
+        (bin_ / f).chmod(0o755)
+
+    def run(*args):
+        env = dict(os.environ, NAV_CW_ROOT=str(tmp_path / "nav_cw"), SYSTEMCTL=str(bin_ / "systemctl"),
+                   ROS2=str(bin_ / "ros2"))
+        return subprocess.run(["bash", SCRIPT, *args], capture_output=True, text=True, env=env)
+
+    run.conf = conf / "mission_conf.pb.txt"
+    run.env = tmp_path / "nav_cw" / "nav_cw.env"
+    run.calls = lambda: (tmp_path / "calls").read_text() if (tmp_path / "calls").exists() else ""
+    return run
+
+
+def test_shadow_mode_remaps_the_planners_commands(root):
+    r = root("shadow", "on")
+    assert r.returncode == 0, r.stdout + r.stderr
+    env = root.env.read_text()
+    assert "NAV_CW_PLANNING_ARGS=" in env and "-r /cmd_vel:=/nav_cw/shadow/cmd_vel" in env
+    assert "restart cw-planning.service" in root.calls() and "shadow:           on" in r.stdout
+    r = root("shadow", "off")
+    assert "NAV_CW_PLANNING_ARGS" not in root.env.read_text() and "shadow:           off" in r.stdout
+
+
+def test_debug_switches(root):
+    r = root("debug", "planning", "on")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'ros2 service call /planning/debug/set_pub_flag std_srvs/srv/SetBool {data: true}' in root.calls()
+    r = root("debug", "perception", "on")
+    assert 'LIDAR3D_ARGS="-p publish_cloud:=true -p publish_tf:=true"' in root.env.read_text()
+    assert "cw-nav-perception.service not running" in r.stdout          # restarted only when it runs
+    root("debug", "perception", "off")
+    assert "LIDAR3D_ARGS" not in root.env.read_text()
+
+
+def test_speed_caps_only_the_mppi(root):
+    r = root("speed", "0.8")
+    assert r.returncode == 0, r.stdout + r.stderr
+    c = root.conf.read_text()
+    teb, mppi = c.split("mppi_planner_conf")
+    assert "max_vx: 3.0" in teb and "reference_velocity: 2.0" in teb       # the TEB block untouched
+    assert "max_vx: 0.8" in mppi and "reference_velocity: 0.8" in mppi and "max_vy: 0.5" in mppi
+    assert 'NAV_CW_SPEED="0.8"' in root.env.read_text() and "restart cw-planning.service" in root.calls()
+    assert root("speed", "fast").returncode == 2
+    assert "speed cap:        0.8 m/s" in root("switches").stdout
+    root("speed", "0.5")                                  # a second cap: the kept file stays the installed one
+    r = root("speed", "off")
+    assert r.returncode == 0, r.stdout + r.stderr
+    c = root.conf.read_text().split("mppi_planner_conf")[1]
+    assert "max_vx: 3.0" in c and "reference_velocity: 1.5" in c
+    assert "NAV_CW_SPEED" not in root.env.read_text() and "off (repository value)" in root("switches").stdout

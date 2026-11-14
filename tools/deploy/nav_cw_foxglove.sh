@@ -8,6 +8,9 @@
 #                                                             Layout -> Import Nav_D20/planning/script/planning_live.json
 #   NAV_CW_FOXGLOVE_PORT (8765), NAV_CW_PREFIX (/opt/seres/nav_cw: its planning prefix gives the message definitions),
 #   NAV_CW_FOXGLOVE_EXTRA="^/some/topic$ ..." more topics to let through
+#   NAV_CW_FOXGLOVE_LEVEL=full   also the heavy ones (point clouds, localization's paths and map cloud, perception's
+#                                markers and debug cloud, the cost map as a grid_map): the layout has them hidden,
+#                                tick them in the 3D panel. More bandwidth and CPU on the dog: for a few minutes.
 # The planner's debug topics need pub_flag (nav_cw.sh configure turns it on; NAV_CW_DEBUG=0 keeps the repo's off).
 set -euo pipefail
 prefix="${NAV_CW_PREFIX:-/opt/seres/nav_cw}"
@@ -19,7 +22,15 @@ TOPICS=(
   '^/planning/debug/plotjuggler/string$'
   '^/map/occupancy_grid$' '^/fused_point_cloud$' '^/lightning/odom$' '^/cmd_vel$'
   '^/perception/lidar_3d/objects$' '^/goal_pose$' '^/clicked_point$' '^/initialpose$' '^/tf$' '^/tf_static$'
+  '^/mc/motion_control$' '^/nav_cw/shadow/(cmd_vel|mc/motion_control)$'
 )
+if [[ "${NAV_CW_FOXGLOVE_LEVEL:-basic}" == full ]]; then
+  TOPICS+=(
+    '^/lightning/(current_scan_world|map_cloud|ins_path|lio_path|ins_pose)$' '^/map$'
+    '^/perception/lidar_3d/(tracks|predictions|cloud)$'
+    '^/planning/debug/(teb_planner|following|gradient_vector|cost_map_production/grid_map|plotjuggler/data_points)$'
+  )
+fi
 read -r -a extra <<< "${NAV_CW_FOXGLOVE_EXTRA:-}"
 TOPICS+=("${extra[@]}")
 list=""

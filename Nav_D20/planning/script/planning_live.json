@@ -110,6 +110,36 @@
           "colorMode": "colormap",
           "colorMap": "turbo",
           "pointSize": 2
+        },
+        "/lightning/current_scan_world": {
+          "visible": false,
+          "pointSize": 2,
+          "colorMode": "flat",
+          "flatColor": "#30d158ff"
+        },
+        "/lightning/map_cloud": {
+          "visible": false,
+          "pointSize": 1.5,
+          "colorMode": "colormap",
+          "colorField": "z",
+          "colorMap": "turbo",
+          "explicitAlpha": 0.5
+        },
+        "/lightning/ins_path": {
+          "visible": false,
+          "lineWidth": 0.08,
+          "gradient": [
+            "#ff9f0aff",
+            "#ff9f0aff"
+          ]
+        },
+        "/lightning/lio_path": {
+          "visible": false,
+          "lineWidth": 0.08,
+          "gradient": [
+            "#64d2ffff",
+            "#64d2ffff"
+          ]
         }
       },
       "publish": {
@@ -122,7 +152,7 @@
         "poseEstimateThetaDeviation": 0.26179939
       },
       "imageMode": {},
-      "foxglovePanelTitle": "狗上实时：路网、代价地图（红）、感知栅格（橙）、路径、人行横道和门控看到的车（/planning/debug/crosswalk）"
+      "foxglovePanelTitle": "狗上实时：路网、代价地图（红）、感知栅格（橙）、路径、人行横道和门控看到的车（/planning/debug/crosswalk）；隐藏的层（定位的当前帧绿、地图点云、INS 橙 / LIO 蓝轨迹）要桥开 NAV_CW_FOXGLOVE_LEVEL=full"
     },
     "Plot!speed": {
       "paths": [
@@ -146,6 +176,27 @@
           "timestampMethod": "receiveTime",
           "label": "指令 vy",
           "color": "#bf5af2"
+        },
+        {
+          "value": "/mc/motion_control.para[0]",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "发给运控的 vx（/mc/motion_control，狗走的是这个）",
+          "color": "#ff453a"
+        },
+        {
+          "value": "/nav_cw/shadow/cmd_vel.linear.x",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "影子模式的指令 vx（不执行）",
+          "color": "#30d158"
+        },
+        {
+          "value": "/nav_cw/shadow/mc/motion_control.para[0]",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "label": "影子模式发给运控的 vx（不执行）",
+          "color": "#a2f5a2"
         }
       ],
       "showLegend": true,
