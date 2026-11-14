@@ -17,9 +17,21 @@
 #
 # Switches for debugging on the dog (docs/DOG_FIELD_GUIDE.md). Kept in <root>/nav_cw.env (NAV_CW_ROOT, default
 # /opt/seres/nav_cw), which our units read (EnvironmentFile); each restarts only the unit it concerns, if it runs:
-#   sudo bash nav_cw.sh shadow on|off       the planner runs but its commands go to /nav_cw/shadow/cmd_vel (and
-#                                           /nav_cw/shadow/mc/motion_control): the dog does not move by them; walk
-#                                           it with the remote and compare (restarts cw-planning)
+#   sudo bash nav_cw.sh shadow on|off       the planner runs but its commands go to /nav_cw/shadow/cmd_vel and
+#                                           /nav_cw/shadow/mc/motion_control: the dog does not move by them; walk
+#                                           it with the remote and compare. The installed communication_conf's
+#                                           pub_cmd_vel / pub_motion names (the planner ignores --ros-args: it
+#                                           calls rclcpp::init(0, nullptr)); restarts cw-planning and checks in the
+#                                           ROS graph who publishes what (if the planner still publishes
+#                                           /mc/motion_control with shadow on, it stops cw-planning, exit 3)
+#   sudo bash nav_cw.sh appmap follow|ignore   follow: our planning and localization switch maps when the App
+#                                           sends /map/switch (latched: its last one arrives at start; the App's
+#                                           current map has to be the repository's). ignore: they listen on
+#                                           /nav_cw/map/switch instead and stay on the site map configure set
+#                                           (planning: communication_conf sub_map_switch; localization: the launch
+#                                           argument map_switch_topic, NAV_CW_SLAM_ARGS); restarts both, checks
+#   sudo bash nav_cw.sh check               who publishes the dog's commands and who listens to /map/switch, against
+#                                           the switches (use-new runs it too)
 #   sudo bash nav_cw.sh debug planning on|off     the planner's debug topics, at once (/planning/debug/set_pub_flag)
 #   sudo bash nav_cw.sh debug perception on|off   lidar_3d_detection's debug cloud and its TF camera_init ->
 #                                           lidar_det (restarts cw-nav-perception: the local grid stops a few s)
@@ -38,7 +50,11 @@ WAIT="${NAV_CW_WAIT:-15}"
 ROOT="${NAV_CW_ROOT:-/opt/seres/nav_cw}"
 ENVFILE="${ROOT}/nav_cw.env"
 ROS2="${ROS2:-ros2}"                  # the tests put a fake one here
-SHADOW_ARGS="--ros-args -r /cmd_vel:=/nav_cw/shadow/cmd_vel -r /mc/motion_control:=/nav_cw/shadow/mc/motion_control"
+SHADOW_CMD=/nav_cw/shadow/cmd_vel
+SHADOW_MC=/nav_cw/shadow/mc/motion_control
+APP_SWITCH=/map/switch
+OWN_SWITCH=/nav_cw/map/switch
+VERIFY_WAIT="${NAV_CW_VERIFY_WAIT:-20}"   # [s] for the restarted node to show up in the ROS graph
 PERCEPTION_DEBUG_ARGS="-p publish_cloud:=true -p publish_tf:=true"
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"   # the tests put a fake one here
 JOURNALCTL="${JOURNALCTL:-journalctl}"
@@ -191,9 +207,104 @@ speed() {   # speed <m/s> | off | show
     "${conf}" | sed 's/  */ /g'
 }
 
+comm_conf() {
+  find "${ROOT}/install" -path '*robot_factory/d20/001/planning_conf/communication_conf.pb.txt' -not -path '*/src/*' \
+    2> /dev/null | head -1
+}
+# topic_name <conf> <field>: the name: "..." of `field { name: "..." ... }`
+topic_name() { sed -n -E "s/^[[:space:]]*$2[[:space:]]*\\{[[:space:]]*name:[[:space:]]*\"([^\"]*)\".*/\\1/p" "$1" | head -1; }
+set_topic_name() {   # set_topic_name <conf> <field> <name>
+  sed -i -E "s|^([[:space:]]*$2[[:space:]]*\\{[[:space:]]*name:[[:space:]]*)\"[^\"]*\"|\\1\"$3\"|" "$1"
+  [[ "$(topic_name "$1" "$2")" == "$3" ]] || { echo "could not set $2 to $3 in $1"; exit 1; }
+}
+shadow_state() {
+  local conf; conf="$(comm_conf)"
+  [[ -n "${conf}" ]] || { echo "no installed communication_conf"; return; }
+  case "$(topic_name "${conf}" pub_motion)" in
+    "${SHADOW_MC}") echo on ;;
+    /mc/motion_control) echo off ;;
+    *) echo "unknown (pub_motion $(topic_name "${conf}" pub_motion))" ;;
+  esac
+}
+appmap_state() {
+  local conf; conf="$(comm_conf)"
+  [[ -n "${conf}" ]] || { echo "no installed communication_conf"; return; }
+  case "$(topic_name "${conf}" sub_map_switch)" in
+    "${OWN_SWITCH}") echo ignore ;;
+    "${APP_SWITCH}") echo follow ;;
+    *) echo "unknown (sub_map_switch $(topic_name "${conf}" sub_map_switch))" ;;
+  esac
+}
+
+# endpoints <topic>: "PUBLISHER <node>" / "SUBSCRIPTION <node>" lines, from the ROS graph
+endpoints() {
+  "${ROS2}" topic info -v "$1" 2> /dev/null |
+    awk '/^Node name:/ { n = $3 } /^Endpoint type:/ { print $3, n }'
+}
+# expect <yes|no> <PUBLISHER|SUBSCRIPTION> <node> <topic>
+expect() {
+  local found=no
+  if endpoints "$4" | grep -qx "$2 $3"; then found=yes; fi
+  if [[ "${found}" == "$1" ]]; then
+    printf '  ok    %-12s %-17s %s %s\n' "$3" "$2" "$([[ $1 == yes ]] && echo on || echo "not on")" "$4"
+    return 0
+  fi
+  printf '  WRONG %-12s %-17s %s %s\n' "$3" "$2" "$([[ $1 == yes ]] && echo "missing on" || echo "still on")" "$4"
+  return 1
+}
+# the ROS graph against the switches; retried for VERIFY_WAIT s (a restarted node takes a moment to be discovered)
+check() {
+  ros_env
+  local shadow appmap ok t0=${SECONDS}
+  shadow="$(shadow_state)"
+  appmap="$(appmap_state)"
+  while :; do
+    ok=0
+    echo "graph (shadow ${shadow}, appmap ${appmap}):"
+    if is_active cw-planning.service; then
+      if [[ "${shadow}" == on ]]; then
+        expect no PUBLISHER planning /mc/motion_control || ok=1
+        expect no PUBLISHER planning /cmd_vel || ok=1
+        expect yes PUBLISHER planning "${SHADOW_MC}" || ok=1
+      else
+        expect yes PUBLISHER planning /mc/motion_control || ok=1
+      fi
+      if [[ "${appmap}" == ignore ]]; then
+        expect no SUBSCRIPTION planning "${APP_SWITCH}" || ok=1
+      else
+        expect yes SUBSCRIPTION planning "${APP_SWITCH}" || ok=1
+      fi
+    else
+      echo "  cw-planning not running"
+    fi
+    if is_active cw-slam.service; then
+      if [[ "${appmap}" == ignore ]]; then
+        expect no SUBSCRIPTION mode_switch_node "${APP_SWITCH}" || ok=1
+      else
+        expect yes SUBSCRIPTION mode_switch_node "${APP_SWITCH}" || ok=1
+      fi
+    fi
+    if (( ok == 0 )); then return 0; fi
+    if (( SECONDS - t0 >= VERIFY_WAIT )); then return 1; fi
+    sleep 2
+  done
+}
+# check, and when shadow is on but the planner still publishes the dog's commands: stop it
+check_or_stop() {
+  if check; then return 0; fi
+  if [[ "$(shadow_state)" == on ]] && endpoints /mc/motion_control | grep -qx "PUBLISHER planning"; then
+    echo "SHADOW NOT IN EFFECT: the planner publishes /mc/motion_control. Stopping cw-planning."
+    "${SYSTEMCTL}" stop cw-planning.service || true
+    return 3
+  fi
+  echo "the graph does not match the switches (above)"
+  return 1
+}
+
 switches() {
-  echo "switches (${ENVFILE}):"
-  echo "  shadow:           $([[ -n "$(env_get NAV_CW_PLANNING_ARGS)" ]] && echo "on (commands to /nav_cw/shadow/cmd_vel)" || echo off)"
+  echo "switches (${ENVFILE}, $(comm_conf)):"
+  echo "  shadow:           $(shadow_state)$([[ "$(shadow_state)" == on ]] && echo " (commands to ${SHADOW_CMD}, ${SHADOW_MC})")"
+  echo "  appmap:           $(appmap_state)$([[ "$(appmap_state)" == ignore ]] && echo " (listening on ${OWN_SWITCH}; localization: $(env_get NAV_CW_SLAM_ARGS))")"
   echo "  perception debug: $([[ -n "$(env_get LIDAR3D_ARGS)" ]] && echo "on ($(env_get LIDAR3D_ARGS))" || echo off)"
   local v; v="$(env_get NAV_CW_SPEED)"
   echo "  speed cap:        ${v:+${v} m/s}${v:-off (repository value)}"
@@ -201,13 +312,30 @@ switches() {
 
 case "${1:-status}" in
   shadow)
+    conf="$(comm_conf)"
+    [[ -n "${conf}" ]] || { echo "no installed communication_conf under ${ROOT}/install"; exit 1; }
     case "${2:-}" in
-      on) env_set NAV_CW_PLANNING_ARGS "${SHADOW_ARGS}" ;;
-      off) env_set NAV_CW_PLANNING_ARGS "" ;;
+      on) set_topic_name "${conf}" pub_cmd_vel "${SHADOW_CMD}"; set_topic_name "${conf}" pub_motion "${SHADOW_MC}" ;;
+      off) set_topic_name "${conf}" pub_cmd_vel /cmd_vel; set_topic_name "${conf}" pub_motion /mc/motion_control ;;
       *) echo "shadow on|off"; exit 2 ;;
     esac
+    switches
     restart_if_active cw-planning.service
-    switches ;;
+    if is_active cw-planning.service; then check_or_stop || exit $?; fi ;;
+  appmap)
+    conf="$(comm_conf)"
+    [[ -n "${conf}" ]] || { echo "no installed communication_conf under ${ROOT}/install"; exit 1; }
+    case "${2:-}" in
+      follow) set_topic_name "${conf}" sub_map_switch "${APP_SWITCH}"; env_set NAV_CW_SLAM_ARGS "" ;;
+      ignore) set_topic_name "${conf}" sub_map_switch "${OWN_SWITCH}"
+              env_set NAV_CW_SLAM_ARGS "map_switch_topic:=${OWN_SWITCH}" ;;
+      *) echo "appmap follow|ignore"; exit 2 ;;
+    esac
+    switches
+    restart_if_active cw-slam.service
+    restart_if_active cw-planning.service
+    if is_active cw-planning.service || is_active cw-slam.service; then check_or_stop || exit $?; fi ;;
+  check) check_or_stop || exit $? ;;
   debug)
     case "${2:-}/${3:-}" in
       planning/on | planning/off)
@@ -225,6 +353,7 @@ case "${1:-status}" in
     echo "switching to ours..."
     if switch "${ORIG[@]}" -- "${NEW[@]}"; then
       status
+      check_or_stop || { echo "putting the robot team's back..."; switch "${NEW[@]}" -- "${ORIG[@]}" || true; status || true; exit 1; }
     else
       echo "ours did not come up: last log lines"
       for u in "${NEW[@]}"; do echo "== ${u}"; "${JOURNALCTL}" -u "${u}" -n 15 --no-pager 2>/dev/null || true; done
@@ -238,5 +367,5 @@ case "${1:-status}" in
     switch "${NEW[@]}" -- "${ORIG[@]}" || { status || true; exit 1; }
     status ;;
   configure) shift; configure "$@" ;;
-  *) sed -n '2,17p' "$0"; exit 2 ;;
+  *) sed -n '2,46p' "$0"; exit 2 ;;
 esac

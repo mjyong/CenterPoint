@@ -28,6 +28,34 @@ case "$cmd" in
 esac
 """
 
+# fake ros2: `topic info -v <topic>` answers as our planner and localization would, from the installed
+# communication_conf (the repository's names without one) and nav_cw.env; FAKE_OLD_PLANNER: a planner that ignores
+# the config's output names. Every call is logged to $STATE/log.
+GRAPH = r"""#!/bin/bash
+echo "ros2 $*" >> "$STATE/log"
+[[ "$1 $2" == "topic info" ]] || exit 0
+topic="${@: -1}"
+conf=$(find "$NAV_CW_ROOT/install" -name communication_conf.pb.txt 2>/dev/null | head -1)
+name() {
+  if [[ -n "$conf" ]]; then sed -n -E "s/^[[:space:]]*$1[[:space:]]*\{[[:space:]]*name:[[:space:]]*\"([^\"]*)\".*/\1/p" "$conf"
+  else echo "$2"; fi
+}
+up() { "$SYSTEMCTL" is-active --quiet "$1"; }
+ep() { printf 'Node name: %s\nNode namespace: /\nEndpoint type: %s\n\n' "$1" "$2"; }
+echo "Type: x"
+if up cw-planning.service; then
+  pubs="$(name pub_cmd_vel /cmd_vel) $(name pub_motion /mc/motion_control)"
+  [[ -n "${FAKE_OLD_PLANNER:-}" ]] && pubs="/cmd_vel /mc/motion_control"
+  for p in $pubs; do if [[ "$p" == "$topic" ]]; then ep planning PUBLISHER; fi; done
+  if [[ "$(name sub_map_switch /map/switch)" == "$topic" ]]; then ep planning SUBSCRIPTION; fi
+fi
+if up cw-slam.service; then
+  sw=$(sed -n 's/.*map_switch_topic:=\([^" ]*\).*/\1/p' "$NAV_CW_ROOT/nav_cw.env" 2>/dev/null)
+  if [[ "${sw:-/map/switch}" == "$topic" ]]; then ep mode_switch_node SUBSCRIPTION; fi
+fi
+exit 0
+"""
+
 
 @pytest.fixture
 def dog(tmp_path):
@@ -36,6 +64,9 @@ def dog(tmp_path):
     fake = tmp_path / "systemctl"
     fake.write_text(FAKE)
     fake.chmod(0o755)
+    graph = tmp_path / "ros2"
+    graph.write_text(GRAPH)
+    graph.chmod(0o755)
     for u in ORIG:
         (state / u).write_text("active")
     for u in NEW:
@@ -43,7 +74,8 @@ def dog(tmp_path):
 
     def run(*args, broken=()):
         (state / "broken").write_text("".join(u + "\n" for u in broken))
-        env = dict(os.environ, STATE=str(state), SYSTEMCTL=str(fake), JOURNALCTL="true", NAV_CW_WAIT="0")
+        env = dict(os.environ, STATE=str(state), SYSTEMCTL=str(fake), JOURNALCTL="true", NAV_CW_WAIT="0",
+                   ROS2=str(graph), NAV_CW_VERIFY_WAIT="0", NAV_CW_ROOT=str(tmp_path / "nav_cw"))
         return subprocess.run(["bash", SCRIPT, *args], env=env, capture_output=True, text=True)
 
     def states():
@@ -220,43 +252,97 @@ def test_the_full_level_lets_the_hidden_layers_through():
     assert hidden and not [t for t in hidden if not any(re.search(p, t) for p in patterns)]
 
 
+COMM = """confs{
+    ros_bridge_conf{
+        sub_map_switch              { name: "/map/switch" }
+        sub_goal_pose               { name: "/goal_pose"           queue_size: 10 }
+        pub_cmd_vel                 { name: "/cmd_vel"             queue_size: 10 }
+        pub_motion                  { name: "/mc/motion_control"   queue_size: 10 }
+        pub_flag: true
+    }
+}
+"""
+
+
 @pytest.fixture
 def root(tmp_path):
-    """an installed tree with a mission_conf, a fake systemctl (cw-planning running) and a fake ros2"""
+    """an installed tree (mission_conf, communication_conf), the fake systemctl (cw-planning running) and the fake
+    ros2 graph"""
     conf = tmp_path / "nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf"
     conf.mkdir(parents=True)
     (conf / "mission_conf.pb.txt").write_text(
         "teb_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    reference_velocity: 2.0\n  }\n}\n"
         "mppi_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    max_vy: 0.5\n  }\n"
         "  reference_velocity_critic{\n    enabled: true\n    reference_velocity: 1.5\n  }\n}\n")
-    bin_ = tmp_path / "bin"
-    bin_.mkdir()
-    (bin_ / "systemctl").write_text('#!/bin/bash\necho "$*" >> "%s/calls"\n'
-                                     '[[ "$1" == is-active ]] && [[ "${@: -1}" == cw-planning.service ]] && exit 0\n'
-                                     '[[ "$1" == is-active ]] && exit 3\nexit 0\n' % tmp_path)
-    (bin_ / "ros2").write_text('#!/bin/bash\necho "ros2 $*" >> "%s/calls"\n' % tmp_path)
-    for f in ("systemctl", "ros2"):
-        (bin_ / f).chmod(0o755)
+    (conf / "communication_conf.pb.txt").write_text(COMM)
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "cw-planning.service").write_text("active")
+    for name, text in (("systemctl", FAKE), ("ros2", GRAPH)):
+        (tmp_path / name).write_text(text)
+        (tmp_path / name).chmod(0o755)
 
-    def run(*args):
-        env = dict(os.environ, NAV_CW_ROOT=str(tmp_path / "nav_cw"), SYSTEMCTL=str(bin_ / "systemctl"),
-                   ROS2=str(bin_ / "ros2"))
+    def run(*args, old_planner=False):
+        env = dict(os.environ, NAV_CW_ROOT=str(tmp_path / "nav_cw"), SYSTEMCTL=str(tmp_path / "systemctl"),
+                   ROS2=str(tmp_path / "ros2"), STATE=str(state), NAV_CW_VERIFY_WAIT="0")
+        if old_planner:
+            env["FAKE_OLD_PLANNER"] = "1"
         return subprocess.run(["bash", SCRIPT, *args], capture_output=True, text=True, env=env)
 
     run.conf = conf / "mission_conf.pb.txt"
+    run.comm = conf / "communication_conf.pb.txt"
     run.env = tmp_path / "nav_cw" / "nav_cw.env"
-    run.calls = lambda: (tmp_path / "calls").read_text() if (tmp_path / "calls").exists() else ""
+    run.calls = lambda: (state / "log").read_text() if (state / "log").exists() else ""
+    run.state = state
     return run
 
 
-def test_shadow_mode_remaps_the_planners_commands(root):
+def test_shadow_mode_renames_the_planners_command_topics_and_checks_the_graph(root):
     r = root("shadow", "on")
     assert r.returncode == 0, r.stdout + r.stderr
-    env = root.env.read_text()
-    assert "NAV_CW_PLANNING_ARGS=" in env and "-r /cmd_vel:=/nav_cw/shadow/cmd_vel" in env
+    c = root.comm.read_text()
+    assert 'pub_cmd_vel                 { name: "/nav_cw/shadow/cmd_vel"' in c
+    assert 'pub_motion                  { name: "/nav_cw/shadow/mc/motion_control"' in c
+    assert "queue_size: 10" in c.split("pub_motion")[1].split("\n")[0]           # the rest of the line kept
     assert "restart cw-planning.service" in root.calls() and "shadow:           on" in r.stdout
+    assert "ok    planning     PUBLISHER         not on /mc/motion_control" in r.stdout
+    assert "ok    planning     PUBLISHER         on /nav_cw/shadow/mc/motion_control" in r.stdout
     r = root("shadow", "off")
-    assert "NAV_CW_PLANNING_ARGS" not in root.env.read_text() and "shadow:           off" in r.stdout
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert root.comm.read_text() == COMM and "shadow:           off" in r.stdout
+    assert "ok    planning     PUBLISHER         on /mc/motion_control" in r.stdout
+
+
+def test_shadow_mode_stops_a_planner_that_still_drives_the_dog(root):
+    """the planner ignores --ros-args (rclcpp::init(0, nullptr)): a shadow mode that the planner does not honour
+    must not leave it driving the dog"""
+    r = root("shadow", "on", old_planner=True)
+    assert r.returncode == 3
+    assert "WRONG planning     PUBLISHER         still on /mc/motion_control" in r.stdout
+    assert "SHADOW NOT IN EFFECT" in r.stdout and "stop cw-planning.service" in root.calls()
+    assert (root.state / "cw-planning.service").read_text().strip() == "inactive"
+
+
+def test_appmap_ignore_moves_both_off_the_apps_switch(root):
+    (root.state / "cw-slam.service").write_text("active")
+    r = root("appmap", "ignore")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'sub_map_switch              { name: "/nav_cw/map/switch" }' in root.comm.read_text()
+    assert 'NAV_CW_SLAM_ARGS="map_switch_topic:=/nav_cw/map/switch"' in root.env.read_text()
+    assert "restart cw-slam.service" in root.calls() and "restart cw-planning.service" in root.calls()
+    assert "ok    planning     SUBSCRIPTION      not on /map/switch" in r.stdout
+    assert "ok    mode_switch_node SUBSCRIPTION      not on /map/switch" in r.stdout
+    assert "appmap:           ignore" in r.stdout
+    r = root("appmap", "follow")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert root.comm.read_text() == COMM and "NAV_CW_SLAM_ARGS" not in root.env.read_text()
+    assert "ok    mode_switch_node SUBSCRIPTION      on /map/switch" in r.stdout
+
+
+def test_check_reports_the_graph(root):
+    r = root("check")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "graph (shadow off, appmap follow)" in r.stdout
 
 
 def test_debug_switches(root):

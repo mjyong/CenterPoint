@@ -164,8 +164,9 @@
 | T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 完成，已复核（2026-11-13）：GPU 版贴边也不卡了（切图回放 3%）；狗上录的真实目标进了门控（最多 5 辆）。1112 那一带没有人行横道；狗上的地图 c1adbe7b 只有 47 m 见方。复核发现：狗上的规划配置是旧版本的，我们的程序读不了（会起不来），上狗要用仓库的配置加狗上的取值 |
 | T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 完成，已复核（2026-11-14）：起来就读站点地图、没放行在人行横道上的处理、GPU 起点间隙都验了（T51 卡住那次 270/354 → 95/3109）。狗上的 App 只有 c1adbe7b，没有人行横道文件 |
 | T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 完成，已复核（2026-11-14）：狗上的 -dev 和 ROS 包都齐，只缺 g2o、acados、OsqpEigen，源码都在服务器上，不用人下载。和狗上的接口两处不同，其中 App 发目标的 /nav/navigation 多了 nav_mode，要人定 |
-| T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步（2026-11-14）：编过、装上、服务写了没 enable。17:55 nvidia 停了原来的规划、定位、感知和雷达，status 不是 theirs，演练没做 |
-| T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T56 | 半天 | 任务已写好 |
+| T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步，已复核（2026-11-14）：编、装、地图、服务都过了。复核发现影子模式按原来的做法不生效（规划不读命令行参数），已改；启动脚本的库路径、App 盘快满、App 的地图切换、演练的共享内存四件事交给 T59 |
+| T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T59 | 半天 | 任务已写好 |
+| T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径，App 盘和 App 地图按人定，域 42 演练（关共享内存、影子模式开着、在 ROS 图里查） | Agent | T56 复核、人定 App 地图 | 2 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -9408,7 +9409,7 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 写；不 apt、不 dpkg -i；原来的服务和它们的文件不动、不停；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。狗要停着（编译占 CPU）。
 仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T56
 
-0. git pull；pytest（同 T58 第 0 步；78 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
+0. git pull；pytest（同 T58 第 0 步；82 passed）。ssh dog true。/opt/seres/nav_cw 已经存在就停下问。
    源码包传到狗上：scp /public/zjst/robot/nav_cw_src/* dog:/home/nvidia/nav_cw_downloads/（先 ssh dog mkdir -p），两边 sha256sum 对一下。
 1. 依赖（T55：狗上的 -dev 和 ROS 包都齐，Livox SDK 在 /usr/local，不用 .deb）：只编三个源码包，装到 /opt/seres/nav_cw/deps（不装进系统）：
    - g2o 20230806_git、acados 0.5.1（含 blasfeo、hpipm）、OsqpEigen 0.10.0：解到 /opt/seres/nav_cw/src/deps/，cmake -DCMAKE_INSTALL_PREFIX=/opt/seres/nav_cw/deps，
@@ -9533,6 +9534,117 @@ vehicle:      d20/001
 
 **代码改动。** `nav_cw.sh configure` 原来 `find` 到的是 `lib/lightning/config/default_d20.yaml`，launch 读的是 `share` 那份。改成优先改 share。`tests/dog/test_nav_cw.py` 加了一条，10 passed。
 
+
+### T56 复核（2026-11-14）
+
+编、装、地图、configure、服务都做对了；deps 只有 15 MB、没进系统；`ldd` 0 个 not found；温度最高 64 °C。`configure` 改了
+`lib/` 下那份、launch 读 `share/` 那份，这个抓得好（399ec41，测试 14 passed）。停在第 6 步也对：原来的服务是 17:55 nvidia 用 sudo
+停的（连激光、相机驱动、云台、视频），不是我们的东西停的，我们不去起它们。**要人确认是谁停的、什么时候恢复**。
+
+复核发现的：
+
+1. **影子模式按原来的做法不生效**（我在 54fb8f3 写的，T56 没用到）：规划 `communication_factory.cc` 里是 `rclcpp::init(0, nullptr)`，
+   命令行的 `--ros-args -r /cmd_vel:=...` 全被忽略，`shadow on` 以后狗照样按规划走。能动狗的只有 `ros_bridge.cc` 的两个发布者
+   `/cmd_vel`、`/mc/motion_control`，名字都来自 `communication_conf.pb.txt` 的 `pub_cmd_vel`、`pub_motion`。改成：`nav_cw.sh shadow on`
+   改装好的那份 `communication_conf` 里这两个名字，重启 `cw-planning`，再到 ROS 图里查谁在发（`ros2 topic info -v`）：影子开着规划还在发
+   `/mc/motion_control` 就停掉 `cw-planning`、退出 3；`use-new` 换完也查，对不上就换回。新命令 `nav_cw.sh check` 随时查。
+   测试里假的 ros2 模拟一个不读配置的规划，验了会被停掉（`tests/dog/test_nav_cw.py`，17 passed）。unit 不再需要 `$$NAV_CW_PLANNING_ARGS`。
+2. T56 用的是 768538b，没有开关：三个 unit 没有 `EnvironmentFile=`。T59 补。
+3. **感知启动脚本的库路径**：`export LD_LIBRARY_PATH=deps...:/opt/seres/nav_perception/lib:...:${LD_LIBRARY_PATH}` 是照机器人团队的脚本抄的，
+   它把机器人团队的库目录放在我们安装的库**前面**，我们的 `lidar_seg`、`grid_map_memory_node`、`lidar_3d_detection` 也会先去那里找库
+   （同名的 glog、gflags、octomap 版本不一样就是 ABI 问题）。报告里的 `ldd` 是在"deps 在前，再 source setup.bash"的环境下查的，
+   和启动脚本的顺序不一样，不算数。改：这个目录只给云台、回充那两个子 shell 加；按启动脚本的真实环境再 `ldd`，我们三个节点不许解析到
+   `/opt/seres/nav_perception/` 下的库。
+4. **App 的盘快满了**：`/userdata` 只有 433 MB，拷进去的 ad68517c 占了 378 MB（a70c6db6 拷到一半就写满了）。机器人的服务在这块盘上写配置，
+   满了可能出问题。要 `df -h /userdata` 看还剩多少。
+5. **App 能不能选到 ad68517c 没确认**（没改 App 的数据库）。选不到的话，App 最后发的 `/map/switch` 是 c1adbe7b（latched），
+   我们的规划一起来就换成它（0 个人行横道），定位也换到 c1adbe7b（47 m 见方那张）——**定位换图是安全问题**。
+   定位收到 `/map/switch` 时按最后一级目录名比，和当前同名就不换（`mode_switch_node.cc` `onMapSwitch`），所以 App 选的是 ad68517c 时
+   定位不动，规划重读 `/userdata` 那份（内容一样）。
+   新加 `nav_cw.sh appmap ignore`：规划的 `sub_map_switch` 改名成 `/nav_cw/map/switch`，定位的 launch 加了参数 `map_switch_topic`
+   （仓库改了 `Nav_D20/slam/lightning-lm-master/launch/model_switch_launch.py`，默认还是 `/map/switch`；unit 传 `$$NAV_CW_SLAM_ARGS`），
+   两个都在 ROS 图里查。这样我们的导航不依赖 App 选哪张图，`/userdata` 里那份也可以删掉，App 的盘就回来了；代价是 App 上显示的狗
+   位置在它自己那张图上，不准（现场看 Foxglove）。**建议现场用 ignore，要人定**（2026-11-14 定的是"App 当前地图换成仓库版"）。
+6. **演练的共享内存**：T56 第 7 步让演练的进程用机器人的 CycloneDDS 配置（开着共享内存，`iox-roudi` 是机器人的 root 进程）。T40 时它的
+   发布者表满过（不限白名单的桥就把它占满）；三套演练进程再挂上去，可能把表占满，影响机器人自己的服务；共享内存按不按域隔开也没验证过。
+   演练改成用关了共享内存的配置副本（只走 UDP，域 42 的端口和域 0 分开），而且影子模式开着：就算串了，规划也不发 `/mc/motion_control`。
+7. 规划还是 768538b 编的，`/planning/debug/crosswalk` 不画骑车的（54fb8f3 加的，只是调试画面），下次重编带上。
+
+文档同步：`docs/DOG_FIELD_GUIDE.md` 第 5 节（影子模式怎么实现、`appmap`、`check`）、第 3.2 节（演练关共享内存）；T57 第 2c 步要求影子模式
+开着时先 `check`。
+
+---
+
+## T59 补完 T56：开关、unit、库路径、App 地图，域 42 演练
+
+```text
+任务 T59（T56 复核以后；第 4 步要人定 App 地图，复核第 5 条）。狗上的规矩同 T56：只写 /opt/seres/nav_cw/、/etc/systemd/system/cw-*.service、
+/userdata/config/robot_service/map/ 里我们拷进去的那份、/home/nvidia/、/tmp/nav_cw_rehearsal/；不 apt、不 dpkg -i；机器人团队的服务和文件
+不动、不停、不起（现在它们是停着的：谁停的人去问，我们不管）；演练只用 ROS_DOMAIN_ID=42。sudo 用 sudo -n。
+仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T59
+
+0. git pull；pytest（同 T58 第 0 步；82 passed）。ssh dog true。记下：
+     sudo -n bash /opt/seres/nav_cw/nav_cw.sh status       （我们的三个有 active 的：停下问；原来的停着照做）
+     df -h /userdata /opt；ls -la /userdata/config/robot_service/map/；ls -la /opt/seres/nav_perception/lib | head -60
+   全部存 data/reports/T59/before.txt。
+1. 脚本和 launch（服务器 → 狗）：
+     scp tools/deploy/nav_cw.sh tools/deploy/nav_cw_foxglove.sh dog:/tmp/ && ssh dog 'sudo -n cp /tmp/nav_cw*.sh /opt/seres/nav_cw/'
+     rsync 仓库的 Nav_D20/slam 到 /opt/seres/nav_cw/src/Nav_D20/slam（同 T56 第 2 步的写法）；装好的那份 launch 换成新的：
+       L=$(find /opt/seres/nav_cw/install/slam -path '*share/lightning/launch/model_switch_launch.py')
+       sudo -n cp -p $L $L.t56   （备份）
+       sudo -n cp /opt/seres/nav_cw/src/Nav_D20/slam/lightning-lm-master/launch/model_switch_launch.py $L
+       diff $L.t56 $L   （只有 map_switch_topic 那几行；launch 是 Python，装的就是原样拷贝，不用重编）
+2. unit 和启动脚本（先把现在的四个存成 data/reports/T59/*.before）：
+   - 三个 unit 的 [Service] 都加 EnvironmentFile=-/opt/seres/nav_cw/nav_cw.env（前面的 "-"：没这个文件也能起）；
+   - cw-slam 的 ExecStart 末尾加 $$NAV_CW_SLAM_ARGS：
+       ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/slam/setup.bash; ros2 launch lightning model_switch_launch.py rviz:=false $$NAV_CW_SLAM_ARGS'
+     （两个 $：systemd 原样交给 bash；没设时是空的）；cw-planning 的 ExecStart 不变（规划不读命令行参数，影子模式改它的配置）；
+   - /opt/seres/nav_cw/start/start_nav_perception_bg.sh：全局的 LD_LIBRARY_PATH 去掉 ${THEIRS}/lib（留 deps、/usr/local/lib、cuda）；
+     云台和回充的子 shell 里各自 export LD_LIBRARY_PATH="${THEIRS}/lib:<它自己的目录>:${LD_LIBRARY_PATH}"；
+   - sudo -n systemctl daemon-reload；systemctl cat 三个 unit 存 data/reports/T59/。
+   - 库（按启动脚本的真实环境）：把启动脚本 start_node 之前的几行（source 两个 setup.bash、export 那几行）拷成 /tmp/nav_cw_env.sh，
+       sudo -n bash -c 'source /tmp/nav_cw_env.sh; for b in <lidar_seg、grid_map_memory_node、lidar_3d_detection 三个可执行文件>; do
+         echo "== $b"; ldd $b | grep -E "not found|/opt/seres/nav_perception/"; done'
+     两种都要 0 行（我们的节点不许用机器人团队的库）；不是 0 抄下来，停下。
+3. 开关（服务不起，只改文件）：
+     sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on；appmap ignore；speed 0.8；switches
+     grep -nE "pub_cmd_vel|pub_motion|sub_map_switch" <装好的 communication_conf>；cat /opt/seres/nav_cw/nav_cw.env；nav_cw.sh speed show
+   抄下来。speed off 放回；shadow on、appmap ignore 留着给第 5 步。
+4. App 地图（按人定，复核第 5 条；人没回就只抄第 0 步的 df，不动）：
+   - 定 ignore：sudo -n rm -rf /userdata/config/robot_service/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13（我们拷进去的；c1adbe7b 不动），
+     df -h /userdata 再抄一次；现场 use-new 前 appmap 一直是 ignore；
+   - 定 follow：留着；App 里选不选得到人去看；第 5 步最后 appmap follow。
+5. 演练（域 42；狗停着、人知道）。照 T56 第 7 步，改这几处：
+   - 所有演练进程（感知三个节点、定位、规划、bag play、record、Foxglove 桥、ros2 命令）用关了共享内存的 CycloneDDS 配置：
+       mkdir -p /tmp/nav_cw_rehearsal; cp /opt/ros/cyclonedds.xml /tmp/nav_cw_rehearsal/cyclonedds.xml
+     把里面 SharedMemory 的 Enable 改成 false（没有这一项就停下抄全文）；diff 两份存报告（只有这一处）；
+       export ROS_DOMAIN_ID=42 CYCLONEDDS_URI=file:///tmp/nav_cw_rehearsal/cyclonedds.xml PLANNING_TIMEOUT_WALL_CLOCK=1
+     环境其余同 cw-*.service（systemctl cat 看 Environment=）；
+   - 定位：ros2 launch lightning model_switch_launch.py rviz:=false map_switch_topic:=/nav_cw/map/switch；
+   - 规划读的是装好的 communication_conf（第 3 步：影子开着、appmap ignore）。起来 10 s 后查图并抄下：
+       ros2 topic info -v /mc/motion_control；ros2 topic info -v /cmd_vel；ros2 topic info -v /nav_cw/shadow/mc/motion_control；
+       ros2 topic info -v /map/switch
+     要：前两个没有 planning 发，第三个有 planning 发，第四个没有 planning、mode_switch_node 订。不对：停掉所有演练进程，停下；
+   - 录包（T56 第 7 步那些话题，加 /nav_cw/shadow/cmd_vel、/nav_cw/shadow/mc/motion_control、/planning/debug/crosswalk）；
+     bag play、5 s 后发目标同 T56；
+   - 放到 60 s 时在域 42 发一条 latched 的地图切换，指向 c1adbe7b（完整目录名看第 0 步的 ls）：
+       ros2 topic pub --once --qos-durability transient_local --qos-reliability reliable /map/switch std_msgs/msg/String "{data: <c1adbe7b 的路径>}"
+     之后规划日志里不许有 "Map switch"，定位日志里不许有"收到 /map/switch"（appmap ignore 生效）；
+   - Foxglove 桥：sudo -n env ROS_DOMAIN_ID=42 CYCLONEDDS_URI=file:///tmp/nav_cw_rehearsal/cyclonedds.xml bash /opt/seres/nav_cw/nav_cw_foxglove.sh；
+     foxglove_probe.py 同 T56，话题再加 /nav_cw/shadow/mc/motion_control；
+   - tegrastats --interval 1000 同 T56（这次机器人的服务停着，数字偏低，报告里写明）；
+   - 放完停掉所有演练进程；sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow off；speed off；appmap 按第 4 步；switches 抄下来；
+     /tmp/nav_cw_rehearsal 和录包拷回服务器 work_dirs/t59_rehearsal/，狗上的录包和 1112 删掉。
+6. 服务器上看（同 T56 第 8 步）：check_planning_mcap.py（/cmd_vel 那行缺是对的：影子模式，指令在 /nav_cw/shadow/cmd_vel）、
+   planning_mcap_viz.py、objects_in_map.py（要 extrinsic OK）；规划日志：车型 d20/001、"startup map … 5 crosswalks"、往前的 CMD、
+   人行横道状态序列、60 s 以后没有 "Map switch"；定位：odom 跳不跳；tegrastats。
+7. 提交：data/reports/T59/、work_dirs/t59_rehearsal（录包 LFS）、本文档。
+
+停止条件：第 0 步我们的服务有 active 的；第 2 步 ldd 不是 0 行；第 5 步图不对（规划还在发 /mc/motion_control）；第 6 步 WRONG。
+报告（写进"T59 结果"）：第 0 步的 df 和两个 ls；四个文件改前改后；ldd；第 3 步的输出；第 4 步做了什么；演练的图、日志、objects_in_map、
+tegrastats；最后的 switches。
+```
+
 ---
 
 ## T57 现场：换成我们的，过人行横道，换回
@@ -9560,7 +9672,8 @@ vehicle:      d20/001
 2c. 摸清运控、影子模式（DOG_FIELD_GUIDE.md 第 8 节第 1、3 步；空场地，狗旁边没人没车，急停在手）：
    - speed 0.3，在 2 m 外发目标，狗走起来以后依次试：遥控能不能接管、松手以后谁在发；sudo -n systemctl stop cw-planning 以后狗是停下
      还是按最后的速度走（再 start 回来、重发目标）；急停按下、松开以后的状态。每一条写进报告；stop 以后狗不停，就记下"stop 不能当软停"；
-   - shadow on：人用遥控把狗遛到人行横道前、停下、转向对面、走过去；Foxglove 里看状态 approach → align → wait / go → cross、
+   - shadow on：输出里图那几行都要是 ok（规划不在 /mc/motion_control 上发；不 ok 它会自己停掉 cw-planning、退出 3：停下，不往下做）；
+     人用遥控把狗遛到人行横道前、停下、转向对面、走过去；Foxglove 里看状态 approach → align → wait / go → cross、
      影子的指令曲线；有车经过时看红框和 waiting for。看完 shadow off；
    - 然后 speed 0.5（第 4 步 a 用），b、c 前人定要不要 0.8。
 3. 录包（每次测试一个，名字 1113_cw_<n>；话题用 DOG_FIELD_GUIDE.md 第 9 节那张表，多了 /mc/motion_control 和影子的两个）：ros2 bag record（域 0）1112 那些话题，加上 /lightning/odom、/cmd_vel、
@@ -9600,7 +9713,7 @@ vehicle:      d20/001
 
 0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_planning_viz.py tests/dog/test_yield_gate.py tests/dog/test_yield_gate_cpp.py \
        tests/dog/test_bag_on_map.py tests/dog/test_objects_in_map.py tests/dog/test_nav_cw.py tests/dog/test_nav_cw_fetch.py \
-       tests/dog/test_nav_stack_env.py -q | tail -1   （78 passed）
+       tests/dog/test_nav_stack_env.py -q | tail -1   （82 passed）
    docker images | grep -E "nvidia/tensorrt.*24.08|dogperc-dev"（底镜像在本机）。
 1. 镜像：
      docker build -t nav-dev -f Nav_D20/docker/Dockerfile.nav-dev Nav_D20/docker 2>&1 | tail -40 | tee data/reports/T58/docker_build.txt
