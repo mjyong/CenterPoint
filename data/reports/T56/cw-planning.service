@@ -1,0 +1,22 @@
+[Unit]
+Description=nav_cw planning
+After=network.target
+Conflicts=planning.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/seres/nav_cw/install/planning
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml
+Environment=LD_LIBRARY_PATH=/opt/seres/nav_cw/deps/usr/lib/aarch64-linux-gnu:/opt/seres/nav_cw/deps/usr/lib:/opt/seres/nav_cw/deps/lib:/opt/seres/nav_cw/deps/opt/acados/lib:/usr/local/cuda/lib64
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/planning/setup.bash; ros2 run planning planning'
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cw-planning
+
+[Install]
+WantedBy=multi-user.target

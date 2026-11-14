@@ -164,7 +164,7 @@
 | T53 | 用 1112 狗上录的包回放：只读拷狗上的定位地图和配置；看 1112 在哪张图上、过不过人行横道；回放（包里的目标，能编出感知节点就现场重算）；重编规划（MPPI GPU 改了） | Agent | T52 | 2 小时 | 完成，已复核（2026-11-13）：GPU 版贴边也不卡了（切图回放 3%）；狗上录的真实目标进了门控（最多 5 辆）。1112 那一带没有人行横道；狗上的地图 c1adbe7b 只有 47 m 见方。复核发现：狗上的规划配置是旧版本的，我们的程序读不了（会起不来），上狗要用仓库的配置加狗上的取值 |
 | T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 完成，已复核（2026-11-14）：起来就读站点地图、没放行在人行横道上的处理、GPU 起点间隙都验了（T51 卡住那次 270/354 → 95/3109）。狗上的 App 只有 c1adbe7b，没有人行横道文件 |
 | T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 完成，已复核（2026-11-14）：狗上的 -dev 和 ROS 包都齐，只缺 g2o、acados、OsqpEigen，源码都在服务器上，不用人下载。和狗上的接口两处不同，其中 App 发目标的 /nav/navigation 多了 nav_mode，要人定 |
-| T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 任务已写好 |
+| T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步（2026-11-14）：编过、装上、服务写了没 enable。17:55 nvidia 停了原来的规划、定位、感知和雷达，status 不是 theirs，演练没做 |
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T56 | 半天 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 任务已写好（服务器上的，等狗、等下载的时候先做） |
 
@@ -9497,6 +9497,41 @@ python3 tools/deploy/nav_cw_fetch.py data/reports/T55/fetch_urls.txt nav_cw_down
 报告（写进"T56 结果"）：deps 解了哪些、改了哪些路径；编译各自最后 30 行和用了多久、温度；ldd not found 行数；狗上装了什么、多大；
 地图两处的 ls 和换回办法；configure 输出；三个 unit 和启动脚本；演练的 planning、定位、objects_in_map、tegrastats 的数。
 ```
+
+### T56 结果
+
+停在第 6 步。编、装、地图、服务都做了。`nav_cw.sh status` 是 `running: mixed (0 of theirs, 0 of ours active)`，不是 theirs，域 42 演练没做，也没有把原来的服务拉起来。
+
+**谁停的。** 17:55:59 nvidia 执行了 `sudo systemctl stop slam.service rte_ptz_control.service camera_geac.service nav_perception.service hesai_lidar_driver.service lidar-3d-detection.service planning.service livox_lidar_driver.service video_rtc.service`。四个导航服务的 `Result=success`、`ExecMainStatus=15`（lidar-3d 是 2），是被停的，不是编挂的。我们的三个 unit 是 disabled，没有 start。
+
+**依赖（只在 `/opt/seres/nav_cw/deps`，15 MB，没装进系统）。** 源码包两边 sha256 一致。
+
+- g2o `20230806_git`：972 s，装到 `/opt/seres/nav_cw/deps`（`lib/cmake/g2o`）
+- acados 0.5.1（blasfeo、hpipm、QPOASES）：100 s，`BLASFEO_TARGET=ARMV8A_ARM_CORTEX_A57`，装到 `/opt/seres/nav_cw/deps/opt/acados`（`NAV_ACADOS_DIR` 指这里，不进系统的 `/opt/acados`）
+- OsqpEigen 0.10.0：11 s。osqp 用仓库 `planning/third_party/osqp/lib_arm` 的 aarch64 库。规划的 `find_package(osqp)` 不认 `lib_arm/cmake` 的相对路径，所以把同一份库和头文件放进 deps 前缀（`deps/lib/libosqp.so`、`deps/include/osqp`、`deps/lib/cmake/osqp`）
+
+**编译。** `git` `768538b`。`nice -n 19`、`NAV_JOBS=4`、`NAV_WORKERS=2`。tegrastats 1404 条：CPU 平均 55.1 °C、最高 63.9 °C，GPU 平均 43.5 °C、最高 48.9 °C，没有到 85 °C。各阶段在 `data/reports/T56/build_summary.txt`。
+
+- 感知接口 16 min 48 s，lidar_seg / grid_map / lidar_3d 8 min 56 s
+- 定位接口加 livox 8 min，lightning 18 min 7 s
+- 规划接口过了；第一次 `find_package(osqp)` 失败（上面那条路径）。补进 deps 以后规划 6 min 31 s
+
+`ldd`（deps 的 `LD_LIBRARY_PATH` 在前，再 source 各自的 `setup.bash`）：planning、mode_switch_node、lidar_seg、grid_map_memory_node、lidar_3d_detection 的 `not found` 都是 0。安装：感知 86 MB、规划 240 MB、定位 40 MB。每个 `install/<模块>/version.txt` 是 2026-11-14、`768538b`。
+
+**地图。** `/opt/seres/nav_cw/maps/` 里两张都在（ad68517c 378 MB，带 `semantic.osm`；a70c6db6 196 MB）。App 的盘 `/userdata` 只有 433 MB。ad68517c 拷进了 `/userdata/config/robot_service/map/`（原来的 c1adbe7b 5.9 MB 还在）。a70c6db6 拷到一半盘满了，残的那份已删掉，只留在 `/opt/seres/nav_cw/maps/`。换回：`sudo rm -rf /userdata/config/robot_service/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13`。App 能不能选到，没改数据库。
+
+**configure：**
+
+```text
+debug topics:  enable_global_map_pub: true  pub_flag: true
+localization: map_path: /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13  (/opt/seres/nav_cw/install/slam/lightning/share/lightning/config/default_d20.yaml)
+planning:     startup_map_dir: "/opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13"  (/opt/seres/nav_cw/install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf/preprocess_conf.pb.txt)
+vehicle:      d20/001
+```
+
+**服务。** 三个 unit 和启动脚本全文在 `data/reports/T56/`。没 enable。cw-nav-perception 起我们的 lidar_seg、grid_map、lidar_3d（模型用狗上 `/opt/seres/perception/lidar_3d_detection/model`，`LIDAR3D_LOCK_CLOCKS=1`），云台和回充仍从 `/opt/seres/nav_perception` 起。
+
+**代码改动。** `nav_cw.sh configure` 原来 `find` 到的是 `lib/lightning/config/default_d20.yaml`，launch 读的是 `share` 那份。改成优先改 share。`tests/dog/test_nav_cw.py` 加了一条，10 passed。
 
 ---
 
