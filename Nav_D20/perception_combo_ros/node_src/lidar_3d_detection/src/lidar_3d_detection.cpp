@@ -133,9 +133,12 @@ bool Lidar3dDetection::Init() {
           inputs_->on_odom(lidar3d::ros::odom(*msg));
         });
   }
+  // best effort on the dog (a slow reader must not hold up the lidar driver; shared memory loses nothing there);
+  // cloud_reliable for a replay over UDP, where best effort loses whole clouds to one lost fragment (T58 review)
+  rclcpp::QoS cloud_qos = rclcpp::SensorDataQoS().keep_last(5);
+  if (declare_parameter<bool>("cloud_reliable", false)) cloud_qos.reliable();
   cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
-      nc.lidar_topic, rclcpp::SensorDataQoS().keep_last(5),
-      [this](sensor_msgs::msg::PointCloud2::SharedPtr msg) { OnCloud(msg); });
+      nc.lidar_topic, cloud_qos, [this](sensor_msgs::msg::PointCloud2::SharedPtr msg) { OnCloud(msg); });
 
   objects_pub_ = create_publisher<perception_interface::msg::LidarObjectArray>(objects_topic_, 5);
   tracks_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(tracks_topic_, 5);

@@ -17,6 +17,8 @@ def generate_launch_description():
         DeclareLaunchArgument("local_frame", default_value="lidar_det"),
         DeclareLaunchArgument("publish_tf", default_value="false",
                               description="TF for viewers on a replayed bag (not on the vehicle: its TF tree has the lidar)"),
+        DeclareLaunchArgument("cloud_reliable", default_value="false",
+                              description="reliable cloud subscription, for replays over UDP (best effort on the dog)"),
     ]
     node = Node(
         package="lidar_3d_detection",
@@ -31,6 +33,7 @@ def generate_launch_description():
             "threads": ParameterValue(LaunchConfiguration("threads"), value_type=int),
             "local_frame": LaunchConfiguration("local_frame"),
             "publish_tf": ParameterValue(LaunchConfiguration("publish_tf"), value_type=bool),
+            "cloud_reliable": ParameterValue(LaunchConfiguration("cloud_reliable"), value_type=bool),
         }],
     )
     return LaunchDescription(args + [node])

@@ -127,8 +127,10 @@ elif [[ -n "${LIVE_PERCEPTION_MODEL:-}" ]]; then
   # 镜像里（NAV_STACK_ROOT）：我们的感知节点用仓库的部署配置现场算目标；包里录的改名避开（BAG_PLAY_EXTRA 没给时）
   [[ -n "${NAV_STACK_ROOT:-}" ]] || { echo "LIVE_PERCEPTION_MODEL 要在 nav-dev 镜像里用（Nav_D20/docker/run.sh）"; exit 1; }
   perc_config="${nav_root}/perception_combo_ros/node_src/lidar_3d_detection/config/lidar_3d_detection.yaml"
+  # 云订成 reliable（LIVE_PERCEPTION_RELIABLE=0 是狗上那样的 best effort）：容器里走 UDP，best effort 丢一个分片就丢整帧（T58 复核）
   ( nav_exec nav_perception ros2 launch lidar_3d_detection lidar_3d_detection.launch.py config:="${perc_config}" \
-      model_dir:="${LIVE_PERCEPTION_MODEL}" ) >"${log_dir}/perception.log" 2>&1 &
+      model_dir:="${LIVE_PERCEPTION_MODEL}" \
+      cloud_reliable:="$([[ "${LIVE_PERCEPTION_RELIABLE:-1}" == 0 ]] && echo false || echo true)" ) >"${log_dir}/perception.log" 2>&1 &
   pids+=($!)
   echo "感知节点：我们的 lidar_3d_detection（${perc_config}，模型 ${LIVE_PERCEPTION_MODEL}）"
   [[ -n "${BAG_PLAY_EXTRA:-}" ]] || play_args+=(--remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects)

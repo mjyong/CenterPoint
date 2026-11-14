@@ -168,8 +168,9 @@
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T61 | 半天 | 任务已写好 |
 | T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
 | T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成，已复核（2026-11-14）：定位不再因大消息退出，odom 约 100 Hz；缩略图一条、Foxglove 订了规划没重启；外参 OK。复核加了：use-new 等 odom（INS 30 s 没固定解定位起不来）、bag_to_mcap.py（狗上录的是 sqlite3） |
+| T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 任务已写好 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 任务已写好 |
-| T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步 |
+| T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
   - 部署：T40（含 T35：A 段随时做；B 段等人带 8 号狗出门）→ 定开机锁频（deb 已有开关，默认关）、天线配置；
@@ -9883,6 +9884,38 @@ Foxglove：`foxglove_bridge on 8765, domain 42`。探针 12 秒：`/planning/deb
 
 ---
 
+## T62 nav-dev 里规划为什么慢一倍、现场感知为什么停（服务器）
+
+```text
+任务 T62（T58 复核以后；服务器上的，不用狗）。nav-dev 镜像回放时：规划约 8 Hz（T54 的 micromamba 约 21 Hz）；我们的感知节点 30 帧以后
+收不到云（T58 复核第 1、2 条）。先查清楚，能改的小改；nav-dev 当不当默认的回放环境看这一条。
+可以改的范围：Nav_D20/docker/、Nav_D20/planning/script/；模块的代码不改（要改就停下写清楚）。回放用已经建好的容器 docker exec
+（docker create 在 vfs 上二十多分钟，T58），环境变量用 docker exec -e 传。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T62
+
+0. git pull；pytest（T58 第 0 步那九个文件，EIGEN_DIR 设上；88 passed）。nvidia-smi 看哪张卡空，用空的那张。
+   容器里重编 nav_perception（节点加了 cloud_reliable；build_stack.sh ... nav_perception），ldd not found 0。
+1. 规划的周期：
+   a. 每秒几个周期：T58 那次 work_dirs/planning_io_t58_cross/logs/planning.log 里 mission_state 行按秒数一数（中位、p10、p90）；
+      micromamba 再放一次同一段（T54 的命令，replay_planning_check.sh … 78.7 226.6），同样数；两边并排；
+   b. 编译选项：两边规划的 CMakeCache.txt 里 CMAKE_BUILD_TYPE、CMAKE_CXX_FLAGS、CMAKE_CXX_FLAGS_RELEASE、CMAKE_CUDA_FLAGS，
+      还有 acados、OSQP（Dockerfile 里从源码编的那两个）的 CMAKE_BUILD_TYPE；
+   c. nav-dev 再放一次那一段，放的时候每 5 s：top -H -b -n 1 -p <planning 的 pid> | head -20（哪个线程忙）、
+      nvidia-smi --query-gpu=index,utilization.gpu,memory.used --format=csv、uptime（负载）；
+   d. 找到原因（比如某个库是 Debug、和谁抢 CPU）能在 Nav_D20/docker/ 里改的就改、重编、再数一次；找不到就把 a–c 报上来。
+2. 现场感知（1112，同 T58 第 4 步那次 t58_1112_live）：
+   a. 默认（这次是 reliable）放一次：节点每秒那一行的 clouds / skipped（中位、最少），/perception/lidar_3d/objects 一共几条（包里的云几帧）；
+   b. 同时另开：ros2 topic hz --qos-reliability best_effort /robot/topic/rdap/top_point_cloud2（容器里，同一个域），每 10 s 记一次；
+   c. 还会停的话，停了以后：容器里 /tmp/lidar_3d_detection_logs 里节点的 glog 文件（WARNING、ERROR）抄下来；
+      cat /proc/<节点 pid>/task/*/wchan；有 gdb 就 gdb -p <pid> -batch -ex "thread apply all bt" | head -80；
+   d. LIVE_PERCEPTION_RELIABLE=0 再放一次（T58 那样的 best effort），看是不是又停：两次并排；
+   e. 不停了就跑 objects_in_map.py，和 T61 狗上的（4 条静止车，−90° 漂移中位 0.12 m，OK）比。
+3. 提交：data/reports/T62/、本文档；改了 Nav_D20/docker/ 或脚本就写进 PATCHES.md。
+
+报告（写进"T62 结果"）：第 1 步 a 的两边周期、b 的编译选项、c 的线程和 GPU、d 改了什么；第 2 步 a–e 的数。
+```
+
+---
+
 ## T60 服务器上的 arm64 编译环境：狗的根文件系统做成镜像，QEMU 里编
 
 ```text
@@ -10111,3 +10144,23 @@ no static vehicle track seen for 20+ frames while the dog moved >= 1 m or turned
 `/viz/state` 的 `planning.crosswalk_vehicles` 最大是 0（T53 用包里录的目标，最大 5）。节点算法代码没改。
 
 回放是在已经建好的容器里 `docker exec` 的。`docker create` 在这台机器的 vfs 上要二十多分钟，没有为每一次回放再 `docker run`。
+
+
+### T58 复核（2026-11-14）
+
+镜像、编译、`ldd` 都好；补的两处（`OPAL_PREFIX` 让 PCL 的 FindMPI 去找不存在的头文件、定位缺 `libGeographicLib.so.26`）是对的。
+和 T54 的过马路回放对上了：状态顺序一样（approach → align（stale）→ 没放行上了人行横道 → wait → cross → none），定位没跑飞、
+solver failed 没多出来。外参这一条不用再在这里做了：T61 在狗上用我们现场重算的目标做了，**extrinsic OK**。还没完的两件：
+
+1. **规划循环慢一倍多**：nav-dev 里 14:21:09–14:24:05 一共 1423 个周期，约 8 Hz；T54（micromamba）同一段约 21 Hz（目标 20 Hz）。
+   服务器是 RTX 4090（sm_89），`NAV_CUDA_ARCH` 默认 89 对得上，日志里 MPPI 也是 CUDA 那条路，不是退回了 CPU。原因还不知道
+   （编译选项？和别的进程抢 CPU/GPU？容器？）。门控的计时、MPPI 都和周期有关，弄清楚之前 nav-dev 不当默认的回放环境。
+2. **现场感知 30 帧以后不发了**：节点每秒那一行是 `clouds 1–5 … skipped 6–20`，`skipped` 是云的时间戳里缺的帧，也就是大部分云没到节点；
+   14 s 以后连这一行都没了（这一行在收到云的回调里打），说明后来一帧云都没进回调。同一时间 `lidar_seg`、`grid_map` 一直在收。
+   差别：`lidar_seg` 用默认 QoS（reliable）订，我们的节点用 `SensorDataQoS`（best effort）。容器里没有共享内存，一帧 1–2 MB 的云
+   走 UDP 要拆成几百个分片，best effort 丢一个分片整帧就没了；狗上走共享内存不丢（T61 一直有目标）。完全停掉这一点还说不全，
+   也可能是回调卡住了。改了：节点加参数 `cloud_reliable`（默认 false，狗上照旧 best effort：慢的 reliable 读者会拖住激光驱动），
+   launch 加同名参数；回放脚本的 `LIVE_PERCEPTION_MODEL` 默认传 `cloud_reliable:=true`（`LIVE_PERCEPTION_RELIABLE=0` 是 best effort，
+   用来复现），`run.sh` 把这个变量传进容器。要重编 nav_perception。
+
+T62 接着查这两件。T58 停在这里（第 4 步以后不用再做）。
