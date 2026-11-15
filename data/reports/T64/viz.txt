@@ -1,0 +1,13 @@
+/public/zjst/robot/cp_data/20261115_cw_1_mcap -> work_dirs/t64_cw_1/viz/planning_viz.mcap (17.2 MB), 162.4 s of bag time from 1794727411.470
+  time base: the bag's stamps; the recorder's clock was 0.0 s (0.0 days) ahead
+  pose: /tf map -> base_link, 16241 samples
+  /map/occupancy_grid -> /viz/perception_grid: 1625 grids
+  local planner: zero command in 0 of 3249 active cycles (0%); with costmap obstacles under the footprint 0 of 0, without 0 of 3249
+  route map: ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip:ad68517c-e845-42a4-b5dd-a6b7c6d2af13/2d/1780551612/map.png, 1041 x 934 cells around the run, 19829 route cells
+  crosswalks: 5 in the map, 1 near the run
+  INS: 16259 messages, RTK fixed 100%, odom - INS median 0.33 m (origin 29.731405, 106.783891, 217.2)
+  overview: work_dirs/t64_cw_1/viz/planning_viz.png
+  topics: /tf 16241, /viz/crosswalks 11, /viz/events 1, /viz/flow 3249, /viz/legend 11, /viz/loc/flow 813, /viz/loc/ins 325, /viz/loc/state 813, /viz/perception_grid 1625, /viz/plan 3249, /viz/robot 1625, /viz/route_map 11, /viz/state 3249, /viz/trail 325
+  events: 1 (0 warnings or errors) on /viz/events
+  open in Foxglove with the layout Nav_D20/planning/script/planning_viz.json
+VIZ_EXIT:0

@@ -1,0 +1,14 @@
+  /lightning/odom                                       16243
+  /map/occupancy_grid                                    1625
+  /nav_cw/shadow/cmd_vel                                 3248
+  /nav_cw/shadow/mc/motion_control                       3248
+  /perception/lidar_3d/objects                           1625
+  /planning/debug/crosswalk                              3249
+  /planning/debug/path_tracking                          3249
+  /planning/debug/plotjuggler/string                     3249
+  /robot/topic/rdap/top_point_cloud2                     1625
+  /rte/rdap/rtk/imus/data_raw                           16259
+  /rte/rdap/rtk/inspvax                                 16259
+  /tf                                                   19488
+/public/zjst/robot/cp_data/20261115_cw_1_mcap: 12 topics, 89367 messages
+BAG_EXIT:0

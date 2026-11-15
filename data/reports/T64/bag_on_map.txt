@@ -1,0 +1,7 @@
+/public/zjst/robot/cp_data/20261115_cw_1_mcap: 16259 INSPVAX (100% good, 100% RTK fixed), 163 s; track in the map frame (origin 29.731405, 106.783891): start (199.1, 463.8), end (199.1, 463.8), x 199..199, y 464..464, 0 m long
+/perception/lidar_3d/objects: 1625 messages; vehicles per message: max 7, frames with a vehicle 100%, with a moving one 25%; nearest vehicle: median 34.8 m, min 15.3 m
+
+map ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip:ad68517c-e845-42a4-b5dd-a6b7c6d2af13/2d/1780551612/map.png: 100% of the track inside the map, 100% within 0.5 m of a route cell
+  crosswalk 22 (centre 187.2, 473.8): track passes by, closest to its edge 3.3 m at 0 m along it
+  goal for replay_planning_check.sh: 199.1 463.8 (0 m along the track, 0 m from its start)
+MAP_EXIT:0

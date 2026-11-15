@@ -171,7 +171,7 @@
 | T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 完成，已复核（2026-11-15）：/tmp 在 NFS 上让规划的 glog 卡住线程，tmpfs 以后 20 Hz；感知 reliable 一帧不丢，外参 OK（0.13 m，和狗上 0.12 m 对上）。nav-dev 可以当默认回放环境。复核加了同一个域上已有回放就不放 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 完成，已复核（2026-11-15）：三个模块在狗的系统镜像里编过，ldd 0，增量 2.5 分钟。vfs 每次起容器 50 分钟，run_arm64.sh 改成留一个容器 exec。狗上的对照没做（隧道不回 SSH），放到 T63 |
 | T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 完成，已复核（2026-11-15）：NEEDED 和狗上一样，文件只差一个 .t56 备份；服务器镜像编的就是狗上会编的。真装以后要 configure + apply |
-| T64 | T57 的包拷回服务器、转 mcap、看人行横道那一段；新门控（人行横道上前方来车也停）在这包上回放，和线上的旧门控对；arm64 编规划给狗 | Agent | T57 复核 | 2 小时 | 任务已写好 |
+| T64 | T57 的包拷回服务器、转 mcap、看人行横道那一段；新门控（人行横道上前方来车也停）在这包上回放，和线上的旧门控对；arm64 编规划给狗 | Agent | T57 复核 | 2 小时 | 完成（2026-11-15）：db3 和狗上 sha 一样；狗站在人行横道 22 外 3.3 m，线上和回放都是 none，新门控没被走到。arm64 规划 12 min 28 s，包 nav_cw_planning_1a5ed36.tar.gz。外参这次量不出来（狗没动） |
 | T65 | 现场：他们的服务下看 App 怎么让狗走起来（只订不发：运控模式、谁在发、焦点、robot_service 和 zsibot 的日志），把表和五个问题给机器人团队；装 T64 编的规划 | 人 + Agent | T64 第 5 步 | 2 小时 | 任务已写好 |
 | T66 | 现场：影子模式下逐个路口调。人照规划的意思遥控狗（停、转、等、走），看五层：定位、白框对不对、感知、门控、状态机和指令；每个路口走一遍、定点看 10 分钟、同事开车（新门控才做），每次录包带备注；回来回灌，和现场的日志对 | 人 + Agent | 无（新门控要 T64 第 5 步） | 半天 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
@@ -10470,6 +10470,46 @@ T57 复核），要看在真包上会不会停、停多久；狗上要换的规�
 报告（写进"T64 结果"）：拷包（大小、sha、用时）；LEFT OUT；bag_on_map；线上和回放的序列对照表；cross_wait 几次、各多久、为谁；
 "going on with" 几次；编规划的用时、sha256。
 ```
+
+### T64 结果
+
+**第 0 步。** `1a5ed36`（含 `078fb92` 和 `nav_cw_record.sh` 的 `884848a`）。pytest 五个文件 72 passed，48 s。`test_yield_gate_cpp` 断言的「 0 differ」「crosswalk_sim: 0 failed」都过了。`data/reports/T64/pytest.txt`。
+
+**第 1 步。** 包在这次开始前已经在 `/public/zjst/robot/cp_data/20261115_cw_1`，没有重跑 rsync，用时没有。db3 5,624,655,872 字节。16:51 和狗上对过，两边 sha256 都是 `f730d1b57de773366c9525bb285d37072f9b3b7f1d1a1555c1e341692f8f1157`。狗上 `metadata.yaml` 还是 reindex 留下的空 `storage_identifier`（sha256 `5e328c3671ce09027229c107dd0e858e7e8c474f4e3570e606530a68ebccfe26`）。服务器这份改成 `sqlite3` 以后 rosbags 才打得开（sha256 `a085ac1fe60c5837c02a0fc6de8947c296ac711a8a035da316cd9bf685feafc3`）；db3 一个字节没动。
+
+**第 2 步。** `bag_to_mcap`：12 个话题、89367 条，没有 LEFT OUT。`/goal_pose`、`/mc/motion_control` 各 0 条，没写进 mcap。`check_planning_mcap` 退出 1：`hesai_lidar` 到 `map` 没有一条 TF（`check.txt`），不是这步的停止条件。可视化：地图上 5 个人行横道，这段旁边 1 个；INS RTK fixed 100%，odom−INS 中位 0.33 m（`viz.txt`，`work_dirs/t64_cw_1/viz`）。
+
+`objects_in_map` 退出 1，不是 OK，也不是 WRONG：1625 条目标、16243 条里程计，超过 0.3 s 对不上的是 0 条；狗净位移 0 m，没有「静止的车、狗走了 ≥1 m」可以对，外参这次量不出来。停止条件里说先停下的是外参错或时间戳错；时间戳是齐的，外参没有测成失败。后面的门控分析照做了。
+
+`bag_on_map`：站在 (199.1, 463.8)，离人行横道 22 的边 3.3 m（中心 187.2, 473.8），轨迹 0 m，没过人行横道。回放终点就是 `199.1 463.8`。
+
+**第 3 步。** 线上 `/planning/debug/plotjuggler/string` 3249 条，从头到尾一个状态（`live_sequence.txt`）：
+
+| 包内时间 | 状态 | index | go | waiting_for | stale |
+| --- | --- | --- | --- | --- | --- |
+| 0.002 s 起，162 s 没变 | none | -1 | 1 | 0 | 0 |
+
+狗站在人行横道外面，旧门控也没有进入 align / wait / cross。`shadow_vs_actual.png`：影子指令的 vy 全程大约 −0.22 m/s，vx 在 0 附近；实际速度（`/lightning/odom`）在 0 附近，大约 128 s 有一次尖峰。人没让狗走，规划在影子里一直给一个侧向速度。
+
+**第 4 步。** 回放没有新建容器（vfs 上 `docker run` 会再拷一份镜像）。用已经在的 nav-dev 容器 t62tmp：GPU 3、域 42、`/tmp` 是 tmpfs。x86 的 planning 在 t58build 里增量重编，`Finished <<< planning [1min 46s]`，然后才放。终点用第 2 步的 `199.1 463.8`。
+
+第一次十几秒就停：目标没发出去，栈退出 1。`replay_planning_check.sh` 先开 rosbag2 录包，`run_planning_stack_debug.sh` 的域检查把录包自己的 `/events/write_split` 当成别的回放。检查改成忽略这一条（`/parameter_events`、`/rosout` 照旧忽略），没有设 `NAV_ALLOW_SHARED_DOMAIN`。第二次 `REPLAY_EXIT:0`，目标已发（`report_replay.txt`）。
+
+回放定位起步跳了 504.9 m（路径 533 m，净 505 m，157.7 s），随后 `standstill` 2565 个周期、`active` 376。`bag_on_map` 给的点是狗站着的位置，回放算出来的里程计不在那儿，机器人不在规划的路上。日志里没有一行 `Crosswalk yield:`（这行只在状态、理由或 unreleased 变的时候打）。plotjuggler 2994 条，一个状态（`replay_sequence.txt`）：
+
+| 回放时间 | 状态 | index | go | waiting_for | stale |
+| --- | --- | --- | --- | --- | --- |
+| 3.50 s 起，一直到结束 | none | -1 | 1 | 0 | 0 |
+
+启动日志有「Tracking: crosswalk yield on, rule wait, on the crosswalk stops for vehicles ahead」和「5 crosswalks」，二进制是这个提交的。`cross_wait`（ahead）0 次。`going on with` 0 次。线上和回放并排：两边全程都是 none。这个包没有把狗放进人行横道，新门控「人行横道上前方来车也停」没有被走到。
+
+**第 5 步。** arm64 增量（`nav-arm64-junyongmou`，`NAV_JOBS=8`，`dog8-rootfs:latest`）：16:39:53–16:53:44。接口包 12.4 s，planning 12 min 28 s，`ARM_EXIT:0`。stderr 是 boost 头文件过时和 OpenCV 4.5/4.8 的链接警告（`build_arm64.txt`）。`ldd`（source `install/planning/setup.bash`）`not found` 是 0（`ldd.txt`）。「stops for vehicles ahead」在一个文件里：`install/planning/planning/lib/planning/planning`。任务写的 `$W/install/planning/lib` 不存在，colcon 前缀下面多一层包名。`install/planning/version.txt`：`2026-11-15`、`1a5ed36599712fc4c2c2899a86af6ab1fd25d467`、`built on the server in dog8-rootfs:latest (QEMU)`。安装目录 229 MB。包：
+
+`/public/zjst/robot/cp_data/nav_cw_planning_1a5ed36.tar.gz`（21 MB）
+
+sha256 `afaa3921ff26c314d9137cfac5a5110596ef07fe3eae923c81f9c5dc4dc68c9f`
+
+T65 第 4 步用这个包。没装到狗上。
 
 ---
 

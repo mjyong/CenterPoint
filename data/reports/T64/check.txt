@@ -1,0 +1,16 @@
+/public/zjst/robot/cp_data/20261115_cw_1_mcap: 12 topics, 25984 transforms
+  /lightning/odom                                  nav_msgs/msg/Odometry                 16243 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid             1625 msgs  frames base_link
+  /nav_cw/shadow/cmd_vel                           geometry_msgs/msg/Twist                3248 msgs  frames -
+  /nav_cw/shadow/mc/motion_control                 mc_interface/msg/Motion                3248 msgs  frames -
+  /perception/lidar_3d/objects                     perception_interface/msg/LidarObjectArray   1625 msgs  frames lidar_det
+  /planning/debug/crosswalk                        visualization_msgs/msg/MarkerArray     3249 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     3249 msgs  frames map
+  /planning/debug/plotjuggler/string               std_msgs/msg/String                    3249 msgs  frames -
+  /robot/topic/rdap/top_point_cloud2               sensor_msgs/msg/PointCloud2            1625 msgs  frames hesai_lidar
+  /rte/rdap/rtk/imus/data_raw                      sensor_msgs/msg/Imu                   16259 msgs  frames imu_link
+  /rte/rdap/rtk/inspvax                            kygi665_msgs/msg/INSPVAX              16259 msgs  frames gps
+  /tf                                              tf2_msgs/msg/TFMessage                19488 msgs  frames -
+PROBLEM /robot/topic/rdap/top_point_cloud2: no single TF path from hesai_lidar to map
+1 problems
+CHECK_EXIT:1

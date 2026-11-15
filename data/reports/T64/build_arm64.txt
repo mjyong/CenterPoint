@@ -1,0 +1,40 @@
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/communication_base.h:9,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.h:4,
+                 from /opt/seres/nav_cw/src/Nav_D20/planning/src/runnable/communication/ros_debug_bridge/ros_debug_bridge.cc:1:
+/usr/include/boost/detail/no_exceptions_support.hpp:17:1: note: ‘#pragma message: This header is deprecated. Use <boost/core/no_exceptions_support.hpp> instead.’
+   17 | BOOST_HEADER_DEPRECATED("<boost/core/no_exceptions_support.hpp>")
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+/usr/bin/ld: warning: libopencv_imgproc.so.4.5d, needed by /opt/ros/humble/lib/libgrid_map_ros.so, may conflict with libopencv_imgproc.so.408
+/usr/bin/ld: warning: libopencv_core.so.4.5d, needed by /opt/ros/humble/lib/libgrid_map_ros.so, may conflict with libopencv_core.so.408
+/usr/bin/ld: warning: libopencv_imgcodecs.so.4.5d, needed by /opt/ros/humble/lib/libcv_bridge.so, may conflict with libopencv_imgcodecs.so.408
+---
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+[Processing: planning]
+Finished <<< planning [12min 28s]
+
+Summary: 1 package finished [12min 34s]
+  1 package had stderr output: planning
+done: /opt/seres/nav_cw/install/{planning}
+ARM_EXIT:0

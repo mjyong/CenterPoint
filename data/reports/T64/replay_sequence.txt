@@ -1,0 +1,13 @@
+No "Crosswalk yield:" lines in planning.INFO (the line is printed only when the mode, reason, or unreleased flag changes).
+
+/planning/debug/plotjuggler/string, 2994 samples, one state the whole replay:
+  t_s 3.50  mode none  index -1  go 1  waiting_for 0  stale 0
+
+cross_wait (ahead): 0
+going on with: 0
+
+Startup log: "Tracking: crosswalk yield on, rule wait, on the crosswalk stops for vehicles ahead"
+and "startup map ... 5 crosswalks". mission_state active 376, then standstill 2565.
+Localization jumped 504.9 m at init (report: path 533 m, net 505 m). The goal bag_on_map
+gave is the live dog's standing point (199.1, 463.8), which is not where this replay's
+odometry started, so the new gate never saw the robot on a crosswalk.

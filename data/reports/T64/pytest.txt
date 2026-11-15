@@ -1,0 +1,46 @@
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[33m [100%][0m
+[33m=============================== warnings summary ===============================[0m
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+../../.venv/lib/python3.10/site-packages/numba/core/decorators.py:159
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/numba/core/decorators.py:159: NumbaDeprecationWarning: [1mThe keyword argument 'nopython=False' was supplied. From Numba 0.59.0 the default is True and supplying this argument has no effect.[0m
+    warnings.warn(msg, NumbaDeprecationWarning)
+
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+../../.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488
+  /home/engineers/junyongmou/robot/ultralytics/.venv/lib/python3.10/site-packages/torch/jit/_script.py:1488: DeprecationWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 30 durations =============================
+19.88s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate_cpp.py::test_cpp_yield_gate_agrees_with_python
+3.45s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw_record.py::test_the_last_tests_goal_under_the_dog_does_not_stop_it
+2.95s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw_record.py::test_a_new_goal_during_the_recording_arms_it
+2.84s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_the_command_line_tool
+2.36s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw_record.py::test_it_stops_hold_seconds_after_the_dog_is_within_the_radius
+1.95s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw_record.py::test_motion_control_changes_are_printed_once_each
+1.55s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw_record.py::test_no_record_only_watches_and_hidden_adds_action_topics
+1.51s call     d20car_predict/CenterPoint/tests/dog/test_bag_to_mcap.py::test_every_topic_goes_over
+0.96s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw_record.py::test_ctrl_c_stops_the_recorder_once_and_it_writes_metadata
+0.95s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_evaluation_with_a_perfect_detector_is_safe_and_waits_for_the_car
+0.94s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_a_rehearsal_runs_ours_on_domain_42_in_place_of_their_navigation
+0.74s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_use_new_puts_theirs_back_without_odometry
+0.68s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_appmap_ignore_moves_both_off_the_apps_switch
+0.61s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_use_new_then_back
+0.60s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_no_rehearsal_while_ours_drive_the_dog
+0.54s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_shadow_mode_renames_the_planners_command_topics_and_checks_the_graph
+0.51s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_ours_ignore_the_apps_map_unless_told_to_follow
+0.47s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_use_new_writes_the_switches_in_before_starting_ours
+0.44s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_min_watch_sees_a_car_coming_out_of_the_rear_blind_sector
+0.44s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_a_rehearsal_that_does_not_come_up_puts_theirs_back
+0.44s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_the_switches_hold_across_a_reinstall
+0.34s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_use_new_puts_theirs_back_when_ours_does_not_come_up
+0.34s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_shadow_mode_stops_a_planner_that_still_drives_the_dog
+0.31s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_unsafe_episodes_are_explained_by_where_the_vehicle_came_from
+0.21s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_speed_caps_only_the_mppi
+0.15s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_on_a_crosswalk_the_robot_goes_on_once_the_vehicle_ahead_has_cleared
+0.15s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw_record.py::test_a_recorder_that_dies_is_reported
+0.12s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_debug_switches
+0.12s call     d20car_predict/CenterPoint/tests/dog/test_nav_cw.py::test_check_reports_the_graph
+0.10s call     d20car_predict/CenterPoint/tests/dog/test_yield_gate.py::test_wait_rule_goes_when_the_vehicle_has_stayed_clear_for_wait_clear
+[33m[32m72 passed[0m, [33m[1m5 warnings[0m[33m in 48.08s[0m[0m
