@@ -27,6 +27,10 @@ fi
 set +u
 # shellcheck disable=SC1090
 source "${NAV_CW_ROS_SETUP:-/opt/ros/humble/setup.bash}"
+# LossPacket lives in the robot's hesai driver, not in our installs. Source it before planning so mc_interface stays visible.
+hesai_setup="${NAV_CW_HESAI_SETUP:-/opt/seres/package/hesai_lidar_driver/setup.bash}"
+# shellcheck disable=SC1090
+[[ -f "${hesai_setup}" ]] && source "${hesai_setup}"
 for p in slam nav_perception planning; do
   # shellcheck disable=SC1090
   [[ -f "${prefix}/install/${p}/setup.bash" ]] && source "${prefix}/install/${p}/setup.bash"

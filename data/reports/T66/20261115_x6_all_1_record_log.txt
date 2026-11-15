@@ -1,0 +1,13 @@
+[20:06:19] recording /home/nvidia/bags/20261115_x6_all_1, domain 0: 28 topics
+[20:06:20] Ctrl-C to stop
+[20:06:20] type a note and Enter to log it with the time (Enter alone: mark)
+[20:06:20] goal (17.45, -17.45)
+[20:06:20] goal 243.6 m away: stops 5 s after the dog is within 1.5 m
+[20:08:17] goal (28.91, 3.97)
+[20:08:17] goal 219.5 m away: stops 5 s after the dog is within 1.5 m
+[20:08:57] goal (27.00, 4.03)
+[20:08:57] goal 220.1 m away: stops 5 s after the dog is within 1.5 m
+[20:12:54] stopping (Ctrl-C)
+[20:12:57] journals of our units saved beside the bag (journal_<unit>.txt)
+[20:12:57] recorded 396 s, 20:06:19 to 20:12:55
+[20:12:57] replay goal: 27.004 4.026

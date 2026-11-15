@@ -21,6 +21,8 @@ Foxglove：`ws://192.168.122.100:8765`，Layout 导入仓库里最新的 `Nav_D2
 
 ## 开工前先清今天下午留下的
 
+这一节已经做过：假定位没有了，`use-new` 也已经成功。不要再执行下面的 `use-original`。
+
 T57 收工时是 `running: ours`、影子开、限速 0.3，没有换回。今天下午又叠了这些，不先清掉，T66 的定位和包都是假的：
 
 - 定位进程在 15:41 崩过，后来重起过，激光对不上后又停发；
@@ -77,14 +79,37 @@ ssh dog "grep -ral 'stops for vehicles ahead' /opt/seres/nav_cw/install/planning
 ssh dog "sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on"
 ssh dog "sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed 0.5"
 ssh dog "sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches"
-ssh dog "sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new"
+ssh dog "sudo -n env NAV_CW_VERIFY_WAIT=60 bash /opt/seres/nav_cw/nav_cw.sh use-new"
 ```
 
 `switches` 要看到：shadow on，行尾有 `nav_blocked false: a person drives`；appmap ignore；限速 0.5。不能有 `NOT APPLIED`，不能有 `REHEARSAL ON`。
 
-`use-new` 的图要全是 ok：规划在 `/nav_cw/shadow/mc/motion_control` 上，不在 `/mc/motion_control` 上。不是全 ok 就停下，它会自己停掉 `cw-planning` 并退出 3，不要再起。
+`use-new` 的图要全是 ok：规划在 `/nav_cw/shadow/mc/motion_control` 上，不在 `/mc/motion_control` 上。不是全 ok 就停下。发到了 `/mc/motion_control` 它会自己停掉 `cw-planning` 并退出 3，不要再起。默认只等 20 秒看图，规划读两张站点栅格要二十多秒，这段里发布者还没出现，检查会判失败并自己换回他们的。所以这条把等待改成 60 秒。换回来之后要再查一次 `status` 是 `running: theirs`，再重跑这一条。
 
-日志里还要有：`Tracking: crosswalk yield on, rule wait`；`startup map … 5 crosswalks`；之后没有 `Map switch`、`Map update`。
+日志里还要有：`Tracking: crosswalk yield on, rule wait, on the crosswalk stops for vehicles ahead`；`startup map … 5 crosswalks`；之后没有 `Map switch`、`Map update`。
+
+### 这次已经做好（2026-11-15 19:35）
+
+不要再跑 `use-original` 或 `use-new`。现在是 `running: ours`，影子开着，限速 0.5，appmap ignore，图全 ok，`/lightning/odom` 已有。Foxglove 桥已在 8765（`/tmp/foxglove_bridge.log`），再开一次会因为端口被占而起不来。
+
+当时的 INS：`ins_status` 3，`pos_type` 56，纬度 29.735730，经度 106.785614。
+
+还要开的两个窗口：
+
+```text
+ssh dog "journalctl -u cw-planning -f | grep --line-buffered -E 'Crosswalk yield|nav_blocked|Navigation|standstill'"
+ssh -t dog
+```
+
+第二个里，目标发好、蓝线穿过白框、`mission_state` 已是 active 之后再录：
+
+```text
+sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x22_all --no-auto
+```
+
+窗口还在就在这个窗口 Ctrl-C。网线断了用「一整趟自己收尾」里的 `pkill -INT`。
+
+当晚的五包在 20:58 前收完，结论在 `docs/SERVER_TASKS.md` 的 T66 结果。上面「不要再 use-original」只对开录之前。写结果时没有做收工：21:38 规划还在，里程计已经超时。
 
 **e. 三个窗口：**
 
@@ -94,7 +119,7 @@ ssh dog "journalctl -u cw-planning -f | grep --line-buffered -E 'Crosswalk yield
 ssh -t dog
 ```
 
-第三个要 `-t`，录包时才能敲备注。Foxglove 桥留在前台。
+第三个要 `-t`，录包时才能敲备注。Foxglove 桥留在前台。桥已经在跑时不要再开，8765 被占着。
 
 ---
 
@@ -118,6 +143,24 @@ ssh -t dog
 
 ---
 
+## 一整趟自己收尾
+
+目标在 Foxglove 里先发好，蓝线穿过白框、`mission_state` 已是 active，再在录包窗口执行。后面观察、看车、过马路都在这一条里，走到你要停的地方，在这个窗口 Ctrl-C。不会因为靠近终点自己停。
+
+```text
+sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x6_all --no-auto
+```
+
+把 `13` 换成图上的号。提前发的目标规划每个周期都还在发，停的时候 `replay goal` 仍写得上。这条同时录四路鱼眼和雷达丢包计数，定位（`/lightning/odom`、`/nav/location`、INS）以及规划的路径、人行横道、代价图、碰撞点和诊断。过程中要记的话，就在这个窗口敲一行回车。
+
+录包窗口还在，就在那个窗口 Ctrl-C。网线断了、窗口没了，笔记本重新连上之后用下面这条。它只给 `nav_cw_record.py` 发一次中断，由它去停 `ros2 bag record` 并写出 `metadata.yaml`。等十几秒，进程自己退出。不要 `kill -9`，也不要直接杀 `ros2 bag record`。
+
+```text
+ssh dog "sudo -n pkill -INT -f '^python3 /opt/seres/nav_cw/nav_cw_record.py'"
+```
+
+---
+
 ## 2. 每个路口：先空着走一遍
 
 录包窗口里，起步前：
@@ -126,7 +169,7 @@ ssh -t dog
 sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x13_walk
 ```
 
-把 `13` 换成图上的号。到目标 1.5 m 以内，停 5 秒后它自己停。中途走出 1.5 m 就重新数。没有目标、或要提前停：在这个窗口 Ctrl-C。不要另开终端去杀进程，不然没有 `metadata.yaml`。
+把 `13` 换成图上的号。到目标 1.5 m 以内，停 5 秒后它自己停。中途走出 1.5 m 就重新数。没有目标、或要提前停：在这个窗口 Ctrl-C。网线断了就用上面「一整趟自己收尾」那条 `pkill -INT`，不要 `kill -9`。
 
 边走边看下面的五层。不对就在同一个窗口敲一行回车，例如 `align：狗头离线 0.5 m`。这一遍必须留下：
 

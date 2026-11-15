@@ -38,10 +38,18 @@ import time
 
 # DOG_FIELD_GUIDE.md section 9 (tests/dog/test_nav_cw_record.py checks the two agree), then what this adds
 TOPICS = [
-    "/robot/topic/rdap/top_point_cloud2", "/rte/rdap/rtk/inspvax", "/rte/rdap/rtk/imus/data_raw",
-    "/lightning/odom", "/map/occupancy_grid", "/perception/lidar_3d/objects", "/goal_pose",
+    "/robot/topic/rdap/top_point_cloud2",
+    # four fisheyes for reviewing lidar_3d_detection labels (SENSORS.md §7); H.264, not the raw images
+    "/robot/topic/rdap/front_sensor_camera", "/robot/topic/rdap/left_sensor_camera",
+    "/robot/topic/rdap/right_sensor_camera", "/robot/topic/rdap/rear_sensor_camera",
+    "/lidar_packets_loss",
+    "/rte/rdap/rtk/inspvax", "/rte/rdap/rtk/imus/data_raw",
+    "/lightning/odom", "/nav/location",
+    "/map/occupancy_grid", "/perception/lidar_3d/objects", "/goal_pose",
     "/cmd_vel", "/mc/motion_control", "/nav_cw/shadow/cmd_vel", "/nav_cw/shadow/mc/motion_control",
     "/planning/debug/crosswalk", "/planning/debug/path_tracking", "/planning/debug/plotjuggler/string",
+    "/planning/debug/collision_checker", "/planning/debug/diagnostic",
+    "/planning/debug/cost_map_production/occmap", "/planning/debug/global_map_manager/occmap",
     "/tf", "/tf_static",
 ]
 ADDED = ["/planning/debug/goal_pose", "/mc/state"]

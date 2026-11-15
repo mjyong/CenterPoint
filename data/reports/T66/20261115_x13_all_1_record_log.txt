@@ -1,0 +1,12 @@
+[19:57:34] recording /home/nvidia/bags/20261115_x13_all_1, domain 0: 28 topics
+[19:57:35] Ctrl-C to stop; or it stops 5 s after the dog is within 1.5 m of the planner's goal
+[19:57:35] type a note and Enter to log it with the time (Enter alone: mark)
+[19:57:35] goal (17.45, -17.45)
+[19:57:35] goal 317.4 m away: stops 5 s after the dog is within 1.5 m
+[19:57:35] /mc/state: mode 3 lower body (IMC), uuid '', 20:DONE
+[20:01:05] /mc/state: mode 3 lower body (IMC), uuid '', 101:DONE
+[20:01:06] /mc/state: mode 3 lower body (IMC), uuid '', 20:DONE
+[20:03:12] stopping (Ctrl-C)
+[20:03:15] journals of our units saved beside the bag (journal_<unit>.txt)
+[20:03:15] recorded 339 s, 19:57:34 to 20:03:13
+[20:03:15] replay goal: 17.448 -17.446

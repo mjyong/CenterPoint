@@ -339,7 +339,7 @@ sudo bash /opt/seres/nav_cw/nav_cw_record.sh          # → /home/nvidia/bags/<Y
 
 - 规划有目标点（`/planning/debug/goal_pose`，或者录的时候新发的 `/goal_pose`），狗（自己走或遥控）先在 1.5 m 外、再进到
   目标 1.5 m 内，5 s 后自己停；中途又出了 1.5 m 就不停了，再进来重新数。上一次测试留下的目标就在狗脚下：不会停，要先出去；
-- 没有目标、或想早点停：Ctrl-C。两种停法都只给录制进程发一次 SIGINT，等它把 `metadata.yaml` 写完；录的时候不碰 db3；
+- 没有目标、或想早点停：在录包窗口 Ctrl-C。网线断了，笔记本重连后执行 `ssh dog "sudo -n pkill -INT -f '^python3 /opt/seres/nav_cw/nav_cw_record.py'"`（只中断 `nav_cw_record.py`，由它停 bag 并写 `metadata.yaml`）。不要 `kill -9`，也不要直接杀 `ros2 bag record`。录的时候不碰 db3；
 - `--tag cw13_walk` 起名 `<日期>_cw13_walk_<n>`（一个路口、一种做法一个名字），`-o <目录>` 直接给名字，`--radius 2 --hold 5` 改距离和时间，
   `--no-auto` 只认 Ctrl-C（定点看用），后面跟话题名多录几个，`--dry-run` 只打印命令；
 - 录的时候在同一个终端敲一行字、回车，就记一条带时间的备注（只回车记 "mark"）：人的判断（"go 不安全"、"空等"、"框偏了"）
@@ -358,13 +358,26 @@ sudo bash /opt/seres/nav_cw/nav_cw_record.sh          # → /home/nvidia/bags/<Y
 
 ```bash
 ros2 bag record -o /home/nvidia/bags/<日期>_cw_<n> \
-  /robot/topic/rdap/top_point_cloud2 /rte/rdap/rtk/inspvax /rte/rdap/rtk/imus/data_raw \
-  /lightning/odom /map/occupancy_grid /perception/lidar_3d/objects /goal_pose \
+  /robot/topic/rdap/top_point_cloud2 \
+  /robot/topic/rdap/front_sensor_camera /robot/topic/rdap/left_sensor_camera \
+  /robot/topic/rdap/right_sensor_camera /robot/topic/rdap/rear_sensor_camera /lidar_packets_loss \
+  /rte/rdap/rtk/inspvax /rte/rdap/rtk/imus/data_raw \
+  /lightning/odom /nav/location \
+  /map/occupancy_grid /perception/lidar_3d/objects /goal_pose \
   /cmd_vel /mc/motion_control /nav_cw/shadow/cmd_vel /nav_cw/shadow/mc/motion_control \
-  /planning/debug/crosswalk /planning/debug/path_tracking /planning/debug/plotjuggler/string /tf /tf_static
+  /planning/debug/crosswalk /planning/debug/path_tracking /planning/debug/plotjuggler/string \
+  /planning/debug/collision_checker /planning/debug/diagnostic \
+  /planning/debug/cost_map_production/occmap /planning/debug/global_map_manager/occmap \
+  /tf /tf_static
 ```
 
-（T57 第 3 步是同一张表；激光和 INS 要录上，回来才能重算感知。用 root 录：机器人的共享内存是 root 的，T40。）狗上的 ros2 bag 没有
+四路 `*_sensor_camera` 是鱼眼的 H.264，给人审核 `lidar_3d_detection` 的框时对照，不进网络。`/lidar_packets_loss` 是雷达丢包计数，用来确认点云没有洞。未压缩图、Livox 和另一套空的 `h264_*` 话题不录（SENSORS.md 第 7 节）。
+
+定位精度看 `/lightning/odom`（激光定位结果）和 `/rte/rdap/rtk/inspvax`（组合导航），再加上 1 Hz 的 `/nav/location`（在哪张图、定位成功还是失败、经纬度和地图位姿）。`/lightning/ins_path` 是同一条组合导航画成的长轨迹，100 Hz 整条重发，不录。`/lightning/map_cloud` 和 `/map` 超过狗上共享内存一块的大小，定位本来就不发。
+
+规划再录：人行横道、全局/局部路径、每周期的数、碰撞接触点、诊断、局部代价图、站点地图缩略。代价图的距离场、TEB 和跟随的调试图不录，这台狗走路用的是 MPPI，数已经在 `plotjuggler/string` 里。
+
+（激光和 INS 要录上，回来才能重算感知。用 root 录：机器人的共享内存是 root 的，T40。）狗上的 ros2 bag 没有
 mcap 插件，录出来是 sqlite3（`.db3`，T61），不要加 `-s mcap`。拷回服务器 `/public/zjst/robot/cp_data/`，然后：
 
 ```bash
