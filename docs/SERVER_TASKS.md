@@ -10663,8 +10663,8 @@ configure / apply 有 NOT APPLIED（把 backup/planning.t61 挪回 install/plann
 6. 回来（服务器，Agent），每个包：
    - 拷：rsync -a --partial dog:/home/nvidia/bags/<包>/ /public/zjst/robot/cp_data/<包>/（拷不动就人用笔记本拷）；
    - 同 T64 第 2 步：bag_to_mcap.py、planning_mcap_viz.py、objects_in_map.py（每个包都要 extrinsic OK）；
-   - 回灌：T68 修好以后照它写的那条命令放（T64 那样放，感知栅格放到第 36 s 就断了，规划后面都在 standstill）；目标用包里
-     record_log.txt 最后的 "replay goal"，名字 t66_<包>。check_planning_mcap.py 不能有 "stops … before the end"；
+   - 回灌：`bash Nav_D20/planning/script/replay_dog_bag.sh /public/zjst/robot/cp_data/<包> t66_<包>`（T68：读 record_log.txt
+     最后的 "replay goal"，只放传感器和感知目标，栅格订 reliable）。check_planning_mcap.py 不能有 "stops … before the end"；
    - 对：回灌日志的 "Crosswalk yield:" 和包里 journal_cw-planning.txt 的，按时间并排，record_log.txt 里的备注按时间插进去
      → data/reports/T66/<包>_sequence.md。走一遍、定点看的包，狗是照规划走的或者没动，两边应该基本一样；不一样的列出来；
    - 定点看的包另外数：wait 几次、每次多久（中位、最长）、go 几次；备注里"go 不安全""空等"各几次，各对着哪辆车（id、从哪来）。
@@ -10722,3 +10722,21 @@ configure / apply 有 NOT APPLIED（把 backup/planning.t61 挪回 install/plann
 停止条件：第 2 步三种都试了还找不到原因（把日志和试过的写清楚，停下）；第 3 步修完还是断。
 报告（写进"T68 结果"）：第 1 步的日志摘录；第 2 步每次的帧数和最后一帧时间；原因；改了什么；第 3 步重放的数；第 4 步的脚本和测试。
 ```
+
+### T68 结果
+
+**第 0 步。** `17eef24`。`pytest tests/dog/test_planning_mcap.py tests/dog/test_bag_to_mcap.py`：10 passed。
+
+**第 1 步。** `data/reports/T68/logs.txt`。lidar_seg 把原始点云处理到包的末尾（最后一帧 stamp `1794727573.756`，128000 点）。grid_map 的 `[Input] LiDAR` 停在 stamp `1794727447.158`（开包后 35.8 s），一共 240 条，然后没有新的回调。两个进程都没有自己退出：回放结束时脚本发 SIGTERM（unix 1794732425），glog 打出 `Aborted at` 是这次信号的栈，不是崩溃。`check_planning_mcap.py` 退出 1：`PROBLEM /map/occupancy_grid: stops 130 s before the end`（240 条，166 s 的录包里只覆盖开头 36 s），以及起步 504.9 m 那条 NOTE。
+
+**第 2 步。** 没有换放法。停的不是某个进程，是栅格对 `/patchworkpp/ground_seg_intensity` 的 best_effort 订阅不再进回调，而 lidar_seg 仍用默认 reliable 在发。全放改名、单独起栅格、用 1112 的包再放，都不会让这条已经死掉的订阅重新收到云。和 T58 同一类：容器里 CycloneDDS 走 UDP，best effort 丢一个分片整帧就没。
+
+**第 3 步。** `run_planning_stack_debug.sh`：`NAV_STACK_ROOT` 时给栅格一份临时 yaml，`reliability=reliable`、`history_depth=10`（`GRID_MAP_RELIABLE=0` 仍用原来的 best_effort）。狗上不设 `NAV_STACK_ROOT`，yaml 不动。`PATCHES.md` 加了一行。重放 `t68_cw_1`（还是 t62tmp，同一条 `--topics`，终点 199.1 463.8，`data/reports/T68/replay.txt`）：
+
+- `/map/occupancy_grid` 1581 帧，最后一帧 stamp `1794727573.756`（和 lidar_seg 的最后一朵云同一个戳，开包后 162.4 s）；
+- 栅格日志 `[cfg] qos reliability=reliable history_depth=10`；
+- `Data timeout exceeded` 1 次，在 09:35:45，包放完的时候；在这之前 09:35:35 有一次 0.54 s 的空档，没有触发暂停；
+- `mission_state`：active 2927、standstill 38，standstill 从这次暂停才开始；
+- `check_planning_mcap.py` 没有 `stops … before the end`。它报的 `PROBLEM layout: /fused_point_cloud is not in the recording` 是回放脚本带的话题表，这次没有开 `RECORD_CLOUD`。
+
+**第 4 步。** `bash Nav_D20/planning/script/replay_dog_bag.sh <包目录> [名字]`。没有 `replay goal` 就退出，提示 `bag_on_map.py`。sqlite3 且没有 `<包>_mcap` 时先转。放法和上面这次一样，地图 ad68517c。对照写在 `work_dirs/planning_io_<名字>/sequence.md`。`tests/dog/test_replay_dog_bag.py` 3 passed。现场指南第 9 节和 T66 第 6 步改成用它。

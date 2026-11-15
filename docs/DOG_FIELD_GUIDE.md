@@ -354,6 +354,7 @@ mcap 插件，录出来是 sqlite3（`.db3`，T61），不要加 `-s mcap`。拷
 ```bash
 python Nav_D20/planning/tools/bag_to_mcap.py <包> <包>_mcap        # 每个话题都转（定义从仓库来）；有 LEFT OUT 就是还有不认的类型
 python Nav_D20/planning/tools/check_planning_mcap.py <包>_mcap     # 规划的输入输出、状态
+bash Nav_D20/planning/script/replay_dog_bag.sh <包> [名字]         # 读 replay goal，只放传感器和感知目标再跑整套；对照在 work_dirs/planning_io_<名字>/sequence.md
 python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
 python Nav_D20/planning/tools/objects_in_map.py <包>               # sqlite 直接读；外参：要 extrinsic OK
 journalctl -u cw-planning --since "<开始>" --until "<结束>" > planning.log   # 狗上，状态变化的那些行

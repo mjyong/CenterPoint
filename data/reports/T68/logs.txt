@@ -1,0 +1,143 @@
+T64 回放 work_dirs/planning_io_t64_cw_1 的日志（T68 第 1 步）
+
+===== lidar_seg.log 共 26901 行，尾 30 =====
+ =-=====> TOP POINT NUM 128000 time: 1794727573.7564079761505
+[TopLidar] Transform done: pts_in=128000 pts_out=128000 offset(x,y,z)=(0.5000000000000,0.0000000000000,0.0000000000000) rpy(yaw,pitch,roll)=(1.5700000000000,0.0000000000000,0.0000000000000) body_pitch_deg=-2.830 cost=5.413ms
+[Process] lidar stamp lag vs now=4847949.8 ms
+ ========= CANNOT GET SYNC LOC DATA ===========
+ ===========> USE ONLY TOP  LIDAR DATA 
+[1;31mPatchWorkpp::flush_patches() - Flushed patches successfully![0m
+[1;31mPatchWorkpp::flush_patches() - Flushed patches successfully![0m
+[1;31mPatchWorkpp::flush_patches() - Flushed patches successfully![0m
+START MY REVERT 
+[LidarProcess] total=0.04784900000000000(sec) input_pts=51328 nonground=27758 ground=23570
+  core: flush=0.00005700000000000 czm=0.00890300000000000 sort=0.01047700000000000 pca=0.01872600000000000 estimate=0.00225300000000000 revert=0.00001200000000000 update=0.00002600000000000 subtotal=0.04045400000000000
+  post: mrt=0.00599400000000000(patches=80 no_nb=30 enable=1) filter=0.00000100000000000(enable=0) convert=0.00000100000000000(enable=0) detect=0.00000100000000000(enable=0) subtotal=0.00599700000000000
+  accounted=0.04645100000000000 unaccounted=0.00139800000000000
+  viz: assemble=0.00583100000000000(sec) viz_pub=0.00173600000000000(sec) full_cloud=51328
+[Process] fuse_pts=51328 lidar_process=0.05851500000000000(sec)
+ LidarProcess down! 
+ full_cloud.points.size()51328 | foreground_idx.size() 27758
+*** Aborted at 1794732425 (unix time) try "date -d @1794732425" if you are using GNU date ***
+PC: @                0x0 (unknown)
+*** SIGTERM (@0x3d400000465) received by PID 1752 (TID 0x7faf50955780) from PID 1125; stack trace: ***
+    @     0x7faf52997046 (unknown)
+    @     0x7faf52ba2992 rclcpp::SignalHandler::signal_handler()
+    @     0x7faf51bd5520 (unknown)
+    @     0x7faf51c24117 (unknown)
+    @     0x7faf51c272dd pthread_cond_clockwait
+    @     0x7faf52b1c0d0 rclcpp::Context::sleep_for()
+    @     0x55673103ebf5 main
+    @     0x7faf51bbcd90 (unknown)
+    @     0x7faf51bbce40 __libc_start_main
+    @     0x55673103f175 _start
+
+===== grid_map.log 共 3393 行，尾 30 =====
+I1115 08:44:54.821141  1753 grid_map_memory_node.cpp:2207] === OctoMap Performance (single-frame) ===
+I1115 08:44:54.821143  1753 grid_map_memory_node.cpp:2208] Total: 5.17212 ms, Sync: 0.019043, Ground(0): 4.73608, LocalMarker: 0.416992
+I1115 08:44:54.821148  1753 grid_map_memory_node.cpp:2213] [Timing] OctoMap callback total time: 5 ms
+I1115 08:44:54.876032  1753 grid_map_memory_node.cpp:302] [Input] LiDAR pointcloud received, stamp=1794727447.158, system_time=1794732294.876, delay=4847718.397141 ms
+I1115 08:44:54.876300  1753 grid_map_memory_node.cpp:341] [Output] Fused pointcloud (lidar_only) published, stamp=1.79473e+09, system_time=1.79473e+09, delay=4.84772e+06 ms
+I1115 08:44:54.876310  1753 grid_map_memory_node.cpp:636] [Grid] generateGrid using timestamp: 1794727447.158
+W1115 08:44:54.876315  1753 grid_map_memory_node.cpp:715] [Grid] No valid mask message found via any sync method, falling back to pointcloud-only mode
+I1115 08:44:54.876323  1753 grid_map_memory_node.cpp:838] [Grid Mode] pointcloud only (no mask)
+I1115 08:44:54.877235  1753 grid_map_memory_node.cpp:1748] [PointCloudToGrid] Input points=24890, ground=0, non_ground=24582, took 0 ms
+I1115 08:44:54.877269  1753 grid_map_memory_node.cpp:1381] [Output] Occupancy grid published, stamp=1794727447.158, system_time=1794732294.877, delay=4847719.641209 ms, source=pointcloud_only
+I1115 08:44:54.877828  1753 grid_map_memory_node.cpp:860] [Timing] generateGrid (pointcloud_only) took 1 ms | sync=0 rgb_decode=0.000976562 convert=0 dilate=0 depth2grid=0.916992 proj_vis=0 lidar_merge=0 publish(+mem)=0.583984 sum=1.50195 (source=none)
+I1115 08:44:54.895946  1753 grid_map_memory_node.cpp:2151] [OctoMap Input] Ground stamp=1794727447.158, Non-ground stamp=1794727447.158, system_time=1794732294.896
+I1115 08:44:54.901151  1753 grid_map_memory_node.cpp:2273] [OctoMap Output] Markers published in base_link, stamp=1794727447.158, system_time=1794732294.901, delay=4847743.522406 ms, free=0, occupied=2522, took 0 ms
+I1115 08:44:54.901408  1753 grid_map_memory_node.cpp:2297] [OctoMap Output] Octomap published in base_link, stamp=1794727447.158, system_time=1794732294.901, delay=4847743.779659 ms, binary=0, took 0 ms
+I1115 08:44:54.901414  1753 grid_map_memory_node.cpp:2207] === OctoMap Performance (single-frame) ===
+I1115 08:44:54.901417  1753 grid_map_memory_node.cpp:2208] Total: 5.47095 ms, Sync: 0.0239258, Ground(0): 4.948, LocalMarker: 0.499023
+I1115 08:44:54.901422  1753 grid_map_memory_node.cpp:2213] [Timing] OctoMap callback total time: 5 ms
+*** Aborted at 1794732425 (unix time) try "date -d @1794732425" if you are using GNU date ***
+PC: @                0x0 (unknown)
+*** SIGTERM (@0x3d400000465) received by PID 1753 (TID 0x7f9918202000) from PID 1125; stack trace: ***
+    @     0x7f99251a6046 (unknown)
+    @     0x7f9925348992 rclcpp::SignalHandler::signal_handler()
+    @     0x7f9923bb3520 (unknown)
+    @     0x7f9923c02117 (unknown)
+    @     0x7f9923c052dd pthread_cond_clockwait
+    @     0x7f99252c20d0 rclcpp::Context::sleep_for()
+    @     0x555c4323b147 main
+    @     0x7f9923b9ad90 (unknown)
+    @     0x7f9923b9ae40 __libc_start_main
+    @     0x555c4323b425 _start
+
+===== bag.log 共 7 行，尾 30 =====
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1794732257.801383851] [rosbag2_player]: Set rate to 1
+[INFO] [1794732257.842764908] [rosbag2_player]: Adding keyboard callbacks.
+[INFO] [1794732257.842802282] [rosbag2_player]: Press SPACE for Pause/Resume
+[INFO] [1794732257.842810484] [rosbag2_player]: Press CURSOR_RIGHT for Play Next Message
+[INFO] [1794732257.842816962] [rosbag2_player]: Press CURSOR_UP for Increase Rate 10%
+[INFO] [1794732257.842822813] [rosbag2_player]: Press CURSOR_DOWN for Decrease Rate 10%
+[INFO] [1794732257.842903323] [rosbag2_player]: Sleep 1000000000 ns
+
+===== loc.log 共 2665 行，尾 30 =====
+E1115 08:47:00.441859  1754 loc_system.cc:318] IMU 回调间隔过大: 0.0411652 秒，可能被阻塞
+I1115 08:47:00.450281  1944 laser_mapping.cc:501] time: 1794727572.8454, state:   198.86680323027   463.88816085192 -0.21906507622987
+E1115 08:47:00.535564  2249 loc_system.cc:318] IMU 回调间隔过大: 0.0400822 秒，可能被阻塞
+I1115 08:47:00.543203  1944 laser_mapping.cc:501] time: 1794727572.9452, state:   198.86759083387   463.89075999687 -0.21728527256413
+I1115 08:47:00.639925  1944 laser_mapping.cc:501] time: 1794727573.0453, state:   198.86869963822   463.87855139082 -0.21830525510313
+E1115 08:47:00.743137  1754 loc_system.cc:318] IMU 回调间隔过大: 0.0470996 秒，可能被阻塞
+I1115 08:47:00.743822  2249 loc_system.cc:1209] LiDAR 平均频率: 10.0629 Hz
+I1115 08:47:00.749799  1944 laser_mapping.cc:501] time: 1794727573.1456, state:   198.87027103717   463.87252576243 -0.21979180677365
+I1115 08:47:00.834239  2248 loc_system.cc:335] LiDAR 回调线程ID: 140405425301056
+I1115 08:47:00.839990  1944 laser_mapping.cc:501] time: 1794727573.2451, state:   198.86901246229   463.87718473602 -0.21705305506928
+I1115 08:47:00.939499  1944 laser_mapping.cc:501] time: 1794727573.3455, state:   198.86828148802   463.87224374057 -0.21920170129777
+E1115 08:47:01.035730  1754 loc_system.cc:318] IMU 回调间隔过大: 0.0400175 秒，可能被阻塞
+I1115 08:47:01.043171  1944 laser_mapping.cc:501] time: 1794727573.4457, state:   198.86548811796   463.90025934858 -0.21886177027979
+E1115 08:47:01.137753  2249 loc_system.cc:318] IMU 回调间隔过大: 0.0420918 秒，可能被阻塞
+I1115 08:47:01.151525  1944 laser_mapping.cc:501] time: 1794727573.5456, state:   198.86817514074   463.88197608592 -0.22262742465696
+E1115 08:47:01.241505  2249 loc_system.cc:318] IMU 回调间隔过大: 0.0457419 秒，可能被阻塞
+I1115 08:47:01.253842  1944 laser_mapping.cc:501] time: 1794727573.6453, state:   198.87236286361   463.86900407474 -0.22327203833907
+I1115 08:47:01.353150  1944 laser_mapping.cc:501] time: 1794727573.7449, state:   198.86937339369   463.87665061351 -0.22019280479044
+I1115 08:47:01.454506  1944 laser_mapping.cc:501] time: 1794727573.8453, state:   198.87277729303   463.86871245945 -0.21816998341448
+[INFO] [1794732425.009879180] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+I1115 08:47:05.014444  1754 timer.cc:16] >>> ===== Printing run time =====
+I1115 08:47:05.014552  1754 timer.cc:21] > [    Incremental Mapping] average time usage: 0.000237677 ms, med: 0.000202 95%: 0.000414 max: 0.006703, called times : 1562
+I1115 08:47:05.014699  1754 timer.cc:21] > [    ObsModel (IEKF Build Jacobian)] average time usage: 0.306658 ms, med: 0.059707 95%: 0.226709 max: 34.8525, called times : 2000
+I1115 08:47:05.014828  1754 timer.cc:21] > [    ObsModel (Lidar Match)] average time usage: 1.51073 ms, med: 0.49896 95%: 5.36625 max: 39.6984, called times : 2000
+I1115 08:47:05.014926  1754 timer.cc:21] > [IEKF Solve and Update] average time usage: 6.27648 ms, med: 3.18915 95%: 22.2751 max: 80.8837, called times : 1562
+I1115 08:47:05.015022  1754 timer.cc:21] > [Preprocess (Standard)] average time usage: 0.000327042 ms, med: 0.000292 95%: 0.00056 max: 0.003074, called times : 1584
+I1115 08:47:05.015132  1754 timer.cc:21] > [Proc Lidar] average time usage: 3.83993 ms, med: 2.96256 95%: 9.51946 max: 19.2282, called times : 1607
+I1115 08:47:05.015230  1754 timer.cc:21] > [Undistort Pcl] average time usage: 1.58017 ms, med: 1.16963 95%: 4.1506 max: 8.32203, called times : 1562
+I1115 08:47:05.015235  1754 timer.cc:27] >>> ===== Printing run time end =====
+I1115 08:47:06.114081  1754 laser_mapping.h:57] laser mapping deconstruct
+
+===== grep（大小写不敏感）=====
+lidar_seg.log: 1 hits
+lidar_seg.log:26889: *** Aborted at 1794732425 (unix time) try "date -d @1794732425" if you are using GNU date ***
+
+grid_map.log: 1 hits
+grid_map.log:3381: *** Aborted at 1794732425 (unix time) try "date -d @1794732425" if you are using GNU date ***
+
+bag.log: 0 hits
+
+loc.log: 0 hits
+
+===== ?? =====
+?? "Aborted at 1794732425" ? glog ? SIGTERM ?????????????
+??????????PID 1125??lidar_seg?1752?? grid_map?1753??????????? main ? sleep ??
+loc.log ???? rclcpp ? SIGINT/SIGTERM??????bag.log ?? error?
+
+lidar_seg ?????????????TOP POINT ???? stamp 1794727573.756?128000 ??
+grid_map ????? [Input] LiDAR ? stamp 1794727447.158???? 1794727411.357 ?? 35.8 s???? 240 ?????????????
+?????? [Input] ????????? /patchworkpp/ground_seg_intensity ????
+????????????????
+
+?? T58 ?????lidar_seg ??? reliable ?????grid_map ? yaml ? best_effort?
+??? CycloneDDS ? UDP?best effort ??????????????????????????
+???????????????
+
+check_planning_mcap.py work_dirs/planning_io_t64_cw_1??? 1??
+PROBLEM /map/occupancy_grid (base_link): 12% of the header stamps are outside the base_link TF stamps (1794727416.2 .. 1794727573.9); stamps 1794727411.4 .. 1794727447.2, 65 s apart
+PROBLEM /map/occupancy_grid: stops 130 s before the end of the recording (240 messages, the last 36 s after the start of 166 s)
+NOTE display: /map/occupancy_grid, /planning/debug/cost_map_production/occmap are all drawn in base_link: the planes tilt with the robot and cut through each other in Foxglove (blinking); open tools/planning_mcap_viz.py's output instead
+NOTE /lightning/odom: a 504.9 m jump 0.1 s after the first pose is the localization initialising: the 14 poses before it are left out of the checks
+2 problems
+
+? 2 ??????????????????? 1112 ??????????????? best_effort ????????
+????????NAV_STACK_ROOT ???????? yaml?reliability=reliable?history_depth=10?GRID_MAP_RELIABLE=0 ?? best_effort??
+???? t68_cw_1 ?? T64 ??? --topics ??? (199.1, 463.8)?
+

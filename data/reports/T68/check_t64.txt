@@ -1,0 +1,19 @@
+work_dirs/planning_io_t64_cw_1: 13 topics, 24751 transforms
+  /cmd_vel                                         geometry_msgs/msg/Twist                2950 msgs  frames -
+  /goal_pose                                       geometry_msgs/msg/PoseStamped             1 msgs  frames map
+  /lightning/odom                                  nav_msgs/msg/Odometry                 15769 msgs  frames map
+  /map/occupancy_grid                              nav_msgs/msg/OccupancyGrid              240 msgs  frames base_link
+  /perception/lidar_3d/objects                     perception_interface/msg/LidarObjectArray   1625 msgs  frames lidar_det
+  /planning/debug/cost_map_production/occmap       nav_msgs/msg/OccupancyGrid             2994 msgs  frames base_link
+  /planning/debug/crosswalk                        visualization_msgs/msg/MarkerArray     2994 msgs  frames map
+  /planning/debug/diagnostic                       diagnostic_msgs/msg/DiagnosticArray    2994 msgs  frames planning
+  /planning/debug/goal_pose                        visualization_msgs/msg/Marker          2951 msgs  frames map
+  /planning/debug/path_tracking                    visualization_msgs/msg/MarkerArray     2994 msgs  frames map
+  /planning/debug/plotjuggler/string               std_msgs/msg/String                    2994 msgs  frames -
+  /rte/rdap/rtk/inspvax                            kygi665_msgs/msg/INSPVAX              16235 msgs  frames -
+  /tf                                              tf2_msgs/msg/TFMessage                18763 msgs  frames -
+PROBLEM /map/occupancy_grid (base_link): 12% of the header stamps are outside the base_link TF stamps (1794727416.2 .. 1794727573.9); stamps 1794727411.4 .. 1794727447.2, 65 s apart
+PROBLEM /map/occupancy_grid: stops 130 s before the end of the recording (240 messages, the last 36 s after the start of 166 s)
+NOTE display: /map/occupancy_grid, /planning/debug/cost_map_production/occmap are all drawn in base_link: the planes tilt with the robot and cut through each other in Foxglove (blinking); open tools/planning_mcap_viz.py's output instead
+NOTE /lightning/odom: a 504.9 m jump 0.1 s after the first pose is the localization initialising: the 14 poses before it are left out of the checks
+2 problems

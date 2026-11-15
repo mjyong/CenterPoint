@@ -113,7 +113,21 @@ echo "链路: bag 的顶激光/IMU/INSPVAX -> lidar_seg -> /map/occupancy_grid�
 
 ( nav_exec nav_perception "${lidar_bin}" ) >"${log_dir}/lidar_seg.log" 2>&1 &
 pids+=($!)
-( nav_exec nav_perception "${grid_bin}" ) >"${log_dir}/grid_map.log" 2>&1 &
+# lidar_seg 用默认 QoS（整数深度 = reliable）发 /patchworkpp/ground_seg_intensity，栅格的 yaml 订的是 best_effort。
+# 容器里走 UDP，best effort 丢一个分片就丢整帧，几十秒以后这个订阅一条都收不到，进程还在（T58、T68：162 s 的包栅格只到 36 s）。
+# 狗上是共享内存，保持 best_effort。GRID_MAP_RELIABLE=0 用 yaml 里的。
+grid_cmd=("${grid_bin}")
+if [[ -n "${NAV_STACK_ROOT:-}" && "${GRID_MAP_RELIABLE:-1}" != 0 ]]; then
+  grid_cfg="${log_dir}/grid_cfg"
+  mkdir -p "${grid_cfg}/grid_map_memory_node/cfg"
+  sed -e 's/reliability: "best_effort"/reliability: "reliable"/' \
+      -e 's/history_depth: 1 /history_depth: 10 /' \
+    "${SERES_PERCEPTION_INSTALL_DIR}/grid_map_memory_node/cfg/grid_map_memory_node.yaml" \
+    > "${grid_cfg}/grid_map_memory_node/cfg/grid_map_memory_node.yaml"
+  grid_cmd=(env SERES_PERCEPTION_INSTALL_DIR="${grid_cfg}" "${grid_bin}")
+  echo "栅格订阅 reliable（容器 UDP 上 best effort 会断，T68）"
+fi
+( nav_exec nav_perception "${grid_cmd[@]}" ) >"${log_dir}/grid_map.log" 2>&1 &
 pids+=($!)
 ( nav_exec slam "${loc_bin}" ) >"${log_dir}/loc.log" 2>&1 &
 pids+=($!)
