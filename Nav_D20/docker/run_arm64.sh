@@ -6,17 +6,27 @@
 # No network: a build that wants to download something fails here instead of fetching what the dog does not have.
 # The environment is the one of T56's build on the dog (docs/SERVER_TASKS.md, T56 step 3).
 #
+# One container is kept and reused (docker exec): on this server's vfs storage driver every `docker run` copies the
+# 22 GB image first, about 50 minutes (T60); an exec into the kept container starts at once. It is created on first
+# use, as root opens the dog's osqp / qdldl CMake files (mode 0700, owned by the dog's nvidia: find_package could
+# not read them, T60), and every command then runs as the caller.
+#
 #   bash Nav_D20/docker/run_arm64.sh <work dir> <command...>
 #   e.g. bash Nav_D20/docker/run_arm64.sh work_dirs/nav_cw_arm64 \
 #            bash /opt/seres/nav_cw/src/Nav_D20/docker/build_stack.sh /opt/seres/nav_cw nav_perception slam planning
-#   NAV_ARM64_IMAGE (default dog8-rootfs:latest), NAV_JOBS (make -j, default nproc), NAV_WORKERS (colcon, 4),
-#   NAV_DRY_RUN=1 prints the docker command.
+#   bash Nav_D20/docker/run_arm64.sh <work dir> --stop     remove the kept container (a new image needs a new one)
+#   NAV_ARM64_IMAGE (default dog8-rootfs:latest), NAV_ARM64_NAME (the container, default nav-arm64-<user>),
+#   NAV_JOBS (make -j, default nproc), NAV_WORKERS (colcon, 4), NAV_DOCKER (default docker),
+#   NAV_DRY_RUN=1 prints the docker commands.
 #   QEMU has to be registered once per boot of the server:
 #     docker run --privileged --rm tonistiigi/binfmt --install arm64
 set -euo pipefail
-work="${1:?usage: bash Nav_D20/docker/run_arm64.sh <work dir> <command...>}"
+work="${1:?usage: bash Nav_D20/docker/run_arm64.sh <work dir> <command...> | --stop}"
 shift
 [[ $# -gt 0 ]] || set -- bash
+DOCKER="${NAV_DOCKER:-docker}"
+image="${NAV_ARM64_IMAGE:-dog8-rootfs:latest}"
+name="${NAV_ARM64_NAME:-nav-arm64-$(id -un)}"
 mkdir -p "${work}"/{src,build,install,log}
 work="$(cd "${work}" && pwd)"
 D=/opt/seres/nav_cw/deps
@@ -34,22 +44,40 @@ envs=(
 )
 env_args=()
 for e in "${envs[@]}"; do env_args+=(-e "${e}"); done
+mounts=()
+for d in src build install log; do mounts+=(-v "${work}/${d}:/opt/seres/nav_cw/${d}"); done
+create=("${DOCKER}" run -d --name "${name}" --platform linux/arm64 --network none
+        --tmpfs /tmp:exec,mode=1777 --tmpfs /var/tmp:exec,mode=1777 --tmpfs /run
+        "${mounts[@]}" -w /opt/seres/nav_cw "${image}" sleep infinity)
+open_cmake=("${DOCKER}" exec -u 0 "${name}" chmod -R a+rX "${D}/lib/cmake/osqp" "${D}/lib/cmake/qdldl")
 tty=()
 [[ -t 0 && -t 1 ]] && tty=(-it)
-# osqp and qdldl ship mode 0700 cmake files owned by the dog's nvidia. find_package cannot
-# read them as the server uid. Open those two directories, then drop to the caller.
-uid="$(id -u)"
-gid="$(id -g)"
-cmd=(docker run --rm "${tty[@]}" --platform linux/arm64 --network none
-     --tmpfs /tmp:exec,mode=1777 --tmpfs /var/tmp:exec,mode=1777 --tmpfs /run
-     -v "${work}/src:/opt/seres/nav_cw/src" -v "${work}/build:/opt/seres/nav_cw/build"
-     -v "${work}/install:/opt/seres/nav_cw/install" -v "${work}/log:/opt/seres/nav_cw/log"
-     -w /opt/seres/nav_cw "${env_args[@]}" "${NAV_ARM64_IMAGE:-dog8-rootfs:latest}"
-     bash -c 'chmod -R a+rX /opt/seres/nav_cw/deps/lib/cmake/osqp /opt/seres/nav_cw/deps/lib/cmake/qdldl && exec setpriv --reuid="$1" --regid="$2" --clear-groups --inh-caps=-all -- "${@:3}"' \
-     bash "${uid}" "${gid}" "$@")
+run=("${DOCKER}" exec "${tty[@]}" -u "$(id -u):$(id -g)" -w /opt/seres/nav_cw "${env_args[@]}" "${name}" "$@")
+
+if [[ "$1" == --stop ]]; then
+  [[ -n "${NAV_DRY_RUN:-}" ]] && { echo "${DOCKER} rm -f ${name}"; exit 0; }
+  exec "${DOCKER}" rm -f "${name}"
+fi
 if [[ -n "${NAV_DRY_RUN:-}" ]]; then
-  printf '%q ' "${cmd[@]}"
-  echo
+  echo "# when ${name} does not exist yet:"
+  printf '%q ' "${create[@]}"; echo
+  printf '%q ' "${open_cmake[@]}"; echo
+  printf '%q ' "${run[@]}"; echo
   exit 0
 fi
-exec "${cmd[@]}"
+
+state="$("${DOCKER}" inspect -f '{{.State.Running}}' "${name}" 2> /dev/null || echo missing)"
+if [[ "${state}" == missing ]]; then
+  echo "creating ${name} from ${image} (on vfs the first one takes long, T60)..."
+  "${create[@]}" > /dev/null
+  "${open_cmake[@]}" || echo "warning: could not open ${D}/lib/cmake/osqp, qdldl (planning's find_package(osqp) may fail)"
+elif [[ "${state}" != true ]]; then
+  "${DOCKER}" start "${name}" > /dev/null
+fi
+# the kept container has to be the one for this work directory
+have="$("${DOCKER}" inspect -f '{{range .Mounts}}{{.Source}}={{.Destination}};{{end}}' "${name}")"
+if [[ "${have}" != *"${work}/src=/opt/seres/nav_cw/src;"* ]]; then
+  echo "${name} mounts another work directory (${have}); NAV_ARM64_NAME=<another name>, or --stop it first"
+  exit 2
+fi
+exec "${run[@]}"

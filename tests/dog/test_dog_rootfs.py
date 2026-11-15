@@ -99,15 +99,70 @@ def test_a_dry_run_only_prints(dog, tmp_path):
     assert not (tmp_path / "out").exists()
 
 
-def test_builds_run_at_the_dogs_paths_without_network(tmp_path):
-    env = dict(os.environ, NAV_DRY_RUN="1", NAV_JOBS="12")
-    r = subprocess.run(["bash", RUN, str(tmp_path / "w"), "bash", "build.sh"], capture_output=True, text=True,
-                       env=env)
+# fake docker: a container is a file $DSTATE/<name> holding its mounts; inspect, run -d, exec, start, rm
+FAKE_DOCKER = r"""#!/bin/bash
+echo "docker $*" >> "$DSTATE/log"
+case "$1" in
+  inspect) f="$DSTATE/${@: -1}"; [[ -e "$f" ]] || exit 1
+           if [[ "$3" == *State.Running* ]]; then echo true; else cat "$f"; fi ;;
+  run) name=""; mounts=""; prev=""
+       for a in "$@"; do
+         [[ "$prev" == --name ]] && name="$a"
+         [[ "$prev" == -v ]] && mounts="${mounts}${a%%:*}=${a#*:};"
+         prev="$a"
+       done
+       echo "$mounts" > "$DSTATE/$name"; echo cid ;;
+  rm) rm -f "$DSTATE/${@: -1}" ;;
+esac
+exit 0
+"""
+
+
+@pytest.fixture
+def arm64(tmp_path):
+    state = tmp_path / "docker"
+    state.mkdir()
+    fake = tmp_path / "fake_docker"
+    fake.write_text(FAKE_DOCKER)
+    fake.chmod(0o755)
+
+    def run(work, *args, **extra):
+        env = dict(os.environ, NAV_DOCKER=str(fake), DSTATE=str(state), NAV_JOBS="12", NAV_ARM64_NAME="nav-arm64-t",
+                   **extra)
+        return subprocess.run(["bash", RUN, str(work), *args], capture_output=True, text=True, env=env)
+
+    run.log = lambda: (state / "log").read_text().splitlines() if (state / "log").exists() else []
+    return run
+
+
+def test_builds_run_at_the_dogs_paths_without_network(tmp_path, arm64):
+    r = arm64(tmp_path / "w", "bash", "build.sh")
     assert r.returncode == 0, r.stdout + r.stderr
-    out = r.stdout
-    assert "--platform linux/arm64" in out and "--network none" in out
+    log = arm64.log()
+    create = next(l for l in log if l.startswith("docker run -d"))
+    assert "--platform linux/arm64" in create and "--network none" in create and create.endswith("sleep infinity")
     for d in ("src", "build", "install", "log"):
-        assert "%s:/opt/seres/nav_cw/%s" % (tmp_path / "w" / d, d) in out
+        assert "%s:/opt/seres/nav_cw/%s" % (tmp_path / "w" / d, d) in create
         assert (tmp_path / "w" / d).is_dir()
-    assert "/opt/seres/nav_cw/deps:" not in out              # the dog's deps come from the image, not a mount
-    assert "NAV_CUDA_ARCH=87" in out and "NAV_JOBS=12" in out and "dog8-rootfs:latest bash build.sh" in out
+    assert "/opt/seres/nav_cw/deps:" not in create            # the dog's deps come from the image, not a mount
+    chmod = next(l for l in log if " chmod " in l)
+    assert chmod.startswith("docker exec -u 0 nav-arm64-t chmod -R a+rX") and "cmake/osqp" in chmod   # T60
+    run = log[-1]
+    assert run.startswith("docker exec -u %d:%d" % (os.getuid(), os.getgid()))
+    assert "NAV_CUDA_ARCH=87" in run and "NAV_JOBS=12" in run and run.endswith("nav-arm64-t bash build.sh")
+
+
+def test_the_kept_container_is_reused_and_checked(tmp_path, arm64):
+    assert arm64(tmp_path / "w", "true").returncode == 0
+    assert arm64(tmp_path / "w", "bash", "b.sh").returncode == 0
+    assert sum(l.startswith("docker run -d") for l in arm64.log()) == 1     # created once (50 min on vfs, T60)
+    r = arm64(tmp_path / "other", "true")                                   # another work directory: refused
+    assert r.returncode == 2 and "mounts another work directory" in r.stdout
+    assert arm64(tmp_path / "w", "--stop").returncode == 0
+    assert arm64.log()[-1] == "docker rm -f nav-arm64-t"
+
+
+def test_a_dry_run_prints_the_commands(tmp_path, arm64):
+    r = arm64(tmp_path / "w", "bash", "build.sh", NAV_DRY_RUN="1")
+    assert r.returncode == 0 and "run -d --name nav-arm64-t" in r.stdout and "sleep infinity" in r.stdout
+    assert not arm64.log()

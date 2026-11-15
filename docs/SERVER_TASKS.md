@@ -169,7 +169,8 @@
 | T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
 | T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成，已复核（2026-11-14）：定位不再因大消息退出，odom 约 100 Hz；缩略图一条、Foxglove 订了规划没重启；外参 OK。复核加了：use-new 等 odom（INS 30 s 没固定解定位起不来）、bag_to_mcap.py（狗上录的是 sqlite3） |
 | T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 任务已写好 |
-| T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 三个模块编过了（规划第一次 osqp 的 cmake 是 0700，打开后再编）。ldd not found 0。增量 2 分 33 秒。拷完以后隧道不回 SSH banner，狗上的对照、dry-run 和关机没做成 |
+| T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 完成，已复核（2026-11-15）：三个模块在狗的系统镜像里编过，ldd 0，增量 2.5 分钟。vfs 每次起容器 50 分钟，run_arm64.sh 改成留一个容器 exec。狗上的对照没做（隧道不回 SSH），放到 T63 |
+| T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 任务已写好（第一次把服务器编的装到狗上之前做） |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -10009,6 +10010,41 @@ Foxglove：`foxglove_bridge on 8765, domain 42`。探针 12 秒：`/planning/deb
 **第 6 步。** `file`：planning、mode_switch_node、lidar_seg、grid_map_memory_node、lidar_3d_detection 都是 ELF 64-bit ARM aarch64。`ldd`（source 各模块的 `setup.bash`）`not found` 都是 0，`data/reports/T60/ldd_*.txt`。服务器这边的 NEEDED 在 `data/reports/T60/needed_server.txt`。三个 `install/<模块>/version.txt`：`2026-11-15`、`d3a29574acfe2dc6e2004f68a3b4dd5cab013f3c`、`built on the server in dog8-rootfs:20261114 (QEMU)`。增量：touch `tracking.cc` 之后 planning 2 分 33 秒（04:06:31–04:10:14，含接口包的重查）。狗上的 `readelf`、文件清单没对上：03:15 起 banner 超时，`data/reports/T60/dog_side.txt`。
 
 **第 7 步。** dry-run 没跑，没有会变的文件数。以后真装：`status` 是 theirs → `rsync -a --delete --chown=root:root` 到 `/opt/seres/nav_cw/install/` → `nav_cw.sh configure`（地图路径、车型、调试话题会被盖掉）→ `nav_cw.sh apply`（开关在 `nav_cw.env`，apply 写回；`use-new` 前也写一遍）→ `switches` 不能有 NOT APPLIED。
+
+
+### T60 复核（2026-11-15）
+
+主体完成：狗的系统拷成了镜像（22 GB，清单里没有密钥，`/public/zjst/robot/dog8_rootfs` 750），三个模块在 QEMU 里编过，五个二进制都是
+aarch64、`ldd` 0 个 not found，`version.txt` 写了在哪编的。用时和狗上差不多（狗上 `-j4` 约 63 分钟，这里 `-j64` 约 76 分钟），
+增量重编规划 2 分 33 秒。osqp / qdldl 的 CMake 文件是狗上 nvidia 的 0700，这个抓得对。
+
+1. **vfs 让每次 `docker run` 先拷 22 GB，起来要约 50 分钟**，编完 `--rm` 还删不干净：这样每编一次都要多等一个小时，没法常用。
+   改了 `run_arm64.sh`：留一个容器（`NAV_ARM64_NAME`，默认 `nav-arm64-<用户>`），第一次用时建（`sleep infinity`），建的时候 root 打开
+   osqp / qdldl 那两个目录一次，之后每条命令 `docker exec -u <调用者>` 进去，马上就起；换了工作目录会拒绝（挂载对不上），
+   `--stop` 删掉它（换了新镜像才要）。T60 的 `setpriv` 那一版不用了（效果一样，只是每次都要新容器）。测试 5 个。
+2. **狗连不上了**：拷完以后 `localhost:5038` TCP 能连、等不到 SSH 的 banner，从服务器直连 192.168.122.100:22 是关的。TCP 能连只说明
+   服务器这头的反向隧道端口在；多半是连着狗的本机那一段（隧道）断了，或者狗关机 / 卡住了。**要人看一下本机的隧道和狗**。
+   tar 是 `nice -n 19 ionice -c3`、只读的，不该把狗拖垮；狗起来以后先 `nav_cw.sh status`。
+3. 狗上的 cmake 是 `/usr/local/bin/cmake` 3.27.7（PATH 在前），不是 apt 的 3.22.1，任务里写错了，镜像里是一样的，没问题。
+4. 编的源码是 `d3a2957`（T61 那一版）；T58 改的 `packages.cmake` 不在里面。以后用这个环境编之前先 rsync 最新的源码。
+5. 没做的（要狗）：狗上的 NEEDED 和文件清单对照、第 7 步的 rsync dry-run。不急：狗上现在跑的是狗上 T61 编的，服务器编的还不装。
+   等狗回来、或者第一次要把服务器编的装上去之前做（T63）。binfmt 那个容器卡在 Removal In Progress，是 vfs 的老问题，不影响注册。
+
+---
+
+## T63 狗回来以后：服务器（arm64 镜像）编的和狗上编的对一遍（只读）
+
+```text
+任务 T63（狗在线；只读：狗上只跑 readelf、find、rsync -n）。第一次把服务器上 T60 那套编的装到狗上之前做，平时不用。
+0. ssh dog true；sudo -n bash /opt/seres/nav_cw/nav_cw.sh status（running: theirs）。连不上就停下（T60 时隧道等不到 SSH banner）。
+1. 先用 run_arm64.sh（留着的容器，T60 复核第 1 条）把最新的源码编一遍（rsync Nav_D20/{planning,slam,perception_combo_ros,seres_interface,docker}
+   到 work_dirs/nav_cw_arm64/src/Nav_D20/，build_stack.sh … nav_perception slam planning；增量）。
+2. 对照（同 T60 第 6 步）：planning、mode_switch_node、lidar_seg、grid_map_memory_node、lidar_3d_detection 两边 readelf -d | grep NEEDED；
+   两边 cd install && find . -type f | sort，只在一边有的列出来（version.txt、__pycache__ 不算）。
+3. rsync -n -a --delete --itemize-changes --rsync-path='sudo -n rsync' work_dirs/nav_cw_arm64/install/ dog:/opt/seres/nav_cw/install/ | tail -50
+   报会变的文件数（真装的步骤在 T60 第 7 步，要人定）。
+4. 提交 data/reports/T63/。
+```
 
 ---
 
