@@ -165,12 +165,14 @@
 | T54 | 重编规划（没放行就在人行横道上的处理）、闭环模拟七种；再放一次 6 号人行横道看新日志；在 T53 的录包上验感知到地图的外参；狗在线时只读核狗上感知节点的配置和输出 | Agent | T53 | 1.5 小时 | 完成，已复核（2026-11-14）：起来就读站点地图、没放行在人行横道上的处理、GPU 起点间隙都验了（T51 卡住那次 270/354 → 95/3109）。狗上的 App 只有 c1adbe7b，没有人行横道文件 |
 | T55 | 镜像拿不到，改在狗上编：只读查狗上缺哪些依赖、狗上的接口定义和仓库的一不一样；列下载清单（人在连着狗的本机下，传到狗上） | Agent | T54、狗在线 | 1 小时 | 完成，已复核（2026-11-14）：狗上的 -dev 和 ROS 包都齐，只缺 g2o、acados、OsqpEigen，源码都在服务器上，不用人下载。和狗上的接口两处不同，其中 App 发目标的 /nav/navigation 多了 nav_mode，要人定 |
 | T56 | 依赖解到 /opt/seres/nav_cw/deps（不装进系统）；狗上编规划、定位、感知，装到 /opt/seres/nav_cw（原来的不动）；地图换成仓库的；写 cw-*.service；域 42 放 1112 演练（感知重算目标，验外参）。不切换 | Agent | T55、文件到狗上 | 4 小时 | 停在第 6 步，已复核（2026-11-14）：编、装、地图、服务都过了。复核发现影子模式按原来的做法不生效（规划不读命令行参数），已改；启动脚本的库路径、App 盘快满、App 的地图切换、演练的共享内存四件事交给 T59 |
-| T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T61 | 半天 | 任务已写好 |
+| T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T61 | 半天 | 停在第 2c 步，已复核（2026-11-15）：换过去、影子、Foxglove、录包都通了。规划发的速度狗不走：`/mc/state` 一直是 mode 3（下肢），规划发 mode 2，App 那一路在规划之前多做的事我们没做（多半是 robot_service 的焦点、切模式）。录包的四个坑改成了 nav_cw_record.sh，人行横道上前方来车也停（人定）。T64 拷包、回放，T65 先看 App 怎么让狗走 |
 | T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
 | T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成，已复核（2026-11-14）：定位不再因大消息退出，odom 约 100 Hz；缩略图一条、Foxglove 订了规划没重启；外参 OK。复核加了：use-new 等 odom（INS 30 s 没固定解定位起不来）、bag_to_mcap.py（狗上录的是 sqlite3） |
 | T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 完成，已复核（2026-11-15）：/tmp 在 NFS 上让规划的 glog 卡住线程，tmpfs 以后 20 Hz；感知 reliable 一帧不丢，外参 OK（0.13 m，和狗上 0.12 m 对上）。nav-dev 可以当默认回放环境。复核加了同一个域上已有回放就不放 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 完成，已复核（2026-11-15）：三个模块在狗的系统镜像里编过，ldd 0，增量 2.5 分钟。vfs 每次起容器 50 分钟，run_arm64.sh 改成留一个容器 exec。狗上的对照没做（隧道不回 SSH），放到 T63 |
 | T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 完成，已复核（2026-11-15）：NEEDED 和狗上一样，文件只差一个 .t56 备份；服务器镜像编的就是狗上会编的。真装以后要 configure + apply |
+| T64 | T57 的包拷回服务器、转 mcap、看人行横道那一段；新门控（人行横道上前方来车也停）在这包上回放，和线上的旧门控对；arm64 编规划给狗 | Agent | T57 复核 | 2 小时 | 任务已写好 |
+| T65 | 现场：他们的服务下看 App 怎么让狗走起来（只订不发：运控模式、谁在发、焦点、robot_service 和 zsibot 的日志），把表和五个问题给机器人团队；装 T64 编的规划 | 人 + Agent | T64 第 5 步 | 2 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -10166,6 +10168,62 @@ App 上的狗画在 c1adbe7b 上，位置不准，不用管；位置看 Foxglove
 
 **没做。** 限速没改到 0.5。第 4 步 a/b/c 没做。包没拷到 `/public/zjst/robot/cp_data/`，没有转 mcap，没有 viz，没有 `objects_in_map.py`。没有 `use-original`。下次先处理运控：规划这条 `/mc/motion_control` 不切步态；遥控走的是另一条通道。
 
+### T57 复核（2026-11-15）
+
+换过去这一半都通了：`use-new` 26 s，RTK 固定解起定位，规划读 ad68517c、5 个人行横道、规则 wait，没有地图切换，感知 10–11 Hz；
+Foxglove 能发目标；影子模式第三次六行都 ok；录上了一包。没按过急停。
+
+**狗不走，不是规划发错了。** 巡航发的就是机器人团队那份代码一直在发的：`ros_bridge.cc` 的 `Publish`，`MODE_WBMC`（2，全身）+
+`MOTION_GAIT_WALK`（20）+ `[vx, vy, ω]`，我们没改过这一段。App 导航时他们的规划发的也是这一条。`zsibot_sdk_node` 也收到了，
+mode 2 的 `dealWalk` 把速度写成了摇杆量。差在运控没在接这一路：`/mc/state` 一直是 mode 3（下肢，IMC）、20 DONE，一次 `switch to gait`
+都没有。
+
+- 规划自己的回充任务不假设运控在什么状态。它先发一次性动作（`MOTION_STAND` 等，`Recharging::QueueMotionSkill`），等 `/mc/state` 里这个
+  动作 DONE、而且时间戳在请求之后（`IsMotionDone`），才发速度，`para` 第 4 个数是 1.0（精细控制）。巡航（Tracking）没有这一步，
+  默认已经有人把狗放到能走的状态了。
+- App 导航是 robot_service 通过 `/nav/navigation`（action，`handle_navigation_accepted`）把规划叫起来的。Foxglove 的 `/goal_pose` 直接进规划，
+  绕过了 robot_service。robot_service 的技能有令牌和焦点：`RobotSkillFocusRequest` 申请、释放、查询焦点，`RobotServiceFocusInfo`
+  里有焦点掩码、谁持有、优先级。最可能是：App 开始导航时，robot_service 先申请运动的焦点、把运控切到全身模式（或者让运控接 SDK 的
+  摇杆量），再调 `/nav/navigation`。我们这一路谁也没做这件事。
+- 手持遥控不经过 ROS（T57 看到了），可能在运控里优先级最高，或者有手动、自动的切换。
+- mode 3 那 2 秒，`dealWalk` 记成 0：下肢模式的速度不走这个口子（或者参数不对），不能把规划改成发 mode 3 了事。
+
+所以不在狗的域 0 上自己去试切模式、申请焦点这类指令：规矩是除了我们的服务不发新东西，也不知道会和 robot_service 怎么打架。
+先看 App 怎么让狗走起来（T65，只订不发：运控的模式、谁在发、焦点、robot_service 和 zsibot 的日志），同时问机器人团队。看清楚以后，
+用他们认可的办法让我们的规划拿到控制（T66），再接着做 T57 第 2c 步后半和第 4 步。
+
+问机器人团队（人去问，T65 第 3 步的表一起给）：
+1. App 里点开始导航以后、robot_service 调 `/nav/navigation` 之前，做了什么？申请哪个焦点（哪一位，token 从哪来）？切不切运控模式
+   （发的什么，消息还是服务）？切不切步态？
+2. `/mc/state` 是 mode 3（下肢）时，`/mc/motion_control` 上 mode 2 + `GAIT_WALK` 的速度会不会执行？要先发什么？
+3. 手持遥控开着的时候，外部的速度会不会被挡掉？遥控上有没有"自动 / 导航"一类的切换？
+4. mode 3 发 `GAIT_WALK` 时 `para` 要几个、各是什么（`zsibot_sdk_node` 的 `dealWalk` 记成了 0）？
+5. 外部程序（我们的规划）要正式拿到运动控制，推荐走哪条：robot_service 的技能（Move、导航 action），还是 `/mc/motion_control` 加焦点？
+
+**录包那四个坑改成了一个脚本**：`tools/deploy/nav_cw_record.sh`（逻辑在旁边的 `nav_cw_record.py`），现场指南第 9 节。
+- 用 root、`set +u` 再 source，slam、nav_perception 在前，planning 最后（T57 前两次没录上的原因）；
+- 一条命令开始，名字自动是 `<日期>_cw_<n>`。规划有目标、狗从 1.5 m 外进到 1.5 m 内，5 s 后自己停（人 2026-11-15 要的），否则 Ctrl-C；
+  两种都只给录制进程发一次 SIGINT，等它写完 `metadata.yaml`，录的时候不碰 db3（T57 的 `database is locked`）；
+- 多录 `/planning/debug/goal_pose`（规划每个周期重发上一个目标；`/goal_pose` 是易失的，录之前发的不在包里）和 `/mc/state`；
+- 录的时候运控一变就打一行（`/mc/state` 的 mode、uuid、动作状态，`/mc/motion_control` 谁在发、什么模式），T65 就靠它看；
+  `--no-record` 只看不录，`--hidden` 能录 action 的状态；
+- 测试 `tests/dog/test_nav_cw_record.py`（假的 ros2、假的 rclpy 按时间线喂目标和里程计）。
+
+CRLF：仓库加了 `.gitattributes`（`*.sh`、`tools/deploy/*.py` 一律 LF）。笔记本上这次以前检出的脚本还是 CRLF，删掉再
+`git checkout -- tools/deploy` 一次；往狗上拷用 `git archive`（T65 第 0 步），出来的就是 LF。
+
+**人行横道的门控改了**（人 2026-11-15 定）：过人行横道途中还看到车可能从狗前方经过，狗也停（`cross_wait`，理由 `ahead`）；
+从后面经过的不停。前后按冲突车最可能的那条预测轨迹离路径最近的点在不在狗头以前判；车从狗身上过照旧接着走（committed）；
+那辆车 3 s 不再冲突就接着走。只查剩下的人行横道再多 1 m。开关 `crosswalk_yield_conf.cross_ahead`（默认 true）。Python 和 C++ 都改了，
+逐帧对 10362 帧 0 差异，闭环仿真加了"上了人行横道才看到前方来车"（停在 11.5 m、车清空后接着走）和"后面来车"（不停）。
+细节在 CROSSWALK_YIELD_FLOW.md 第 5、6 节，PLANNING_INTEGRATION.md 第 4 节。狗上要换规划（T64 第 5 步编、T65 第 4 步装），实车看要等狗能走（T66）。
+
+其余：
+- 包还在狗上（`/home/nvidia/bags/20261115_cw_1`，reindex 过）：T64 拷回来、转、看人行横道那一段（线上是旧门控），再用新门控回放；
+- 第 4 步 a/b/c、0.5 m/s 没做，等狗能走；
+- 狗现在是 `running: ours`、shadow on、限速 0.3：T65 第 0 步先换回他们的（看 App 要用他们的服务）；
+- 运控日志里的 `motion_status` 和眼前的狗对不上（几乎一直是 2 = 趴下），不当证据，记得对；
+- 遥控接管、`stop cw-planning` 是停还是滑、急停按下松开，都要等狗能被规划带着走才能试（T66）。
 
 ---
 
@@ -10352,3 +10410,122 @@ nav-dev（`run.sh`、`/tmp` tmpfs、现场感知默认 reliable）可以当以�
    （`NAV_ALLOW_SHARED_DOMAIN=1` 跳过）。一起放就每套一个域（43、44……）。
 2. 已经建好、`/tmp` 还在 NFS 上的容器（t58build 那些）还是约 13 Hz；以后回放用 `run.sh` 新建的（`/tmp` 是 tmpfs），或者在老容器里
    回放前先 `mount -t tmpfs tmpfs /tmp`（要 root）。`docker create` 在 vfs 上约 31 分钟，建一个留着用。
+
+---
+
+## T64 T57 的包：拷回来、转、看人行横道；新门控在这包上回放；arm64 编规划（服务器）
+
+```text
+任务 T64（服务器；狗上只读拷一次）。为什么：T57 在影子模式下遥控走了一段，包还在狗上（/home/nvidia/bags/20261115_cw_1，sqlite3，
+reindex 过，5.2 GiB，162.6 s，T57 结果）；2026-11-15 人定人行横道上"前方来车也停"（门控理由 ahead、规划状态 cross_wait = 6，
+T57 复核），要看在真包上会不会停、停多久；狗上要换的规划先在服务器上编好（T60、T63：服务器的 arm64 镜像编的就是狗上会编的）。
+仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T64
+
+0. git pull（要有 078fb92 "Crosswalk: stop for a vehicle that may pass ahead" 和 nav_cw_record.sh 那两个提交）。
+   pytest tests/dog/test_yield_gate.py tests/dog/test_yield_gate_cpp.py tests/dog/test_nav_cw_record.py tests/dog/test_bag_to_mcap.py
+   tests/dog/test_nav_cw.py：全过；test_yield_gate_cpp 里是 "0 differ"、"crosswalk_sim: 0 failed"（九行 ok）。
+1. 拷包（只读；隧道不稳，断了就重跑，rsync 续得上）：
+     rsync -a --partial --info=progress2 dog:/home/nvidia/bags/20261115_cw_1/ /public/zjst/robot/cp_data/20261115_cw_1/
+   两边 sha256sum *.db3 一样、metadata.yaml 在；记下用时。半小时还拷不完、或者一直断：停下告诉人，人用笔记本拷到服务器。
+2. 看包：
+     B=/public/zjst/robot/cp_data/20261115_cw_1
+     python Nav_D20/planning/tools/bag_to_mcap.py $B ${B}_mcap            （LEFT OUT 抄下来）
+     python Nav_D20/planning/tools/check_planning_mcap.py ${B}_mcap > data/reports/T64/check.txt
+     python Nav_D20/planning/tools/planning_mcap_viz.py ${B}_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip \
+       -o work_dirs/t64_cw_1/viz/planning_viz.mcap
+     python Nav_D20/planning/tools/objects_in_map.py $B > data/reports/T64/objects_in_map.txt    （要 extrinsic OK）
+     python Nav_D20/planning/tools/bag_on_map.py --bag ${B}_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip \
+       > data/reports/T64/bag_on_map.txt     （落在哪张图上、过没过人行横道、哪个号、几点；回放的终点）
+3. 线上那一段（狗上的规划，影子模式，旧门控：上了人行横道就不停）：
+   - /planning/debug/plotjuggler/string 里的 crosswalk_mode、crosswalk_index、crosswalk_go、crosswalk_waiting_for、crosswalk_stale 按时间
+     排成状态序列（变了才记一行，带包里的时间）→ data/reports/T64/live_sequence.txt；和第 2 步过人行横道的时间对上；
+   - 影子的指令（/nav_cw/shadow/mc/motion_control 的 para 前三个）和实际速度（/lightning/odom 的 twist）画在一张图上
+     → data/reports/T64/shadow_vs_actual.png：人遥控走的时候规划想怎么走。
+4. 新门控在这包上回放（nav-dev：Nav_D20/docker/run.sh，/tmp 是 tmpfs，T62；规划用这个提交增量编，同 T58 第 2 步只编 planning）。
+   包里已经有狗上算好的 /lightning/odom、/map/occupancy_grid、/tf，回放只放传感器和狗上的感知目标：
+     M=/repo/data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13
+     BAG_PLAY_EXTRA="--topics /robot/topic/rdap/top_point_cloud2 /rte/rdap/rtk/inspvax /rte/rdap/rtk/imus/data_raw /perception/lidar_3d/objects" \
+     PLANNING_STARTUP_MAP=$M LOC_MAP_PATH=$M NAV_GPU=<空闲的卡> bash Nav_D20/docker/run.sh \
+       bash Nav_D20/planning/script/replay_planning_check.sh t64_cw_1 <X> <Y> --bag ${B}_mcap
+     cp work_dirs/planning_io_t64_cw_1/report.txt data/reports/T64/report_replay.txt
+   <X> <Y>：第 2 步 bag_on_map 给的终点（包里没有目标：/goal_pose 是录之前发的，T57）。狗是人遥控的，回放里规划的指令不动狗，看的是门控：
+   - 日志里每一行 "Crosswalk yield:"（状态、理由、waiting for / going on with）→ data/reports/T64/replay_sequence.txt；
+   - 有没有 cross_wait (ahead)：几次、各停多久、等的是哪个 id、那辆车在狗前面多远（/planning/debug/crosswalk 的车框）；
+     "going on with"（看到了但不停：从后面过的车）有几次；
+   - 和第 3 步线上的序列并排成一张表（时间、线上的状态 / 理由、回放的状态 / 理由）。回放的状态和线上的对不上不奇怪（回放里狗被人
+     拉着走，align / wait 停不住，可能变成 unreleased），关心的是上了人行横道以后门控的判断。
+   域：脚本先看这个域上有没有别的话题（T62 复核），有就等别人的回放放完，别加 NAV_ALLOW_SHARED_DOMAIN。
+5. arm64 编规划（狗上用，T65 第 4 步装）：
+     rsync -a --delete Nav_D20/{planning,slam,perception_combo_ros,seres_interface,docker} work_dirs/nav_cw_arm64/src/Nav_D20/
+     W=work_dirs/nav_cw_arm64; B2=/opt/seres/nav_cw/src/Nav_D20/docker/build_stack.sh
+     bash Nav_D20/docker/run_arm64.sh $W bash $B2 /opt/seres/nav_cw planning 2>&1 | tail -40 > data/reports/T64/build_arm64.txt
+   记下用时（应该是增量）。ldd（同 T60 第 6 步，run_arm64.sh 的环境）planning 的 not found 是 0；
+   grep -ral "stops for vehicles ahead" $W/install/planning/lib 有一个文件（新的那行日志在里面）；
+   install/planning 里写 version.txt（日期、git sha）；打包：
+     tar -C $W/install -czf /public/zjst/robot/cp_data/nav_cw_planning_<sha 前 7 位>.tar.gz planning; sha256sum 那个文件，抄进报告。
+6. 提交：data/reports/T64/、work_dirs/t64_cw_1/viz、本文档。
+
+停止条件：第 0 步测试不过；第 1 步拷不动；第 2 步 extrinsic 不是 OK（外参或时间戳的问题比门控要紧，先停下）；第 5 步编不过或 ldd 有 not found。
+报告（写进"T64 结果"）：拷包（大小、sha、用时）；LEFT OUT；bag_on_map；线上和回放的序列对照表；cross_wait 几次、各多久、为谁；
+"going on with" 几次；编规划的用时、sha256。
+```
+
+---
+
+## T65 现场：看 App 怎么让狗走起来（只订不发）；装新门控的规划
+
+```text
+任务 T65（T64 第 5 步编好以后，人在现场）。为什么：T57 规划发的速度运控收到了，狗不走：/mc/state 一直是 mode 3（下肢），规划发的是
+mode 2（全身）+ 行走。App 导航时机器人团队的规划发的是同一条消息（同一份代码），所以差在 App 那一路在规划之前多做的事（多半是
+robot_service：申请运动的焦点、切运控模式，T57 复核）。这次只看、不发：在他们的服务下让 App 让狗走，把运控和 robot_service 那边每一步的
+变化录下来；和 T57 复核的五个问题一起给机器人团队。另外把 T64 编的规划（新门控）装上。
+规矩：域 0 上只订不发：不发运控、焦点、技能、目标，也不起我们的规划；Agent 只用 nav_cw.sh 停、起他们的四个导航服务，别的服务不动；
+只写 /opt/seres/nav_cw/、/home/nvidia/、/tmp/；sudo -n。每一步 Agent 先说要做什么，人说可以再做。mkdir -p data/reports/T65
+
+0. 笔记本 git pull。脚本拷上去（git archive 按 .gitattributes 出 LF，不会再有 T57 的 CRLF）：
+     git archive HEAD tools/deploy/nav_cw.sh tools/deploy/nav_cw_foxglove.sh tools/deploy/nav_cw_record.sh tools/deploy/nav_cw_record.py \
+       | ssh dog 'rm -rf /tmp/t65 && mkdir -p /tmp/t65 && tar -x -C /tmp/t65 && sudo -n cp /tmp/t65/tools/deploy/* /opt/seres/nav_cw/'
+     ssh dog "grep -c \$'\r' /opt/seres/nav_cw/nav_cw.sh /opt/seres/nav_cw/nav_cw_record.sh /opt/seres/nav_cw/nav_cw_record.py"   （都是 0）
+   狗上是 T57 收工的样子：running: ours、shadow on、限速 0.3。先换回他们的（App 要用他们的服务），开关放回：
+     ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original && sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed off &&
+              sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow off; sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'
+   → running: theirs，App 里狗正常。
+1. 静着看（狗站着，App 不动）。环境同 nav_cw_record.sh 里那几行（root；source humble、slam、nav_perception，planning 最后；
+   RMW_IMPLEMENTATION=rmw_cyclonedds_cpp，CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml）：
+   - 图：ros2 topic list -t、ros2 service list -t、ros2 action list -t → data/reports/T65/graph_{topics,services,actions}.txt；
+     ros2 topic info -v /mc/motion_control、ros2 topic info -v /mc/state（谁发谁收）；
+   - 跟运控、焦点、模式、遥控有关的：grep -iE "^/mc/|focus|skill|robot_mode|mode|remote|joy|teleop|zsibot|robot_service|^/nav/"
+     列出来；话题各 echo --once 一条存下来（/mc/state 要整条：uuid、mode、state 数组、fault_arr）；
+   - unit：systemctl list-units --type=service --all | grep -iE "zsibot|robot|remote|mc|nav|app" → data/reports/T65/units.txt；
+   - sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --no-record 跑 20 s：现在的 /mc/state 那一行（T57 是 mode 3、20:DONE）。
+2. App 让狗走（空场地，人拿急停和遥控；他们的服务在跑）。每种一个包，录的时候同一个终端里看运控那几行：
+     sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --no-auto --hidden -o /home/nvidia/bags/<日期>_t65_<a|b|c> \
+       <第 1 步找到的焦点、技能、模式、遥控话题> /nav/navigation/_action/status /nav/navigation/_action/feedback
+   每种开始前记 T0、结束记 T1；journalctl -u <第 1 步那几个 unit：zsibot、robot_service、遥控、他们的规划> --since T0 --until T1
+   存到 data/reports/T65/journal_<a|b|c>.txt：
+   a. App 里最简单的让狗动的办法（摇杆、"前进"一类的按钮，有就用）：走两三秒、停；
+   b. App 导航：他们的定位用 c1adbe7b，狗要在那张图的范围里、App 上位置对（人看；不对就跳过 b，写明）。发一个 3–5 m 的目标，走到、停；
+   c. 手持遥控走两三秒（对照：T57 看到它不经过 ROS）。
+   每种都抄进报告：/mc/state 的 mode 什么时候变（3 → 2？什么时候变回去）、uuid 是谁；/mc/motion_control 上谁在发（uuid、mode、motion，
+   开始动那一行）；焦点信息（谁持有、掩码）、机器人模式（IDLE → WORKING？）怎么变；zsibot 日志里 "switch to gait"、mode、focus、token
+   一类的行；robot_service 日志里 a、b 开始那一刻做了什么（申请焦点、调了谁、发了什么）。
+3. 对照：Agent 把 a、b 里"狗动起来之前"的事件按时间排成一张表（谁、发了 / 调了什么、/mc/state 怎么变），和 T57 我们的规划那次
+   （只有 /mc/motion_control mode 2，/mc/state 一直 mode 3）放在一起 → data/reports/T65/sequence.md。人把这张表和 T57 复核那五个问题
+   发给机器人团队，回答（有的话）抄进报告。不要照着表自己去发：等回话、复核以后写 T66（我们的规划怎么拿到控制，再接 T57 第 2c 步后半、
+   第 4 步，人行横道的新门控也在那时实车看）。
+4. 装 T64 编的规划（他们的服务在跑、我们的停着，直接换；原来的留着能换回）：
+     scp /public/zjst/robot/cp_data/nav_cw_planning_<sha>.tar.gz dog:/tmp/ ；ssh dog 'sha256sum /tmp/nav_cw_planning_<sha>.tar.gz'（和 T64 抄的一样）
+     ssh dog 'sudo -n mv /opt/seres/nav_cw/install/planning /opt/seres/nav_cw/install/planning.t61 &&
+              sudo -n tar --no-same-owner -xzf /tmp/nav_cw_planning_<sha>.tar.gz -C /opt/seres/nav_cw/install'
+     ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh configure /opt/seres/nav_cw /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 &&
+              sudo -n bash /opt/seres/nav_cw/nav_cw.sh apply && sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches'
+   configure 重新写装好的配置（T63 复核：装完一定要 configure + apply）；有 NOT APPLIED 就停下，把 planning.t61 换回来。
+     ssh dog 'grep -ral "stops for vehicles ahead" /opt/seres/nav_cw/install/planning/lib'   （有一个文件）
+   不切换（不 use-new）：狗能被规划带着走之前，切过去也只能影子。
+5. 收尾：running: theirs（一直是）；switches 抄下来；包拷回服务器 /public/zjst/robot/cp_data/（bag_to_mcap.py 转，LEFT OUT 抄下来）。
+6. 提交：data/reports/T65/（图、units、各次的运控行、日志摘录、sequence.md）、本文档。
+
+停止条件：第 0 步 use-original 不成功；任何时候狗的行为不对（急停，记时间）；第 2 步 b 位置不对（跳过 b）；第 4 步 sha 对不上、
+configure / apply 有 NOT APPLIED（换回 planning.t61）。
+报告（写进"T65 结果"）：第 1 步的图（运控、焦点、模式、遥控那几块）和 units；a、b、c 每次的运控行和事件表；机器人团队的回答；第 4 步的输出。
+```

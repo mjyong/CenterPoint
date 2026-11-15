@@ -10,8 +10,13 @@ The goal is the latest of /planning/debug/goal_pose (the planner republishes the
 /goal_pose (a new one sent during the recording); the dog is /lightning/odom (map frame, like the goal). A goal the
 dog is already within the radius of (the last test's) does not stop it: the dog has to be outside first.
 
+It also prints every change of the motion control's state (/mc/state: mode, uuid, each motion's state) and of who
+commands it (/mc/motion_control: uuid, mode, motion): T57's dog stood in mode 3 (lower body) while the planner sent
+mode 2 (whole body) walks. --no-record only watches.
+
     sudo bash /opt/seres/nav_cw/nav_cw_record.sh                       # /home/nvidia/bags/<date>_cw_<n>
-    sudo bash /opt/seres/nav_cw/nav_cw_record.sh -o /home/nvidia/bags/x --radius 2 --hold 5 /mc/state_extra ...
+    sudo bash /opt/seres/nav_cw/nav_cw_record.sh -o /home/nvidia/bags/x --radius 2 --hold 5 /more/topic ...
+    sudo bash /opt/seres/nav_cw/nav_cw_record.sh --no-record      # only the motion-control lines (and the goal)
 """
 import argparse
 import datetime
@@ -34,6 +39,34 @@ TOPICS = [
 ADDED = ["/planning/debug/goal_pose", "/mc/state"]
 GOAL_MARKER, GOAL_POSE, ODOM = "/planning/debug/goal_pose", "/goal_pose", "/lightning/odom"
 CACHE = 256 * 1024 * 1024        # [B] --max-cache-size (T35: the default dropped point clouds)
+MODES = {0: "unknown", 1: "debug", 2: "whole body (WBMC)", 3: "lower body (IMC)", 4: "teleop"}   # mc_interface/Mode
+STATES = {1: "REJECTED", 2: "DOING", 3: "DONE", 4: "ABORTED"}                                 # MotionState
+
+
+def describe_state(uuid, mode, motions, fault):
+    """One line for an mc_interface/State: mode, the commanding uuid, (motion, state) pairs."""
+    return "/mc/state: mode %d %s, uuid %r, %s%s" % (
+        mode, MODES.get(mode, "?"), uuid,
+        " ".join("%d:%s" % (m, STATES.get(s, s)) for m, s in motions) or "no motions",
+        ", fault 0x%x" % fault if fault else "")
+
+
+def describe_command(uuid, mode, motion, para):
+    return "/mc/motion_control: uuid %r, mode %d %s, motion %d, para [%s]" % (
+        uuid, mode, MODES.get(mode, "?"), motion, ", ".join("%.2f" % v for v in para))
+
+
+class Changes:
+    """Report a value only when it changes (the topics run at 10-100 Hz)."""
+
+    def __init__(self):
+        self.last = {}
+
+    def __call__(self, key, value):
+        if self.last.get(key) == value:
+            return False
+        self.last[key] = value
+        return True
 
 
 class Arrival:
@@ -97,7 +130,8 @@ def _raise_stop(signum, frame):
 
 
 def ros_feed(arrival, log):
-    """Subscriptions that feed ``arrival``; -> (spin(timeout), close()), or None without rclpy."""
+    """Subscriptions that feed ``arrival`` and print the motion control's changes; -> (spin(timeout), close()), or
+    None without rclpy."""
     try:
         import rclpy
         from geometry_msgs.msg import PoseStamped
@@ -105,7 +139,7 @@ def ros_feed(arrival, log):
         from rclpy.qos import qos_profile_sensor_data
         from visualization_msgs.msg import Marker
     except ImportError as e:
-        log("no rclpy (%s): no auto stop, Ctrl-C to stop" % e)
+        log("no rclpy (%s): no auto stop, no motion-control lines; Ctrl-C to stop" % e)
         return None
     rclpy.init()
     # subscriptions only: no rosout, no parameter services on the robot's domain
@@ -127,6 +161,27 @@ def ros_feed(arrival, log):
     node.create_subscription(Marker, GOAL_MARKER, goal, qos_profile_sensor_data)
     node.create_subscription(PoseStamped, GOAL_POSE, goal, qos_profile_sensor_data)
     node.create_subscription(Odometry, ODOM, odom, qos_profile_sensor_data)
+    try:
+        from mc_interface.msg import Motion, State       # the planning prefix's (nav_cw_record.sh sources it last)
+    except ImportError as e:
+        log("no mc_interface (%s): no motion-control lines" % e)
+    else:
+        changed = Changes()
+
+        def state(msg):
+            motions = tuple((int(s.motion), int(s.state)) for s in msg.state)
+            v = (msg.uuid, int(msg.mode), motions, int(msg.fault))
+            if changed("state", v):
+                log(describe_state(*v))
+
+        def command(msg):
+            para = [float(x) for x in msg.para]
+            moving = any(abs(x) > 1e-3 for x in para[:3])
+            if changed(("cmd", msg.uuid), (int(msg.mode), int(msg.motion), moving)):
+                log(describe_command(msg.uuid, int(msg.mode), int(msg.motion), para))
+
+        node.create_subscription(State, "/mc/state", state, qos_profile_sensor_data)
+        node.create_subscription(Motion, "/mc/motion_control", command, qos_profile_sensor_data)
 
     def close():
         node.destroy_node()
@@ -158,6 +213,24 @@ def chown_tree(path, uid, gid):
             os.chown(n, uid, gid)
 
 
+def watch_only(log):
+    """--no-record: the motion-control lines and the goal until Ctrl-C."""
+    feed = ros_feed(Arrival(), log)
+    if feed is None:
+        return 1
+    for s in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(s, _raise_stop)
+    log("watching, domain %s; Ctrl-C to stop" % os.environ.get("ROS_DOMAIN_ID", "0"))
+    try:
+        while True:
+            feed[0](0.1)
+    except Stop:
+        pass
+    finally:
+        feed[1]()
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("topics", nargs="*", help="more topics to record")
@@ -166,18 +239,23 @@ def main(argv=None):
     ap.add_argument("--radius", type=float, default=1.5, help="[m] the dog this close to the goal ...")
     ap.add_argument("--hold", type=float, default=5.0, help="[s] ... this long before the recording stops")
     ap.add_argument("--no-auto", action="store_true", help="only Ctrl-C stops it")
+    ap.add_argument("--no-record", action="store_true", help="only print the motion-control changes (and the goal)")
+    ap.add_argument("--hidden", action="store_true", help="also hidden topics (an action's _action/status, feedback)")
     ap.add_argument("--dry-run", action="store_true", help="print the record command")
     args = ap.parse_args(argv)
 
     def log(line):
         print("[%s] %s" % (time.strftime("%H:%M:%S"), line), flush=True)
 
+    if args.no_record:
+        return watch_only(log)
     out = args.output or default_output(args.dir)
     if os.path.exists(out):
         log("%s exists; ros2 bag record would refuse it" % out)
         return 2
     topics = TOPICS + ADDED + [t for t in args.topics if t not in TOPICS + ADDED]
-    cmd = ["ros2", "bag", "record", "-s", "sqlite3", "--max-cache-size", str(CACHE), "-o", out] + topics
+    cmd = ["ros2", "bag", "record", "-s", "sqlite3", "--max-cache-size", str(CACHE), "-o", out]
+    cmd += (["--include-hidden-topics"] if args.hidden else []) + topics
     if args.dry_run:
         print("# domain %s" % os.environ.get("ROS_DOMAIN_ID", "0"))
         print(" ".join(cmd))
@@ -188,17 +266,18 @@ def main(argv=None):
     log("recording %s, domain %s: %d topics" % (out, os.environ.get("ROS_DOMAIN_ID", "0"), len(topics)))
     rec = subprocess.Popen(cmd, start_new_session=True)
     arrival = Arrival(args.radius, args.hold)
-    feed = None if args.no_auto else ros_feed(arrival, log)
+    feed = ros_feed(arrival, log)
+    auto = feed is not None and not args.no_auto
     why = None
     try:
-        log("Ctrl-C to stop" + ("" if feed is None else "; or it stops %g s after the dog is within %.1f m of "
-                                                       "the planner's goal" % (args.hold, args.radius)))
+        log("Ctrl-C to stop" + ("; or it stops %g s after the dog is within %.1f m of the planner's goal" % (
+            args.hold, args.radius) if auto else ""))
         while rec.poll() is None:
             if feed is not None:
                 feed[0](0.1)
             else:
                 time.sleep(0.1)
-            if arrival.due(time.monotonic()):
+            if auto and arrival.due(time.monotonic()):
                 why = "at the goal"
                 break
     except Stop as e:

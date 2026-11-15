@@ -49,7 +49,7 @@ _t0 = [None]
 _feed = []
 def init():
     _t0[0] = time.monotonic()
-    _feed[:] = sorted(json.loads(os.environ.get("FAKE_FEED", "[]")))
+    _feed[:] = sorted(json.loads(os.environ.get("FAKE_FEED", "[]")), key=lambda e: e[0])
 def ok():
     return _t0[0] is not None
 def shutdown():
@@ -68,10 +68,10 @@ def spin_once(node, timeout_sec=None):
     time.sleep(timeout_sec or 0.0)
     now = time.monotonic() - _t0[0]
     while _feed and _feed[0][0] <= now:
-        t, topic, x, y = _feed.pop(0)
+        t, topic, *args = _feed.pop(0)
         if topic in node.subs:
             msg_type, cb = node.subs[topic]
-            cb(msg_type.fake(x, y))
+            cb(msg_type.fake(*args))
 '''
 
 FAKE_MSG = r'''class _P:
@@ -95,6 +95,25 @@ class {name}:
 '''
 
 
+FAKE_MC = r'''class _S:
+    def __init__(self, motion, state):
+        self.motion, self.state = motion, state
+class State:
+    @classmethod
+    def fake(cls, mode, uuid, motions, fault=0):
+        m = cls()
+        m.mode, m.uuid, m.fault = mode, uuid, fault
+        m.state = [_S(a, b) for a, b in motions]
+        return m
+class Motion:
+    @classmethod
+    def fake(cls, uuid, mode, motion, para):
+        m = cls()
+        m.uuid, m.mode, m.motion, m.para = uuid, mode, motion, para
+        return m
+'''
+
+
 @pytest.fixture
 def dog(tmp_path):
     bin_ = tmp_path / "bin"
@@ -110,6 +129,9 @@ def dog(tmp_path):
         (py / pkg).mkdir()
         (py / pkg / "__init__.py").write_text("")
         (py / pkg / "msg.py").write_text(FAKE_MSG.format(name=name, nested=nested))
+    (py / "mc_interface").mkdir()
+    (py / "mc_interface" / "__init__.py").write_text("")
+    (py / "mc_interface" / "msg.py").write_text(FAKE_MC)
     prefix = tmp_path / "prefix"
     for p in ("slam", "nav_perception", "planning"):
         (prefix / "install" / p).mkdir(parents=True)
@@ -245,3 +267,32 @@ def test_arrival_and_numbering(tmp_path):
         (tmp_path / n).mkdir()
     assert rec.default_output(str(tmp_path), "20261115").endswith("20261115_cw_4")
     assert rec.default_output(str(tmp_path / "none"), "20261116").endswith("20261116_cw_1")
+
+
+def test_motion_control_changes_are_printed_once_each(dog):
+    # T57: the dog stood in mode 3 while the planner sent mode 2 walks
+    feed = [[0.2 + 0.05 * k, "/mc/state", 3, "", [[20, 3]]] for k in range(10)] + \
+           [[0.3 + 0.05 * k, "/mc/motion_control", "planning", 2, 20, [0.0, 0.0, 0.0]] for k in range(4)] + \
+           [[0.5 + 0.05 * k, "/mc/motion_control", "planning", 2, 20, [0.27, 0.09, 0.0]] for k in range(6)] + \
+           [[0.9, "/mc/state", 2, "planning", [[20, 2]]]]
+    p = dog("--no-auto", FAKE_FEED=feed)
+    dog.wait_recording(p)
+    time.sleep(1.5)
+    os.killpg(p.pid, signal.SIGINT)
+    out, _ = p.communicate(timeout=20)
+    assert p.returncode == 0, out
+    assert out.count("/mc/state: mode 3 lower body (IMC), uuid '', 20:DONE") == 1
+    assert out.count("/mc/motion_control: uuid 'planning', mode 2 whole body (WBMC), motion 20") == 2   # still, moving
+    assert "para [0.27, 0.09, 0.00]" in out and "/mc/state: mode 2 whole body (WBMC), uuid 'planning', 20:DOING" in out
+
+
+def test_no_record_only_watches_and_hidden_adds_action_topics(dog):
+    p = dog("--no-record", FAKE_FEED=[[0.2, "/mc/state", 3, "", [[20, 3]]]])
+    time.sleep(1.5)
+    os.killpg(p.pid, signal.SIGINT)
+    out, _ = p.communicate(timeout=20)
+    assert p.returncode == 0 and "watching, domain 0" in out and "/mc/state: mode 3" in out, out
+    assert "ros2 bag record" not in dog.log.read_text()
+    r = subprocess.run(["bash", SH, "--dry-run", "--hidden", "-o", "/x/z"], env=dog.env(), capture_output=True,
+                       text=True)
+    assert "--include-hidden-topics /robot/topic/rdap/top_point_cloud2" in r.stdout, r.stdout

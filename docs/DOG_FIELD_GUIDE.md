@@ -294,7 +294,11 @@ sudo bash /opt/seres/nav_cw/nav_cw_record.sh          # → /home/nvidia/bags/<Y
   目标 1.5 m 内，5 s 后自己停；中途又出了 1.5 m 就不停了，再进来重新数。上一次测试留下的目标就在狗脚下：不会停，要先出去；
 - 没有目标、或想早点停：Ctrl-C。两种停法都只给录制进程发一次 SIGINT，等它把 `metadata.yaml` 写完；录的时候不碰 db3；
 - `-o <目录>` 换名字，`--radius 2 --hold 5` 改距离和时间，`--no-auto` 只认 Ctrl-C，后面跟话题名多录几个，`--dry-run` 只打印命令；
-- 录完包归 nvidia（`sudo` 的那个人），打印 `ros2 bag info`。没有 `metadata.yaml`（录制进程被杀了）就照提示 `ros2 bag reindex`。
+- 录完包归 nvidia（`sudo` 的那个人），打印 `ros2 bag info`。没有 `metadata.yaml`（录制进程被杀了）就照提示 `ros2 bag reindex`；
+- 录的时候运控一变就打一行：`/mc/state: mode 3 lower body (IMC), uuid '', 20:DONE`（模式、谁在控、每个动作的状态）、
+  `/mc/motion_control: uuid 'planning', mode 2 whole body (WBMC), motion 20, para [...]`（谁在发、发的什么模式，开始动和停下各一行）。
+  T57 狗不走时就是这个样子：狗在 mode 3，规划发 mode 2。只想看这几行、不录：`--no-record`；要录 action 的状态（`/nav/navigation/_action/status`
+  这类隐藏话题）：`--hidden` 再把话题名写上。
 
 它录的是下面这张表，再加 `/planning/debug/goal_pose`（`/goal_pose` 是易失的，录之前发的目标不在包里，T57）和 `/mc/state`
 （运控的状态）。手动录也行（同一张表）：
@@ -330,6 +334,8 @@ journalctl -u cw-planning --since "<开始>" --until "<结束>" > planning.log  
 | `shadow on` 退出 3，`SHADOW NOT IN EFFECT` | 它打出的图 | 装的规划没按配置改话题名（版本不对？）；它已经把 `cw-planning` 停了，别再起，查清楚 |
 | `use-new` 退出 1，图那几行有 WRONG | 哪一行 | 开关和实际不符（launch 是旧的、没读 `nav_cw.env`）；它已经换回了 |
 | 狗不走、`mission_state: standstill` | `journalctl` 里的超时、`nav_blocked` | 里程计或栅格断流（暂停 1 s、恢复 3 s）；被挡；影子模式没关；限速设成了 0 |
+| 狗不走、`mission_state: active`、`/mc/motion_control` 上有规划的速度 | `nav_cw_record.sh --no-record` 打的 `/mc/state` 那行 | T57：运控在 mode 3（下肢），规划发 mode 2（全身）；App 那一路在规划之前多做的事（焦点、切模式）我们没做。还在查（T65），别自己发切模式的指令 |
+| 人行横道上停住、`cross_wait (ahead)` | Foxglove 里红框在哪、在不在狗前方 | 按设计：前方有车可能过来（2026-11-15）；车过去 3 s 后接着走。后面过的车是橙框，不停 |
 | 一直 `wait (stale)` | `ros2 topic hz /perception/lidar_3d/objects`；`crosswalk_stale` | 感知没起来；感知和里程计的时间对不上（`max_pose_gap` 0.3 s） |
 | 一直 `wait (vehicle)`，路上没车 | Foxglove 里红框在哪 | 停着的车被当成在动（速度噪声、INS 朝向不对）；路边的车被预测"可能拐过来" |
 | 车框跟着狗转 | `objects_in_map.py` | 外参不对 |

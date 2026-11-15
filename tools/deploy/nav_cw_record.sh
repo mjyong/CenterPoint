@@ -2,11 +2,14 @@
 # One command to record a bag on dog 8: the field guide's topics (DOG_FIELD_GUIDE.md section 9), the planner's goal
 # and /mc/state, sqlite3, as root (the robot's shared memory is root's, T40). It stops by itself 5 s after the dog
 # (walking or remote-controlled) has come within 1.5 m of the planner's goal; otherwise Ctrl-C. Either way the
-# recorder gets one SIGINT and writes metadata.yaml. The logic is nav_cw_record.py, next to this file.
+# recorder gets one SIGINT and writes metadata.yaml. Meanwhile it prints each change of /mc/state (mode, uuid, motion
+# states) and of who sends /mc/motion_control. The logic is nav_cw_record.py, next to this file.
 #
 #   sudo bash /opt/seres/nav_cw/nav_cw_record.sh                 -> /home/nvidia/bags/<YYYYMMDD>_cw_<n>
 #   sudo bash /opt/seres/nav_cw/nav_cw_record.sh -o /home/nvidia/bags/<name> [--radius 1.5] [--hold 5] [--no-auto]
-#                                                [more topics ...]   (--dry-run prints the record command)
+#                                                [--hidden] [more topics ...]   (--hidden: also action topics like
+#                                                /nav/navigation/_action/status; --dry-run prints the command)
+#   sudo bash /opt/seres/nav_cw/nav_cw_record.sh --no-record      only the motion-control lines, no bag
 #   NAV_CW_PREFIX (/opt/seres/nav_cw: our installs give the message types), NAV_CW_BAG_DIR (/home/nvidia/bags).
 # Domain: ROS_DOMAIN_ID if set, else nav_cw.env's (42 during a rehearsal), else 0. It only subscribes.
 set -euo pipefail
