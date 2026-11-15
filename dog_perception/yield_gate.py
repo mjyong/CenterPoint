@@ -82,6 +82,12 @@ class YieldConfig:
     # in the blind sector then is still unseen. Kept off; the blind sector needs the robot turned (or another lidar).
     min_watch: float = 0.0          # [s] at the curb the robot watches at least this long before it goes (0: off;
                                     # from the first update after reset, i.e. arriving)
+    # On the crosswalk (people, 2026-11-15): the robot stops for a vehicle that may still pass ahead of it: a conflict
+    # (turns included) whose most likely predicted track crosses the path beyond the robot's nose. Not by the turns:
+    # every vehicle near gets those, and a car behind would stop it too. Not for one passing behind it, standing
+    # vehicles (they give way) or stale perception. One whose track crosses the robot's own footprint while it walks
+    # is "committed" as at the curb: keep going, out of its way. False: the old rule, never stop on the crosswalk
+    cross_ahead: bool = True
 
 
 @dataclass
@@ -90,7 +96,9 @@ class Assessment:
     stale: bool
     conflicts: list = field(default_factory=list)   # dicts: id, gap [s] (nan: young; stop rule: slack; wait rule:
                                                     # when it reaches the path), s [m], kind (predicted / turn /
-                                                    # young)
+                                                    # young), ahead (its most likely predicted track crosses
+                                                    # the path beyond the robot's nose, crossing_s; young: the
+                                                    # closest path point)
     standing: list = field(default_factory=list)    # dicts: id, standing_for [s] or None, blocking (body on the path)
     approaching: set = field(default_factory=set)   # ids of moving vehicles heading towards the path
     present: set = field(default_factory=set)       # ids of every vehicle looked at
@@ -102,7 +110,7 @@ class Assessment:
 class Decision:
     go: bool
     reason: str                     # clear / committed / on_crosswalk / vehicle / young / standing / blocked /
-                                    # clearing / not_passed / lost / stale / watching
+                                    # clearing / not_passed / lost / stale / watching / ahead (on the crosswalk)
     ids: list = field(default_factory=list)
     gap: float = float("inf")
 
@@ -254,6 +262,14 @@ def turn_modes(obj, now, stamp, cfg, horizon, sigma):
     return out
 
 
+def crossing_s(pts, s, centers):
+    """[m] along the path where a track of vehicle centres comes closest to it: where it crosses the path (the first
+    time step and path point of the smallest distance). Beyond the robot's nose (0.5 dog_length) the vehicle passes
+    ahead of the robot; at the first path point (the robot) it passes behind, or through the robot."""
+    d2 = ((centers[:, None, :] - pts[None, :, :]) ** 2).sum(-1)
+    return float(s[int(np.argmin(d2)) % len(s)])
+
+
 def _is_moving(obj, cfg):
     return obj.get("motion") == "moving" or float(np.hypot(*obj["velocity"][:2])) >= cfg.stopped_speed
 
@@ -268,7 +284,9 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
     d_in, d_out = robot_windows(s, cfg)
     horizon = max(cfg.horizon, float(d_out[-1]) + cfg.pet)   # a vehicle later than this cannot conflict
     corridor = 0.5 * cfg.dog_width + cfg.lateral_margin
-    here = s <= 0.5 * cfg.dog_length                      # under the robot now
+    nose = 0.5 * cfg.dog_length
+    here = s <= nose                                      # under the robot now
+    limit = np.inf if cfg.yield_rule == "wait" else 0.0 if cfg.yield_rule == "stop" else cfg.pet
     for obj in objects:
         if obj["label"] not in cfg.classes:
             continue
@@ -311,9 +329,9 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
                                              np.full(len(tau), hw0 + 0.5 * cfg.dog_width), tau)
                     a.in_lane = bool(np.any(~np.isnan(raw_first)))
             a.min_gap = min(a.min_gap, worst[0])
-            limit = np.inf if cfg.yield_rule == "wait" else 0.0 if cfg.yield_rule == "stop" else cfg.pet
             if worst[0] < limit:
-                a.conflicts.append(dict(id=oid, gap=worst[0], s=worst[1], kind=worst[2]))
+                ahead = crossing_s(pts, s, modes[0][0]) > nose   # where its most likely track crosses
+                a.conflicts.append(dict(id=oid, gap=worst[0], s=worst[1], kind=worst[2], ahead=ahead))
                 conflicted = True
             r = pts[int(np.argmin(dist))] - p
             if float(np.dot(np.asarray(obj["velocity"], dtype=float)[:2], r)) > 0:
@@ -334,7 +352,8 @@ def assess(path_xy, objects, now, stamp, cfg=YieldConfig()):
         # a new track: its velocity (and so its prediction) is not to be trusted yet
         if (not conflicted and cfg.young_range > 0 and obj.get("age") is not None and obj["age"] < cfg.young_age
                 and dist.min() <= cfg.young_range):
-            a.conflicts.append(dict(id=oid, gap=float("nan"), s=float(s[int(np.argmin(dist))]), kind="young"))
+            sj = float(s[int(np.argmin(dist))])
+            a.conflicts.append(dict(id=oid, gap=float("nan"), s=sj, kind="young", ahead=sj > nose))
     return a
 
 
@@ -356,12 +375,15 @@ class YieldGate:
         self.conflict_last = {}         # id -> last time it was a conflict (wait rule)
         self.seen_last = {}             # id -> last time it was seen (wait rule)
         self.watch_since = None         # first update standing at the curb (min_watch)
+        self.crossing = False           # the last update was on the crosswalk
 
     def update(self, a, now, dog_moving=False, on_crosswalk=False):
-        """``on_crosswalk``: the robot's centre is on a crosswalk of the map. It does not stop there for vehicles,
-        stale perception included: vehicles have to give way, and stopping in a lane is worse (people, 2026-11-12).
-        ``min_watch``: a go is held ("watching") until the robot has stood at the curb that long; not once it is
-        moving or on the crosswalk."""
+        """``on_crosswalk``: the robot's centre is on a crosswalk of the map (``a`` assessed on what is left of it).
+        It stops there only for a vehicle that may pass ahead of it (``cross_ahead``, people 2026-11-15; before:
+        never, 2026-11-12), and goes on as at the curb: each one waited for clear (wait_clear) or lost (lost_hold).
+        Not for vehicles passing behind it, standing ones (they give way) or stale perception: stopping in a lane
+        is worse. ``min_watch``: a go is held ("watching") until the robot has stood at the curb that long; not once
+        it is moving or on the crosswalk."""
         if self.watch_since is None and not dog_moving and not on_crosswalk:
             self.watch_since = now
         d = self._decide(a, now, dog_moving, on_crosswalk)
@@ -373,9 +395,8 @@ class YieldGate:
     def _decide(self, a, now, dog_moving, on_crosswalk):
         cfg = self.cfg
         if on_crosswalk:
-            self.paused = False
-            self.yielded.clear()
-            return Decision(True, "on_crosswalk", [c["id"] for c in a.conflicts], a.min_gap)
+            return self._decide_crosswalk(a, now, dog_moving)
+        self.crossing = False
         if a.stale:
             self.paused = True
             self.last_conflict = now
@@ -407,7 +428,14 @@ class YieldGate:
             reason = ("young" if all(c["kind"] == "young" for c in a.conflicts) else "vehicle") if conflict_ids \
                 else "blocked" if blocked else "standing"
             return Decision(False, reason, conflict_ids + waiting_for, gap)
-        if self.paused and cfg.yield_rule == "wait":
+        return self._resume(a, now, gap) or Decision(True, "clear", [], gap)
+
+    def _resume(self, a, now, gap):
+        """After a wait: hold while the vehicles waited for have not cleared (a Decision), or None (go)."""
+        cfg = self.cfg
+        if not self.paused:
+            return None
+        if cfg.yield_rule == "wait":
             clearing = sorted(i for i in self.yielded if i in a.present
                               and now - self.conflict_last.get(i, -np.inf) < cfg.wait_clear)
             if clearing:
@@ -416,18 +444,41 @@ class YieldGate:
                           and now - self.seen_last.get(i, -np.inf) < cfg.lost_hold)
             if lost:
                 return Decision(False, "lost", lost, gap)
-            self.paused = False
-            self.yielded.clear()
-            return Decision(True, "clear", [], gap)
-        if self.paused:
+        else:
             if now - self.last_conflict < cfg.clear_time:
                 return Decision(False, "clearing", sorted(self.yielded), gap)
             pending = sorted(i for i in self.yielded if i in a.present and i in a.approaching)
             if pending:
                 return Decision(False, "not_passed", pending, gap)
+        self.paused = False
+        self.yielded.clear()
+        return None
+
+    def _decide_crosswalk(self, a, now, dog_moving):
+        """On the crosswalk: wait only for vehicles that may pass ahead (see update); stale perception adds none."""
+        cfg = self.cfg
+        if not self.crossing:           # just stepped on: what it waited for at the curb is not what counts here
+            self.crossing = True
             self.paused = False
             self.yielded.clear()
-        return Decision(True, "clear", [], gap)
+        conflict_ids = [c["id"] for c in a.conflicts]
+        if not cfg.cross_ahead:
+            return Decision(True, "on_crosswalk", conflict_ids, a.min_gap)   # the old rule: never stop here
+        gap = min([c["gap"] for c in a.conflicts if c["gap"] == c["gap"]], default=a.min_gap)
+        ahead = [] if a.stale else [c["id"] for c in a.conflicts if c["ahead"]]
+        if cfg.yield_rule == "wait":
+            for oid in a.present:
+                self.seen_last[oid] = now
+            for oid in ahead:
+                self.conflict_last[oid] = now
+        if dog_moving and not self.paused and a.in_lane:
+            return Decision(True, "committed", conflict_ids, gap)     # its track crosses the robot: get out of it
+        if ahead:
+            self.paused = True
+            self.last_conflict = now
+            self.yielded.update(ahead)
+            return Decision(False, "ahead", ahead, gap)
+        return self._resume(a, now, gap) or Decision(True, "on_crosswalk", conflict_ids, gap)
 
 
 def required_sight_range(crossing_length, v_vehicle, latency, cfg=YieldConfig()):

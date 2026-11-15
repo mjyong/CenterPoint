@@ -285,9 +285,10 @@ std_msgs::msg::ColorRGBA CwColor(float r, float g, float b, float a) {
 }  // namespace
 
 // ours (T55 review): in the map frame, the crosswalks near the robot (the one it is at or heading to coloured by the
-// mode: approach yellow, align / wait red, go / cross green), perception's vehicles where the gate places them
-// (red: the gate waits for it; an arrow for the velocity) and a line of text over the robot (mode, reason, how many
-// it waits for). If the extrinsic were wrong the boxes would miss the vehicles' cells in the cost map.
+// mode: approach yellow, align / wait / cross_wait red, go / cross green), perception's vehicles where the gate places
+// them (red: the gate waits for it; orange: a conflict it goes on with, passing behind the robot on the crosswalk or
+// committed; an arrow for the velocity) and a line of text over the robot (mode, reason, how many it waits for). If
+// the extrinsic were wrong the boxes would miss the vehicles' cells in the cost map.
 void RosDebugBridge::CrosswalkDebug() {
   using planning::mission::CrosswalkYieldOutput;
   auto *mission_tracking = dynamic_cast<planning::mission::Tracking *>(
@@ -315,7 +316,8 @@ void RosDebugBridge::CrosswalkDebug() {
   switch (o.mode) {
     case CrosswalkYieldOutput::kApproach: mode_color = CwColor(1.0f, 0.85f, 0.1f, 0.95f); break;
     case CrosswalkYieldOutput::kAlign:
-    case CrosswalkYieldOutput::kWait: mode_color = CwColor(1.0f, 0.2f, 0.2f, 0.95f); break;
+    case CrosswalkYieldOutput::kWait:
+    case CrosswalkYieldOutput::kCrossWait: mode_color = CwColor(1.0f, 0.2f, 0.2f, 0.95f); break;
     case CrosswalkYieldOutput::kGo:
     case CrosswalkYieldOutput::kCross: mode_color = CwColor(0.2f, 0.9f, 0.3f, 0.95f); break;
     default: break;
@@ -349,7 +351,8 @@ void RosDebugBridge::CrosswalkDebug() {
   if (mission_tracking->crosswalk_objects_in_map(&objs)) {
     for (const auto &ob : objs) {
       if (ob.label != "vehicle" && ob.label != "cyclist") continue;   // what the gate yields to
-      const bool waited = std::find(o.decision.ids.begin(), o.decision.ids.end(), ob.id) != o.decision.ids.end();
+      const bool listed = std::find(o.decision.ids.begin(), o.decision.ids.end(), ob.id) != o.decision.ids.end();
+      const bool waited = listed && !o.decision.go;
       auto box = base("vehicles", visualization_msgs::msg::Marker::CUBE);
       box.pose.position.x = ob.position.x();
       box.pose.position.y = ob.position.y();
@@ -359,7 +362,9 @@ void RosDebugBridge::CrosswalkDebug() {
       box.scale.x = std::max(ob.length, 0.5);
       box.scale.y = std::max(ob.width, 0.5);
       box.scale.z = 1.6;
-      box.color = waited ? CwColor(1.0f, 0.15f, 0.15f, 0.6f) : CwColor(0.3f, 0.6f, 1.0f, 0.45f);
+      box.color = waited   ? CwColor(1.0f, 0.15f, 0.15f, 0.6f)
+                  : listed ? CwColor(1.0f, 0.55f, 0.1f, 0.6f)
+                           : CwColor(0.3f, 0.6f, 1.0f, 0.45f);
       arr.markers.push_back(box);
       if (ob.velocity.norm() > 0.3) {
         auto arrow = base("vehicle_velocity", visualization_msgs::msg::Marker::ARROW);
@@ -387,7 +392,9 @@ void RosDebugBridge::CrosswalkDebug() {
     text.scale.z = 0.5;
     text.color = mode_color;
     text.text = std::string(planning::mission::ModeName(o.mode)) + " (" + o.decision.reason + ")" +
-                (o.decision.ids.empty() ? "" : ", waiting for " + std::to_string(o.decision.ids.size())) +
+                (o.decision.ids.empty() ? ""
+                 : o.decision.go        ? ", going on with " + std::to_string(o.decision.ids.size())
+                                        : ", waiting for " + std::to_string(o.decision.ids.size())) +
                 (o.stale ? ", perception stale" : "") + (o.unreleased ? ", on it without a go" : "");
     arr.markers.push_back(text);
   }

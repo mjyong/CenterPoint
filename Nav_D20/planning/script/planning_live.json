@@ -243,7 +243,7 @@
       "diffTopicPath": "",
       "showFullMessageForDiff": false,
       "expansion": "all",
-      "foxglovePanelTitle": "规划每周期的数（crosswalk_mode 0 无 1 接近 2 转向 3 等 4 放行 5 在人行横道上；crosswalk_go、crosswalk_vehicles …）"
+      "foxglovePanelTitle": "规划每周期的数（crosswalk_mode 0 无 1 接近 2 转向 3 等 4 放行 5 在人行横道上 6 人行横道上为前方来车停；crosswalk_go、crosswalk_vehicles …）"
     },
     "RawMessages!objects": {
       "topicPath": "/perception/lidar_3d/objects",

@@ -290,12 +290,82 @@ def test_a_standing_vehicle_across_the_path_is_watched_longer():
     assert assess(PATH, [car(-6.0, 4.0, 0.0, motion="stopped", yaw=0.0)], 0.0, 0.0).standing[0]["blocking"] is False
 
 
-def test_on_a_crosswalk_the_robot_does_not_stop_for_vehicles():
-    coming = assess(PATH, [car(-30.0, 4.0, KMH30)], 0.0, 0.0)
-    assert coming.conflicts and not YieldGate().update(coming, 0.0, dog_moving=True).go
-    assert YieldGate().update(coming, 0.0, dog_moving=True, on_crosswalk=True).reason == "on_crosswalk"
-    stale = assess(PATH, [], 1.0, 0.0)
-    assert YieldGate().update(stale, 1.0, on_crosswalk=True).go
+# On the crosswalk (people, 2026-11-15): the robot (at the path's start, nose 0.5 m ahead) stops for a vehicle that
+# may still pass ahead of it, not for one passing behind it. The path is what is left of the crossing.
+def test_on_a_crosswalk_the_robot_stops_for_a_vehicle_passing_ahead():
+    for cfg in (WAIT, GAP):
+        coming = yg.assess(PATH, [car(-30.0, 4.0, KMH30)], 0.0, 0.0, cfg)      # its lane 4 m ahead
+        assert coming.conflicts[0]["ahead"]
+        d = yg.YieldGate(cfg).update(coming, 0.0, dog_moving=True, on_crosswalk=True)
+        assert not d.go and d.reason == "ahead" and d.ids == [1]
+
+
+def test_on_a_crosswalk_the_robot_goes_on_for_a_vehicle_passing_behind():
+    # the lane 3 m behind (crossed already): with the wait rule's margins it still reaches the path's start
+    behind = yg.assess(PATH, [car(-30.0, -3.0, KMH30)], 0.0, 0.0, WAIT)
+    assert [c["id"] for c in behind.conflicts] == [1] and not behind.conflicts[0]["ahead"]
+    assert yg.crossing_s(*yg.resample_path(PATH, 0.1, 10.0), np.array([[-5.0, -3.0], [5.0, -3.0]])) == 0.0
+    d = yg.YieldGate(WAIT).update(behind, 0.0, dog_moving=True, on_crosswalk=True)
+    assert d.go and d.reason == "on_crosswalk" and d.ids == [1]
+    # at the curb the same vehicle would be waited for
+    assert not yg.YieldGate(WAIT).update(behind, 0.0).go
+    # its hypothetical left turn would cross 1 m ahead of the robot; where it goes on the road decides, not that
+    near = car(-8.0, -3.0, 6.0)
+    pts, s = yg.resample_path(PATH, 0.1, 10.0)
+    modes, _ = yg.rollout(near, 0.0, 0.0, WAIT, 10.0)
+    turns = yg.turn_modes(near, 0.0, 0.0, WAIT, 10.0, modes[0][2])
+    assert max(yg.crossing_s(pts, s, c) for c, _, _ in turns) > 0.5 >= yg.crossing_s(pts, s, modes[0][0])
+    a = yg.assess(PATH, [near], 0.0, 0.0, WAIT)
+    assert a.conflicts and not a.conflicts[0]["ahead"]
+
+
+def test_on_a_crosswalk_a_vehicle_across_the_robot_itself_is_committed():
+    through = yg.assess(PATH, [car(-30.0, 0.3, KMH30)], 0.0, 0.0, WAIT)       # its track crosses the robot
+    assert through.in_lane and not through.conflicts[0]["ahead"]
+    assert yg.YieldGate(WAIT).update(through, 0.0, dog_moving=True, on_crosswalk=True).reason == "committed"
+    # 1.5 m ahead of the centre: in its lane too, so a walking robot keeps going out of the way ...
+    close = yg.assess(PATH, [car(-30.0, 1.5, KMH30)], 0.0, 0.0, WAIT)
+    assert close.in_lane and close.conflicts[0]["ahead"]
+    assert yg.YieldGate(WAIT).update(close, 0.0, dog_moving=True, on_crosswalk=True).reason == "committed"
+    # ... a standing one waits
+    assert yg.YieldGate(WAIT).update(close, 0.0, dog_moving=False, on_crosswalk=True).reason == "ahead"
+
+
+def test_on_a_crosswalk_the_robot_goes_on_once_the_vehicle_ahead_has_cleared():
+    gate = yg.YieldGate(WAIT)
+    ds = [(t, gate.update(yg.assess(PATH, [car(-30.0 + KMH30 * t, 4.0, KMH30)], t, t, WAIT), t,
+                          dog_moving=t == 0.0, on_crosswalk=True)) for t in np.arange(0.0, 12.0, 0.1)]
+    assert ds[0][1].reason == "ahead"
+    last = max(t for t, d in ds if d.reason == "ahead")
+    assert {d.reason for t, d in ds if last < t < last + 2.95} == {"clearing"}
+    t_go, d_go = next((t, d) for t, d in ds if d.go)
+    assert t_go == pytest.approx(last + 3.0, abs=0.11) and d_go.reason == "on_crosswalk"
+
+
+def test_on_a_crosswalk_standing_vehicles_and_stale_perception_do_not_stop_the_robot():
+    waiting_car = car(-4.0, 4.0, 0.0, motion="stopped", yaw=0.0)            # nose to the crosswalk, giving way
+    a = yg.assess(PATH, [waiting_car], 0.0, 0.0, WAIT)
+    assert a.standing and not yg.YieldGate(WAIT).update(a, 0.0).go           # at the curb: watched
+    assert yg.YieldGate(WAIT).update(a, 0.0, dog_moving=True, on_crosswalk=True).go
+    assert yg.YieldGate(WAIT).update(yg.assess(PATH, [], 1.0, 0.0, WAIT), 1.0, on_crosswalk=True).go
+    # stale while stopped for a vehicle ahead: it is lost, held lost_hold, then the robot goes on
+    gate = yg.YieldGate(WAIT)
+    coming = yg.assess(PATH, [car(-30.0, 4.0, KMH30)], 0.0, 0.0, WAIT)
+    assert gate.update(coming, 0.0, on_crosswalk=True).reason == "ahead"
+    ds = [(t, gate.update(yg.assess(PATH, [], t, 0.0, WAIT), t, on_crosswalk=True)) for t in np.arange(0.1, 7.0, 0.1)]
+    assert {d.reason for t, d in ds if t < 4.95} == {"lost"}
+    assert next(t for t, d in ds if d.go) == pytest.approx(5.0, abs=0.11)
+
+
+def test_stepping_onto_the_crosswalk_forgets_the_curb_and_cross_ahead_off_is_the_old_rule():
+    gate = yg.YieldGate(WAIT)
+    behind = car(-30.0, -3.0, KMH30)
+    assert not gate.update(yg.assess(PATH, [behind], 0.0, 0.0, WAIT), 0.0).go           # at the curb
+    assert gate.update(yg.assess(PATH, [behind], 0.1, 0.1, WAIT), 0.1, on_crosswalk=True).go
+    old = YieldConfig(cross_ahead=False)
+    coming = yg.assess(PATH, [car(-30.0, 4.0, KMH30)], 0.0, 0.0, old)
+    d = yg.YieldGate(old).update(coming, 0.0, dog_moving=True, on_crosswalk=True)
+    assert d.go and d.reason == "on_crosswalk" and d.ids == [1]
 
 
 def test_crosswalk_span_along_the_path():

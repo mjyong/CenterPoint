@@ -86,8 +86,10 @@ bool Tracking::Init(PlanningEntry *planning_entry) {
     y.det_to_base_yaw_deg = c.det_to_base_yaw_deg();
     y.gate.yield_rule = c.yield_rule();
     y.gate.stale_after = c.stale_after();
+    y.gate.cross_ahead = c.cross_ahead();
     crosswalk_yield_.Configure(y);
-    AINFO << "Tracking: crosswalk yield " << (y.enable ? "on" : "off") << ", rule " << y.gate.yield_rule;
+    AINFO << "Tracking: crosswalk yield " << (y.enable ? "on" : "off") << ", rule " << y.gate.yield_rule
+          << ", on the crosswalk " << (y.gate.cross_ahead ? "stops for vehicles ahead" : "never stops");
   }
   init_flag_ = true;
   return true;
@@ -123,7 +125,8 @@ void Tracking::StepCrosswalk(const Pose2d &pose, double speed, double stamp, con
     AINFO << "Crosswalk yield: " << ModeName(o.mode) << " (" << o.decision.reason << ") crosswalk " << o.crosswalk
           << ", stop point in " << o.s_stop << " m, entry " << o.s_in << " m, exit " << o.s_out
           << " m, heading error " << o.heading_error * 180.0 / M_PI << " deg, vehicles " << o.objects
-          << (o.stale ? ", perception stale" : "") << (ids.empty() ? "" : ", waiting for " + ids)
+          << (o.stale ? ", perception stale" : "")
+          << (ids.empty() ? "" : (o.decision.go ? ", going on with " : ", waiting for ") + ids)
           << (o.unreleased ? ", on the crosswalk without a go (" + std::to_string(o.depth) + " m past the entry)" : "");
   }
   DebugDatas::Instance()->emplace("crosswalk_mode", static_cast<int>(o.mode));
@@ -141,7 +144,7 @@ void Tracking::StepCrosswalk(const Pose2d &pose, double speed, double stamp, con
 void Tracking::ApplyCrosswalk(double *vx, double *vy, double *wz) {
   const auto &o = crosswalk_out_;
   if (!crosswalk_yield_.config().enable || o.mode == CrosswalkYieldOutput::kNone) return;
-  if (o.hold) {             // waiting at the curb, or turning to face across
+  if (o.hold) {             // waiting at the curb, turning to face across, or on the crosswalk for a vehicle ahead
     *vx = 0.0;
     *vy = 0.0;
     *wz = o.hold_omega;

@@ -1,7 +1,8 @@
 # 过人行横道给车让行：从感知到规划的整个流程
 
 狗按全局路径走到地图上标的人行横道前，减速、在入口前停下、转到面朝对面，然后问门控"现在能不能过"：
-只要看到在动、而且可能经过这条人行横道的车就等，车走了、过一会儿再过；上了人行横道就不再为车停。
+只要看到在动、而且可能经过这条人行横道的车就等，车走了、过一会儿再过。上了人行横道以后，看到车可能从狗**前方**经过还会停下等它过去；
+从狗**后面**经过的车不停（2026-11-15 定）。
 这份把这件事从激光点云一直串到发给运控的速度：每一步在哪个文件、输入什么、怎么算、输出什么。
 为什么这样定（"宁愿多等"、不做 TTC 急停等）在 [PLANNING_INTEGRATION.md](PLANNING_INTEGRATION.md)；
 现场怎么跑、怎么看在 [DOG_FIELD_GUIDE.md](DOG_FIELD_GUIDE.md)。
@@ -25,7 +26,7 @@
         ▼
  ④ CrosswalkYield（crosswalk_yield.cc）
         │  目标 lidar_det → base_link → map（用目标时间戳时的位姿）
-        │  找路径上下一个人行横道 → 状态机 approach / align / wait / go / cross / none
+        │  找路径上下一个人行横道 → 状态机 approach / align / wait / go / cross / cross_wait / none
         │        ▲
         │        └─ ⑤ 门控 yield::Assess + YieldGate::Update（src/algorithm/yield_gate/）：go 还是 wait、为什么
         ▼
@@ -140,7 +141,9 @@ p_map = R(yaw_odom) · ( R(−90°) · p_det + (0.319, 0.043) ) + xy_odom
 1. 没开（`enable: false`）或地图里没有人行横道 → none；
 2. `PathAhead`：从狗的位置接上全局路径上离它最近的那一段往后，最多 `lookahead`（40 m）；
 3. 狗中心在某个人行横道里？
-   - 是这个人行横道、而且已经放行（go / cross）→ **cross**：不停；门控照算（`on_crosswalk`，永远 go），给调试看；
+   - 是这个人行横道、而且已经放行（go / cross）→ **cross**。门控只查这个人行横道剩下的部分再多 `check_beyond_exit`（1 m），
+     不查出口以后的人行道（沿人行道开的车不是从狗前方横穿）。门控说 wait（有车可能从狗前方经过，第 6.2 节）→ **cross_wait**：
+     原地停（0, 0, 0），不转向；那辆车开过去、清空 3 s（或看不到 5 s）以后回到 cross 接着走；
    - 没放行就在里面（等在路边时定位跳了一下、或者狗是从路上起步的）：沿着过街方向往回量离入口线多深；
      不超过 `max_unreleased_depth`（1.5 m）就当成还在路边，照常 align / wait / go；更深就 cross（已经在路中间，停下更糟）；
 4. 找路径上下一个还没过的人行横道：`CrosswalkSpan` 给出路径进入（`s_in`）和离开（`s_out`）它的位置。没有 → none；
@@ -154,7 +157,8 @@ p_map = R(yaw_odom) · ( R(−90°) · p_det + (0.319, 0.043) ) + xy_odom
 | align | 到了停止点，朝向和过街方向差 > `align_tolerance_deg`（10°） | hold，ω = clamp(1.0 × 朝向差, ±0.5 rad/s)：原地转 | 一到停止点就 `Reset` 重新开始等；转的时候计时照走 |
 | wait | 朝向对了、门控说 wait | hold，ω = 0 | 每周期问 |
 | go | 门控说 go | 不改指令（MPPI 照常走） | 每周期问，狗在动时传 `dog_moving`；新来车还会变回 wait，除非已经在车的扫掠范围里（committed） |
-| cross | 狗在已放行的人行横道里 | 不改指令；进去时记成"过过了" | `on_crosswalk` |
+| cross | 狗在已放行的人行横道里 | 不改指令；进去时记成"过过了" | `on_crosswalk`，只查剩下的人行横道 + 1 m |
+| cross_wait | 在人行横道上、门控说 wait（`ahead`，之后 `clearing` / `lost`） | hold，ω = 0 | 同上；内部仍算 cross |
 
 ```text
             新的人行横道在前面
@@ -170,8 +174,9 @@ p_map = R(yaw_odom) · ( R(−90°) · p_det + (0.319, 0.043) ) + xy_odom
   │               go ──────────────────────┘
   │                │ 狗中心进了人行横道
   │                ▼
-  └──────────── cross（不停）
-     出了人行横道、前面没有别的
+  └──────────── cross ◀──────▶ cross_wait（原地停）
+     出了人行横道、    车可能从狗前方经过 → 停；那辆车清空 3 s → 接着走
+     前面没有别的
 ```
 
 ---
@@ -193,6 +198,10 @@ p_map = R(yaw_odom) · ( R(−90°) · p_det + (0.319, 0.043) ) + xy_odom
   - 车身框每边放大：0.5 m（车）+ 1 × 标准差 + 0.7 m（狗走廊）+ 1.5 m（wait 规则多给的）；
   - 放大的框在这段时间里**碰到路径段上任何一点** → 冲突（kind 是 predicted 或 turn）。wait 规则不算"来不来得及"，碰到就算；
   - 狗现在站的地方在车（不放大的）扫掠范围里 → `in_lane`（下面 committed 用）；
+  - 冲突的车从狗的前方还是后面过（`ahead`，人行横道上用）：取它**最可能的那条预测轨迹**，找轨迹上离路径最近的点落在路径的哪里
+    （`CrossingS`）；在狗头（狗中心往前 0.5 m）以前 → ahead。不用左转、右转那两条假想轨迹来判前后：每辆近处的车都加了这两条，
+    狗后面开过去的车假想一转弯就会"穿到狗前面"，狗就会停在路中间（闭环仿真 behind 一开始就是这样停下的）。
+    新航迹看它离路径最近的点在不在狗头以前；
 - **站着的车**：在走廊旁边（横向 ≤ 半车宽 + 0.5 + 0.7 m，纵向 ≤ 半车长 + 10 m，车头或车尾对着路径）→ standing；车身压在走廊上 → blocking；
 - **新航迹**：`age` < 1 s、离路径 30 m 内、还没算冲突 → 冲突（kind young）：速度和预测还不可信。
 
@@ -202,7 +211,7 @@ p_map = R(yaw_odom) · ( R(−90°) · p_det + (0.319, 0.043) ) + xy_odom
 
 | 条件 | 结果（理由） |
 |---|---|
-| 狗在人行横道上 | go（`on_crosswalk`），清空等过的车 |
+| 狗在人行横道上 | 走下面"人行横道上"那张表 |
 | 感知 stale | wait（`stale`） |
 | 狗在动、没在等、狗已经在某辆在动的车的扫掠范围里 | go（`committed`）：不在车前面停下 |
 | 有冲突 | wait（全是新航迹 `young`，否则 `vehicle`）；这些车记进"等过的" |
@@ -211,7 +220,21 @@ p_map = R(yaw_odom) · ( R(−90°) · p_det + (0.319, 0.043) ) + xy_odom
 | 等过的车看不到了、离最后一次看到不到 5 s（`lost_hold`） | wait（`lost`）：被挡住或开出范围的车，也得等一会儿 |
 | 都不是 | go（`clear`），清空等过的车 |
 
-结果 `Decision`：`go`、理由、相关的航迹 id（`waiting for …`）、最小间隔。
+狗在人行横道上（`on_crosswalk`，2026-11-15 起；`cross_ahead: false` 回到原来的"永远 go"）：
+
+| 条件 | 结果（理由） |
+|---|---|
+| 刚从路边踩上来（上一次不在人行横道上） | 清空路边等过的车，往下判 |
+| 狗在动、没在等、狗已经在某辆在动的车的扫掠范围里 | go（`committed`）：车要从狗身上过，接着走、让开 |
+| 有冲突、而且从狗前方过（`ahead`）；感知 stale 时一辆也不算 | wait（`ahead`）；这些车记进"等过的" |
+| 等过的车还看得到、离它最后一次"从前方过的冲突"不到 3 s | wait（`clearing`） |
+| 等过的车看不到了、离最后一次看到不到 5 s | wait（`lost`）：感知断了也是这条，最多再停 5 s 就走 |
+| 都不是 | go（`on_crosswalk`）：后面过的车、站着让狗的车、stale 都不停 |
+
+站着的车在人行横道上不算（它们在让狗；路边那 3 s / 15 s 的规矩会让狗和让狗的车互相等）。新航迹（young）在狗前方也停。
+
+结果 `Decision`：`go`、理由、相关的航迹 id（wait 时 `waiting for …`；go 时 `going on with …`：门控看到了但不停的冲突，
+比如后面过的车）、最小间隔。
 
 ---
 
@@ -221,7 +244,7 @@ p_map = R(yaw_odom) · ( R(−90°) · p_det + (0.319, 0.043) ) + xy_odom
 
 MPPI 算出 (vx, vy, ω) 以后：
 
-- `hold`（align、wait）：换成 (0, 0, `hold_omega`)，并且 `ResetNavBlocked()`、本周期不判"被挡"（是故意停的，不能变成 standstill、重新规划）；
+- `hold`（align、wait、cross_wait）：换成 (0, 0, `hold_omega`)，并且 `ResetNavBlocked()`、本周期不判"被挡"（是故意停的，不能变成 standstill、重新规划）；
 - 否则：vx、vy 乘 `speed_scale`（approach 减速；go、cross 是 1），ω 不变；
 - MPPI 求解失败时也调一次（指令本来是 0），所以路边照样能转向。
 
@@ -239,15 +262,17 @@ MPPI 算出 (vx, vy, ω) 以后：
 
   ```text
   Crosswalk yield: <状态> (<理由>) crosswalk <序号>, stop point in <m> m, entry <m> m, exit <m> m, heading error <deg> deg,
-                   vehicles <n>[, perception stale][, waiting for <id> ...][, on the crosswalk without a go (<m> m past the entry)]
+                   vehicles <n>[, perception stale][, waiting for <id> ... | , going on with <id> ...]
+                   [, on the crosswalk without a go (<m> m past the entry)]
   ```
 
-- `DebugDatas`（`/planning/debug/plotjuggler/string`，Foxglove 侧栏"规划的数"）：`crosswalk_mode`（0–5 依次 none、approach、align、
-  wait、go、cross）、`crosswalk_index`、`crosswalk_s_stop`、`crosswalk_hold`、`crosswalk_go`、`crosswalk_vehicles`（最近一帧里
+- `DebugDatas`（`/planning/debug/plotjuggler/string`，Foxglove 侧栏"规划的数"）：`crosswalk_mode`（0–6 依次 none、approach、align、
+  wait、go、cross、cross_wait）、`crosswalk_index`、`crosswalk_s_stop`、`crosswalk_hold`、`crosswalk_go`、`crosswalk_vehicles`（最近一帧里
   门控管的车有几辆）、`crosswalk_waiting_for`、`crosswalk_stale`、`crosswalk_unreleased`、`crosswalk_heading_error`；
 - `/planning/debug/crosswalk`（`visualization_msgs/MarkerArray`，map 系，`pub_flag` 开着才发，规划自己的 bag 也录）：
-  80 m 内的人行横道（白框；正在处理的加粗、按状态变色：黄 approach、红 align / wait、绿 go / cross）；
-  门控看到的车（转到 map 以后的位置，蓝框，门控在等的红框，箭头是速度）；狗头上一行"状态（理由）, waiting for N"。
+  80 m 内的人行横道（白框；正在处理的加粗、按状态变色：黄 approach、红 align / wait / cross_wait、绿 go / cross）；
+  门控看到的车（转到 map 以后的位置，蓝框；门控在等的红框；门控看到冲突但不停的橙框，比如人行横道上从狗后面过的车；箭头是速度）；
+  狗头上一行"状态（理由）, waiting for N"或"…, going on with N"。
 
 ---
 
@@ -274,6 +299,7 @@ MPPI 算出 (vx, vy, ω) 以后：
 | 16 | `yield_rule` | "wait" | wait / gap / stop |
 | 17 | `stale_after` | 0.3 s | 感知比这旧就等 |
 | 18 | `max_unreleased_depth` | 1.5 m | 没放行就在人行横道上：这么深以内当路边 |
+| 19 | `cross_ahead` | true | 人行横道上为从狗前方过的车停；false：上了人行横道就不停（2026-11-12 的规则） |
 
 **只在代码里的**（`yield_gate.h` 的 `YieldConfig`，改要重编；Python 参考 `dog_perception/yield_gate.py` 要一起改，parity 才过）：
 `classes`（vehicle、cyclist）、`dog_length` 1.0、`dog_width` 0.4、`lateral_margin` 0.5、`vehicle_margin` 0.5、`sigma_k` 1、
@@ -288,7 +314,7 @@ MPPI 算出 (vx, vy, ω) 以后：
 | 层 | 工具 | 看什么 |
 |---|---|---|
 | 门控的规则 | `dog_perception/yield_gate.py`（参考实现）、`tools/dog/yield_eval.py`（1104 的标注当真值，T44） | 该等的没放、放的时候安全；不安全的按原因分类 |
-| C++ 和 Python 一样 | `Nav_D20/planning/tools/yield_gate_parity/run.sh`（`parity.cc` 逐帧对；`crosswalk_sim.cc` 闭环走一遍 `CrosswalkYield`） | 每帧 go / 理由一样；闭环状态序列对 |
+| C++ 和 Python 一样 | `Nav_D20/planning/tools/yield_gate_parity/run.sh`（`parity.cc` 逐帧对；`crosswalk_sim.cc` 闭环走一遍 `CrosswalkYield`，有人行横道上前方来车、后面来车两个） | 每帧 go / 理由 / ahead 一样；闭环状态序列对 |
 | 外参 | `Nav_D20/planning/tools/objects_in_map.py <包>` | extrinsic OK |
 | 回放 | `Nav_D20/planning/script/replay_planning_check.sh`（服务器 nav-dev 镜像，T58；狗上域 42，T56） | 日志里的状态序列；`check_planning_mcap.py`、`planning_mcap_viz.py` |
 | 真狗 | T57（DOG_FIELD_GUIDE.md 第 8 节） | 空人行横道 → 同事开车 → 正常车流 |
@@ -303,4 +329,6 @@ MPPI 算出 (vx, vy, ω) 以后：
 - 人行横道的位置全靠地图和定位：地图选错（App 的 `/map/switch`）、定位偏了，停的地方就错；
 - 外参、INS 朝向错了，停着的车会"动起来"，狗会一直等（1112 的教训：天线接反时的目标）；
 - 感知和里程计的时间对不上（> 0.3 s）就一直 stale、一直等；
-- 上了人行横道就不再停：这时候来车只能靠车让狗（人定：车撞狗车全责；停在车道里更危险，PLANNING_INTEGRATION.md 第 4 节）。
+- 人行横道上只为从狗前方过的车停（2026-11-15）：后面过的车、站着的车、感知断了都不停（停在车道里更危险）；
+  车从狗身上过（committed）接着走。停在路中间等前方的车，狗身后的车道这时只能靠车让狗（车撞狗车全责，PLANNING_INTEGRATION.md 第 4 节）；
+- 前后按最可能的那条预测轨迹判：车突然转弯、预测还没跟上的那一两帧，可能判成后面；感知看不到的车照样管不了。

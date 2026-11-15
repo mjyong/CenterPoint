@@ -6,7 +6,7 @@
         --scenes $(for d in data/labels/1104_*/labels_sustech2.pkl; do basename $(dirname $d); done)
 
 Scenarios: hand-made ones (a car crossing, far, passing, a side road, standing and blocking vehicles, a young
-track, stale perception, the crosswalk, a lost vehicle) for each rule; random ones (moving and standing vehicles
+track, stale perception, the crosswalk: vehicles ahead, behind, across the robot, a lost vehicle) for each rule; random ones (moving and standing vehicles
 with multi-mode predictions and covariances, the robot moving or on the crosswalk); with --scenes, the 1104
 tracker output the offline evaluation uses (tools/dog/yield_eval.py), a few arrival times per path.
 """
@@ -55,6 +55,8 @@ class Writer:
                 items.append("classes %d %s" % (len(v), " ".join(v)))
             elif isinstance(v, str):
                 items.append("%s %s" % (fd.name, v))
+            elif isinstance(v, bool):
+                items.append("%s %d" % (fd.name, int(v)))
             else:
                 items.append("%s %s" % (fd.name, num(v)))
         self.w("CONFIG", len(items), " ".join(items))
@@ -89,7 +91,8 @@ class Writer:
                         toks += [0]
             self.w(*toks)
         self.w("ASSESS", int(a.stale), int(a.in_lane), num(a.min_gap), len(a.conflicts),
-               " ".join("%d %s %s %s" % (c["id"], num(c["gap"]), num(c["s"]), c["kind"]) for c in a.conflicts),
+               " ".join("%d %s %s %s %d" % (c["id"], num(c["gap"]), num(c["s"]), c["kind"], int(c["ahead"]))
+                        for c in a.conflicts),
                len(a.standing),
                " ".join("%d %s %d" % (st["id"], num(st["standing_for"]), int(st["blocking"])) for st in a.standing),
                len(a.approaching), " ".join(str(i) for i in sorted(a.approaching)),
@@ -143,6 +146,19 @@ def hand_made(writer):
                                                (PATH, [car(-12.0, 0.2, v30)], 0.1, 0.1, False, False)])
         run(writer, "crosswalk_" + rule, cfg, [(PATH, [car(-30.0, 4.0, v30)], 0.0, 0.0, True, True),
                                                (PATH, [], 1.0, 0.0, False, True)])
+        # on the crosswalk (2026-11-15): a car passing ahead until it has cleared, one behind, one across the robot
+        for name, y in (("ahead", 4.0), ("behind", -3.0), ("across", 0.3), ("close", 1.5)):
+            run(writer, "crosswalk_%s_%s" % (name, rule), cfg,
+                [(PATH, [car(-30.0 + v30 * t, y, v30)], t, t, t < 0.25, True) for t in np.arange(0.0, 12.0, 0.1)])
+        waiting_car = car(-4.0, 4.0, 0.0, motion="stopped", yaw=0.0)
+        run(writer, "crosswalk_standing_" + rule, cfg,
+            [(PATH, [waiting_car], t, t, True, True) for t in np.arange(0.0, 4.0, 0.1)])
+        run(writer, "crosswalk_stale_" + rule, cfg, [(PATH, [car(-30.0, 4.0, v30)], 0.0, 0.0, False, True)] +
+            [(PATH, [], t, 0.0, False, True) for t in np.arange(0.1, 7.0, 0.1)])
+        run(writer, "crosswalk_from_curb_" + rule, cfg,
+            [(PATH, [car(-30.0 + v30 * t, -3.0, v30)], t, t, False, t >= 0.5) for t in np.arange(0.0, 3.0, 0.1)])
+        run(writer, "crosswalk_old_" + rule, YieldConfig(yield_rule=rule, cross_ahead=False),
+            [(PATH, [car(-30.0 + v30 * t, 4.0, v30)], t, t, True, True) for t in np.arange(0.0, 3.0, 0.1)])
         run(writer, "lost_" + rule, cfg, [(PATH, [car(-30.0, 4.0, v30)], 0.0, 0.0, False, False)] +
             [(PATH, [], t, t, False, False) for t in np.arange(0.1, 8.0, 0.1)])
         run(writer, "message_age_" + rule, cfg, [(PATH, [car(-30.0, 4.0, v30)], 0.25, 0.0, False, False)])
@@ -208,6 +224,7 @@ def random_scenes(writer, n, seed):
         objs = [random_object(rng, i + 1, 0.0) for i in range(int(rng.integers(0, 7)))]
         frames = []
         t = 0.0
+        p_cw = float(rng.choice([0.05, 0.05, 0.7]))       # some scenes mostly on the crosswalk
         for k in range(int(rng.integers(1, 40))):
             stamp = t - rng.choice([0.0, 0.05, 0.2, 0.5]) if rng.random() < 0.95 else None
             moved = []
@@ -220,7 +237,7 @@ def random_scenes(writer, n, seed):
                     o["age"] = o["age"] + t
                 if rng.random() > 0.1:                 # sometimes not seen in a frame
                     moved.append(o)
-            frames.append((path, moved, t, stamp, bool(rng.random() < 0.2), bool(rng.random() < 0.05)))
+            frames.append((path, moved, t, stamp, bool(rng.random() < 0.2), bool(rng.random() < p_cw)))
             t += float(rng.choice([0.1, 0.1, 0.5, 1.0]))
         run(writer, "random_%03d" % sc, cfg, frames)
 

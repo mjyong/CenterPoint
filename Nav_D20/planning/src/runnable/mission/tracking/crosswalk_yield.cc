@@ -86,6 +86,7 @@ const char *ModeName(CrosswalkYieldOutput::Mode m) {
     case CrosswalkYieldOutput::kWait: return "wait";
     case CrosswalkYieldOutput::kGo: return "go";
     case CrosswalkYieldOutput::kCross: return "cross";
+    case CrosswalkYieldOutput::kCrossWait: return "cross_wait";
     default: return "none";
   }
 }
@@ -175,7 +176,7 @@ CrosswalkYieldOutput CrosswalkYield::Step(double now, const Vec2 &robot_xy, doub
     return out;
   }
   const std::vector<Vec2> ahead = PathAhead(robot_xy, global_path, cfg_.lookahead);
-  // the robot on a crosswalk: never stop there
+  // the robot on a crosswalk: it stops there only for a vehicle that may pass ahead of it
   int inside = -1;
   for (size_t k = 0; k < crosswalks_.size(); ++k) {
     if (algorithm::yield::InsidePolygon(robot_xy, crosswalks_[k])) inside = static_cast<int>(k);
@@ -215,10 +216,23 @@ CrosswalkYieldOutput CrosswalkYield::Step(double now, const Vec2 &robot_xy, doub
     current_ = inside;
     out.mode = mode_;
     out.crosswalk = inside;
+    // what is left of the crosswalk, plus the margin past the exit as at the curb: not the sidewalk beyond (a car
+    // driving along it is not crossing ahead of the robot)
     algorithm::yield::YieldConfig c = cfg_.gate;
+    double a_in = 0.0, a_out = 0.0;
+    if (algorithm::yield::CrosswalkSpan(ahead, crosswalks_[inside], &a_in, &a_out)) {
+      out.s_in = a_in;
+      out.s_out = a_out;
+      c.path_length = a_out + cfg_.check_beyond_exit;
+    }
     const auto a = algorithm::yield::Assess(ahead, objs, now, stamp, c);
     out.decision = gate_.Update(a, now, moving, true);
     out.stale = a.stale;
+    if (!out.decision.go) {   // a vehicle may pass ahead: stand still (vehicles give way; it is not turned here)
+      out.mode = CrosswalkYieldOutput::kCrossWait;
+      out.hold = true;
+      out.hold_omega = 0.0;
+    }
     return out;
   }
   // the next crosswalk along the path, not crossed yet

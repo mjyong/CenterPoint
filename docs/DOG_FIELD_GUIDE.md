@@ -209,11 +209,11 @@ Foxglove 的桥（`nav_cw_foxglove.sh`，以 root 跑，带白名单：不限的
 | `/planning/debug/path_tracking` | 全局路径、局部参考、MPPI 的优化路径 | 沿路，经过人行横道 | 路径穿墙：地图或定位 |
 | `/planning/debug/goal_pose` | 目标 | 在你点的地方 | |
 | `/planning/debug/collision_checker` | 碰撞检查的足迹 | | 一直红：被挡（nav_blocked） |
-| `/planning/debug/crosswalk` | 人行横道（80 m 内）：白框；正在处理的那个按状态变色：黄 approach、红 align / wait、绿 go / cross；车框：蓝 = 看到的车、红 = 门控在等的车，箭头是速度；狗头上一行状态字 | 车框贴在真车上，停着的车在地图上不动 | 车框跟着狗转：外参不对（`objects_in_map.py`）；整体偏：定位或时间戳 |
+| `/planning/debug/crosswalk` | 人行横道（80 m 内）：白框；正在处理的那个按状态变色：黄 approach、红 align / wait / cross_wait、绿 go / cross；车框：蓝 = 看到的车、红 = 门控在等的车、橙 = 门控看到冲突但不停（人行横道上从狗后面过的车、committed），箭头是速度；狗头上一行状态字 | 车框贴在真车上，停着的车在地图上不动 | 车框跟着狗转：外参不对（`objects_in_map.py`）；整体偏：定位或时间戳 |
 | `/lightning/odom` | 狗的位置和朝向 | 平稳，不跳 | 跳：定位，停下来查 |
 | 速度曲线 | 实际 vx、`/cmd_vel` 的 vx / vy、发给运控的 vx（`/mc/motion_control`）、影子模式的两条 | 实际跟着指令；限速时指令不超过限速 | 指令有、实际没有：运控没接（遥控接管了？） |
 | 角速度曲线 | 实际 ω、指令 ω | align 时指令 ω ≤ 0.5 rad/s | |
-| 侧栏 "规划的数"（`/planning/debug/plotjuggler/string`） | `crosswalk_mode`（0 none 1 approach 2 align 3 wait 4 go 5 cross）、`crosswalk_index`、`crosswalk_s_stop`、`crosswalk_hold`、`crosswalk_go`、`crosswalk_vehicles`、`crosswalk_waiting_for`、`crosswalk_stale`、`crosswalk_unreleased`、`crosswalk_heading_error`；`cmd_vx` 等 | | `crosswalk_stale` 一直 1：感知断了或时间对不上 |
+| 侧栏 "规划的数"（`/planning/debug/plotjuggler/string`） | `crosswalk_mode`（0 none 1 approach 2 align 3 wait 4 go 5 cross 6 cross_wait：人行横道上为前方来车停着）、`crosswalk_index`、`crosswalk_s_stop`、`crosswalk_hold`、`crosswalk_go`、`crosswalk_vehicles`、`crosswalk_waiting_for`、`crosswalk_stale`、`crosswalk_unreleased`、`crosswalk_heading_error`；`cmd_vx` 等 | | `crosswalk_stale` 一直 1：感知断了或时间对不上 |
 | 诊断 | 规划的 fault | 空 | |
 | 感知的原始目标（`/perception/lidar_3d/objects`） | 每个目标的 id、类别、motion、age、速度 | | |
 

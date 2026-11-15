@@ -241,6 +241,22 @@ bool CrosswalkSpan(const std::vector<Vec2> &path, const std::vector<Vec2> &polyg
   return true;
 }
 
+double CrossingS(const std::vector<Vec2> &pts, const std::vector<double> &s, const std::vector<Vec2> &centers) {
+  double best = kInf;
+  size_t jb = 0;
+  for (const Vec2 &c : centers) {
+    for (size_t j = 0; j < pts.size(); ++j) {
+      const double dx = c.x() - pts[j].x(), dy = c.y() - pts[j].y();
+      const double d2 = dx * dx + dy * dy;
+      if (d2 < best) {   // np.argmin: the first of the smallest
+        best = d2;
+        jb = j;
+      }
+    }
+  }
+  return s.empty() ? 0.0 : s[jb];
+}
+
 Assessment Assess(const std::vector<Vec2> &path, const std::vector<Object> &objects, double now, double stamp,
                   const YieldConfig &cfg) {
   Assessment a;
@@ -258,12 +274,14 @@ Assessment Assess(const std::vector<Vec2> &path, const std::vector<Object> &obje
   }
   const double horizon = std::max(cfg.horizon, d_out.back() + cfg.pet);
   const double corridor = 0.5 * cfg.dog_width + cfg.lateral_margin;
+  const double nose = 0.5 * cfg.dog_length;
   std::vector<Vec2> here;
   for (size_t j = 0; j < J; ++j) {
-    if (s[j] <= 0.5 * cfg.dog_length) here.push_back(pts[j]);
+    if (s[j] <= nose) here.push_back(pts[j]);
   }
   const bool wait = cfg.yield_rule == "wait";
   const bool stop = cfg.yield_rule == "stop";
+  const double limit = wait ? kInf : stop ? 0.0 : cfg.pet;
   for (const Object &o : objects) {
     if (std::find(cfg.classes.begin(), cfg.classes.end(), o.label) == cfg.classes.end()) continue;
     a.present.insert(o.id);
@@ -336,9 +354,9 @@ Assessment Assess(const std::vector<Vec2> &path, const std::vector<Object> &obje
         }
       }
       a.min_gap = std::min(a.min_gap, worst_g);
-      const double limit = wait ? kInf : stop ? 0.0 : cfg.pet;
       if (worst_g < limit) {
-        a.conflicts.push_back(Conflict{o.id, worst_g, worst_s, worst_kind});
+        const bool ahead = CrossingS(pts, s, modes[0].centers) > nose;   // where its most likely track crosses
+        a.conflicts.push_back(Conflict{o.id, worst_g, worst_s, worst_kind, ahead});
         conflicted = true;
       }
       const Vec2 r = pts[jn] - o.position;
@@ -367,7 +385,7 @@ Assessment Assess(const std::vector<Vec2> &path, const std::vector<Object> &obje
     }
     // a new track: its velocity (and so its prediction) is not to be trusted yet
     if (!conflicted && cfg.young_range > 0 && o.has_age && o.age < cfg.young_age && dist[jn] <= cfg.young_range) {
-      a.conflicts.push_back(Conflict{o.id, kNaN, s[jn], "young"});
+      a.conflicts.push_back(Conflict{o.id, kNaN, s[jn], "young", s[jn] > nose});
     }
   }
   return a;
@@ -382,6 +400,7 @@ void YieldGate::Reset() {
   seen_last_.clear();
   watch_set_ = false;
   watch_since_ = 0.0;
+  crossing_ = false;
 }
 
 Decision YieldGate::Update(const Assessment &a, double now, bool dog_moving, bool on_crosswalk) {
@@ -401,11 +420,8 @@ Decision YieldGate::Decide(const Assessment &a, double now, bool dog_moving, boo
   const YieldConfig &cfg = cfg_;
   std::vector<int> conflict_ids;
   for (const auto &c : a.conflicts) conflict_ids.push_back(c.id);
-  if (on_crosswalk) {
-    paused_ = false;
-    yielded_.clear();
-    return Decision{true, "on_crosswalk", conflict_ids, a.min_gap};
-  }
+  if (on_crosswalk) return DecideCrosswalk(a, now, dog_moving);
+  crossing_ = false;
   if (a.stale) {
     paused_ = true;
     last_conflict_ = now;
@@ -461,37 +477,91 @@ Decision YieldGate::Decide(const Assessment &a, double now, bool dog_moving, boo
     }
     return Decision{false, reason, ids, gap};
   }
+  Decision hold;
+  if (Resume(a, now, gap, &hold)) return hold;
+  return Decision{true, "clear", {}, gap};
+}
+
+bool YieldGate::Resume(const Assessment &a, double now, double gap, Decision *hold) {
+  const YieldConfig &cfg = cfg_;
+  if (!paused_) return false;
   auto last_of = [](const std::map<int, double> &m, int id) {
     auto it = m.find(id);
     return it == m.end() ? -kInf : it->second;
   };
-  if (paused_ && wait) {
+  if (cfg.yield_rule == "wait") {
     std::vector<int> clearing, lost;
     for (int i : yielded_) {
       if (a.present.count(i) && now - last_of(conflict_last_, i) < cfg.wait_clear) clearing.push_back(i);
     }
-    if (!clearing.empty()) return Decision{false, "clearing", clearing, gap};
+    if (!clearing.empty()) {
+      *hold = Decision{false, "clearing", clearing, gap};
+      return true;
+    }
     for (int i : yielded_) {
       if (!a.present.count(i) && now - last_of(seen_last_, i) < cfg.lost_hold) lost.push_back(i);
     }
-    if (!lost.empty()) return Decision{false, "lost", lost, gap};
-    paused_ = false;
-    yielded_.clear();
-    return Decision{true, "clear", {}, gap};
-  }
-  if (paused_) {
+    if (!lost.empty()) {
+      *hold = Decision{false, "lost", lost, gap};
+      return true;
+    }
+  } else {
     if (now - last_conflict_ < cfg.clear_time) {
-      return Decision{false, "clearing", std::vector<int>(yielded_.begin(), yielded_.end()), gap};
+      *hold = Decision{false, "clearing", std::vector<int>(yielded_.begin(), yielded_.end()), gap};
+      return true;
     }
     std::vector<int> pending;
     for (int i : yielded_) {
       if (a.present.count(i) && a.approaching.count(i)) pending.push_back(i);
     }
-    if (!pending.empty()) return Decision{false, "not_passed", pending, gap};
+    if (!pending.empty()) {
+      *hold = Decision{false, "not_passed", pending, gap};
+      return true;
+    }
+  }
+  paused_ = false;
+  yielded_.clear();
+  return false;
+}
+
+Decision YieldGate::DecideCrosswalk(const Assessment &a, double now, bool dog_moving) {
+  const YieldConfig &cfg = cfg_;
+  if (!crossing_) {   // just stepped on: what it waited for at the curb is not what counts here
+    crossing_ = true;
     paused_ = false;
     yielded_.clear();
   }
-  return Decision{true, "clear", {}, gap};
+  std::vector<int> conflict_ids, ahead;
+  for (const auto &c : a.conflicts) {
+    conflict_ids.push_back(c.id);
+    if (c.ahead && !a.stale) ahead.push_back(c.id);
+  }
+  if (!cfg.cross_ahead) return Decision{true, "on_crosswalk", conflict_ids, a.min_gap};   // the old rule
+  double gap = kInf;
+  bool any_gap = false;
+  for (const auto &c : a.conflicts) {
+    if (!std::isnan(c.gap)) {
+      gap = any_gap ? std::min(gap, c.gap) : c.gap;
+      any_gap = true;
+    }
+  }
+  if (!any_gap) gap = a.min_gap;
+  if (cfg.yield_rule == "wait") {
+    for (int oid : a.present) seen_last_[oid] = now;
+    for (int oid : ahead) conflict_last_[oid] = now;
+  }
+  if (dog_moving && !paused_ && a.in_lane) {
+    return Decision{true, "committed", conflict_ids, gap};   // its track crosses the robot: get out of it
+  }
+  if (!ahead.empty()) {
+    paused_ = true;
+    last_conflict_ = now;
+    yielded_.insert(ahead.begin(), ahead.end());
+    return Decision{false, "ahead", ahead, gap};
+  }
+  Decision hold;
+  if (Resume(a, now, gap, &hold)) return hold;
+  return Decision{true, "on_crosswalk", conflict_ids, gap};
 }
 
 }  // namespace yield

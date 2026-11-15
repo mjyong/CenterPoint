@@ -57,7 +57,7 @@ YieldConfig ReadConfig() {
       F(clear_time); F(stopped_speed); F(stopped_wait); F(blocked_wait); F(start_zone); F(stale_after);
       F(young_age); F(young_range); F(turn_range); F(turn_radius); F(turn_max_deg); F(reaction_time);
       F(brake_decel); F(stop_margin); F(wait_reach); F(wait_max_horizon); F(wait_margin); F(wait_clear);
-      F(lost_hold); F(min_watch);
+      F(lost_hold); F(min_watch); F(cross_ahead);
       else throw std::runtime_error("unknown config key " + k);
 #undef F
     }
@@ -161,6 +161,7 @@ int main(int argc, char **argv) {
       c.gap = Num();
       c.s = Num();
       c.kind = Tok();
+      c.ahead = Int() == 1;
     }
     std::vector<Standing> e_st(Int());
     for (auto &st : e_st) {
@@ -191,9 +192,9 @@ int main(int argc, char **argv) {
     } else {
       for (size_t i = 0; i < e_conf.size(); ++i) {
         const auto &x = a.conflicts[i], &y = e_conf[i];
-        if (x.id != y.id || x.kind != y.kind || !Close(x.gap, y.gap) || !Close(x.s, y.s)) {
-          why << " conflict[" << i << "] " << x.id << " " << x.kind << " " << x.gap << " " << x.s << " / " << y.id
-              << " " << y.kind << " " << y.gap << " " << y.s;
+        if (x.id != y.id || x.kind != y.kind || !Close(x.gap, y.gap) || !Close(x.s, y.s) || x.ahead != y.ahead) {
+          why << " conflict[" << i << "] " << x.id << " " << x.kind << " " << x.gap << " " << x.s << " " << x.ahead
+              << " / " << y.id << " " << y.kind << " " << y.gap << " " << y.s << " " << y.ahead;
         }
       }
     }

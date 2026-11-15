@@ -1,6 +1,7 @@
 """The C++ yield gate in Nav_D20/planning (src/algorithm/yield_gate/) against the Python reference, frame by frame:
 hand-made and random scenarios (Nav_D20/planning/tools/yield_gate_parity/); and the planner's crosswalk behaviour
-(CrosswalkYield) in a closed loop: wait for a passing car, go, never stop on the crosswalk. Needs g++ and Eigen 3."""
+(CrosswalkYield) in a closed loop: wait for a passing car, go; on the crosswalk stop only for a car passing ahead.
+Needs g++ and Eigen 3."""
 import os
 import shutil
 import subprocess

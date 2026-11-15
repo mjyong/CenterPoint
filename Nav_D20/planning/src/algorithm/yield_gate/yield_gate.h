@@ -61,6 +61,10 @@ struct YieldConfig {
   double wait_clear = 3.0;       // [s] wait rule: a vehicle waited for must stay clear this long
   double lost_hold = 5.0;        // [s] wait rule: a vehicle waited for and then lost is waited for this long
   double min_watch = 0.0;        // [s] watch at the curb at least this long (T50: does not help; keep 0)
+  // on the crosswalk (people, 2026-11-15): stop for a vehicle that may pass ahead of the robot's nose (a conflict,
+  // turns included, whose most likely predicted track crosses the path there), not for one passing behind it,
+  // standing ones or stale perception; false: the old rule, never stop there
+  bool cross_ahead = true;
 };
 
 enum class Motion { kStatic, kMoving, kStopped };
@@ -94,6 +98,8 @@ struct Conflict {
   double gap;   // [s] NaN: young; stop rule: slack; wait rule: when it reaches the path
   double s;     // [m] along the path
   std::string kind;  // predicted / turn / young
+  bool ahead = false;  // its most likely predicted track crosses the path beyond the robot's nose (CrossingS;
+                       // young: the closest path point)
 };
 
 struct Standing {
@@ -117,7 +123,7 @@ struct Assessment {
 struct Decision {
   bool go = true;
   std::string reason;  // clear / committed / on_crosswalk / vehicle / young / standing / blocked / clearing /
-                       // not_passed / lost / stale / watching
+                       // not_passed / lost / stale / watching / ahead (on the crosswalk)
   std::vector<int> ids;
   double gap = kInf;
 };
@@ -131,6 +137,11 @@ bool InsidePolygon(const Vec2 &p, const std::vector<Vec2> &polygon);
 bool CrosswalkSpan(const std::vector<Vec2> &path, const std::vector<Vec2> &polygon, double *s_in, double *s_out,
                    double step = 0.1);
 
+// [m] along the path (points `pts` at `s`) where a track of vehicle centres comes closest to it: where it crosses the
+// path (the first time step and point of the smallest distance). Beyond the robot's nose (0.5 dog_length) the vehicle
+// passes ahead of the robot; at the first point (the robot) behind it, or through it.
+double CrossingS(const std::vector<Vec2> &pts, const std::vector<double> &s, const std::vector<Vec2> &centers);
+
 // `stamp` NaN: no perception at all (stale).
 Assessment Assess(const std::vector<Vec2> &path, const std::vector<Object> &objects, double now, double stamp,
                   const YieldConfig &cfg);
@@ -139,12 +150,17 @@ class YieldGate {
  public:
   explicit YieldGate(const YieldConfig &cfg = YieldConfig()) : cfg_(cfg) { Reset(); }
   void Reset();
-  // on_crosswalk: the robot's centre is on a crosswalk of the map: it does not stop there for vehicles.
+  // on_crosswalk: the robot's centre is on a crosswalk of the map (`a` assessed on what is left of it). It stops there
+  // only for a vehicle that may pass ahead of it (cross_ahead), and goes on as at the curb (wait_clear / lost_hold);
+  // not for vehicles passing behind it, standing ones (they give way) or stale perception.
   Decision Update(const Assessment &a, double now, bool dog_moving = false, bool on_crosswalk = false);
   const YieldConfig &config() const { return cfg_; }
 
  private:
   Decision Decide(const Assessment &a, double now, bool dog_moving, bool on_crosswalk);
+  Decision DecideCrosswalk(const Assessment &a, double now, bool dog_moving);
+  // after a wait: true and *hold while the vehicles waited for have not cleared; false: go (no longer paused)
+  bool Resume(const Assessment &a, double now, double gap, Decision *hold);
   YieldConfig cfg_;
   bool paused_ = false;
   double last_conflict_ = -kInf;
@@ -154,6 +170,7 @@ class YieldGate {
   std::map<int, double> seen_last_;
   bool watch_set_ = false;
   double watch_since_ = 0.0;
+  bool crossing_ = false;   // the last update was on the crosswalk
 };
 
 }  // namespace yield

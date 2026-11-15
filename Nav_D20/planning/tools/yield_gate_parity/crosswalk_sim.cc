@@ -2,7 +2,8 @@
 // through a crosswalk at y 10..18; the robot follows the path at 1 m/s times the speed scale, or holds and turns.
 // Cases: a car passing east on y = 14 while the robot waits; no car; no perception; arriving turned 60 deg away;
 // the pose jumping 1.2 m onto the crosswalk while the robot waits (with the car, and with no perception); starting
-// 3 m onto the crosswalk with no perception (T52 review).
+// 3 m onto the crosswalk with no perception (T52 review); a car first seen while the robot is on the crosswalk, in a
+// lane ahead of it (it stops there until the car has cleared) or behind it (it does not stop), 2026-11-15.
 // Exit 1 when a case does not do what it should. Built and run by run.sh.
 #include <cstdio>
 #include <string>
@@ -21,6 +22,8 @@ struct Result {
   bool held_on_crosswalk = false;
   bool aligned = false;         // an align hold
   bool unreleased = false;       // an output with "on the crosswalk without a go"
+  bool cross_wait = false;       // a cross_wait hold (reason ahead first)
+  double held_y = -1;            // where it was when it first held on the crosswalk
   double go_time = -1, arrive_time = -1, reach_time = -1, cross_time = -1;
 };
 
@@ -28,6 +31,11 @@ Result Run(const std::string &mode) {
   const bool jump = mode == "jump" || mode == "jumpstale", deep = mode == "deep";
   const bool car = mode == "car" || mode == "jump", stale = mode == "stale" || mode == "jumpstale" || deep;
   const bool turned = mode == "turned";
+  // a car seen only once the robot is this far up the crosswalk, 30 m west, in the lane at car_y
+  const bool late = mode == "ahead" || mode == "behind";
+  const double car_y = mode == "ahead" ? 16.0 : mode == "behind" ? 10.5 : 14.0;
+  const double appear_y = mode == "ahead" ? 11.5 : 14.0;
+  double appear_t = -1.0, speed = 0.0;
   CrosswalkYieldConfig cfg;
   cfg.enable = true;
   CrosswalkYield cy;
@@ -49,8 +57,10 @@ Result Run(const std::string &mode) {
     cy.AddOdom(t, xy, yaw);
     if (k % 2 == 0 && !stale) {   // perception: 10 Hz, 0.1 s old, in its own frame
       std::vector<Object> objs;
-      const Vec2 car_map(-100.0 + 6.0 * (t - 0.1 - t0), 14.0);   // 6 m/s east, crosses x = 0 at 16.7 s
-      if (car && std::abs(car_map.x() - xy.x()) < 40) {
+      Vec2 car_map(-100.0 + 6.0 * (t - 0.1 - t0), 14.0);   // 6 m/s east, crosses x = 0 at 16.7 s
+      if (late && appear_t < 0 && xy.y() > appear_y) appear_t = t;
+      if (late) car_map = Vec2(-30.0 + 6.0 * (t - 0.1 - appear_t), car_y);
+      if ((car && std::abs(car_map.x() - xy.x()) < 40) || (late && appear_t >= 0 && car_map.x() < 40)) {
         Eigen::Matrix2d Rm, Rd;
         Rm << std::cos(yaw), -std::sin(yaw), std::sin(yaw), std::cos(yaw);
         Rd << 0, 1, -1, 0;   // det -> base_link: -90 deg
@@ -70,7 +80,7 @@ Result Run(const std::string &mode) {
       }
       cy.SetObjects(t - 0.1, objs);
     }
-    const CrosswalkYieldOutput out = cy.Step(t, xy, yaw, 0.0, path);
+    const CrosswalkYieldOutput out = cy.Step(t, xy, yaw, speed, path);
     if (out.mode != last) {
       std::printf("  %-7s t %5.2f  y %5.2f  yaw %5.1f deg  %-8s %-12s s_stop %5.2f\n", mode.c_str(), t - t0, xy.y(),
                   yaw * 180 / M_PI, ModeName(out.mode), out.decision.reason.c_str(), out.s_stop);
@@ -83,7 +93,13 @@ Result Run(const std::string &mode) {
     if (r.go_time < 0 && out.mode == CrosswalkYieldOutput::kGo) r.go_time = t - t0;
     if (r.cross_time < 0 && out.mode == CrosswalkYieldOutput::kCross) r.cross_time = t - t0;
     if (out.unreleased) r.unreleased = true;
-    if (out.hold && xy.y() > 10 && xy.y() < 18) r.held_on_crosswalk = true;
+    if (out.hold && xy.y() > 10 && xy.y() < 18) {
+      if (!r.held_on_crosswalk) r.held_y = xy.y();
+      r.held_on_crosswalk = true;
+    }
+    if (out.mode == CrosswalkYieldOutput::kCrossWait && out.hold && (r.cross_wait || out.decision.reason == "ahead")) {
+      r.cross_wait = true;
+    }
     double v = out.speed_scale;
     if (out.hold) {
       v = 0.0;
@@ -92,6 +108,7 @@ Result Run(const std::string &mode) {
       yaw += std::clamp(M_PI / 2 - yaw, -0.5 * dt, 0.5 * dt);   // the local planner turns along the path
     }
     xy.y() += v * dt;
+    speed = v;
     if (xy.y() > 25) {
       r.reach_time = t - t0;
       break;
@@ -128,6 +145,12 @@ int main() {
   const Result d = Run("deep");
   check(d.unreleased && d.cross_time >= 0 && d.cross_time < 0.1 && d.reach_time > 0,
         "starts 3 m onto the crosswalk with no perception: crosses (it is on the road)");
+  const Result ah = Run("ahead");
+  check(ah.cross_wait && ah.held_on_crosswalk && ah.held_y > 11.4 && ah.held_y < 11.7 && ah.reach_time > 0,
+        "a car seen on the crosswalk, in a lane ahead: stops there (cross_wait), goes on once it has cleared");
+  const Result bh = Run("behind");
+  check(!bh.held_on_crosswalk && !bh.cross_wait && bh.reach_time > 0 && bh.reach_time < n.reach_time + 0.2,
+        "a car seen on the crosswalk, in a lane behind: does not stop");
   std::printf("crosswalk_sim: %d failed\n", bad);
   return bad == 0 ? 0 : 1;
 }

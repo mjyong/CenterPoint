@@ -70,6 +70,9 @@ message MissionConf {
     // on a crosswalk without the gate's go (a localization jump at the curb): up to this far past the entry, hold
     // and ask the gate; deeper (started on the road): cross (T52 review)
     optional double max_unreleased_depth = 18 [ default = 1.5 ];  // [m]
+    // on the crosswalk: stop for a vehicle that may pass ahead of the robot, not for one behind it (2026-11-15);
+    // false: never stop there (the rule of 2026-11-12)
+    optional bool   cross_ahead         = 19 [ default = true ];
   }
   message FollowingConf {
     enum Type {
