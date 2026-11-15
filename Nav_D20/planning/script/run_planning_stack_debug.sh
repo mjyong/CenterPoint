@@ -95,6 +95,17 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "ROS_DOMAIN_ID=${ROS_DOMAIN_ID}"
+# 这个域上已经有别的回放就不放（T62：两套一起放、同一个域，定位收到两个包的 IMU，时间戳倒流 5.3 s。docker 默认的网桥是
+# 所有容器共用的，组播能过去；同一个容器里 docker exec 两次更是同一张图）。一起放就给每套一个 ROS_DOMAIN_ID（43、44……）。
+# NAV_ALLOW_SHARED_DOMAIN=1 跳过这项检查
+if [[ -z "${NAV_ALLOW_SHARED_DOMAIN:-}" ]] && command -v ros2 > /dev/null; then
+  others="$(timeout 15 ros2 topic list --no-daemon --spin-time 3 2> /dev/null | grep -vxE '/parameter_events|/rosout' || true)"
+  if [[ -n "${others}" ]]; then
+    echo "域 ${ROS_DOMAIN_ID} 上已经有话题（别的回放？）：$(echo "${others}" | head -5 | tr '\n' ' ')"
+    echo "换一个 ROS_DOMAIN_ID 再放（或者确认没有别的回放以后 NAV_ALLOW_SHARED_DOMAIN=1）"
+    exit 1
+  fi
+fi
 echo "bag=${bag}"
 echo "日志 ${log_dir}"
 echo "链路: bag 的顶激光/IMU/INSPVAX -> lidar_seg -> /map/occupancy_grid，定位 -> /lightning/odom -> planning"

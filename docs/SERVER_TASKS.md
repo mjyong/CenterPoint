@@ -168,9 +168,9 @@
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T61 | 半天 | 任务已写好 |
 | T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
 | T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成，已复核（2026-11-14）：定位不再因大消息退出，odom 约 100 Hz；缩略图一条、Foxglove 订了规划没重启；外参 OK。复核加了：use-new 等 odom（INS 30 s 没固定解定位起不来）、bag_to_mcap.py（狗上录的是 sqlite3） |
-| T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 完成（2026-11-15）：/tmp 在 NFS 上，规划 glog 把线程打进 D，空闲 GPU 上中位 13 Hz；run.sh 给 /tmp 挂 tmpfs 以后中位 20 Hz，和 micromamba 一样。1112 reliable 不停，1653 条目标，外参 OK（−90°，漂移中位 0.13 m）。best effort 仍丢帧（skipped 中位 3）但这次没停死 |
+| T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 完成，已复核（2026-11-15）：/tmp 在 NFS 上让规划的 glog 卡住线程，tmpfs 以后 20 Hz；感知 reliable 一帧不丢，外参 OK（0.13 m，和狗上 0.12 m 对上）。nav-dev 可以当默认回放环境。复核加了同一个域上已有回放就不放 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 完成，已复核（2026-11-15）：三个模块在狗的系统镜像里编过，ldd 0，增量 2.5 分钟。vfs 每次起容器 50 分钟，run_arm64.sh 改成留一个容器 exec。狗上的对照没做（隧道不回 SSH），放到 T63 |
-| T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 完成：NEEDED 一样。rsync -n 会换 13789 个文件（大小不同的 46 个，其余是时间和属主），删 3 个（.t56 和一份 pyc）。没装到狗上 |
+| T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 完成，已复核（2026-11-15）：NEEDED 和狗上一样，文件只差一个 .t56 备份；服务器镜像编的就是狗上会编的。真装以后要 configure + apply |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -10058,6 +10058,18 @@ aarch64、`ldd` 0 个 not found，`version.txt` 写了在哪编的。用时和�
 
 **第 3 步。** 隧道恢复后重跑 `rsync -n -a --delete --itemize-changes`（`running: theirs`）。会换 13789 个文件：其中 13743 个大小相同，差在时间、权限、属主；大小不同的 46 个，主要是 `version.txt`、`parent_prefix_path`、`SOURCES.txt`，加上 `lidar_3d_detection` 二进制、`lidar_3d_detection.launch.py`、规划的 `communication_conf.pb.txt` 和 `preprocess_conf.pb.txt`、定位的 `default_d20.yaml`。planning、mode_switch_node、lidar_seg、grid_map_memory_node 的二进制大小相同。会删 3 个：`model_switch_launch.py.t56` 和它的 `__pycache__`（一个目录、一个 `.pyc`）。全文 `data/reports/T63/rsync_dry_run.txt`。真装仍是 T60 第 7 步，要人定；这次没改狗上的东西。
 
+
+### T63 复核（2026-11-15）
+
+都对。五个二进制的 `NEEDED` 和狗上逐条一样，文件清单只差 T56 留下的 `.t56` 备份：服务器上狗的系统镜像编出来的，就是狗上会编出来的。
+rsync 会改大小的 46 个文件里，配置（`communication_conf`、`preprocess_conf`、`default_d20.yaml`）是狗上被 `configure` 改过的，
+`lidar_3d_detection` 二进制不同是因为服务器这份带了 `cloud_reliable`（T58 复核），规划、定位、lidar_seg、grid_map 的二进制大小一样。
+所以以后真装：装完必须 `configure` + `apply`（T60 第 7 步）。`run_arm64.sh` 那个修得对（不存在的容器 `docker inspect` 先打一个空行
+再退出 1，我的假 docker 没模拟出来）。
+
+隧道又断了一次（rsync 读完清单以后被对端重置，过了一阵恢复）：传大东西的时候隧道不稳。现场 T57 用笔记本直连；以后从服务器往狗上
+装，rsync 断了重跑就行（它续得上）。
+
 ---
 
 ## T57 现场：换成我们的，过人行横道，换回
@@ -10288,3 +10300,21 @@ d. `LIVE_PERCEPTION_RELIABLE=0`：每秒 `clouds` 中位 8、最少 1、合计 1
 e. reliable 那次 `objects_in_map.py`：4 条静止车，配置的 −90° 漂移中位 0.13 m，4/4 还在 0.5 m 内，`extrinsic OK`。T61 在狗上是 0.12 m、OK。
 
 `run.sh` 起的 nav-dev（`/tmp` 是 tmpfs，现场感知默认 reliable）周期和感知都过了，以后的回放走这条。micromamba 留着当备用。
+
+
+### T62 复核（2026-11-15）
+
+两件都查清楚了，做得好：
+- **规划慢**：不是编译（两边都是 Release、`-O3`），是规划把 glog 写死在 `/tmp`（`main.cc` 的 `FLAGS_log_dir`），而 vfs 上容器的 `/tmp`
+  在 NFS 上，每个周期写日志都把主线程打进 D。`run.sh` 给 `/tmp` 挂 tmpfs 以后中位 20 Hz，和 micromamba 一样。
+- **感知停**：订成 reliable 以后 1112 的云一帧不丢（clouds 1652、skipped 0），目标 1653 条，外参 **OK**（−90°，漂移中位 0.13 m，
+  4/4）——和 T61 狗上现场重算的 0.12 m 几乎一样，服务器和狗上两边对上了。best effort 还是丢（skipped 合计 521），这次没停死。
+nav-dev（`run.sh`、`/tmp` tmpfs、现场感知默认 reliable）可以当以后回放的默认环境了，micromamba 留着备用。
+
+另外两点：
+1. **两套回放一起放、同一个域会串**（"两套一起放的那次不作数"：定位收到两个包的 IMU，时间戳倒流 5.3 s）。`run.sh` 说的"容器自己的
+   网络"只对主机成立：docker 默认的网桥所有容器共用，组播能过去；同一个容器里 `docker exec` 两次更是同一张图。加了一道检查：
+   `run_planning_stack_debug.sh`（`replay_planning_check.sh` 也走它）起之前看这个域上有没有别的话题，有就停下、让换 `ROS_DOMAIN_ID`
+   （`NAV_ALLOW_SHARED_DOMAIN=1` 跳过）。一起放就每套一个域（43、44……）。
+2. 已经建好、`/tmp` 还在 NFS 上的容器（t58build 那些）还是约 13 Hz；以后回放用 `run.sh` 新建的（`/tmp` 是 tmpfs），或者在老容器里
+   回放前先 `mount -t tmpfs tmpfs /tmp`（要 root）。`docker create` 在 vfs 上约 31 分钟，建一个留着用。
