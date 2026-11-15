@@ -4,7 +4,8 @@
 #
 #   bash Nav_D20/planning/script/replay_dog_bag.sh <包目录> [名字]
 # 没有 replay goal 就退出，用 Nav_D20/planning/tools/bag_on_map.py 看目标点。
-# 对照写在 work_dirs/planning_io_<名字>/sequence.md。
+# 对照写在 work_dirs/planning_io_<名字>/sequence.md：两列都是"包开始后几秒"（现场：record_log.txt 第一行 recording 的时刻；
+# 回灌：logs/play_start.log 的时刻加 ros2 bag play 的 --delay 1 s），备注插在现场那列。
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -70,23 +71,29 @@ os.makedirs(io, exist_ok=True)
 def hms(h, m, s):
     return int(h) * 3600 + int(m) * 60 + float(s)
 
-field = []
+TOD = re.compile(r"(?<!\d)(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)")   # the first time of day on a line ("T17:32:35" too)
+
+field, t0 = [], None
+for line in open(os.path.join(bag, "record_log.txt"), errors="replace"):
+    m = re.match(r"\[(\d{2}):(\d{2}):(\d{2})\] (.*)", line)
+    if not m:
+        continue
+    if t0 is None and m.group(4).startswith("recording "):
+        t0 = hms(*m.groups()[:3])                  # nav_cw_record.sh started ros2 bag record here
+    if m.group(4).startswith("note: "):
+        field.append((hms(*m.groups()[:3]), m.group(4).strip()))
 journal = os.path.join(bag, "journal_cw-planning.txt")
 if os.path.isfile(journal):
     for line in open(journal, errors="replace"):
         if "Crosswalk yield:" not in line:
             continue
-        m = re.match(r"(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)", line)
+        m = TOD.search(line)                       # the journal's own stamp (short-iso-precise or short-precise)
         if not m:
             continue
-        text = "Crosswalk yield: " + line.split("Crosswalk yield:", 1)[1].strip()
-        field.append((hms(m.group(2), m.group(3), m.group(4)), text))
-for line in open(os.path.join(bag, "record_log.txt"), errors="replace"):
-    m = re.match(r"\[(\d{2}):(\d{2}):(\d{2})\] note: (.*)", line)
-    if m:
-        field.append((hms(*m.groups()[:3]), "note: " + m.group(4).strip()))
+        field.append((hms(*m.groups()), "Crosswalk yield: " + line.split("Crosswalk yield:", 1)[1].strip()))
 field.sort()
-t0 = field[0][0] if field else 0.0
+if t0 is None:
+    t0 = field[0][0] if field else 0.0
 
 replay = []
 logs = os.path.join(io, "logs")
@@ -98,8 +105,13 @@ if os.path.isdir(logs):
         if os.path.isfile(os.path.join(logs, n)):
             picked = os.path.join(logs, n)
             break
+r0 = None
+start = os.path.join(logs, "play_start.log")
+if os.path.isfile(start):
+    m = TOD.search(open(start).read())
+    if m:
+        r0 = hms(*m.groups()) + 1.0                # ros2 bag play --delay 1
 if picked:
-    r0 = None
     for line in open(picked, errors="replace"):
         m = re.search(r"\b(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)", line)
         if m is None:
@@ -116,7 +128,7 @@ rows = [(t - t0, "field", text) for t, text in field] + [(t, "replay", text) for
 rows.sort()
 out = ["# %s" % os.path.basename(io), "",
        "goal %s %s" % (os.environ["GOAL_X"], os.environ["GOAL_Y"]), "",
-       "| t (s) | 现场 | 回灌 |", "|---|---|---|"]
+       "| 包开始后 (s) | 现场 | 回灌 |", "|---|---|---|"]
 for t, src, text in rows:
     cell = text.replace("|", "/")
     if src == "field":

@@ -19,6 +19,7 @@ FAKE_REPLAY = textwrap.dedent(r'''
       echo "map=${PLANNING_STARTUP_MAP-}"
     } > "$NAV_FAKE_OUT"
     mkdir -p "$NAV_IO_DIR/logs"
+    echo "08:59:58.000000000" > "$NAV_IO_DIR/logs/play_start.log"
     cat > "$NAV_IO_DIR/logs/planning.INFO" << 'EOF'
     I1115 09:00:00.000000  1 main.cc:1] planning start
     I1115 09:00:05.000000  1 tracking.cc:125] Crosswalk yield: wait (vehicle) crosswalk 1
@@ -39,14 +40,15 @@ FAKE_CONVERT = textwrap.dedent(r'''
 def _bag(tmp, goal="10.000 20.000"):
     os.makedirs(tmp)
     open(os.path.join(tmp, "record_log.txt"), "w").write(
+        "[17:32:30] recording /home/nvidia/bags/cw, domain 0: 18 topics\n"
         "[17:32:32] watching\n"
         "[17:32:33] replay goal: 1.000 2.000\n"
         "[17:32:40] note: go was early\n"
         "[17:33:00] replay goal: %s\n" % goal)
     open(os.path.join(tmp, "journal_cw-planning.txt"), "w").write(
-        "2026-11-15 17:32:35.100000 host cw-planning[1]: I1115 08:44:35.100000 1 tracking.cc:125] "
+        "2026-11-15T17:32:35.100000+0800 host cw-planning[1]: I1115 08:44:35.100000 1 tracking.cc:125] "
         "Crosswalk yield: wait (vehicle) crosswalk 1\n"
-        "2026-11-15 17:32:50.100000 host cw-planning[1]: I1115 08:44:50.100000 1 tracking.cc:125] "
+        "Nov 15 17:32:50.100000 host cw-planning[1]: I1115 08:44:50.100000 1 tracking.cc:125] "
         "Crosswalk yield: go (clear) crosswalk 1\n")
     open(os.path.join(tmp, "metadata.yaml"), "w").write("storage_identifier: sqlite3\n")
     open(os.path.join(tmp, "x.db3"), "w").close()
@@ -87,9 +89,13 @@ def test_goal_play_method_and_sequence(tmp_path):
     field = [line for line in seq.splitlines() if line.startswith("|") and "Crosswalk yield" in line or "note:" in line]
     texts = "\n".join(field)
     assert texts.index("wait (vehicle)") < texts.index("note: go was early") < texts.index("go (clear)")
-    assert "| 0.0 | Crosswalk yield: wait (vehicle) crosswalk 1 | |" in seq
-    assert "| 4.9 | note: go was early | |" in seq
-    assert "| 5.0 | | Crosswalk yield: wait (vehicle) crosswalk 1 |" in seq
+    # both columns in seconds after the bag started: the field from the recording line, the replay from play_start
+    # + the 1 s --delay; the journal's stamp in either journalctl format
+    assert "| 5.1 | Crosswalk yield: wait (vehicle) crosswalk 1 | |" in seq
+    assert "| 10.0 | note: go was early | |" in seq
+    assert "| 20.1 | Crosswalk yield: go (clear) crosswalk 1 | |" in seq
+    assert "| 6.0 | | Crosswalk yield: wait (vehicle) crosswalk 1 |" in seq
+    assert "| 21.0 | | Crosswalk yield: go (clear) crosswalk 1 |" in seq
 
 
 def test_sqlite_bag_is_converted_when_mcap_is_missing(tmp_path):

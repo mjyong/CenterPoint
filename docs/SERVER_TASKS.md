@@ -172,9 +172,9 @@
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 完成，已复核（2026-11-15）：三个模块在狗的系统镜像里编过，ldd 0，增量 2.5 分钟。vfs 每次起容器 50 分钟，run_arm64.sh 改成留一个容器 exec。狗上的对照没做（隧道不回 SSH），放到 T63 |
 | T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 完成，已复核（2026-11-15）：NEEDED 和狗上一样，文件只差一个 .t56 备份；服务器镜像编的就是狗上会编的。真装以后要 configure + apply |
 | T64 | T57 的包拷回服务器、转 mcap、看人行横道那一段；新门控（人行横道上前方来车也停）在这包上回放，和线上的旧门控对；arm64 编规划给狗 | Agent | T57 复核 | 2 小时 | 完成，已复核（2026-11-15）：包里狗站着没过人行横道，验不了门控。回放的 standstill 不是定位（504.9 m 是初始化），是感知栅格放到第 36 s 就断了，交给 T68。arm64 规划包 nav_cw_planning_1a5ed36.tar.gz 可以装（T65 第 4 步） |
-| T65 | 现场：他们的服务下看 App 怎么让狗走起来（只订不发：运控模式、谁在发、焦点、robot_service 和 zsibot 的日志），把表和五个问题给机器人团队；装 T64 编的规划 | 人 + Agent | T64 第 5 步 | 2 小时 | 任务已写好 |
+| T65 | 现场：他们的服务下看 App 怎么让狗走起来（只订不发：运控模式、谁在发、焦点、robot_service 和 zsibot 的日志），把表和五个问题给机器人团队；装 T64 编的规划 | 人 + Agent | T64 第 5 步 | 2 小时 | 做完了（人说，2026-11-15），结果还没推上来 |
 | T66 | 现场：影子模式下逐个路口调。人照规划的意思遥控狗（停、转、等、走），看五层：定位、白框对不对、感知、门控、状态机和指令；每个路口走一遍、定点看 10 分钟、同事开车（新门控才做），每次录包带备注；回来回灌，和现场的日志对 | 人 + Agent | 无（新门控要 T64 第 5 步） | 半天 | 任务已写好 |
-| T68 | 回放里感知栅格放到第 36 s 就断了（T64）：看 lidar_seg、grid_map 的日志，换几种放法找原因，修好再放 T57 的包；狗上录的包怎么回灌写成一条命令 | Agent | T64 复核 | 2 小时 | 任务已写好 |
+| T68 | 回放里感知栅格放到第 36 s 就断了（T64）：看 lidar_seg、grid_map 的日志，换几种放法找原因，修好再放 T57 的包；狗上录的包怎么回灌写成一条命令 | Agent | T64 复核 | 2 小时 | 完成，已复核（2026-11-15）：栅格 best_effort 订阅在容器 UDP 上 36 s 后收不到，回放改 reliable，1581 帧放到包尾。replay_dog_bag.sh 写好；复核修了现场日志的时间格式和两列对齐 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -10637,8 +10637,10 @@ configure / apply 有 NOT APPLIED（把 backup/planning.t61 挪回 install/plann
         Nav_D20/planning/script/planning_live.json；
       - 状态：ssh dog 'journalctl -u cw-planning -f | grep --line-buffered -E "Crosswalk yield|nav_blocked|Navigation|standstill"'；
       - 录包：ssh -t dog（要 -t，才能边录边敲备注）。
-1. 选路口：人定测哪几个（Foxglove 里全局路径要从白框上穿过）；至少两个，其中一个有正常车流。下面 <N> 用规划给的编号（日志
-   "crosswalk N"、侧栏 crosswalk_index；第一次 approach 时就看得到）。
+1. 选路口：人定测哪几个（Foxglove 里全局路径要从白框上穿过）；至少两个，其中一个有正常车流。下面 <N> 用现场指南第 1 节
+   ad68517c 那张图上的编号。规划日志里的 "crosswalk 0–4"、侧栏 crosswalk_index 是另一套（OSM 里的顺序）：
+     规划 0 = 图上 6，1 = 13，2 = 22，3 = 32，4 = 38。
+   先挑 13、32、38（路网在这几处画宽了，全局路径从白框上过）；22 路径只擦边，6 只有一端碰到路，多半走不出 approach。
 2. 每个路口先空的时候"走一遍"（DOG_FIELD_GUIDE.md 第 8.1 节"走一遍"那六步）。起步前在录包窗口开录：
      sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x<N>_walk
    到目标 1.5 m 内它 5 s 后自己停。边走边按 8.1 的表看，不对就在录包窗口敲一行字回车。这一遍必须记下：
@@ -10663,8 +10665,9 @@ configure / apply 有 NOT APPLIED（把 backup/planning.t61 挪回 install/plann
 6. 回来（服务器，Agent），每个包：
    - 拷：rsync -a --partial dog:/home/nvidia/bags/<包>/ /public/zjst/robot/cp_data/<包>/（拷不动就人用笔记本拷）；
    - 同 T64 第 2 步：bag_to_mcap.py、planning_mcap_viz.py、objects_in_map.py（每个包都要 extrinsic OK）；
-   - 回灌：`bash Nav_D20/planning/script/replay_dog_bag.sh /public/zjst/robot/cp_data/<包> t66_<包>`（T68：读 record_log.txt
-     最后的 "replay goal"，只放传感器和感知目标，栅格订 reliable）。check_planning_mcap.py 不能有 "stops … before the end"；
+   - 回灌（nav-dev 容器里跑，同 T68 用的那个，/tmp 是 tmpfs）：
+       bash Nav_D20/planning/script/replay_dog_bag.sh /public/zjst/robot/cp_data/<包> t66_<包>
+     （T68：读 record_log.txt 最后的 "replay goal"，只放传感器和感知目标，栅格订 reliable；sequence.md 两列都是包开始后几秒）。check_planning_mcap.py 不能有 "stops … before the end"；
    - 对：回灌日志的 "Crosswalk yield:" 和包里 journal_cw-planning.txt 的，按时间并排，record_log.txt 里的备注按时间插进去
      → data/reports/T66/<包>_sequence.md。走一遍、定点看的包，狗是照规划走的或者没动，两边应该基本一样；不一样的列出来；
    - 定点看的包另外数：wait 几次、每次多久（中位、最长）、go 几次；备注里"go 不安全""空等"各几次，各对着哪辆车（id、从哪来）。
@@ -10740,3 +10743,22 @@ configure / apply 有 NOT APPLIED（把 backup/planning.t61 挪回 install/plann
 - `check_planning_mcap.py` 没有 `stops … before the end`。它报的 `PROBLEM layout: /fused_point_cloud is not in the recording` 是回放脚本带的话题表，这次没有开 `RECORD_CLOUD`。
 
 **第 4 步。** `bash Nav_D20/planning/script/replay_dog_bag.sh <包目录> [名字]`。没有 `replay goal` 就退出，提示 `bag_on_map.py`。sqlite3 且没有 `<包>_mcap` 时先转。放法和上面这次一样，地图 ad68517c。对照写在 `work_dirs/planning_io_<名字>/sequence.md`。`tests/dog/test_replay_dog_bag.py` 3 passed。现场指南第 9 节和 T66 第 6 步改成用它。
+
+### T68 复核（2026-11-15）
+
+找得准。lidar_seg 一直处理到包尾；栅格对 `/patchworkpp/ground_seg_intensity` 是 best_effort 订阅，36 s 以后一条都不进回调，进程还在。
+和 T58 感知订云是同一类：容器里 CycloneDDS 走 UDP，best effort 的大消息丢分片。回放时给栅格一份 reliable 的临时 yaml，狗上
+（共享内存）不动，栅格 1581 帧放到包尾，standstill 只在包放完以后。`replay_dog_bag.sh` 也写好了。
+
+复核改了两处，都在回灌对照表上：
+1. **现场那列一行都对不上。** 解析要求日志行以 `2026-11-15 17:32:35` 开头，可录包脚本存日志用的是 journalctl 的 `short-precise`，
+   实际是 `Nov 15 17:32:35.123456 host …`。现在录包改用 `short-iso-precise`，解析两种都认（找行里第一个时刻）。
+2. **两列的零点不一样**：现场从第一条事件算，回灌从规划进程启动算，并排时同一行不是同一时刻。现在都算成"包开始后几秒"：
+   现场用 record_log.txt 第一行 `recording` 的时刻；回灌用 `run_planning_stack_debug.sh` 放包前写的 `logs/play_start.log`，
+   再加 `--delay` 的 1 s。测试覆盖了两种 journalctl 格式和对齐（`tests/dog/test_replay_dog_bag.py`）。
+
+另外，`3e7e5d5` 把两张站点地图放进了现场指南，对得上。但规划日志的 `crosswalk N` 是 OSM 里 relation id 的顺序（`std::map<long long>`），
+不是图上的号：**规划 0 = 6，1 = 13，2 = 22，3 = 32，4 = 38**。现场指南第 1 节、T66 第 1 步写上了，T66 包名用图上的号。
+现场指南第 4 节举的例子 "crosswalk 6" 在这张图上不存在，改成了 1。
+
+T65 的结果还没推上来：仓库里没有 "T65 结果"，也没有 data/reports/T65。

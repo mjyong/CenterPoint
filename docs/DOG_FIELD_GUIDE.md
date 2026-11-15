@@ -65,6 +65,9 @@ ros2 topic echo --once /lightning/odom
 
 规划起来读的是 **ad68517c**（`startup_map_dir`，5 条）。北面 22、13 在主路上，6 在西边岔出去的短路上；南面 32、38。第一次现场（T57）走这张。
 
+规划日志的 `crosswalk N`、侧栏 `crosswalk_index` 是 OSM 里的顺序，不是图上的号：**规划 0 = 6，1 = 13，2 = 22，3 = 32，4 = 38**。
+路网在 13、32、38 处画宽了，全局路径从白框上过；22 只擦边，6 只有一端碰到路（PLANNING_INTEGRATION.md 第 4 节）。
+
 **a70c6db6** 有 8 条（东边路口 7、13、20、26、32，南边 38、46，最西边单独一条 52）。规划不会自己切过去。等人带狗到这一片再走，不排在 T57 前面。
 
 ![ad68517c 的五条人行横道](map_ad68517c_crosswalks.png)
@@ -170,7 +173,7 @@ Foxglove：`rehearsal on` 时 `sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh
   人行横道的状态每变一次打一行：
 
   ```text
-  Crosswalk yield: wait (vehicle) crosswalk 6, stop point in -0.02 m, entry 0.78 m, exit 7.9 m, heading error 3 deg, vehicles 2, waiting for 17
+  Crosswalk yield: wait (vehicle) crosswalk 1, stop point in -0.02 m, entry 0.78 m, exit 7.9 m, heading error 3 deg, vehicles 2, waiting for 17
   ```
 
 - **App**：电量、遥控照旧，位置不准（画在 c1adbe7b 上）。`appmap follow` 时才跟 App：在 App 里切图，规划和定位都会跟着切

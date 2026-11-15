@@ -171,7 +171,7 @@ def save_journals(out, start, end, log):
     for unit in os.environ.get("NAV_CW_RECORD_UNITS", "cw-planning cw-slam cw-nav-perception").split():
         path = os.path.join(out, "journal_%s.txt" % unit)
         with open(path, "w") as f:
-            subprocess.run([jc, "-u", unit, "--since", since, "--until", until, "--no-pager", "-o", "short-precise"],
+            subprocess.run([jc, "-u", unit, "--since", since, "--until", until, "--no-pager", "-o", "short-iso-precise"],
                            stdout=f, stderr=subprocess.STDOUT)
     log("journals of our units saved beside the bag (journal_<unit>.txt)")
 

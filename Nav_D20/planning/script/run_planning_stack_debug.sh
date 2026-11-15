@@ -162,6 +162,8 @@ elif [[ -n "${LIVE_PERCEPTION_MODEL:-}" ]]; then
   [[ -n "${BAG_PLAY_EXTRA:-}" ]] || play_args+=(--remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects)
 fi
 # bag 路径放在 --remap 前面：ros2 bag play 的 --remap 会把后面的位置参数也吃掉（T58 现场感知那次没放成）
+# 放包那一刻（本机时刻，和规划 glog 同一个钟）：replay_dog_bag.sh 拿它把回灌的日志换成"包开始后几秒"（--delay 1 另加）
+date +%T.%N > "${log_dir}/play_start.log"
 ros2 bag play "${bag}" "${play_args[@]}" >"${log_dir}/bag.log" 2>&1 &
 bag_pid=$!
 pids+=("${bag_pid}")

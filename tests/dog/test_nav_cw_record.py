@@ -318,7 +318,7 @@ def test_notes_journals_and_the_replay_goal_go_beside_the_bag(dog):
     assert "note: car from the left, the go was early" in rec_log and "note: mark" in rec_log
     assert "replay goal: 12.500 -3.250" in rec_log and "stopping (Ctrl-C)" in rec_log
     j = (bag / "journal_cw-planning.txt").read_text()
-    assert j.startswith("journal -u cw-planning --since ") and "--until" in j and "short-precise" in j
+    assert j.startswith("journal -u cw-planning --since ") and "--until" in j and "short-iso-precise" in j
     assert {f.name for f in bag.iterdir()} >= {"journal_cw-slam.txt", "journal_cw-nav-perception.txt",
                                                "metadata.yaml"}
     assert subprocess.run(["bash", SH, "--tag", "a/b"], env=dog.env(), capture_output=True).returncode == 2
