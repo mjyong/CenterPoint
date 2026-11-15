@@ -119,3 +119,19 @@ def test_missing_goal_points_at_bag_on_map(tmp_path):
     proc = subprocess.run(["bash", SH, bag], cwd=str(tmp_path), env=dict(os.environ), text=True, capture_output=True)
     assert proc.returncode == 1
     assert "bag_on_map.py" in proc.stderr
+
+
+def test_the_planners_transformed_goal_wins_over_the_record_log(tmp_path):
+    """T66: Foxglove sent the goal in base_link; record_log.txt has those numbers, the planner's log the map ones."""
+    bag = str(tmp_path / "cw")
+    _bag(bag)
+    os.makedirs(bag + "_mcap")
+    with open(os.path.join(bag, "journal_cw-planning.txt"), "a") as f:
+        f.write("2026-11-15T17:32:31.000000+0800 host cw-planning[1]: I1115 08:44:31.0 1 ros_bridge.cc:653] "
+                "[PLANNING]Transformed goal from base_link to map: (188.25, 470.5)\n")
+    proc, io, out = _run(str(tmp_path), bag, "t66_fake", env=dict(os.environ))
+    assert proc.returncode == 0, proc.stderr
+    called = open(out).read()
+    assert "x=188.25" in called and "y=470.5" in called and "规划日志" in proc.stdout
+    proc, io, out = _run(str(tmp_path), bag, "t66_fake", env=dict(os.environ, NAV_REPLAY_GOAL="1.5 -2"))
+    assert "x=1.5" in open(out).read() and "NAV_REPLAY_GOAL" in proc.stdout

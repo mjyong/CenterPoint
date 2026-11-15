@@ -1,5 +1,7 @@
 # T66 现场手册：影子模式下逐个路口调人行横道
 
+> T66 那晚用的。第二轮按 `docs/SERVER_TASKS.md` 的 T70 做：两个人、录包窗口按状态响铃、目标在 base_link 里发也对了、use-new 默认等 60 s、开工前查域 0 上 `/lightning/odom` 只有一个发布者、收工 use-original（T66 复核）。
+
 笔记本仓库已在 `claude/me/v01` 的 `213f8db`。这一页是现场按顺序做的命令和看什么。
 
 出处：

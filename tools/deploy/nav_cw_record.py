@@ -6,9 +6,16 @@ no mcap plugin, T61). It stops by itself once the planner has a goal and the dog
 come within --radius (1.5 m) of it: --hold (5 s) later. Otherwise Ctrl-C stops it. Either way the recorder gets one
 SIGINT and writes metadata.yaml; nothing opens the database while it is written (T57: "database is locked").
 
-The goal is the latest of /planning/debug/goal_pose (the planner republishes the last /goal_pose every cycle) and
-/goal_pose (a new one sent during the recording); the dog is /lightning/odom (map frame, like the goal). A goal the
-dog is already within the radius of (the last test's) does not stop it: the dog has to be outside first.
+The goal is a /goal_pose sent during the recording, else /planning/debug/goal_pose (the planner republishes the last
+one every cycle); the dog is /lightning/odom (map). Foxglove publishes the goal in its display frame, base_link in
+planning_live.json: such a goal is placed in map by the dog's odometry pose when it arrives, as the planner does with
+its TF (T66: the goals were taken as map numbers, "317 m away", and the replay goals were wrong). A goal the dog is
+already within the radius of (the last test's) does not stop it: the dog has to be outside first.
+
+Cues (T66: the person walking the dog went on past align twice): each change of the planner's crosswalk state
+(/planning/debug/plotjuggler/string crosswalk_mode) is a line saying what to do, with the terminal bell: approach
+slow down, align stop and turn (which way, how far), wait stand, go / cross walk, cross_wait stop. The crosswalk is
+named by the site map's numbers (planner index 0..4 = 6, 13, 22, 32, 38 on ad68517c; NAV_CW_CROSSWALK_NAMES).
 
 It also prints every change of the motion control's state (/mc/state: mode, uuid, each motion's state) and of who
 commands it (/mc/motion_control: uuid, mode, motion): T57's dog stood in mode 3 (lower body) while the planner sent
@@ -70,6 +77,54 @@ def describe_state(uuid, mode, motions, fault):
 def describe_command(uuid, mode, motion, para):
     return "/mc/motion_control: uuid %r, mode %d %s, motion %d, para [%s]" % (
         uuid, mode, MODES.get(mode, "?"), motion, ", ".join("%.2f" % v for v in para))
+
+
+CROSSWALK_NAMES = os.environ.get("NAV_CW_CROSSWALK_NAMES", "6,13,22,32,38").split(",")   # ad68517c, planner order
+CUES = {1: "approach：慢下来，沿路线走到停止点",
+        2: "停！align：原地{turn}转到面朝对面（差 {deg:.0f}°）",
+        3: "wait：站着别动",
+        4: "go：沿路线走过去",
+        5: "cross：在人行横道上，接着走",
+        6: "停！cross_wait：前方可能来车，原地站着"}
+
+
+def yaw_of(q):
+    return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
+
+
+def to_map(xy, pose):
+    """A point in the dog's frame (base_link) in map, by the dog's pose (x, y, yaw)."""
+    x, y, yaw = pose
+    c, s = math.cos(yaw), math.sin(yaw)
+    return (x + c * xy[0] - s * xy[1], y + s * xy[0] + c * xy[1])
+
+
+def parse_debug(text):
+    """The planner's /planning/debug/plotjuggler/string: "key: value" lines."""
+    out = {}
+    for line in text.splitlines():
+        k, _, v = line.partition(":")
+        try:
+            out[k.strip()] = float(v)
+        except ValueError:
+            pass
+    return out
+
+
+def cue(values):
+    """-> (mode, line) for the crosswalk state in a debug string; mode None without one."""
+    if "crosswalk_mode" not in values:
+        return None, None
+    mode = int(values["crosswalk_mode"])
+    if mode == 0:
+        return 0, "none：前面 40 m 没有人行横道"
+    k = int(values.get("crosswalk_index", -1))
+    name = CROSSWALK_NAMES[k] if 0 <= k < len(CROSSWALK_NAMES) else str(k)
+    err = values.get("crosswalk_heading_error", 0.0)
+    text = CUES.get(mode, "mode %d" % mode).format(turn="往左" if err > 0 else "往右", deg=abs(math.degrees(err)))
+    if mode == 3 and values.get("crosswalk_waiting_for", 0) > 0:
+        text += "（等 %d 辆）" % int(values["crosswalk_waiting_for"])
+    return mode, "== 图上 %s 号 %s" % (name, text)
 
 
 class Changes:
@@ -192,9 +247,9 @@ def _raise_stop(signum, frame):
     raise Stop(signal.Signals(signum).name)
 
 
-def ros_feed(arrival, log):
-    """Subscriptions that feed ``arrival`` and print the motion control's changes; -> (spin(timeout), close()), or
-    None without rclpy."""
+def ros_feed(arrival, log, cues=True):
+    """Subscriptions that feed ``arrival``, print the motion control's changes and the crosswalk cues;
+    -> (spin(timeout), close()), or None without rclpy."""
     try:
         import rclpy
         from geometry_msgs.msg import PoseStamped
@@ -208,22 +263,52 @@ def ros_feed(arrival, log):
     # subscriptions only: no rosout, no parameter services on the robot's domain
     node = rclpy.create_node("nav_cw_record", enable_rosout=False, start_parameter_services=False)
 
-    def goal(msg):
-        p = msg.pose.position
-        line = arrival.set_goal((p.x, p.y))
+    latest = {}
+
+    def set_goal(xy):
+        line = arrival.set_goal(xy)
         if line:
             log(line)
 
+    def goal_marker(msg):
+        if "sent" not in latest:              # a goal sent during the recording is placed from /goal_pose
+            p = msg.pose.position
+            set_goal((p.x, p.y))
+
+    def goal_pose(msg):
+        p, frame = msg.pose.position, msg.header.frame_id
+        xy = (p.x, p.y)
+        if frame not in ("", "map"):
+            if frame != "base_link" or "pose" not in latest:
+                log("goal in %s: not placed (only base_link, by the odometry); the planner's marker is used" % frame)
+                return
+            xy = to_map(xy, latest["pose"])
+            log("goal sent in base_link (%.2f, %.2f): (%.2f, %.2f) in map" % (p.x, p.y, xy[0], xy[1]))
+        latest["sent"] = True
+        set_goal(xy)
+
     def odom(msg):
         p = msg.pose.pose.position
+        latest["pose"] = (p.x, p.y, yaw_of(msg.pose.pose.orientation))
         line = arrival.set_pose((p.x, p.y), time.monotonic())
         if line:
             log(line)
 
     # best effort takes both reliable and best-effort publishers
-    node.create_subscription(Marker, GOAL_MARKER, goal, qos_profile_sensor_data)
-    node.create_subscription(PoseStamped, GOAL_POSE, goal, qos_profile_sensor_data)
+    node.create_subscription(Marker, GOAL_MARKER, goal_marker, qos_profile_sensor_data)
+    node.create_subscription(PoseStamped, GOAL_POSE, goal_pose, qos_profile_sensor_data)
     node.create_subscription(Odometry, ODOM, odom, qos_profile_sensor_data)
+    if cues:
+        from std_msgs.msg import String
+
+        def debug(msg):
+            mode, line = cue(parse_debug(msg.data))
+            if mode is not None and mode != latest.get("mode"):
+                latest["mode"] = mode
+                print("\a", end="", flush=True)      # the terminal bell: look at the screen
+                log(line)
+
+        node.create_subscription(String, "/planning/debug/plotjuggler/string", debug, qos_profile_sensor_data)
     try:
         from mc_interface.msg import Motion, State       # the planning prefix's (nav_cw_record.sh sources it last)
     except ImportError as e:
@@ -276,9 +361,9 @@ def chown_tree(path, uid, gid):
             os.chown(n, uid, gid)
 
 
-def watch_only(log):
-    """--no-record: the motion-control lines and the goal until Ctrl-C."""
-    feed = ros_feed(Arrival(), log)
+def watch_only(log, cues=True):
+    """--no-record: the motion-control lines, the goal and the crosswalk cues until Ctrl-C."""
+    feed = ros_feed(Arrival(), log, cues)
     if feed is None:
         return 1
     for s in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
@@ -307,6 +392,7 @@ def main(argv=None):
     ap.add_argument("--no-auto", action="store_true", help="only Ctrl-C stops it")
     ap.add_argument("--no-record", action="store_true", help="only print the motion-control changes (and the goal)")
     ap.add_argument("--hidden", action="store_true", help="also hidden topics (an action's _action/status, feedback)")
+    ap.add_argument("--no-cues", action="store_true", help="no crosswalk cue lines and bell")
     ap.add_argument("--dry-run", action="store_true", help="print the record command")
     args = ap.parse_args(argv)
 
@@ -318,7 +404,7 @@ def main(argv=None):
         print(line, flush=True)
 
     if args.no_record:
-        return watch_only(log)
+        return watch_only(log, cues=not args.no_cues)
     if not re.match(r"^[\w.-]+$", args.tag):
         log("--tag: letters, digits, _ . - only")
         return 2
@@ -340,7 +426,7 @@ def main(argv=None):
     started = time.time()
     rec = subprocess.Popen(cmd, start_new_session=True, stdin=subprocess.DEVNULL)   # the notes are ours
     arrival = Arrival(args.radius, args.hold)
-    feed = ros_feed(arrival, log)
+    feed = ros_feed(arrival, log, cues=not args.no_cues)
     auto = feed is not None and not args.no_auto
     notes = Notes(sys.stdin, log)
     why = None

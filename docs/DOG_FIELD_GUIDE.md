@@ -313,6 +313,24 @@ Foxglove 只能发 `/goal_pose`。一层一层来，前一层过了再下一层�
 
 顺带看：感知每秒一行、约 10 Hz（`journalctl -u cw-nav-perception -f`）；侧栏 `nav_blocked` 一直是 0；`mission_state` 是 active。
 
+**两个人**（T66：一个人边遥控边看 Foxglove，两次在 align 没停住就走过了入口线，上了人行横道没有 go）：A 只管遥控狗；B 拿着笔记本，
+看录包窗口和 Foxglove，喊"停 / 往左转 / 走"，敲备注。录包窗口在规划的人行横道状态每变一次时响一声、打一行该做什么：
+
+```text
+== 图上 13 号 approach：慢下来，沿路线走到停止点
+== 图上 13 号 停！align：原地往右转到面朝对面（差 46°）
+== 图上 13 号 wait：站着别动（等 2 辆）
+== 图上 13 号 go：沿路线走过去
+== 图上 13 号 停！cross_wait：前方可能来车，原地站着
+```
+
+**目标**：Foxglove 的 Publish pose 发在 base_link 里（布局跟着狗）；规划用 TF 转到 map，录包窗口打
+`goal sent in base_link (…): (x, y) in map`，下一行 `goal N m away` 应该是几十米。几百米就是没转对，别往下做。
+
+**每次开始前**：域 0 上 `/lightning/odom` 只能是定位在发（`ros2 topic info -v /lightning/odom` 只有一个发布者）。
+T65 那天下午有个 `/tmp/fake_pose.py` 在域 0 上发假的 `/lightning/odom` 和 TF：调试用的假数据只放在域 42 或服务器上。
+`df -h /home/nvidia`：包大约每秒 35 MB（大头是点云），一个包 5 分钟以内（约 10 GB），一次一个做法。收工 `use-original`。
+
 **走一遍**（每个路口，人当执行器）：
 1. 在路线上离人行横道 10 m 以外起步。Foxglove 发对面的目标，全局路径要穿过白框。5 s 内 `mission_state` 不是 active 就再发一次
    （还在跑的任务，第一下只会被停掉）；

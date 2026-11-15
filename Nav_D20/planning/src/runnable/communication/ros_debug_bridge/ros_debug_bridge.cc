@@ -510,8 +510,31 @@ void RosDebugBridge::PathTrackingDebug() {
 
 void RosDebugBridge::GoalPose(
     const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+  // ours (T66 review): Foxglove publishes the goal in its display frame (planning_live.json follows base_link). The
+  // planner transforms it to map (RosBridge::OnGoalPose); the marker has to as well, or it is drawn at the base_link
+  // numbers in map (and nav_cw_record.py took those as the goal: "317 m away", a wrong replay goal)
+  geometry_msgs::msg::Pose pose = msg->pose;
+  const std::string &frame_id = msg->header.frame_id;
+  if (!frame_id.empty() && frame_id != "map") {
+    Transform3d tf;
+    if (TfBuffer::Instance()->get("map", frame_id, tf)) {
+      const Eigen::Vector3d p = tf * Eigen::Vector3d(pose.position.x, pose.position.y, pose.position.z);
+      const Eigen::Quaterniond q =
+          Eigen::Quaterniond(tf.rotation()) * Eigen::Quaterniond(pose.orientation.w, pose.orientation.x,
+                                                                 pose.orientation.y, pose.orientation.z);
+      pose.position.x = p.x();
+      pose.position.y = p.y();
+      pose.position.z = p.z();
+      pose.orientation.x = q.x();
+      pose.orientation.y = q.y();
+      pose.orientation.z = q.z();
+      pose.orientation.w = q.w();
+    } else {
+      AWARN << "goal marker: no transform from " << frame_id << " to map, drawn as it came";
+    }
+  }
   goal_pose_marker_ = VisualizationUtil::createMarkerArrow(
-      "map", "goal_pose", 1, msg->pose,
+      "map", "goal_pose", 1, pose,
       VisualizationUtil::createMarkerScale(0.5, 0.1, 0.1),
       VisualizationUtil::getColor(VisualizationUtil::GREEN));
 }

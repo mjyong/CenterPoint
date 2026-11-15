@@ -4,6 +4,9 @@
 #
 #   bash Nav_D20/planning/script/replay_dog_bag.sh <包目录> [名字]
 # 没有 replay goal 就退出，用 Nav_D20/planning/tools/bag_on_map.py 看目标点。
+# 终点按这个顺序取（T66 复核）：NAV_REPLAY_GOAL="x y"；包里 journal_cw-planning.txt 最后一条规划自己打的
+# "Transformed goal from <系> to map: (x, y)"（Foxglove 跟着 base_link 发目标，规划用 TF 转到 map）；record_log.txt 的 replay goal
+# （T66 的包里它是 base_link 下的数，不对）。
 # 对照写在 work_dirs/planning_io_<名字>/sequence.md：两列都是"包开始后几秒"（现场：record_log.txt 第一行 recording 的时刻；
 # 回灌：logs/play_start.log 的时刻加 ros2 bag play 的 --delay 1 s），备注插在现场那列。
 set -euo pipefail
@@ -21,13 +24,27 @@ if [[ ! -f "${log}" ]]; then
   echo "没有 ${log}：用 Nav_D20/planning/tools/bag_on_map.py 看目标点" >&2
   exit 1
 fi
-line="$(grep 'replay goal: ' "${log}" | tail -n 1 || true)"
-if [[ ! "${line}" =~ replay\ goal:\ ([-0-9.]+)\ ([-0-9.]+) ]]; then
-  echo "record_log.txt 里没有 replay goal：用 Nav_D20/planning/tools/bag_on_map.py 看目标点" >&2
-  exit 1
+goal_from=""
+if [[ -n "${NAV_REPLAY_GOAL:-}" ]]; then
+  read -r goal_x goal_y <<< "${NAV_REPLAY_GOAL}"
+  goal_from="NAV_REPLAY_GOAL"
 fi
-goal_x="${BASH_REMATCH[1]}"
-goal_y="${BASH_REMATCH[2]}"
+tf_line="$(grep -ohE 'Transformed goal from [^ ]+ to map: \([-0-9.e+]+, [-0-9.e+]+\)' "${bag}/journal_cw-planning.txt" 2>/dev/null | tail -n 1 || true)"
+if [[ -z "${goal_from}" && "${tf_line}" =~ \(([-0-9.e+]+),\ ([-0-9.e+]+)\) ]]; then
+  goal_x="${BASH_REMATCH[1]}"
+  goal_y="${BASH_REMATCH[2]}"
+  goal_from="规划日志 ${tf_line%%:*}"
+fi
+if [[ -z "${goal_from}" ]]; then
+  line="$(grep 'replay goal: ' "${log}" | tail -n 1 || true)"
+  if [[ ! "${line}" =~ replay\ goal:\ ([-0-9.]+)\ ([-0-9.]+) ]]; then
+    echo "record_log.txt 里没有 replay goal：用 Nav_D20/planning/tools/bag_on_map.py 看目标点（NAV_REPLAY_GOAL=\"x y\"）" >&2
+    exit 1
+  fi
+  goal_x="${BASH_REMATCH[1]}"
+  goal_y="${BASH_REMATCH[2]}"
+  goal_from="record_log.txt"
+fi
 
 play="${bag}"
 if [[ -d "${bag}_mcap" ]]; then
@@ -52,7 +69,7 @@ export PLANNING_STARTUP_MAP="${repo_root}/data/loc_maps/ad68517c-e845-42a4-b5dd-
 export LOC_MAP_PATH="${PLANNING_STARTUP_MAP}"
 export BAG_PLAY_EXTRA="${BAG_PLAY_EXTRA:---topics /robot/topic/rdap/top_point_cloud2 /rte/rdap/rtk/inspvax /rte/rdap/rtk/imus/data_raw /perception/lidar_3d/objects}"
 io="${NAV_IO_DIR:-${repo_root}/work_dirs/planning_io_${name}}"
-echo "replay goal: ${goal_x} ${goal_y}"
+echo "replay goal: ${goal_x} ${goal_y}（${goal_from}）"
 echo "bag: ${play}"
 echo "放法: ${BAG_PLAY_EXTRA}"
 

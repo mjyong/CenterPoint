@@ -74,23 +74,32 @@ def spin_once(node, timeout_sec=None):
             cb(msg_type.fake(*args))
 '''
 
-FAKE_MSG = r'''class _P:
+FAKE_MSG = r'''import math
+class _P:
     def __init__(self, x, y):
         self.x, self.y, self.z = x, y, 0.0
+class _Q:
+    def __init__(self, yaw):
+        self.x, self.y, self.z, self.w = 0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)
 class _Pose:
-    def __init__(self, x, y):
-        self.position = _P(x, y)
+    def __init__(self, x, y, yaw):
+        self.position, self.orientation = _P(x, y), _Q(yaw)
+class _H:
+    def __init__(self, frame):
+        self.frame_id = frame
 class {name}:
     @classmethod
-    def fake(cls, x, y):
+    def fake(cls, x, y, third=None):
+        # PoseStamped / Marker: third is the frame (default map); Odometry: the yaw (default 0)
         m = cls()
         if {nested}:
             class _PP:
                 pass
             m.pose = _PP()
-            m.pose.pose = _Pose(x, y)
+            m.pose.pose = _Pose(x, y, third or 0.0)
         else:
-            m.pose = _Pose(x, y)
+            m.pose = _Pose(x, y, 0.0)
+            m.header = _H(third or "map")
         return m
 '''
 
@@ -129,6 +138,11 @@ def dog(tmp_path):
         (py / pkg).mkdir()
         (py / pkg / "__init__.py").write_text("")
         (py / pkg / "msg.py").write_text(FAKE_MSG.format(name=name, nested=nested))
+    (py / "std_msgs").mkdir()
+    (py / "std_msgs" / "__init__.py").write_text("")
+    (py / "std_msgs" / "msg.py").write_text(
+        "class String:\n    @classmethod\n    def fake(cls, data):\n        m = cls()\n        m.data = data\n"
+        "        return m\n")
     (py / "mc_interface").mkdir()
     (py / "mc_interface" / "__init__.py").write_text("")
     (py / "mc_interface" / "msg.py").write_text(FAKE_MC)
@@ -174,7 +188,8 @@ def test_the_topics_are_the_field_guides(dog):
     spec.loader.exec_module(rec)
     text = open(GUIDE, encoding="utf-8").read()
     sec = text[text.index("## 9."):text.index("## 10.")]
-    block = sec[sec.index("ros2 bag record"):sec.index("```", sec.index("ros2 bag record"))]
+    start = sec.index("ros2 bag record -o")                   # the command block, not a mention in the text
+    block = sec[start:sec.index("```", start)]
     assert re.findall(r"(/[\w/]+)", block.split("\n", 1)[1]) == rec.TOPICS
     assert "/planning/debug/goal_pose" in rec.ADDED            # /goal_pose is volatile (T57: 0 messages)
 
@@ -322,3 +337,34 @@ def test_notes_journals_and_the_replay_goal_go_beside_the_bag(dog):
     assert {f.name for f in bag.iterdir()} >= {"journal_cw-slam.txt", "journal_cw-nav-perception.txt",
                                                "metadata.yaml"}
     assert subprocess.run(["bash", SH, "--tag", "a/b"], env=dog.env(), capture_output=True).returncode == 2
+
+
+def test_a_goal_sent_in_base_link_is_placed_by_the_odometry(dog):
+    """T66: Foxglove follows base_link, so Publish pose sends base_link; the planner's TF puts it in map"""
+    yaw = 1.5707963267948966
+    feed = [[0.2 + 0.05 * k, "/lightning/odom", 100.0, 50.0 + 0.0 * k, yaw] for k in range(10)] + \
+           [[0.8, "/goal_pose", 10.0, 0.0, "base_link"],
+            [0.9, "/planning/debug/goal_pose", 10.0, 0.0]] + \
+           [[1.0 + 0.1 * k, "/lightning/odom", 100.0, 50.0 + 0.5 * k, yaw] for k in range(40)]
+    p = dog("--hold", "0.5", FAKE_FEED=feed)
+    out, _ = p.communicate(timeout=30)
+    assert p.returncode == 0, out
+    assert "goal sent in base_link (10.00, 0.00): (100.00, 60.00) in map" in out
+    assert "goal (10.00, 0.00)" not in out                      # the older planner's marker is not taken
+    assert "stopping (at the goal)" in out and "replay goal: 100.000 60.000" in out
+
+
+def test_the_planners_crosswalk_states_are_cues_with_the_bell(dog):
+    s = lambda mode, err=0.0, k=1: "planning: 1.0\ncrosswalk_mode: %d\ncrosswalk_index: %d\n" \
+        "crosswalk_heading_error: %f\ncrosswalk_waiting_for: 2\n" % (mode, k, err)   # noqa: E731
+    feed = [[0.2, "/planning/debug/plotjuggler/string", s(1)], [0.25, "/planning/debug/plotjuggler/string", s(1)],
+            [0.3, "/planning/debug/plotjuggler/string", s(2, -0.8)], [0.4, "/planning/debug/plotjuggler/string", s(3)],
+            [0.5, "/planning/debug/plotjuggler/string", s(6, 0.0, 4)]]
+    p = dog("--no-record", FAKE_FEED=feed)
+    time.sleep(1.5)
+    os.killpg(p.pid, signal.SIGINT)
+    out, _ = p.communicate(timeout=20)
+    assert out.count("== 图上 13 号 approach") == 1                 # once per change
+    assert "== 图上 13 号 停！align：原地往右转到面朝对面（差 46°）" in out
+    assert "== 图上 13 号 wait：站着别动（等 2 辆）" in out and "== 图上 38 号 停！cross_wait" in out
+    assert out.count("\a") == 4

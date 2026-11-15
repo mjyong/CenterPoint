@@ -173,8 +173,10 @@
 | T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 完成，已复核（2026-11-15）：NEEDED 和狗上一样，文件只差一个 .t56 备份；服务器镜像编的就是狗上会编的。真装以后要 configure + apply |
 | T64 | T57 的包拷回服务器、转 mcap、看人行横道那一段；新门控（人行横道上前方来车也停）在这包上回放，和线上的旧门控对；arm64 编规划给狗 | Agent | T57 复核 | 2 小时 | 完成，已复核（2026-11-15）：包里狗站着没过人行横道，验不了门控。回放的 standstill 不是定位（504.9 m 是初始化），是感知栅格放到第 36 s 就断了，交给 T68。arm64 规划包 nav_cw_planning_1a5ed36.tar.gz 可以装（T65 第 4 步） |
 | T65 | 现场：他们的服务下看 App 怎么让狗走起来（只订不发：运控模式、谁在发、焦点、robot_service 和 zsibot 的日志），把表和五个问题给机器人团队；装 T64 编的规划 | 人 + Agent | T64 第 5 步 | 2 小时 | 做完了（人说，2026-11-15），结果还没推上来 |
-| T66 | 现场：影子模式下逐个路口调。人照规划的意思遥控狗（停、转、等、走），看五层：定位、白框对不对、感知、门控、状态机和指令；每个路口走一遍、定点看 10 分钟、同事开车（新门控才做），每次录包带备注；回来回灌，和现场的日志对 | 人 + Agent | 无（新门控要 T64 第 5 步） | 半天 | 现场日志已整理（2026-11-15）。新门控在横道上会停。没有人写的备注，没有单独的定点看和同事开车，回灌没做。包在狗上 |
+| T66 | 现场：影子模式下逐个路口调。人照规划的意思遥控狗（停、转、等、走），看五层：定位、白框对不对、感知、门控、状态机和指令；每个路口走一遍、定点看 10 分钟、同事开车（新门控才做），每次录包带备注；回来回灌，和现场的日志对 | 人 + Agent | 无（新门控要 T64 第 5 步） | 半天 | 部分完成，已复核（2026-11-15）：新门控在人行横道上会为前方来车停。目标是在 base_link 里发的，标记、录包脚本、回灌终点都当成了 map（已修，要重编规划）；人没跟上状态机，路边那一半几乎没测；cross / cross_wait 来回翻、车 id 一秒就换，交给 T69。下午域 0 上跑过假定位（fake_pose.py），收工没 use-original。T70 第二轮 |
 | T68 | 回放里感知栅格放到第 36 s 就断了（T64）：看 lidar_seg、grid_map 的日志，换几种放法找原因，修好再放 T57 的包；狗上录的包怎么回灌写成一条命令 | Agent | T64 复核 | 2 小时 | 完成，已复核（2026-11-15）：栅格 best_effort 订阅在容器 UDP 上 36 s 后收不到，回放改 reliable，1581 帧放到包尾。replay_dog_bag.sh 写好；复核修了现场日志的时间格式和两列对齐 |
+| T69 | T66 的包：从狗上的 journal 拿到 map 里的终点再回灌；逐段看人行横道上的停和走（等的是谁、车 id 是不是一辆车被跟成几段）；查定位 15:41、21:09 停的原因；arm64 重编规划（目标标记的修复） | Agent | T66 复核 | 3 小时 | 任务已写好 |
+| T70 | 现场 T66 第二轮：装 T69 编的规划；两个人（一个遥控、一个看屏幕喊和敲备注），录包窗口按状态响铃提示；13、32、38 号每个走一遍、定点看 10 分钟、同事开车；一个包 5 分钟以内；收工 use-original | 人 + Agent | T69 第 5 步 | 半天 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -10711,6 +10713,47 @@ configure / apply 有 NOT APPLIED（把 backup/planning.t61 挪回 install/plann
 
 序列和原始备注：`data/reports/T66/`。
 
+
+### T66 复核（2026-11-15）
+
+做到的：新门控在狗上跑起来了。人行横道上前方来车会进 `cross_wait (ahead)`，影子一直有效（`/mc/motion_control` 0 条），被堵检测关了，
+standstill 0 行。四个包都有 record_log 和三份 journal。没做的：人的备注、定点看、同事开车、回灌。
+
+复核找到的问题，按要紧排：
+
+1. **域 0 上跑过一个假定位。** T66_FIELD.md 开头写着：下午有个 `/tmp/fake_pose.py` 在发 `/lightning/odom` 和 `map → base_link`，点在
+   (−56.15, −228.26)。这违反了"域 0 上除了我们的服务不发别的"：假里程计会喂给在跑的那套导航，影子关着的时候能带着狗走。
+   T66 开工前停掉了。以后调试用的假数据只放在域 42（rehearsal）或服务器上。是谁、为什么起的，在 T65 的结果里写清楚
+   （T65 的结果还没推上来）。现场指南 8.1 加了开工前查一下 `/lightning/odom` 只有一个发布者。
+2. **目标是在 base_link 里发的，规划以外的地方都当成了 map。** record_log 里的目标是 (17.45, −17.45)、(38.80, −8.07)，"离狗 317 m、
+   504 m"。`planning_live.json` 的 3D 面板跟着 base_link，Foxglove 的 Publish pose 就按 base_link 发。规划自己用 TF 转到了 map
+   （`OnGoalPose`，所以状态机是对的），可是：
+   - 规划重发的目标标记 `/planning/debug/goal_pose` 没转，箭头画在 map 的 (17, −17)；
+   - 录包脚本拿这个数当目标，自动停一次都不会触发；`replay goal` 也是错的，T66 结果表里的"回灌终点"都不能用。
+   改了三处：规划的标记用 TF 转到 map（`ros_debug_bridge.cc`，要重编规划，PATCHES.md 一行）；录包脚本收到 base_link 的目标，用当时的
+   里程计放进 map，录的时候发过 `/goal_pose` 就不再用标记；`replay_dog_bag.sh` 先用包里 journal 的 "Transformed goal … to map"，
+   也可以 `NAV_REPLAY_GOAL="x y"`。T66 的包回灌要从狗上的完整 journal 拿终点（T69 第 1 步）。
+3. **人没跟上状态机，路边那一半几乎没测到。**
+   - 13 号：align 时朝向差 −62°，人接着走，3 s 后过了入口 1.5 m、没有 go，按设计直接 cross；
+   - 38 号：align 时已经过了入口线，朝向差 115°；
+   - 22 号：在停止点 wait，2 s 后人走过了入口线；
+   - 6 号：开录时就在人行横道上。
+   一个人边遥控边看 Foxglove 跟不上。改成两个人（A 遥控、B 看屏幕喊），录包窗口在规划的人行横道状态每变一次时响一声，打一行
+   "停！align：原地往右转（差 46°）"、"wait：站着别动"之类（现场指南 8.1）。
+4. **人行横道上 cross / cross_wait 来回翻，等的车 id 一秒就 lost、换成新 id**（13 号：890、899、901）。可能是感知把一辆车跟成了几段，
+   每段新 id 都重新触发一次；也可能是真有几辆车，或者停着的车速度噪声。没有包看不出来，不改门控，T69 逐段查。
+5. **第五个包 `x22_all_3`**：29 分钟、67 GB，没走录包脚本收尾，没有 record_log 和 journal，状态对不回来。包大约每秒 35 MB
+   （大头是点云），以后一个包 5 分钟以内、一次一个做法。
+6. **收工没 `use-original`**。21:38 规划还在跑，里程计超时大约 1722 s，也就是 21:09 左右定位就停了；下午 15:41 定位还崩过一次
+   （T66_FIELD.md）。一天里停了两次，原因要查（T69 第 1 步拿 journal）。狗回来先 `nav_cw.sh status`，还是 ours 就 `use-original`；
+   狗重启过的话起来的就是他们的。
+7. `use-new` 看图默认只等 20 s，规划读站点栅格要二十多秒才出现发布者，检查判失败、自己换回去。现场改成 60 s 跑的。默认已改成 60 s
+   （查到就返回，快的时候不多等）。
+8. T66 加了四路鱼眼、`/lidar_packets_loss`、`/nav/location` 和几张规划的调试图，source 了 hesai 驱动的 setup，都对。改的时候把
+   `test_the_topics_are_the_field_guides` 弄坏了：§9 正文里提到"直接杀 `ros2 bag record`"，测试找到的是这一处。测试已改成找命令块。
+
+还要回的：T65 的结果（运控那张时间表、机器人团队的回答、新规划是不是 T65 装的、`fake_pose.py` 是怎么回事）。
+
 ---
 
 ## T68 回放里感知栅格为什么放到第 36 s 就断了（服务器）
@@ -10794,3 +10837,98 @@ configure / apply 有 NOT APPLIED（把 backup/planning.t61 挪回 install/plann
 现场指南第 4 节举的例子 "crosswalk 6" 在这张图上不存在，改成了 1。
 
 T65 的结果还没推上来：仓库里没有 "T65 结果"，也没有 data/reports/T65。
+
+---
+
+## T69 T66 的包：拿对终点回灌，逐段看人行横道上的停和走；查定位为什么停了两次（服务器，狗上只读）
+
+```text
+任务 T69（服务器；狗上只读）。为什么：T66 复核。目标是在 base_link 里发的，包里 record_log 的 replay goal 不对，要从规划自己打的
+"Transformed goal … to map" 拿；人行横道上 cross / cross_wait 来回翻，等的车 id 一秒就 lost、换成新 id，要逐段看清是哪种情况再决定
+改不改门控；定位 15:41 崩过一次，21:09 左右又停了；狗上要换带目标标记修复的规划。
+仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T69
+
+0. git pull；pytest tests/dog/test_nav_cw_record.py tests/dog/test_replay_dog_bag.py tests/dog/test_planning_mcap.py
+   tests/dog/test_bag_to_mcap.py tests/dog/test_yield_gate.py tests/dog/test_yield_gate_cpp.py（全过）。
+1. 狗上只读拿日志（journal 还在的话）：
+     ssh dog 'journalctl -u cw-planning --since "2026-11-15 19:30" --until "2026-11-15 21:40" --no-pager -o short-iso-precise' \
+       | grep -E "Transformed goal|Navigation|Start Tracking|Set mission|Crosswalk yield|Data timeout|nav_blocked" > data/reports/T69/planning_events.txt
+     ssh dog 'journalctl -u cw-slam --since "2026-11-15 15:30" --until "2026-11-15 15:55" --no-pager -o short-iso-precise' > data/reports/T69/slam_1541.txt
+     ssh dog 'journalctl -u cw-slam --since "2026-11-15 21:00" --until "2026-11-15 21:40" --no-pager -o short-iso-precise' > data/reports/T69/slam_2109.txt
+     ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'   （还是 ours：不要动，告诉人；人在狗边上时再 use-original）
+   两段定位日志各写一句：最后几行是什么、有没有 Segmentation fault / abort / 定位故障 / 雷达断流、进程是退出了还是还在但不发。
+2. 终点：每个包（x22_all_1、x13_all_1、x6_all_1、x22_all_2）的 map 终点 = 包结束以前最后一条 "Transformed goal … to map"
+   （第 1 步的文件，或者包里 journal_cw-planning.txt）。和包里第一条 /planning/debug/path_tracking 的全局路径终点对一下（差 < 1 m）。
+   写进 data/reports/T69/goals.txt（包名、终点、来自哪一行、和路径终点差多少）。
+3. 拷包（只读，rsync -a --partial，隧道断了重跑）四个到 /public/zjst/robot/cp_data/；x22_all_3（67 GB，没有日志）不拷。
+   每个：bag_to_mcap.py（LEFT OUT 抄下来）、objects_in_map.py（要 extrinsic OK；狗动了的包才量得出来）。
+4. 回灌（nav-dev 容器里，同 T68）：NAV_REPLAY_GOAL="<第 2 步的终点>" bash Nav_D20/planning/script/replay_dog_bag.sh <包> t69_<包>。
+   每个看：/map/occupancy_grid 放到包尾、check_planning_mcap.py 没有 "stops … before the end"、sequence.md。狗是人遥控的，回灌用的是同样的
+   传感器和感知目标，状态应该和现场基本一样；不一样的地方列出来（时间、现场、回灌）。
+5. 逐段看（写一个工具 Nav_D20/planning/tools/crosswalk_episodes.py <现场的包目录>，读 sqlite 或 mcap）：
+   - 从 /planning/debug/plotjuggler/string 取 crosswalk_mode、crosswalk_index、crosswalk_go、crosswalk_waiting_for、crosswalk_vehicles；
+     从包里 journal_cw-planning.txt 取每次状态变化的理由和等的 id（"waiting for …" / "going on with …"）；
+   - /perception/lidar_3d/objects 用 objects_in_map.py 的那套变换放进 map（狗的位姿用 /lightning/odom）；
+   - 每一段 wait / cross_wait（开始、结束、多久），对每个等的 id：类别、motion、速度、age、在狗前方多远（沿路径）、横向多远、
+     这个 id 活了多久、它没了以后 1 s 内 3 m 内有没有冒出新 id（算成"一辆车被跟成几段"）；
+   - 每段放行（go / cross）时，狗前方 30 m 内有没有在动的车（有就是可疑的放行，列出来）；
+   - 输出每个包一张 markdown 表 → data/reports/T69/<包>_episodes.md；tests/dog/ 下用 rosbags 写一个假包测它。
+   回答四个问题：
+   a. cross_wait 是不是真有在动的车从狗前方过（几段是、几段不是）；
+   b. 等的车里几个是"被跟成几段"（id 没了、附近马上又冒出新 id）；
+   c. 6 号上 49 s、54 s 那两段 cross_wait 是谁让它一直等；
+   d. 有没有可疑的放行。
+   鱼眼（/robot/topic/rdap/*_sensor_camera）能在 Foxglove 里看的话（先看类型），挑 a、d 里的几段截图对照；看不了就写明。
+6. arm64 重编规划（这次的提交，有目标标记的修复；同 T64 第 5 步）：rsync 源码、build_stack.sh planning、ldd 0、
+   grep -ral "drawn as it came" install/planning/planning/lib（有一个文件：新的那行警告），version.txt，
+   打包 /public/zjst/robot/cp_data/nav_cw_planning_<sha 前 7 位>.tar.gz，sha256 抄下来（T70 装）。
+7. 提交：data/reports/T69/、crosswalk_episodes.py 和测试、本文档。
+
+停止条件：第 1 步狗连不上（跳过，只用包里的 journal）；第 4 步栅格又断；第 6 步编不过或 ldd 有 not found。
+报告（写进"T69 结果"）：两次定位停的原因；每个包的终点和来源；回灌和现场的差别；每个包的分段表和 a–d 的回答；规划包和 sha。
+```
+
+---
+
+## T70 现场：T66 第二轮（影子模式，两个人，按状态响铃）
+
+```text
+任务 T70（T69 第 6 步编好以后，人在现场，Agent 在笔记本上连着狗）。为什么：T66 复核。T66 只测到了人行横道上那一半，路边的
+align / wait / go 几乎没测，也没有定点看、同事开车和人的备注。这次两个人：A 只管遥控狗；B 拿笔记本看录包窗口和 Foxglove，
+喊"停 / 往左转 / 走"，敲备注。录包窗口在规划的人行横道状态每变一次时响一声，打出该做什么（现场指南 8.1）。
+规矩同 T66（影子一直开、只由人遥控、急停在手、同事开车 ≤ 10 km/h 离狗 ≥ 3 m 不朝狗站的车道开、域 0 上不发运控焦点模式、
+只写 /opt/seres/nav_cw/ /home/nvidia/ /tmp/、sudo -n），再加两条：
+  - 域 0 上不起任何自己发话题的调试程序（Foxglove 发的 /goal_pose 除外；T65 那天的 fake_pose.py 不许再有）；
+  - 收工一定 use-original，status 看到 running: theirs 才算完。
+每一步 Agent 先说要做什么，人说可以再做。mkdir -p data/reports/T70
+
+0. 准备（笔记本 git pull）：
+   a. status：是 ours 就先 use-original（下面要换规划）。
+   b. 脚本拷上去（同 T66 第 0 步 a，git archive 出 LF）；grep -c "crosswalk_mode" /opt/seres/nav_cw/nav_cw_record.py ≥ 1
+      （响铃提示是新的）。
+   c. 装 T69 编的规划（同 T65 第 4 步：原来的挪到 /opt/seres/nav_cw/backup/、tar --no-same-owner、configure、apply、switches）；
+      grep -ral "drawn as it came" /opt/seres/nav_cw/install/planning/planning/lib 有一个文件。
+   d. INS 固定解；df -h /home/nvidia（每个包约 35 MB/s；剩 50 GB 以下就不再录，先拷走）。
+   e. shadow on、speed 0.5、switches（shadow 那行有 nav_blocked false）；use-new（图都 ok；现在默认等到 60 s）。
+   f. ssh dog 'sudo -n bash -c "source /opt/ros/humble/setup.bash; ros2 topic info -v /lightning/odom"'：只有一个发布者（我们的定位）。
+      不是就停下。
+   g. 三个窗口同 T66 第 0 步 f；录包窗口 ssh -t dog，B 拿着。
+1. 路口：13、32、38 号（图上的号；规划日志 1、3、4）。每个路口按顺序做三个包，每个包一个做法、5 分钟以内：
+   a. --tag x<N>_walk：路口空的时候，现场指南 8.1"走一遍"。B 照响铃那行喊，A 照做。B 必须敲的备注：
+      align 那一刻狗头离斑马线入口线多远（"align：狗头离线 0.4 m"）、白框和斑马线偏多少、整个过程哪里不对；
+   b. --tag x<N>_watch --no-auto：走到 wait / go 不动，10 分钟（5 分钟一个包，录两个）。每次响铃变 go，B 判断"这时候起步安全吗"，
+      不安全敲 "go 不安全：<哪来的车、多远、多快>"，没车在等敲 "空等"，框不对也敲；
+   c. --tag x<N>_car --no-auto（人定做不做）：同 T66 第 3 步 c，狗放行后走到人行横道中间停住，同事从狗前方、再从狗后面的车道
+      开过去，每次之前敲 "前方，从左" 之类。前方应 cross_wait（ahead），后面不停（橙框，going on with）。
+   发目标以后看录包窗口：`goal sent in base_link (…): (x, y) in map`，下一行 `goal N m away` 是几十米。几百米就停下（没转对）。
+2. 每个包录完：Agent 看最后几行（done、replay goal），ls 包目录（metadata.yaml、record_log.txt、三份 journal）；
+   B 说这个路口五层各一句，Agent 写进 data/reports/T70/field_notes.md。
+3. 收工：use-original；speed off；shadow off；switches；status → running: theirs。
+4. 回来（服务器，Agent）：同 T69 第 3–5 步（拷包、转、回灌、crosswalk_episodes.py）；watch 的包另外数 wait 几次、多久、go 几次，
+   "go 不安全""空等"各几次、对着哪辆车。
+5. 提交：data/reports/T70/、本文档。
+
+停止条件：第 0 步 c 有 NOT APPLIED（挪回 backup）、f 有别的发布者；use-new 的图不 ok；目标几百米远；定位偏 > 1 m 或跳；
+任何时候不安全：急停、记时间。
+报告（写进"T70 结果"）：每个路口：包名、五层各一句（按 B 的备注）；watch 的统计；同事开车每次的结果；回灌和现场对不对得上。
+```

@@ -72,7 +72,8 @@ APP_SWITCH=/map/switch
 OWN_SWITCH=/nav_cw/map/switch
 APP_UPDATE=/map/file_update
 OWN_UPDATE=/nav_cw/map/file_update
-VERIFY_WAIT="${NAV_CW_VERIFY_WAIT:-20}"   # [s] for the restarted node to show up in the ROS graph
+VERIFY_WAIT="${NAV_CW_VERIFY_WAIT:-60}"   # [s] at most, for the restarted node to show up in the ROS graph (T66: the planner
+                                          # reads the site grids for 20+ s before it advertises; polled, so no slower when fast)
 ODOM_WAIT="${NAV_CW_ODOM_WAIT:-45}"       # [s] for our localization's first odometry after use-new (0: do not wait)
 PERCEPTION_DEBUG_ARGS="-p publish_cloud:=true -p publish_tf:=true"
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"   # the tests put a fake one here
