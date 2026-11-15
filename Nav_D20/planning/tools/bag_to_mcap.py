@@ -4,13 +4,16 @@ The dog's ros2 bag has no mcap plugin, so it records sqlite3 (T61); a plain conv
 does not know (kygi665_msgs/INSPVAX, perception_interface/LidarObjectArray, mc_interface/Motion, rhr_interface ...).
 Here the definitions come from the repository (bag_on_map.typestore, every package under Nav_D20/seres_interface/ros),
 and the messages are copied as they are (CDR, not decoded and encoded again). Topics whose type is still unknown are
-listed, not silently dropped.
+listed, not silently dropped. A bag mended with `ros2 bag reindex` (the dog's Humble writes an empty
+storage_identifier, T64) is read through a temporary copy of its metadata; the bag itself is not touched.
 
     python Nav_D20/planning/tools/bag_to_mcap.py <bag dir> <out dir>
 """
 import argparse
 import os
+import re
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 
@@ -18,8 +21,32 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 
+def readable(src, tmp):
+    """``src``, or a directory in ``tmp`` that links its files and carries metadata.yaml with storage_identifier
+    sqlite3 when reindex left it empty and the bag is *.db3."""
+    meta = Path(src) / "metadata.yaml"
+    if not meta.is_file():
+        return Path(src)
+    text = meta.read_text()
+    if not re.search(r"^\s*storage_identifier:\s*(''|\"\")?\s*$", text, re.M) or not list(Path(src).glob("*.db3")):
+        return Path(src)
+    view = Path(tmp) / Path(src).name
+    view.mkdir()
+    for f in Path(src).iterdir():
+        if f.name != "metadata.yaml":
+            (view / f.name).symlink_to(f.resolve())
+    (view / "metadata.yaml").write_text(re.sub(r"^(\s*storage_identifier:).*$", r"\1 sqlite3", text, flags=re.M))
+    print("%s: storage_identifier was empty (ros2 bag reindex); read as sqlite3" % src)
+    return view
+
+
 def convert(src, dst):
     """-> (Counter of messages written per topic, {topic: why it was left out})"""
+    with tempfile.TemporaryDirectory() as tmp:
+        return _convert(readable(src, tmp), dst)
+
+
+def _convert(src, dst):
     from bag_on_map import typestore
     from rosbags.highlevel import AnyReader
     from rosbags.rosbag2 import StoragePlugin, Writer

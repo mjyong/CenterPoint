@@ -55,3 +55,25 @@ def test_every_topic_goes_over(tmp_path, tool, capsys):
         assert topics == {t: v[0] for t, v in msgs.items()}
         motion = [r.deserialize(raw, c.msgtype) for c, _, raw in r.messages() if c.topic == "/mc/motion_control"]
     assert len(motion) == 3 and motion[0].uuid == "planning" and abs(motion[0].para[0] - 0.4) < 1e-6
+
+
+def test_a_reindexed_bag_with_an_empty_storage_identifier_is_read_as_sqlite(tmp_path):
+    """T64: ros2 bag reindex on the dog wrote storage_identifier: '' and rosbags would not open the bag."""
+    sys.path.insert(0, TOOLS)
+    try:
+        import bag_to_mcap
+    finally:
+        sys.path.remove(TOOLS)
+    bag = tmp_path / "20261115_cw_1"
+    bag.mkdir()
+    (bag / "20261115_cw_1_0.db3").write_bytes(b"db")
+    meta = "rosbag2_bagfile_information:\n  version: 5\n  storage_identifier: ''\n  duration: {nanoseconds: 1}\n"
+    (bag / "metadata.yaml").write_text(meta)
+    views = tmp_path / "views"
+    views.mkdir()
+    view = bag_to_mcap.readable(str(bag), str(views))
+    assert "storage_identifier: sqlite3" in (view / "metadata.yaml").read_text()
+    assert (view / "20261115_cw_1_0.db3").resolve() == (bag / "20261115_cw_1_0.db3").resolve()
+    assert (bag / "metadata.yaml").read_text() == meta                     # the bag itself is not touched
+    (bag / "metadata.yaml").write_text(meta.replace("''", "sqlite3"))
+    assert bag_to_mcap.readable(str(bag), str(tmp_path)) == bag

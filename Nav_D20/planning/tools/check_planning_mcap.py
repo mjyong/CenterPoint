@@ -44,6 +44,9 @@ DRAWN = ("nav_msgs/msg/OccupancyGrid", "nav_msgs/msg/Odometry", "nav_msgs/msg/Pa
 MAX_SPEED = 4.0       # [m/s] the dogs walk below about 2 m/s
 MAX_Z_SWING = 3.0     # [m] height change over a recording
 MAX_JUMP = 1.0        # [m] between consecutive odometry messages
+STARTUP = 2.0         # [s] odometry before a jump this early is the localization initialising (planning_mcap_viz.py;
+                      # T64: 504.9 m from the origin to the INS position at 0.1 s, read as a broken localization)
+EARLY_STOP = (10.0, 0.25)   # [s], share of the recording: a regular topic that ends this much before the end stopped
 SPEED_WINDOW = 0.2    # [s] speed over at least this: 100 Hz INS odometry 1-2 ms apart reads metres per second from
                       # centimetre jitter (T43 B)
 FOOTPRINT_SHARE = 0.1  # a grid with this share of the footprint's cells occupied has the robot on an obstacle;
@@ -288,14 +291,56 @@ def marker_problems(topics):
     return out
 
 
+def _odom(t):
+    """(xyz, stamps) in stamp order, without the poses before a start-up jump; and that jump (m, s) or None."""
+    xyz, s = np.asarray(t["xyz"], float), np.asarray(t["stamps"], float)
+    order = np.argsort(s, kind="stable")
+    xyz, s = xyz[order], s[order]
+    jumps = np.nonzero(np.linalg.norm(np.diff(xyz[:, :2], axis=0), axis=1) > MAX_JUMP)[0]
+    early = [j for j in jumps if s[j + 1] - s[0] < STARTUP]
+    if early and len(s) - (early[-1] + 1) >= 3:
+        k = early[-1] + 1
+        return xyz[k:], s[k:], (float(np.linalg.norm(xyz[k, :2] - xyz[k - 1, :2])), float(s[k] - s[0]), k)
+    return xyz, s, None
+
+
+def odom_notes(topics):
+    out = []
+    for name, t in sorted(topics.items()):
+        if t["type"] == "nav_msgs/msg/Odometry" and len(t["xyz"]) >= 3:
+            jump = _odom(t)[2]
+            if jump:
+                out.append("%s: a %.1f m jump %.1f s after the first pose is the localization initialising: the %d "
+                           "poses before it are left out of the checks" % ((name,) + jump))
+    return out
+
+
+def stop_problems(topics):
+    """A regular topic (>= 20 messages, under 1 s apart) that ends long before the recording does (T64: the
+    perception grid stopped after 36 of 162 s; the planner paused on it and never resumed)."""
+    ends = [max(t["log"]) for t in topics.values() if t["log"]]
+    starts = [min(t["log"]) for t in topics.values() if t["log"]]
+    if not ends:
+        return []
+    end, duration = max(ends), max(ends) - min(starts)
+    out = []
+    for name, t in sorted(topics.items()):
+        log = np.sort(np.asarray(t["log"], float))
+        if len(log) < 20 or np.median(np.diff(log)) >= 1.0:
+            continue
+        early = end - log[-1]
+        if early > max(EARLY_STOP[0], EARLY_STOP[1] * duration):
+            out.append("%s: stops %.0f s before the end of the recording (%d messages, the last %.0f s after the "
+                       "start of %.0f s)" % (name, early, len(log), log[-1] - min(starts), duration))
+    return out
+
+
 def odom_problems(topics):
     out = []
     for name, t in sorted(topics.items()):
         if t["type"] != "nav_msgs/msg/Odometry" or len(t["xyz"]) < 3:
             continue
-        xyz, s = np.asarray(t["xyz"]), np.asarray(t["stamps"])
-        order = np.argsort(s, kind="stable")
-        xyz, s = xyz[order], s[order]
+        xyz, s, _ = _odom(t)
         step = np.linalg.norm(np.diff(xyz[:, :2], axis=0), axis=1)
         j = np.searchsorted(s, s + SPEED_WINDOW)
         ok = j < len(s)
@@ -340,7 +385,7 @@ def main(argv=None):
     FOOT = tuple(args.footprint)
     topics, edges = read(args.bag)
     problems = (tf_problems(edges) + time_problems(topics, edges, args.display_frame) + marker_problems(topics)
-                + odom_problems(topics) + footprint_problems(topics))
+                + odom_problems(topics) + stop_problems(topics) + footprint_problems(topics))
     if args.layout:
         problems += ["layout: %s is not in the recording" % n for n in sorted(layout_topics(args.layout) - set(topics))]
     print("%s: %d topics, %d transforms" % (args.bag, len(topics), len(edges)))
@@ -349,7 +394,7 @@ def main(argv=None):
         print("  %-48s %-36s %6d msgs  frames %s" % (name, t["type"], len(t["log"]), frames))
     for p in problems:
         print("PROBLEM " + p)
-    for n in display_notes(topics):
+    for n in display_notes(topics) + odom_notes(topics):
         print("NOTE " + n)
     print("no problems found" if not problems else "%d problems" % len(problems))
     return 1 if problems else 0

@@ -202,3 +202,32 @@ def test_check_planning_mcap_finds_a_costmap_on_the_wall_clock(tmp_path, capsys)
     problems = [line for line in capsys.readouterr().out.splitlines() if line.startswith("PROBLEM ")]
     assert len(problems) == 1 and "occmap (base_link): 100% of the header stamps are outside the base_link TF" \
         in problems[0], problems
+
+
+def test_check_planning_mcap_takes_a_start_up_jump_for_the_localization_initialising():
+    """T64: the replay's first pose at the origin, then the INS position 504.9 m away 0.1 s later."""
+    sys.path.insert(0, TOOL)
+    import check_planning_mcap as c
+    s = np.arange(0.0, 20.0, 0.01)
+    xyz = np.column_stack([199.1 + 0.001 * s, 463.8 + 0.0 * s, 0.0 * s])
+    xyz[:10] = 0.0                                                  # before the localization initialises
+    topics = {"/lightning/odom": dict(type="nav_msgs/msg/Odometry", xyz=list(xyz), stamps=list(s), log=list(s))}
+    assert c.odom_problems(topics) == []
+    note = c.odom_notes(topics)
+    assert len(note) == 1 and "504.7 m jump 0.1 s after the first pose" in note[0] and "the 10 poses" in note[0]
+    xyz[1500] += 30.0                                               # later: a real jump
+    assert "not a walking robot" in c.odom_problems(topics)[0]
+
+
+def test_check_planning_mcap_finds_a_topic_that_stopped():
+    """T64: /map/occupancy_grid ended 36 s into a 162 s replay; the planner paused on it for the rest."""
+    sys.path.insert(0, TOOL)
+    import check_planning_mcap as c
+    run = list(np.arange(0.0, 162.0, 0.05))
+    topics = {"/planning/debug/plotjuggler/string": dict(type="std_msgs/msg/String", log=run),
+              "/map/occupancy_grid": dict(type="nav_msgs/msg/OccupancyGrid", log=list(np.arange(0.0, 36.0, 0.15))),
+              "/goal_pose": dict(type="geometry_msgs/msg/PoseStamped", log=[5.0])}
+    out = c.stop_problems(topics)
+    assert len(out) == 1 and out[0].startswith("/map/occupancy_grid: stops 126 s before the end"), out
+    topics["/map/occupancy_grid"]["log"] = list(np.arange(0.0, 158.0, 0.1))   # the bag ends a few s before
+    assert c.stop_problems(topics) == []

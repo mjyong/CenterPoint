@@ -171,9 +171,10 @@
 | T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 完成，已复核（2026-11-15）：/tmp 在 NFS 上让规划的 glog 卡住线程，tmpfs 以后 20 Hz；感知 reliable 一帧不丢，外参 OK（0.13 m，和狗上 0.12 m 对上）。nav-dev 可以当默认回放环境。复核加了同一个域上已有回放就不放 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 完成，已复核（2026-11-15）：三个模块在狗的系统镜像里编过，ldd 0，增量 2.5 分钟。vfs 每次起容器 50 分钟，run_arm64.sh 改成留一个容器 exec。狗上的对照没做（隧道不回 SSH），放到 T63 |
 | T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 完成，已复核（2026-11-15）：NEEDED 和狗上一样，文件只差一个 .t56 备份；服务器镜像编的就是狗上会编的。真装以后要 configure + apply |
-| T64 | T57 的包拷回服务器、转 mcap、看人行横道那一段；新门控（人行横道上前方来车也停）在这包上回放，和线上的旧门控对；arm64 编规划给狗 | Agent | T57 复核 | 2 小时 | 完成（2026-11-15）：db3 和狗上 sha 一样；狗站在人行横道 22 外 3.3 m，线上和回放都是 none，新门控没被走到。arm64 规划 12 min 28 s，包 nav_cw_planning_1a5ed36.tar.gz。外参这次量不出来（狗没动） |
+| T64 | T57 的包拷回服务器、转 mcap、看人行横道那一段；新门控（人行横道上前方来车也停）在这包上回放，和线上的旧门控对；arm64 编规划给狗 | Agent | T57 复核 | 2 小时 | 完成，已复核（2026-11-15）：包里狗站着没过人行横道，验不了门控。回放的 standstill 不是定位（504.9 m 是初始化），是感知栅格放到第 36 s 就断了，交给 T68。arm64 规划包 nav_cw_planning_1a5ed36.tar.gz 可以装（T65 第 4 步） |
 | T65 | 现场：他们的服务下看 App 怎么让狗走起来（只订不发：运控模式、谁在发、焦点、robot_service 和 zsibot 的日志），把表和五个问题给机器人团队；装 T64 编的规划 | 人 + Agent | T64 第 5 步 | 2 小时 | 任务已写好 |
 | T66 | 现场：影子模式下逐个路口调。人照规划的意思遥控狗（停、转、等、走），看五层：定位、白框对不对、感知、门控、状态机和指令；每个路口走一遍、定点看 10 分钟、同事开车（新门控才做），每次录包带备注；回来回灌，和现场的日志对 | 人 + Agent | 无（新门控要 T64 第 5 步） | 半天 | 任务已写好 |
+| T68 | 回放里感知栅格放到第 36 s 就断了（T64）：看 lidar_seg、grid_map 的日志，换几种放法找原因，修好再放 T57 的包；狗上录的包怎么回灌写成一条命令 | Agent | T64 复核 | 2 小时 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -10511,6 +10512,35 @@ sha256 `afaa3921ff26c314d9137cfac5a5110596ef07fe3eae923c81f9c5dc4dc68c9f`
 
 T65 第 4 步用这个包。没装到狗上。
 
+### T64 复核（2026-11-15）
+
+拷包、转换、arm64 编都对。包 `nav_cw_planning_1a5ed36.tar.gz` 可以装：T65 第 4 步写上了包名和 sha。原来的规划备份挪到 install 外面，
+因为 `nav_cw.sh` 的 configure、apply 是在 install 下面按 find 找配置的，备份留在 install 里可能被改到。任务里的路径
+`install/planning/lib` 写错了（colcon 前缀下面还有一层包名），T65、T66 改成了 `install/planning/planning/lib`。域检查漏了回放自己录包的
+`/events/write_split`，你修得对。
+
+**这包里没有过人行横道。** 录的时候狗已经站在终点附近：离人行横道 22 的边 3.3 m，轨迹 0 m。所以线上、回放都是 none，
+新门控没被走到。这个包验不了门控，要等 T66 的包。影子指令的 vy 一直是 −0.22 m/s：终点在狗侧边 0.7 m，规划要过去。到达要离终点
+0.5 m 内、朝向差 0.2 rad 内、指令变小，影子里狗不动就一直发，这是正常的（现场指南 8.1 第 6 步加了一句）。
+
+**回放里规划停在 standstill，不是定位的问题。**
+- 504.9 m 那一跳在 0.1 s，是定位初始化：从原点 (0, 0) 跳到 INS 的位置，|(199.1, 463.8)| = 504.7 m。可视化工具也把它当成起步跳变去掉了。
+  "回放算出来的里程计不在那儿"不对：之后 odom 和 INS 中位差 0.33 m。
+- 真正的问题是感知栅格 `/map/occupancy_grid`：回放里只有 240 帧，时间戳 411–447 s，也就是包放到第 36 s 就没了。以前的回放都是
+  1600–1700 帧（T49–T58 的 report）。规划 "Data timeout exceeded" 一次、没恢复，后面 2565 个周期都在 standstill。报告里那条
+  "12% of the header stamps are outside … 65 s apart" 说的就是它，只是说得太绕。
+- 检查工具改了：起步 2 s 内的跳变当成定位初始化，记成 NOTE，不算问题；规则发的话题比录包早结束很多（> 10 s，且 > 时长的 25%）
+  就报 PROBLEM "stops N s before the end"。测试在 `tests/dog/test_planning_mcap.py`。
+- 栅格为什么断，从这里查不了：回放的 `lidar_seg.log`、`grid_map.log` 没提交上来。交给 T68（先看日志，再换几种放法）。修好以前，
+  T66 的包回灌也会在同样的地方停。
+
+其余：
+- `ros2 bag reindex` 写出空的 `storage_identifier`，rosbags 打不开：`bag_to_mcap.py` 现在自己处理（临时目录里链过去、改成 sqlite3，
+  原包不动）。录包脚本正常停的时候用不着 reindex；
+- objects_in_map 量不出外参（狗没动），不算失败；
+- `check_planning_mcap` 说 `hesai_lidar` 到 `map` 没有 TF：狗上没人发 `/tf_static`（T57 也没订上），这个包的点云在 Foxglove 里画不出来，
+  不影响规划。
+
 ---
 
 ## T65 现场：看 App 怎么让狗走起来（只订不发）；装新门控的规划
@@ -10554,20 +10584,23 @@ robot_service：申请运动的焦点、切运控模式，T57 复核）。这次
    （只有 /mc/motion_control mode 2，/mc/state 一直 mode 3）放在一起 → data/reports/T65/sequence.md。人把这张表和 T57 复核那五个问题
    发给机器人团队，回答（有的话）抄进报告。不要照着表自己去发：等回话、复核以后写 T67（我们的规划怎么拿到控制，再接 T57 第 2c 步后半、
    第 4 步，人行横道的新门控也在那时实车看）。
-4. 装 T64 编的规划（他们的服务在跑、我们的停着，直接换；原来的留着能换回）：
-     scp /public/zjst/robot/cp_data/nav_cw_planning_<sha>.tar.gz dog:/tmp/ ；ssh dog 'sha256sum /tmp/nav_cw_planning_<sha>.tar.gz'（和 T64 抄的一样）
-     ssh dog 'sudo -n mv /opt/seres/nav_cw/install/planning /opt/seres/nav_cw/install/planning.t61 &&
-              sudo -n tar --no-same-owner -xzf /tmp/nav_cw_planning_<sha>.tar.gz -C /opt/seres/nav_cw/install'
+4. 装 T64 编的规划（他们的服务在跑、我们的停着，直接换；原来的留着能换回）。包是 nav_cw_planning_1a5ed36.tar.gz，
+   sha256 afaa3921ff26c314d9137cfac5a5110596ef07fe3eae923c81f9c5dc4dc68c9f（T64 第 5 步）：
+     scp /public/zjst/robot/cp_data/nav_cw_planning_1a5ed36.tar.gz dog:/tmp/ ；ssh dog 'sha256sum /tmp/nav_cw_planning_1a5ed36.tar.gz'
+   原来的挪到 install 外面（nav_cw.sh 的 configure、apply 在 install 下面按 find 找配置，备份留在 install 里可能被改到）：
+     ssh dog 'sudo -n mkdir -p /opt/seres/nav_cw/backup && sudo -n mv /opt/seres/nav_cw/install/planning /opt/seres/nav_cw/backup/planning.t61 &&
+              sudo -n tar --no-same-owner -xzf /tmp/nav_cw_planning_1a5ed36.tar.gz -C /opt/seres/nav_cw/install'
      ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh configure /opt/seres/nav_cw /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 &&
               sudo -n bash /opt/seres/nav_cw/nav_cw.sh apply && sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches'
-   configure 重新写装好的配置（T63 复核：装完一定要 configure + apply）；有 NOT APPLIED 就停下，把 planning.t61 换回来。
-     ssh dog 'grep -ral "stops for vehicles ahead" /opt/seres/nav_cw/install/planning/lib'   （有一个文件）
+   configure 重新写装好的配置（T63 复核：装完一定要 configure + apply）；有 NOT APPLIED 就停下，把 backup/planning.t61 挪回
+   install/planning。ssh dog 'cat /opt/seres/nav_cw/install/planning/version.txt'：2026-11-15、1a5ed36…。
+     ssh dog 'grep -ral "stops for vehicles ahead" /opt/seres/nav_cw/install/planning/planning/lib'   （有一个文件）
    不切换（不 use-new）：狗能被规划带着走之前，切过去也只能影子。
 5. 收尾：running: theirs（一直是）；switches 抄下来；包拷回服务器 /public/zjst/robot/cp_data/（bag_to_mcap.py 转，LEFT OUT 抄下来）。
 6. 提交：data/reports/T65/（图、units、各次的运控行、日志摘录、sequence.md）、本文档。
 
 停止条件：第 0 步 use-original 不成功；任何时候狗的行为不对（急停，记时间）；第 2 步 b 位置不对（跳过 b）；第 4 步 sha 对不上、
-configure / apply 有 NOT APPLIED（换回 planning.t61）。
+configure / apply 有 NOT APPLIED（把 backup/planning.t61 挪回 install/planning）。
 报告（写进"T65 结果"）：第 1 步的图（运控、焦点、模式、遥控那几块）和 units；a、b、c 每次的运控行和事件表；机器人团队的回答；第 4 步的输出。
 ```
 
@@ -10592,7 +10625,7 @@ configure / apply 有 NOT APPLIED（换回 planning.t61）。
       grep -c $'\r' 都是 0；ssh dog 'grep -c shadow_blocked /opt/seres/nav_cw/nav_cw.sh' ≥ 1（影子模式关被堵检测，这次新加的：不然狗被人
       按在路边、门控一放行，约 4.5 s 后规划就进 standstill，要外部恢复）。
    b. 规划的版本：T64 第 5 步编好了、T65 第 4 步还没装，就现在照 T65 第 4 步装（新门控：人行横道上前方来车也停）。报告里写明是哪个：
-        ssh dog 'grep -ral "stops for vehicles ahead" /opt/seres/nav_cw/install/planning/lib'
+        ssh dog 'grep -ral "stops for vehicles ahead" /opt/seres/nav_cw/install/planning/planning/lib'
       有：新门控；没有：旧门控（上了人行横道一律不停，第 3 步 c 不做）。
    c. INS 固定解（同 T57 第 1 步：ins_status 3、pos_type 56）；狗起步放在路网上。
    d. 开关：sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on；speed 0.5；switches 抄下来：shadow on（行尾有 "nav_blocked false: a person
@@ -10630,8 +10663,8 @@ configure / apply 有 NOT APPLIED（换回 planning.t61）。
 6. 回来（服务器，Agent），每个包：
    - 拷：rsync -a --partial dog:/home/nvidia/bags/<包>/ /public/zjst/robot/cp_data/<包>/（拷不动就人用笔记本拷）；
    - 同 T64 第 2 步：bag_to_mcap.py、planning_mcap_viz.py、objects_in_map.py（每个包都要 extrinsic OK）；
-   - 回灌，同 T64 第 4 步：只放传感器和感知目标（BAG_PLAY_EXTRA="--topics …"），目标用包里 record_log.txt 最后的 "replay goal"，
-     名字 t66_<包>；
+   - 回灌：T68 修好以后照它写的那条命令放（T64 那样放，感知栅格放到第 36 s 就断了，规划后面都在 standstill）；目标用包里
+     record_log.txt 最后的 "replay goal"，名字 t66_<包>。check_planning_mcap.py 不能有 "stops … before the end"；
    - 对：回灌日志的 "Crosswalk yield:" 和包里 journal_cw-planning.txt 的，按时间并排，record_log.txt 里的备注按时间插进去
      → data/reports/T66/<包>_sequence.md。走一遍、定点看的包，狗是照规划走的或者没动，两边应该基本一样；不一样的列出来；
    - 定点看的包另外数：wait 几次、每次多久（中位、最长）、go 几次；备注里"go 不安全""空等"各几次，各对着哪辆车（id、从哪来）。
@@ -10641,4 +10674,51 @@ configure / apply 有 NOT APPLIED（换回 planning.t61）。
 定位偏 > 1 m、一直跳：这个路口不测；任何时候不安全：急停、记时间；回来 extrinsic 不是 OK：先查外参，门控的结论不作数。
 报告（写进"T66 结果"）：规划版本（新 / 旧门控）；每个路口：编号、包名、五层各一句（定位；白框对不对、偏多少，align 时狗头离线多远；
 感知漏 / 假；门控对不对；状态机和指令）；定点看的统计；同事开车每一次的结果；回灌和现场对不对得上。
+```
+
+---
+
+## T68 回放里感知栅格为什么放到第 36 s 就断了（服务器）
+
+```text
+任务 T68（服务器）。为什么：T64 用 nav-dev 回放 T57 的包，/map/occupancy_grid 只有 240 帧（时间戳 411–447 s，包是 162 s），以前的
+回放都是 1600–1700 帧；规划 "Data timeout exceeded" 以后一直 standstill（T64 复核）。不修好，狗上录的包（T66）都没法回灌。
+和以前不同的地方：包是狗上录的（里面有狗上算好的 /lightning/odom、/map/occupancy_grid、/tf，T64 用 --topics 只放传感器和感知目标）；
+狗站着没动；包的时间就是今天（离回放的时钟 81 分钟）。仓库根目录，PYTHONPATH=.。mkdir -p data/reports/T68
+
+0. git pull；pytest tests/dog/test_planning_mcap.py tests/dog/test_bag_to_mcap.py（全过）。
+1. 先看 T64 那次的日志（work_dirs/planning_io_t64_cw_1/logs/）：
+   - lidar_seg.log、grid_map.log、bag.log、loc.log 各自最后 30 行；grep -nE "error|Error|ERROR|terminate|Segmentation|core dumped|
+     exception|Killed|abort" logs/*.log；
+   - 栅格停的那一刻（包里 447 s 左右，回放开始后约 36 s）前后：lidar_seg 还在出分割的点云吗（它的话题有没有，grid_map 的输入日志
+     "[Input] …" 停在哪一种）；进程是退出了还是还在但不发了；
+   - 新的检查工具再跑一遍：python Nav_D20/planning/tools/check_planning_mcap.py work_dirs/planning_io_t64_cw_1 → 应该有
+     "PROBLEM /map/occupancy_grid: stops … before the end" 和起步跳变那条 NOTE。
+   抄进 data/reports/T68/logs.txt。
+2. 换放法试（每次一个名字，同 T64 第 4 步的容器、环境、终点 199.1 463.8；每次数 /map/occupancy_grid 的帧数和最后一帧的时间）：
+   a. 不用 --topics，改成全放、把狗上算的那几个话题改名避开：
+        BAG_PLAY_EXTRA="--remap /lightning/odom:=/bag/lightning/odom /map/occupancy_grid:=/bag/map/occupancy_grid /tf:=/bag/tf
+          /planning/debug/crosswalk:=/bag/crosswalk /planning/debug/path_tracking:=/bag/path_tracking
+          /planning/debug/plotjuggler/string:=/bag/plotjuggler"
+      （ros2 bag play 的 --remap 后面可以跟好几条）；
+   b. 第 1 步看到是哪个进程停的，就单独起它（同 run_planning_stack_debug.sh 里的命令、同样的环境），只放它要的话题，日志级别调高，
+      看停之前最后做了什么；
+   c. 对照：T62 那次的 1112 包（/public/zjst/robot/cp_data/1112_t40）用现在的镜像和脚本再放一次，栅格还是满的吗（不是的话是我们
+      最近改坏了：看 git log Nav_D20/planning/script Nav_D20/perception_combo_ros）。
+   原因找到就停止试，写清楚是哪一个。
+3. 修：在回放脚本（放法、参数）或节点的配置里修，改了 Nav_D20 下的代码就在 PATCHES.md 加一行。修完 T64 那次重放（名字 t68_cw_1）：
+   /map/occupancy_grid 约 1600 帧、"Data timeout exceeded" 只在包放完时出现一次、check_planning_mcap.py 没有 "stops … before the end"、
+   mission_state 里 standstill 只有包放完以后那一段。
+4. 回灌狗上录的包写成一条命令：Nav_D20/planning/script/replay_dog_bag.sh <包目录> [名字]：
+   - 读包里 record_log.txt 最后的 "replay goal: x y" 当终点（没有就报错退出，提示用 bag_on_map.py 给的）；
+   - sqlite3 的包先用 bag_to_mcap.py 转到 <包>_mcap（已经有就不转）；
+   - 用第 3 步定下来的放法（BAG_PLAY_EXTRA）、ad68517c 的 PLANNING_STARTUP_MAP 和 LOC_MAP_PATH 调 replay_planning_check.sh；
+   - 放完把回灌日志的 "Crosswalk yield:" 和包里 journal_cw-planning.txt 的按时间并排，record_log.txt 的备注插进去，写到
+     work_dirs/planning_io_<名字>/sequence.md；
+   - 测试：tests/dog/ 下加一个，用假的 replay_planning_check.sh 和一个假包（record_log.txt、journal、metadata），查终点、放法、并排的结果。
+   现场指南第 9 节、T66 第 6 步改成用它。
+5. 提交：data/reports/T68/、脚本和测试、本文档。
+
+停止条件：第 2 步三种都试了还找不到原因（把日志和试过的写清楚，停下）；第 3 步修完还是断。
+报告（写进"T68 结果"）：第 1 步的日志摘录；第 2 步每次的帧数和最后一帧时间；原因；改了什么；第 3 步重放的数；第 4 步的脚本和测试。
 ```
