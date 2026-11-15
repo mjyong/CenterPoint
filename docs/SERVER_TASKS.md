@@ -10059,6 +10059,13 @@ App 上的狗画在 c1adbe7b 上，位置不准，不用管；位置看 Foxglove
 目标用 Foxglove 发（人定 2026-11-14）：笔记本上 Foxglove 桌面版，能连到狗的 8765（不在一个网段就 ssh -N -L 8765:127.0.0.1:8765 nvidia@<狗>）；
 服务器上开着 Foxglove 或者能看 journalctl。
 
+0. 连得上、装的是最新的（T60 以后隧道一度不回 SSH；T61 以后 nav_cw.sh 改过：use-new 等 odom）：
+     ssh dog true                                  （连不上先查连着狗的本机的隧道，别往下做）
+     scp tools/deploy/nav_cw.sh tools/deploy/nav_cw_foxglove.sh dog:/tmp/ && ssh dog 'sudo -n cp /tmp/nav_cw*.sh /opt/seres/nav_cw/'
+     ssh dog 'sha256sum /opt/seres/nav_cw/nav_cw.sh; grep -c NAV_CW_ODOM_WAIT /opt/seres/nav_cw/nav_cw.sh'   （和仓库的一样；后一个不是 0）
+   规划、定位、感知不用重编：狗上是 T61 编的（3af3220）；之后只有感知节点加了 cloud_reliable（默认 false，狗上行为不变）。
+   笔记本 Foxglove 用仓库里最新的 Nav_D20/planning/script/planning_live.json。
+   狗的起点放在路网上（Foxglove 里规划的缩略图上的路）：规划在路网外起步会被当成站在障碍里（T49、T61 复核第 4 条）。
 1. ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status' → running: theirs。
    INS 要先是 RTK 固定解（我们的定位起来以后只等 30 s，等不到就从配置里的位姿起，对不上地图、没有 odom，T61）：
      ssh dog "sudo -n bash -c 'source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/slam/setup.bash; export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml; timeout 5 ros2 topic echo --once /rte/rdap/rtk/inspvax' | grep -A1 -E 'ins_status|pos_type'"
