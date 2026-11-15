@@ -1,0 +1,908 @@
+===== 1 11:00:48 pid=none
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14035 MiB
+6, 0 %, 21331 MiB
+7, 62 %, 10401 MiB
+ 11:00:48 up 255 days, 17:43, 89 users,  load average: 149.63, 133.50, 97.24
+===== 2 11:00:54 pid=none
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14035 MiB
+6, 0 %, 21331 MiB
+7, 12 %, 10401 MiB
+ 11:00:54 up 255 days, 17:43, 89 users,  load average: 149.88, 134.08, 97.82
+===== 3 11:00:59 pid=none
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14035 MiB
+6, 0 %, 21331 MiB
+7, 0 %, 10401 MiB
+ 11:01:00 up 255 days, 17:43, 89 users,  load average: 150.45, 134.46, 98.14
+===== 4 11:01:06 pid=5912
+top - 03:01:06 up 255 days, 17:43,  0 users,  load average: 151.93, 135.03, 98.5
+Threads:  12 total,   1 running,  11 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 32.3 us, 10.9 sy,  1.0 ni, 41.0 id, 13.8 wa,  0.0 hi,  0.9 si,  0.0 st
+MiB Mem : 1031713.+total, 364996.5 free, 115004.3 used, 551713.1 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 903274.0 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0 2165040   1.2g  61280 R  99.9   0.1   0:01.64 planning
+   6015 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.00 planning
+   6016 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.00 planning
+   6017 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.00 gc
+   6018 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.00 dq.buil+
+   6019 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.00 dq.user
+   6020 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.01 tev
+   6021 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.00 recv
+   6022 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.03 recvMC
+   6023 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.18 recvUC
+   6024 980       20   0 2165040   1.2g  61280 S   0.0   0.1   0:00.00 planning
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14035 MiB
+6, 0 %, 21331 MiB
+7, 48 %, 10401 MiB
+ 11:01:07 up 255 days, 17:43, 89 users,  load average: 151.93, 135.03, 98.52
+===== 5 11:01:12 pid=5912
+top - 03:01:12 up 255 days, 17:43,  0 users,  load average: 151.62, 135.25, 98.7
+Threads:  12 total,   1 running,  11 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 56.8 us,  9.0 sy,  0.6 ni, 25.9 id,  7.3 wa,  0.0 hi,  0.5 si,  0.0 st
+MiB Mem : 1031713.+total, 365013.0 free, 114763.1 used, 551937.8 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 903515.2 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0 2164140   1.2g  61576 R  99.9   0.1   0:07.74 planning
+   6015 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 planning
+   6016 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 planning
+   6017 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 gc
+   6018 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 dq.buil+
+   6019 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 dq.user
+   6020 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.01 tev
+   6021 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 recv
+   6022 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.20 recvMC
+   6023 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.32 recvUC
+   6024 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 planning
+0, 95 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14035 MiB
+6, 0 %, 21331 MiB
+7, 3 %, 10401 MiB
+ 11:01:13 up 255 days, 17:43, 89 users,  load average: 151.62, 135.25, 98.78
+===== 6 11:01:18 pid=5912
+top - 03:01:18 up 255 days, 17:43,  0 users,  load average: 150.05, 135.19, 98.9
+Threads:  12 total,   1 running,  11 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 57.2 us,  9.7 sy,  0.4 ni, 24.1 id,  8.2 wa,  0.0 hi,  0.4 si,  0.0 st
+MiB Mem : 1031713.+total, 364766.6 free, 114799.3 used, 552148.1 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 903478.6 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0 2164140   1.2g  61576 R  99.9   0.1   0:13.45 planning
+   6015 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 planning
+   6016 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 planning
+   6017 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 gc
+   6018 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 dq.buil+
+   6019 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 dq.user
+   6020 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.01 tev
+   6021 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 recv
+   6022 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.38 recvMC
+   6023 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.32 recvUC
+   6024 980       20   0 2164140   1.2g  61576 S   0.0   0.1   0:00.00 planning
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14035 MiB
+6, 0 %, 21331 MiB
+7, 4 %, 10977 MiB
+ 11:01:18 up 255 days, 17:43, 89 users,  load average: 150.05, 135.19, 98.96
+===== 7 11:01:24 pid=5912
+top - 03:01:24 up 255 days, 17:43,  0 users,  load average: 142.51, 134.09, 98.9
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 42.6 us,  7.5 sy,  1.0 ni, 43.7 id,  4.7 wa,  0.0 hi,  0.5 si,  0.0 st
+MiB Mem : 1031713.+total, 363417.3 free, 115921.4 used, 552375.2 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 902348.9 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148216 D  25.0   0.2   0:15.94 planning
+   6025 980       20   0   12.3g   2.4g 148216 S   6.2   0.2   0:00.07 planning
+   6369 980       20   0   12.3g   2.4g 148216 S   6.2   0.2   0:00.06 planning
+   6015 980       20   0   12.3g   2.4g 148216 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148216 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148216 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148216 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148216 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148216 S   0.0   0.2   0:00.02 tev
+   6021 980       20   0   12.3g   2.4g 148216 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148216 S   0.0   0.2   0:00.52 recvMC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 5 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 12 %, 10977 MiB
+ 11:01:24 up 255 days, 17:43, 89 users,  load average: 142.51, 134.09, 98.99
+===== 8 11:01:29 pid=5912
+top - 03:01:30 up 255 days, 17:43,  0 users,  load average: 141.90, 134.11, 99.1
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 47.1 us, 10.4 sy,  0.6 ni, 36.6 id,  4.7 wa,  0.0 hi,  0.6 si,  0.0 st
+MiB Mem : 1031713.+total, 363416.1 free, 115697.5 used, 552600.3 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 902572.9 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148280 D  37.5   0.2   0:17.58 planning
+   6369 980       20   0   12.3g   2.4g 148280 S  12.5   0.2   0:00.65 planning
+   6022 980       20   0   12.3g   2.4g 148280 S   6.2   0.2   0:00.65 recvMC
+   6015 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.02 tev
+   6021 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 recv
+   6023 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.33 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 5 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 20 %, 10977 MiB
+ 11:01:30 up 255 days, 17:43, 89 users,  load average: 141.90, 134.11, 99.19
+===== 9 11:01:35 pid=5912
+top - 03:01:35 up 255 days, 17:44,  0 users,  load average: 139.67, 133.77, 99.2
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 42.4 us, 10.9 sy,  0.5 ni, 39.9 id,  5.7 wa,  0.0 hi,  0.6 si,  0.0 st
+MiB Mem : 1031713.+total, 363278.7 free, 115615.7 used, 552819.6 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 902654.8 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148280 D  26.7   0.2   0:18.95 planning
+   6022 980       20   0   12.3g   2.4g 148280 S   6.7   0.2   0:00.77 recvMC
+   6369 980       20   0   12.3g   2.4g 148280 S   6.7   0.2   0:01.12 planning
+   6015 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.03 tev
+   6021 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.00 recv
+   6023 980       20   0   12.3g   2.4g 148280 S   0.0   0.2   0:00.33 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 4 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 6 %, 10977 MiB
+ 11:01:36 up 255 days, 17:44, 89 users,  load average: 139.67, 133.77, 99.27
+===== 10 11:01:41 pid=5912
+top - 03:01:41 up 255 days, 17:44,  0 users,  load average: 136.41, 133.20, 99.2
+Threads:  79 total,   3 running,  76 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 51.7 us,  8.9 sy,  0.6 ni, 31.5 id,  6.4 wa,  0.0 hi,  0.8 si,  0.0 st
+MiB Mem : 1031713.+total, 363011.5 free, 115655.1 used, 553047.3 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 902614.8 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148344 R  20.0   0.2   0:20.43 planning
+   6369 980       20   0   12.3g   2.4g 148344 S   6.7   0.2   0:01.63 planning
+   6015 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.03 tev
+   6021 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148344 R   0.0   0.2   0:00.90 recvMC
+   6023 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.33 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 5 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 37 %, 11079 MiB
+ 11:01:41 up 255 days, 17:44, 89 users,  load average: 136.41, 133.20, 99.27
+===== 11 11:01:47 pid=5912
+top - 03:01:47 up 255 days, 17:44,  0 users,  load average: 134.70, 132.89, 99.3
+Threads:  79 total,   1 running,  78 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 62.3 us,  7.0 sy,  0.5 ni, 24.7 id,  4.7 wa,  0.0 hi,  0.9 si,  0.0 st
+MiB Mem : 1031713.+total, 362734.1 free, 115714.5 used, 553265.3 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 902555.7 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148344 R  40.0   0.2   0:21.68 planning
+   6369 980       20   0   12.3g   2.4g 148344 S   6.7   0.2   0:02.24 planning
+   6015 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.03 tev
+   6021 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:01.02 recvMC
+   6023 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.33 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 5 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 47 %, 11079 MiB
+ 11:01:47 up 255 days, 17:44, 89 users,  load average: 134.70, 132.89, 99.35
+===== 12 11:01:52 pid=5912
+top - 03:01:53 up 255 days, 17:44,  0 users,  load average: 132.96, 132.56, 99.4
+Threads:  79 total,   1 running,  78 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 54.9 us,  4.2 sy,  0.9 ni, 35.7 id,  3.9 wa,  0.0 hi,  0.3 si,  0.0 st
+MiB Mem : 1031713.+total, 363423.5 free, 114802.4 used, 553488.1 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 903467.4 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148344 R  25.0   0.2   0:23.32 planning
+   6369 980       20   0   12.3g   2.4g 148344 S   6.2   0.2   0:02.80 planning
+   6015 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.04 tev
+   6021 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:01.14 recvMC
+   6023 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.34 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 3 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 56 %, 11079 MiB
+ 11:01:53 up 255 days, 17:44, 89 users,  load average: 132.96, 132.56, 99.42
+===== 13 11:01:58 pid=5912
+top - 03:01:58 up 255 days, 17:44,  0 users,  load average: 129.04, 131.76, 99.3
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 53.5 us,  8.1 sy,  0.8 ni, 34.9 id,  2.1 wa,  0.0 hi,  0.6 si,  0.0 st
+MiB Mem : 1031713.+total, 362922.4 free, 115065.7 used, 553725.9 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 903204.6 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148344 D  37.5   0.2   0:24.85 planning
+   6369 980       20   0   12.3g   2.4g 148344 S  12.5   0.2   0:03.44 planning
+   6015 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.04 tev
+   6021 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:01.26 recvMC
+   6023 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.34 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 5 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 0 %, 11079 MiB
+ 11:01:58 up 255 days, 17:44, 89 users,  load average: 129.04, 131.76, 99.34
+===== 14 11:02:04 pid=5912
+top - 03:02:04 up 255 days, 17:44,  0 users,  load average: 132.72, 132.42, 99.9
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 51.9 us,  6.8 sy,  0.7 ni, 25.5 id, 14.5 wa,  0.0 hi,  0.6 si,  0.0 st
+MiB Mem : 1031713.+total, 362480.2 free, 115002.9 used, 554230.8 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 903267.3 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148344 D  20.0   0.2   0:25.84 planning
+   6369 980       20   0   12.3g   2.4g 148344 S   6.7   0.2   0:03.78 planning
+   6015 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.05 tev
+   6021 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:01.38 recvMC
+   6023 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.34 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 0 %, 11079 MiB
+ 11:02:04 up 255 days, 17:44, 89 users,  load average: 132.72, 132.42, 99.90
+===== 15 11:02:10 pid=5912
+top - 03:02:10 up 255 days, 17:44,  0 users,  load average: 130.98, 132.06, 99.9
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 58.3 us,  5.6 sy,  1.1 ni, 23.2 id, 11.2 wa,  0.0 hi,  0.6 si,  0.0 st
+MiB Mem : 1031713.+total, 361950.8 free, 115296.8 used, 554466.3 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 902973.4 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148344 D  20.0   0.2   0:26.93 planning
+   6369 980       20   0   12.3g   2.4g 148344 S   6.7   0.2   0:04.15 planning
+   6015 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.05 tev
+   6021 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:01.49 recvMC
+   6023 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.35 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 9 %, 11079 MiB
+ 11:02:10 up 255 days, 17:44, 89 users,  load average: 130.98, 132.06, 99.96
+===== 16 11:02:15 pid=5912
+top - 03:02:16 up 255 days, 17:44,  0 users,  load average: 128.74, 131.58, 99.9
+Threads:  79 total,   1 running,  78 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 59.7 us,  4.8 sy,  0.5 ni, 23.3 id, 11.1 wa,  0.0 hi,  0.5 si,  0.0 st
+MiB Mem : 1031713.+total, 361433.2 free, 115559.2 used, 554721.6 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 902711.1 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148344 R  13.3   0.2   0:28.00 planning
+   6369 980       20   0   12.3g   2.4g 148344 S   6.7   0.2   0:04.52 planning
+   6015 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.06 tev
+   6021 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:01.61 recvMC
+   6023 980       20   0   12.3g   2.4g 148344 S   0.0   0.2   0:00.36 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 0 %, 11079 MiB
+ 11:02:16 up 255 days, 17:44, 89 users,  load average: 128.74, 131.58, 99.98
+===== 17 11:02:21 pid=5912
+top - 03:02:22 up 255 days, 17:44,  0 users,  load average: 127.16, 131.20, 100.
+Threads:  79 total,   2 running,  77 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 77.7 us,  5.2 sy,  0.4 ni,  7.8 id,  8.1 wa,  0.0 hi,  0.7 si,  0.0 st
+MiB Mem : 1031713.+total, 360644.2 free, 115812.6 used, 555257.2 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 902457.8 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148408 R  20.0   0.2   0:29.07 planning
+   6369 980       20   0   12.3g   2.4g 148408 R  13.3   0.2   0:04.92 planning
+   6015 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.07 tev
+   6021 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:01.72 recvMC
+   6023 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.36 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 5 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 2 %, 12163 MiB
+ 11:02:22 up 255 days, 17:44, 89 users,  load average: 127.16, 131.20, 100.03
+===== 18 11:02:27 pid=5912
+top - 03:02:27 up 255 days, 17:44,  0 users,  load average: 126.50, 131.00, 100.
+Threads:  79 total,   2 running,  77 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  5.3 us,  5.9 sy,  0.8 ni, 48.5 id, 38.5 wa,  0.0 hi,  0.8 si,  0.0 st
+MiB Mem : 1031713.+total, 359889.9 free, 116205.4 used, 555618.7 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 902064.9 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   6369 980       20   0   12.3g   2.4g 148408 R  33.3   0.2   0:05.45 planning
+   5912 980       20   0   12.3g   2.4g 148408 R  26.7   0.2   0:30.41 planning
+   6015 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.07 tev
+   6021 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:01.86 recvMC
+   6023 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.36 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 4 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 0 %, 14721 MiB
+ 11:02:27 up 255 days, 17:44, 89 users,  load average: 126.50, 131.00, 100.13
+===== 19 11:02:33 pid=5912
+top - 03:02:33 up 255 days, 17:45,  0 users,  load average: 131.91, 132.05, 100.
+Threads:  79 total,   1 running,  78 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 58.9 us,  6.7 sy,  1.1 ni, 23.0 id,  9.8 wa,  0.0 hi,  0.5 si,  0.0 st
+MiB Mem : 1031713.+total, 359488.6 free, 116354.3 used, 555871.1 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 901916.1 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148408 R  20.0   0.2   0:31.58 planning
+   6369 980       20   0   12.3g   2.4g 148408 S   6.7   0.2   0:05.86 planning
+   6015 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.08 tev
+   6021 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:01.98 recvMC
+   6023 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.36 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 28 %, 8297 MiB
+ 11:02:33 up 255 days, 17:45, 89 users,  load average: 131.91, 132.05, 100.63
+===== 20 11:02:38 pid=5912
+top - 03:02:39 up 255 days, 17:45,  0 users,  load average: 134.56, 132.59, 100.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 39.5 us, 15.4 sy,  1.0 ni, 31.5 id, 11.9 wa,  0.0 hi,  0.8 si,  0.0 st
+MiB Mem : 1031713.+total, 358968.8 free, 116650.3 used, 556094.9 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 901620.2 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148408 D  18.8   0.2   0:32.79 planning
+   6369 980       20   0   12.3g   2.4g 148408 S   6.2   0.2   0:06.31 planning
+   6015 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.08 tev
+   6021 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:02.10 recvMC
+   6023 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.37 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 15 %, 8297 MiB
+ 11:02:39 up 255 days, 17:45, 89 users,  load average: 137.56, 133.25, 101.36
+===== 21 11:02:45 pid=5912
+top - 03:02:45 up 255 days, 17:45,  0 users,  load average: 141.12, 134.06, 101.
+Threads:  79 total,   2 running,  77 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 49.0 us,  9.6 sy,  0.8 ni, 29.7 id, 10.1 wa,  0.0 hi,  0.8 si,  0.0 st
+MiB Mem : 1031713.+total, 358218.2 free, 117158.5 used, 556337.3 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 901111.8 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148408 D  26.7   0.2   0:34.06 planning
+   6369 980       20   0   12.3g   2.4g 148408 S  13.3   0.2   0:06.73 planning
+   6015 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.08 tev
+   6021 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148408 R   0.0   0.2   0:02.22 recvMC
+   6023 980       20   0   12.3g   2.4g 148408 S   0.0   0.2   0:00.37 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 41 %, 8297 MiB
+ 11:02:45 up 255 days, 17:45, 89 users,  load average: 141.12, 134.06, 101.79
+===== 22 11:02:51 pid=5912
+top - 03:02:51 up 255 days, 17:45,  0 users,  load average: 142.07, 134.37, 102.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 56.0 us,  8.4 sy,  0.7 ni, 22.1 id, 12.3 wa,  0.0 hi,  0.5 si,  0.0 st
+MiB Mem : 1031713.+total, 357699.1 free, 117434.7 used, 556580.2 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 900835.1 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 D  18.8   0.2   0:35.18 planning
+   6022 980       20   0   12.3g   2.4g 148668 S   6.2   0.2   0:02.35 recvMC
+   6369 980       20   0   12.3g   2.4g 148668 S   6.2   0.2   0:07.14 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.10 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 recv
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.38 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 40 %, 10055 MiB
+ 11:02:51 up 255 days, 17:45, 89 users,  load average: 142.07, 134.37, 102.07
+===== 23 11:02:57 pid=5912
+top - 03:02:57 up 255 days, 17:45,  0 users,  load average: 144.31, 134.96, 102.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 66.5 us,  8.0 sy,  0.7 ni, 15.3 id,  8.9 wa,  0.0 hi,  0.6 si,  0.0 st
+MiB Mem : 1031713.+total, 357537.8 free, 117370.0 used, 556806.1 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 900900.2 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 D  12.5   0.2   0:36.27 planning
+   6025 980       20   0   12.3g   2.4g 148668 S   6.2   0.2   0:00.41 planning
+   6369 980       20   0   12.3g   2.4g 148668 S   6.2   0.2   0:07.58 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.10 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:02.47 recvMC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 5 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 17 %, 10055 MiB
+ 11:02:57 up 255 days, 17:45, 89 users,  load average: 144.31, 134.96, 102.44
+===== 24 11:03:02 pid=5912
+top - 03:03:03 up 255 days, 17:45,  0 users,  load average: 146.20, 135.51, 102.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 38.7 us,  7.6 sy,  1.1 ni, 41.0 id, 10.9 wa,  0.0 hi,  0.8 si,  0.0 st
+MiB Mem : 1031713.+total, 358196.6 free, 116464.2 used, 557053.2 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 901806.1 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 D  18.8   0.2   0:37.24 planning
+   6022 980       20   0   12.3g   2.4g 148668 S   6.2   0.2   0:02.60 recvMC
+   6369 980       20   0   12.3g   2.4g 148668 S   6.2   0.2   0:07.98 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.10 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 recv
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.38 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 55 %, 10055 MiB
+ 11:03:03 up 255 days, 17:45, 89 users,  load average: 146.20, 135.51, 102.79
+===== 25 11:03:09 pid=5912
+top - 03:03:09 up 255 days, 17:45,  0 users,  load average: 146.29, 135.85, 103.
+Threads:  79 total,   1 running,  78 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 68.8 us,  7.0 sy,  0.8 ni, 15.7 id,  7.0 wa,  0.0 hi,  0.9 si,  0.0 st
+MiB Mem : 1031713.+total, 357257.7 free, 116850.5 used, 557605.8 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 901419.9 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 R  18.8   0.2   0:38.29 planning
+   6369 980       20   0   12.3g   2.4g 148668 S   6.2   0.2   0:08.39 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.11 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 recv
+   6022 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:02.72 recvMC
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.39 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 12 %, 10055 MiB
+ 11:03:09 up 255 days, 17:45, 89 users,  load average: 146.29, 135.85, 103.25
+===== 26 11:03:15 pid=5912
+top - 03:03:15 up 255 days, 17:45,  0 users,  load average: 149.47, 136.68, 103.
+Threads:  79 total,   2 running,  77 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 53.7 us,  5.0 sy,  0.6 ni, 29.5 id, 10.8 wa,  0.0 hi,  0.4 si,  0.0 st
+MiB Mem : 1031713.+total, 357041.8 free, 116779.6 used, 557892.6 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 901491.2 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 R  26.7   0.2   0:39.58 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.11 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 recv
+   6022 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:02.85 recvMC
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.39 recvUC
+   6024 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 52 %, 12287 MiB
+ 11:03:15 up 255 days, 17:45, 89 users,  load average: 149.47, 136.68, 103.69
+===== 27 11:03:20 pid=5912
+top - 03:03:21 up 255 days, 17:45,  0 users,  load average: 146.07, 136.19, 103.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 65.4 us,  6.4 sy,  0.7 ni, 15.4 id, 11.3 wa,  0.0 hi,  0.8 si,  0.0 st
+MiB Mem : 1031713.+total, 356447.4 free, 117056.1 used, 558210.5 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 901214.1 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 D  31.2   0.2   0:40.79 planning
+   6369 980       20   0   12.3g   2.4g 148668 S  12.5   0.2   0:09.91 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.12 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 recv
+   6022 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:02.98 recvMC
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.40 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 1 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 31 %, 12287 MiB
+ 11:03:21 up 255 days, 17:45, 89 users,  load average: 146.07, 136.19, 103.71
+===== 28 11:03:26 pid=5912
+top - 03:03:27 up 255 days, 17:45,  0 users,  load average: 151.51, 137.48, 104.
+Threads:  79 total,   1 running,  78 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 56.9 us,  8.2 sy,  0.9 ni, 23.9 id,  9.6 wa,  0.0 hi,  0.4 si,  0.0 st
+MiB Mem : 1031713.+total, 355896.2 free, 117293.4 used, 558524.4 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 900976.9 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 R  20.0   0.2   0:42.13 planning
+   6022 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:03.12 recvMC
+   6369 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:10.33 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.12 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 recv
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.40 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 49 %, 12287 MiB
+ 11:03:27 up 255 days, 17:45, 89 users,  load average: 151.51, 137.48, 104.30
+===== 29 11:03:32 pid=5912
+top - 03:03:33 up 255 days, 17:46,  0 users,  load average: 153.23, 138.07, 104.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 72.3 us,  4.2 sy,  0.9 ni, 18.5 id,  3.6 wa,  0.0 hi,  0.5 si,  0.0 st
+MiB Mem : 1031713.+total, 355487.0 free, 117446.1 used, 558780.8 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 900824.1 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 D  20.0   0.2   0:43.36 planning
+   6025 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:00.55 planning
+   6369 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:10.72 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.13 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 recv
+   6022 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:03.24 recvMC
+0, 99 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 0 %, 12287 MiB
+ 11:03:33 up 255 days, 17:46, 89 users,  load average: 153.23, 138.07, 104.67
+===== 30 11:03:38 pid=5912
+top - 03:03:39 up 255 days, 17:46,  0 users,  load average: 155.78, 138.85, 105.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 53.1 us,  8.0 sy,  0.5 ni, 24.8 id, 12.5 wa,  0.0 hi,  1.0 si,  0.0 st
+MiB Mem : 1031713.+total, 355052.2 free, 117652.7 used, 559009.1 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 900617.6 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 D  26.7   0.2   0:44.67 planning
+   6022 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:03.37 recvMC
+   6369 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:11.12 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.14 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 recv
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.41 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 11 %, 14419 MiB
+ 11:03:39 up 255 days, 17:46, 89 users,  load average: 155.78, 138.85, 105.10
+===== 31 11:03:44 pid=5912
+top - 03:03:44 up 255 days, 17:46,  0 users,  load average: 158.52, 139.99, 105.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 46.3 us,  7.5 sy,  0.7 ni, 32.4 id, 12.6 wa,  0.0 hi,  0.6 si,  0.0 st
+MiB Mem : 1031713.+total, 354588.9 free, 117887.2 used, 559237.8 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 900382.6 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 D  20.0   0.2   0:46.05 planning
+   6022 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:03.49 recvMC
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.15 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 recv
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.41 recvUC
+   6024 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 69 %, 14419 MiB
+ 11:03:45 up 255 days, 17:46, 89 users,  load average: 158.52, 139.99, 105.84
+===== 32 11:03:50 pid=5912
+top - 03:03:50 up 255 days, 17:46,  0 users,  load average: 159.92, 140.59, 106.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 50.6 us, 11.3 sy,  0.6 ni, 27.8 id,  9.3 wa,  0.0 hi,  0.4 si,  0.0 st
+MiB Mem : 1031713.+total, 354259.9 free, 117985.3 used, 559468.8 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 900284.9 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 D  20.0   0.2   0:47.37 planning
+   6022 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:03.61 recvMC
+   6369 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:11.92 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.15 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 recv
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.42 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 0 %, 14419 MiB
+ 11:03:50 up 255 days, 17:46, 89 users,  load average: 159.92, 140.59, 106.21
+===== 33 11:03:56 pid=5912
+top - 03:03:56 up 255 days, 17:46,  0 users,  load average: 161.04, 141.15, 106.
+Threads:  79 total,   0 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 63.2 us,  9.9 sy,  0.8 ni, 20.3 id,  5.3 wa,  0.0 hi,  0.5 si,  0.0 st
+MiB Mem : 1031713.+total, 353926.2 free, 118132.8 used, 559654.9 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 900137.6 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5912 980       20   0   12.3g   2.4g 148668 D  13.3   0.2   0:48.77 planning
+   6369 980       20   0   12.3g   2.4g 148668 S   6.7   0.2   0:12.34 planning
+   6015 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6016 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 planning
+   6017 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 gc
+   6018 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 dq.buil+
+   6019 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.00 dq.user
+   6020 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.16 tev
+   6021 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.01 recv
+   6022 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:03.73 recvMC
+   6023 980       20   0   12.3g   2.4g 148668 S   0.0   0.2   0:00.43 recvUC
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 2 %, 14441 MiB
+6, 0 %, 21331 MiB
+7, 41 %, 14419 MiB
+ 11:03:56 up 255 days, 17:46, 89 users,  load average: 161.04, 141.15, 106.58
+===== 34 11:04:01 pid=5912
+top - 03:04:02 up 255 days, 17:46,  0 users,  load average: 156.40, 140.51, 106.
+Threads:   0 total,   0 running,   0 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 55.9 us,  9.0 sy,  0.5 ni, 27.7 id,  6.4 wa,  0.0 hi,  0.4 si,  0.0 st
+MiB Mem : 1031713.+total, 356892.3 free, 115154.3 used, 559667.3 buff/cache
+MiB Swap:   8192.0 total,      0.0 free,   8192.0 used. 903123.9 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14035 MiB
+6, 0 %, 21331 MiB
+7, 0 %, 16605 MiB
+ 11:04:02 up 255 days, 17:46, 89 users,  load average: 156.40, 140.51, 106.56
+===== 35 11:04:07 pid=none
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14035 MiB
+6, 0 %, 21331 MiB
+7, 0 %, 16605 MiB
+ 11:04:08 up 255 days, 17:46, 89 users,  load average: 151.96, 139.86, 106.53
+===== 36 11:04:13 pid=none
+0, 100 %, 7187 MiB
+1, 0 %, 21205 MiB
+2, 0 %, 21285 MiB
+3, 0 %, 14735 MiB
+4, 0 %, 15295 MiB
+5, 0 %, 14035 MiB
+6, 0 %, 21331 MiB
+7, 31 %, 16605 MiB
+ 11:04:13 up 255 days, 17:46, 89 users,  load average: 148.04, 139.24, 106.51
+SAMPLE_DONE

@@ -168,7 +168,7 @@
 | T57 | 现场：一条命令换成我们的，空人行横道（有人拿急停）→ 同事开车低速经过 → 正常车流，每次录包；换回 | 人 + Agent | T61 | 半天 | 任务已写好 |
 | T59 | 补完 T56：装新的开关脚本和定位的 launch，unit 读开关文件，感知启动脚本的库路径；App 地图 ignore（App 的数据库只有 c1adbe7b）；域 42 演练用我们的服务和共享内存（rehearsal on：停他们的四个导航服务），先验共享内存不串域 | Agent | T56 复核 | 2 小时 | 停在第 5 步，已复核（2026-11-14）：共享内存按域隔开、rehearsal 来回都好。抓到大消息的问题：定位的地图点云 18.6 MB、栅格 117 MB、规划的全局栅格 117 MB，超过 iceoryx 的 16 MB；仓库里修了，T61 重编再演练 |
 | T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成，已复核（2026-11-14）：定位不再因大消息退出，odom 约 100 Hz；缩略图一条、Foxglove 订了规划没重启；外参 OK。复核加了：use-new 等 odom（INS 30 s 没固定解定位起不来）、bag_to_mcap.py（狗上录的是 sqlite3） |
-| T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 任务已写好 |
+| T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 完成（2026-11-15）：/tmp 在 NFS 上，规划 glog 把线程打进 D，空闲 GPU 上中位 13 Hz；run.sh 给 /tmp 挂 tmpfs 以后中位 20 Hz，和 micromamba 一样。1112 reliable 不停，1653 条目标，外参 OK（−90°，漂移中位 0.13 m）。best effort 仍丢帧（skipped 中位 3）但这次没停死 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 完成，已复核（2026-11-15）：三个模块在狗的系统镜像里编过，ldd 0，增量 2.5 分钟。vfs 每次起容器 50 分钟，run_arm64.sh 改成留一个容器 exec。狗上的对照没做（隧道不回 SSH），放到 T63 |
 | T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 任务已写好（第一次把服务器编的装到狗上之前做） |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
@@ -10238,3 +10238,41 @@ solver failed 没多出来。外参这一条不用再在这里做了：T61 在�
    用来复现），`run.sh` 把这个变量传进容器。要重编 nav_perception。
 
 T62 接着查这两件。T58 停在这里（第 4 步以后不用再做）。
+
+## T62 结果
+
+第 0 步。`git pull` 已是最新。pytest 那九个文件 **89 passed**（任务写的是 88；没有失败）。`nav_perception` 在 `t58build` 里重编，exit 0，`ldd` 的 `not found` 是 0，二进制里有 `cloud_reliable`。
+
+第 1 步。
+
+a. 同一段人行横道（`replay_planning_check.sh … 78.7 226.6`），`mission_state` 按秒：
+
+| | 每秒中位 | p10 | p90 | 全程 |
+|---|---|---|---|---|
+| T54 的日志（micromamba） | 20 | 19 | 21 | 19.34 Hz（3114 / 161 s） |
+| 今天 micromamba 再放一次（GPU 3，单独放） | 20 | 20 | 20 | 19.44 Hz（3150 / 162 s，active 3112） |
+| nav-dev，`/tmp` 在 NFS 上（GPU 5，单独放） | 13 | 10 | 15 | 12.53 Hz（1992 / 159 s，active 1963） |
+| T58 那次的日志 | 9 | 7 | 10 | 8.84 Hz（1423 / 161 s） |
+| nav-dev，`/tmp` 改成 tmpfs 以后 | 20 | 20 | 20 | 19.75 Hz（3160 / 160 s，active 3118） |
+
+两套一起放的那次不作数：定位的 IMU 时间戳倒流约 5.3 s，起点被带离路网，`No free point found near start`，全程 fault。分开再放，起点和 T54 一样（`Start adjusted` 从约 78.31 119.38 挪到约 78.06 119.69），一路 active。
+
+b. 两边规划的 `CMakeCache.txt` 都是 `CMAKE_BUILD_TYPE=Release`，`CMAKE_CXX_FLAGS` 空，`CMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG`，`CMAKE_CUDA_FLAGS` 空，`CMAKE_CUDA_FLAGS_RELEASE=-O3 -DNDEBUG`。acados、OSQP 在 `Dockerfile.nav-dev` 里用 `CMAKE_BUILD_TYPE=Release` 编，编完删掉了构建目录，没有留下 `CMakeCache.txt`。编译选项对不上这 7 Hz 的差。
+
+c. NFS 上的那次（GPU 5 利用率 0–5%，主机负载约 150）：规划主线程大多在 **D**，CPU 大约 12–40%。tmpfs 上的那次（GPU 3 利用率 2–5%）：主线程是 R 或 S，`wchan` 是 0 或 `futex_wait_queue_me`。GPU 没有打满。`planning/src/runnable/entry/main.cc` 把 `FLAGS_log_dir` 写成 `/tmp`；这个容器的根在 vfs 上，`/tmp` 就是 NFS，每个周期的 glog 把线程打进不可中断的写。
+
+d. 改了 `Nav_D20/docker/run.sh`：`--tmpfs /tmp:rw,nosuid,size=8g`。新建容器 `t62tmp`（`docker create` 在 vfs 上约 31 分钟）再放一次，中位 20 Hz，和 micromamba 并排。模块代码没改。已经建好、`/tmp` 仍在 NFS 上的容器还是大约 13 Hz。
+
+第 2 步。1112（`/public/zjst/robot/cp_data/1112_t40`，1676 帧云，目标 −386.9 655.3）。包里原来的目标 1669 条。
+
+a. reliable（默认）：每秒 `clouds` 中位 11、最少 1（156 行里只有开头那一秒是 1，其余 8–13），`skipped` 中位 0、最少 0、最多 0，合计 clouds 1652、frames 1645。`/perception/lidar_3d/objects` 1653 条。没有停。
+
+b. 这台 Humble 的 `ros2 topic hz` 没有 `--qos-reliability`。best effort 那次另开了一个 best effort 订阅：前两个 10 s 收到 41、34 条，之后一直是 0，而节点自己的回调一直收到约 8 Hz。这个订阅的数不能当线上帧率。节点把缺的时间戳记在 `skipped` 里：best effort 的 clouds + skipped 合计约 1658，和包里的 1676 帧对得上。
+
+c. reliable 没有停，没有抓 wchan / gdb。
+
+d. `LIVE_PERCEPTION_RELIABLE=0`：每秒 `clouds` 中位 8、最少 1、合计 1137，`skipped` 中位 3、最多 14、合计 521，frames 1134。`/perception/lidar_3d/objects` 1135 条。日志从 03:11:44 到 03:14:32，整段都在打，没有再像 T58 那样停死。丢的是分片（`skipped`），回调还在。
+
+e. reliable 那次 `objects_in_map.py`：4 条静止车，配置的 −90° 漂移中位 0.13 m，4/4 还在 0.5 m 内，`extrinsic OK`。T61 在狗上是 0.12 m、OK。
+
+`run.sh` 起的 nav-dev（`/tmp` 是 tmpfs，现场感知默认 reliable）周期和感知都过了，以后的回放走这条。micromamba 留着当备用。

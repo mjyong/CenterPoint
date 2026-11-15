@@ -1,0 +1,14 @@
+T62 planning cycle counts (mission_state lines per second).
+
+T54 log (micromamba): median 20, p10 19, p90 21, 19.34 Hz (3114 / 161 s)
+micromamba replay t62_mm2, GPU 3, alone: median 20, p10 20, p90 20, 19.44 Hz (3150 / 162 s, active 3112)
+nav-dev t62_nav2, /tmp on NFS, GPU 5, alone: median 13, p10 10, p90 15, 12.53 Hz (1992 / 159 s, active 1963)
+T58 log: median 9, p10 7, p90 10, 8.84 Hz (1423 / 161 s)
+nav-dev t62_nav3, /tmp tmpfs, GPU 3: median 20, p10 20, p90 20, 19.75 Hz (3160 / 160 s, active 3118)
+
+CMake both sides: Release, CXX_FLAGS empty, CXX_FLAGS_RELEASE -O3 -DNDEBUG, CUDA_FLAGS empty, CUDA_FLAGS_RELEASE -O3 -DNDEBUG.
+acados and OSQP: Dockerfile CMAKE_BUILD_TYPE=Release, build trees removed.
+
+1112 bag clouds: 1676. Recorded objects in the bag: 1669.
+reliable: clouds median 11 min 1 sum 1652, skipped median 0 max 0, frames 1645, objects 1653, extrinsic OK, -90 deg, median drift 0.13 m, 4/4 static.
+best effort: clouds median 8 min 1 sum 1137, skipped median 3 max 14 sum 521, frames 1134, objects 1135. Did not stop.

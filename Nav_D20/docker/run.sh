@@ -12,7 +12,10 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tty=()
 [[ -t 0 && -t 1 ]] && tty=(-it)
+# /tmp in a vfs container is the NFS layer. Planning writes glog there (FLAGS_log_dir = "/tmp") and the
+# cycle thread sits in D; a replay then runs at ~13 Hz instead of 20 (T62). A tmpfs keeps that off NFS.
 exec docker run --rm "${tty[@]}" --gpus "\"device=${NAV_GPU:-0}\"" --shm-size 8g \
+  --tmpfs /tmp:rw,nosuid,size=8g \
   -u "$(id -u):$(id -g)" -e HOME=/tmp \
   -v "${repo}:/repo" -w /repo \
   -v "/public:/public:$([[ -n "${NAV_PUBLIC_RW:-}" ]] && echo rw || echo ro)" \
