@@ -66,7 +66,10 @@ if [[ -n "${NAV_DRY_RUN:-}" ]]; then
   exit 0
 fi
 
-state="$("${DOCKER}" inspect -f '{{.State.Running}}' "${name}" 2> /dev/null || echo missing)"
+# a missing container makes docker inspect exit 1 after a blank line on stdout; that line is not "missing"
+raw="$("${DOCKER}" inspect -f '{{.State.Running}}' "${name}" 2> /dev/null || true)"
+state="${raw//[[:space:]]/}"
+[[ -n "${state}" ]] || state=missing
 if [[ "${state}" == missing ]]; then
   echo "creating ${name} from ${image} (on vfs the first one takes long, T60)..."
   "${create[@]}" > /dev/null

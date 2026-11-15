@@ -1,0 +1,160 @@
+creating nav-arm64-junyongmou from dog8-rootfs:latest (on vfs the first one takes long, T60)...
+== nav_perception: all (from Nav_D20/perception_combo_ros/common_interface)
+[5.652s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[5.654s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[5.655s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[6.299s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'kygi665_msgs' is in: /opt/seres/nav_cw/install/nav_perception/kygi665_msgs
+	'nav_interface' is in: /opt/seres/nav_cw/install/nav_perception/nav_interface
+	'perception_interface' is in: /opt/seres/nav_cw/install/nav_perception/perception_interface
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding kygi665_msgs nav_interface perception_interface
+
+This may be promoted to an error in a future release of colcon-override-check.
+Starting >>> common_interface
+Starting >>> nav2_interface
+Starting >>> UtilsTest
+Starting >>> kygi665_msgs
+Finished <<< UtilsTest [3.98s]
+Starting >>> rte_interface
+Finished <<< kygi665_msgs [11.4s]
+Starting >>> seres_proto
+Finished <<< nav2_interface [12.1s]
+Finished <<< common_interface [12.6s]
+Starting >>> interfaces
+Starting >>> mc_interface
+Finished <<< seres_proto [5.40s]
+Starting >>> nav_interface
+Finished <<< mc_interface [13.6s]
+Starting >>> perception_interface
+Finished <<< interfaces [18.2s]
+Starting >>> robot_interface
+Finished <<< rte_interface [30.3s]
+Finished <<< perception_interface [13.6s]
+Finished <<< nav_interface [23.5s]
+Finished <<< robot_interface [13.0s]
+
+Summary: 11 packages finished [48.8s]
+== nav_perception: lidar_seg,grid_map_memory_node,lidar_3d_detection (from Nav_D20/perception_combo_ros/node_src)
+[4.141s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[4.142s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[4.142s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> grid_map_memory_node
+Starting >>> lidar_3d_detection
+Starting >>> lidar_seg
+Finished <<< grid_map_memory_node [5.72s]
+Finished <<< lidar_seg [5.84s]
+[Processing: lidar_3d_detection]
+[Processing: lidar_3d_detection]
+[Processing: lidar_3d_detection]
+[Processing: lidar_3d_detection]
+[Processing: lidar_3d_detection]
+[Processing: lidar_3d_detection]
+Finished <<< lidar_3d_detection [3min 32s]
+
+Summary: 3 packages finished [3min 36s]
+== slam: kygi665_msgs,rhr_interface,nav2_interface,common_interface (from Nav_D20/seres_interface)
+[4.957s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[4.960s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[4.961s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[5.438s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'rhr_interface' is in: /opt/seres/nav_cw/install/slam/rhr_interface
+	'kygi665_msgs' is in: /opt/seres/nav_cw/install/slam/kygi665_msgs
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding kygi665_msgs rhr_interface
+
+This may be promoted to an error in a future release of colcon-override-check.
+Starting >>> common_interface
+Starting >>> kygi665_msgs
+Starting >>> rhr_interface
+Finished <<< kygi665_msgs [9.61s]
+Finished <<< rhr_interface [9.83s]
+Finished <<< common_interface [10.4s]
+Starting >>> nav2_interface
+Finished <<< nav2_interface [14.0s]
+
+Summary: 4 packages finished [28.3s]
+== slam: novatel_oem7_msgs,basic,livox_ros_driver2 (from Nav_D20/slam)
+[3.755s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[3.756s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[3.757s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[4.219s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'livox_ros_driver2' is in: /opt/seres/nav_cw/install/slam/livox_ros_driver2
+	'novatel_oem7_msgs' is in: /opt/seres/nav_cw/install/slam/novatel_oem7_msgs
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding livox_ros_driver2 novatel_oem7_msgs
+
+This may be promoted to an error in a future release of colcon-override-check.
+Starting >>> basic
+Starting >>> livox_ros_driver2
+Starting >>> novatel_oem7_msgs
+Finished <<< basic [4.25s]
+Finished <<< livox_ros_driver2 [10.8s]
+Finished <<< novatel_oem7_msgs [12.1s]
+
+Summary: 3 packages finished [15.6s]
+== slam: lightning (from Nav_D20/slam)
+[3.904s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[3.905s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[3.905s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> lightning
+[Processing: lightning]
+Finished <<< lightning [47.5s]
+
+Summary: 1 package finished [50.9s]
+== planning: nav2_interface,common_interface,mc_interface,perception_interface,rte_interface,rhr_interface (from Nav_D20/seres_interface)
+[5.073s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[5.074s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[5.074s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[5.560s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'nav2_interface' is in: /opt/seres/nav_cw/install/planning/nav2_interface
+	'rte_interface' is in: /opt/seres/nav_cw/install/planning/rte_interface
+	'mc_interface' is in: /opt/seres/nav_cw/install/planning/mc_interface
+	'perception_interface' is in: /opt/seres/nav_cw/install/planning/perception_interface
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding mc_interface nav2_interface perception_interface rte_interface
+
+This may be promoted to an error in a future release of colcon-override-check.
+Starting >>> common_interface
+Starting >>> mc_interface
+Starting >>> rhr_interface
+Starting >>> rte_interface
+Finished <<< rhr_interface [9.47s]
+Finished <<< mc_interface [9.88s]
+Finished <<< common_interface [10.3s]
+Starting >>> nav2_interface
+Starting >>> perception_interface
+Finished <<< rte_interface [16.2s]
+Finished <<< nav2_interface [10.9s]
+Finished <<< perception_interface [11.3s]
+
+Summary: 6 packages finished [26.1s]
+== planning: nav_interface (from Nav_D20/planning/third_party)
+[3.383s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[3.384s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[3.385s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> nav_interface
+Finished <<< nav_interface [10.8s]
+
+Summary: 1 package finished [13.7s]
+== planning: planning (from Nav_D20/planning)
+[3.504s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[3.505s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/opt/ros/humble' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[3.506s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/opt/seres/nav_cw/deps/usr' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> planning
+Finished <<< planning [9.65s]
+
+Summary: 1 package finished [12.6s]
+done: /opt/seres/nav_cw/install/{nav_perception,slam,planning}
