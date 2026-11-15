@@ -1,6 +1,7 @@
 """tools/deploy/nav_cw.sh: switching dog 8 between the robot team's navigation services and ours, against a fake
 systemctl (unit states in files)."""
 import os
+import re
 import subprocess
 
 import pytest
@@ -77,7 +78,8 @@ COMM = """confs{
 """
 
 
-MISSION = ("teb_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    reference_velocity: 2.0\n  }\n}\n"
+MISSION = ("tracking_conf{\n  nav_blocked_enable: true\n  nav_blocked_window: 1.5\n}\n"
+           "teb_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    reference_velocity: 2.0\n  }\n}\n"
            "mppi_planner_conf{\n  dynamic_constraints{\n    max_vx: 3.0\n    max_vy: 0.5\n  }\n"
            "  reference_velocity_critic{\n    enabled: true\n    reference_velocity: 1.5\n  }\n}\n")
 CONF_DIR = "install/planning/planning/lib/planning/robot_factory/d20/001/planning_conf"
@@ -408,6 +410,19 @@ def test_speed_caps_only_the_mppi(root):
     assert "NAV_CW_SPEED" not in root.env.read_text() and "off (repository value)" in root("switches").stdout
 
 
+def test_shadow_mode_turns_the_planners_blocked_check_off_and_back(root):
+    """a person drives the dog in shadow mode: a go with the dog held at the curb is not "blocked" (standstill)"""
+    blocked = lambda: re.search(r"nav_blocked_enable: (\w+)", root.conf.read_text()).group(1)   # noqa: E731
+    assert root("shadow", "on").returncode == 0 and blocked() == "false"
+    assert "nav_blocked false: a person drives" in root("switches").stdout
+    assert root("speed", "0.5").returncode == 0 and blocked() == "false"            # the cap does not undo it
+    assert "max_vx: 0.5" in root.conf.read_text().split("mppi_planner_conf")[1]
+    assert root("speed", "off").returncode == 0 and blocked() == "false"            # nor putting the file back
+    assert "max_vx: 3.0" in root.conf.read_text().split("mppi_planner_conf")[1]
+    assert root("shadow", "off").returncode == 0 and blocked() == "true"
+    assert "window: 1.5" in root.conf.read_text()
+
+
 def test_the_switches_hold_across_a_reinstall(root):
     """a reinstall (T60 step 7) puts the repository's configs back; the switches kept in nav_cw.env go in again"""
     (root.state / "cw-planning.service").write_text("inactive")
@@ -422,6 +437,8 @@ def test_the_switches_hold_across_a_reinstall(root):
     assert "max_vx: 0.8" in root.conf.read_text().split("mppi_planner_conf")[1]
     assert "NOT APPLIED" not in r.stdout
     root("speed", "off")
+    assert root.conf.read_text() == MISSION.replace("nav_blocked_enable: true", "nav_blocked_enable: false")  # shadow
+    root("shadow", "off")
     assert root.conf.read_text() == MISSION
 
 

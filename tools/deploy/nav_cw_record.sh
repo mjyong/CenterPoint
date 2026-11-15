@@ -9,7 +9,10 @@
 #   sudo bash /opt/seres/nav_cw/nav_cw_record.sh -o /home/nvidia/bags/<name> [--radius 1.5] [--hold 5] [--no-auto]
 #                                                [--hidden] [more topics ...]   (--hidden: also action topics like
 #                                                /nav/navigation/_action/status; --dry-run prints the command)
+#   sudo bash /opt/seres/nav_cw/nav_cw_record.sh --tag cw13_watch  -> <date>_cw13_watch_<n> (one name per crosswalk)
 #   sudo bash /opt/seres/nav_cw/nav_cw_record.sh --no-record      only the motion-control lines, no bag
+# A line typed while it records (Enter) is a note with the time. When it stops, the bag directory also gets
+# record_log.txt (the output, the notes, "replay goal: x y") and journal_<unit>.txt (our units over the recording).
 #   NAV_CW_PREFIX (/opt/seres/nav_cw: our installs give the message types), NAV_CW_BAG_DIR (/home/nvidia/bags).
 # Domain: ROS_DOMAIN_ID if set, else nav_cw.env's (42 during a rehearsal), else 0. It only subscribes.
 set -euo pipefail

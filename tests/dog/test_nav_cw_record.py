@@ -141,18 +141,21 @@ def dog(tmp_path):
     bags = tmp_path / "bags"
     log = tmp_path / "log.txt"
     log.write_text("")
+    (bin_ / "journalctl").write_text('#!/bin/bash\necho "journal $*"\n')
+    (bin_ / "journalctl").chmod(0o755)
 
     def env(**extra):
         e = dict(os.environ, NAV_CW_ROS_SETUP=str(setup), NAV_CW_PREFIX=str(prefix), NAV_CW_RECORD_ANY_USER="1",
-                 NAV_CW_BAG_DIR=str(bags), FAKE_LOG=str(log), PYTHONUNBUFFERED="1")
+                 NAV_CW_BAG_DIR=str(bags), FAKE_LOG=str(log), PYTHONUNBUFFERED="1",
+                 NAV_CW_JOURNALCTL=str(bin_ / "journalctl"))
         for k in ("ROS_DOMAIN_ID", "SUDO_UID", "SUDO_GID", "PYTHONPATH"):
             e.pop(k, None)
         e.update({k: (json.dumps(v) if k == "FAKE_FEED" else str(v)) for k, v in extra.items()})
         return e
 
-    def start(*args, **extra):
+    def start(*args, stdin=subprocess.DEVNULL, **extra):
         # its own process group, as the terminal's foreground group: killpg(SIGINT) is a Ctrl-C
-        return subprocess.Popen(["bash", SH, *args], env=env(**extra), stdout=subprocess.PIPE,
+        return subprocess.Popen(["bash", SH, *args], env=env(**extra), stdout=subprocess.PIPE, stdin=stdin,
                                 stderr=subprocess.STDOUT, text=True, start_new_session=True)
 
     def wait_recording(p, timeout=10.0):
@@ -296,3 +299,26 @@ def test_no_record_only_watches_and_hidden_adds_action_topics(dog):
     r = subprocess.run(["bash", SH, "--dry-run", "--hidden", "-o", "/x/z"], env=dog.env(), capture_output=True,
                        text=True)
     assert "--include-hidden-topics /robot/topic/rdap/top_point_cloud2" in r.stdout, r.stdout
+
+
+def test_notes_journals_and_the_replay_goal_go_beside_the_bag(dog):
+    feed = [[0.2, "/planning/debug/goal_pose", 12.5, -3.25]]
+    p = dog("--tag", "cw13_watch", stdin=subprocess.PIPE, FAKE_FEED=feed)
+    dog.wait_recording(p)
+    p.stdin.write("car from the left, the go was early\n")
+    p.stdin.write("\n")
+    p.stdin.flush()
+    time.sleep(1.0)
+    os.killpg(p.pid, signal.SIGINT)
+    out, _ = p.communicate(timeout=20)
+    assert p.returncode == 0, out
+    bag = next(d for d in dog.bags.iterdir())
+    assert re.match(r"^\d{8}_cw13_watch_1$", bag.name)
+    rec_log = (bag / "record_log.txt").read_text()
+    assert "note: car from the left, the go was early" in rec_log and "note: mark" in rec_log
+    assert "replay goal: 12.500 -3.250" in rec_log and "stopping (Ctrl-C)" in rec_log
+    j = (bag / "journal_cw-planning.txt").read_text()
+    assert j.startswith("journal -u cw-planning --since ") and "--until" in j and "short-precise" in j
+    assert {f.name for f in bag.iterdir()} >= {"journal_cw-slam.txt", "journal_cw-nav-perception.txt",
+                                               "metadata.yaml"}
+    assert subprocess.run(["bash", SH, "--tag", "a/b"], env=dog.env(), capture_output=True).returncode == 2

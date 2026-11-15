@@ -27,7 +27,9 @@
 #                                           pub_cmd_vel / pub_motion names (the planner ignores --ros-args: it
 #                                           calls rclcpp::init(0, nullptr)); restarts cw-planning and checks in the
 #                                           ROS graph who publishes what (if the planner still publishes
-#                                           /mc/motion_control with shadow on, it stops cw-planning, exit 3)
+#                                           /mc/motion_control with shadow on, it stops cw-planning, exit 3).
+#                                           Shadow also turns the planner's nav_blocked off (mission_conf): the
+#                                           dog held by a person is not "blocked" (else standstill after ~4.5 s)
 #   sudo bash nav_cw.sh appmap ignore|follow   ignore (the default): our planning and localization listen on
 #                                           /nav_cw/map/switch and /nav_cw/map/file_update instead of the App's
 #                                           and stay on the site map configure set (planning: communication_conf
@@ -225,6 +227,27 @@ cap_speed() {
       { print }' "${conf}" > "${conf}.tmp" && mv "${conf}.tmp" "${conf}"
 }
 
+# shadow_blocked <conf>: in shadow mode the planner's commands do not move the dog, a person does, and the planner's
+# "blocked" check (towards the goal slower than nav_blocked_progress_epsilon for nav_blocked_window +
+# nav_blocked_enter_duration, about 4.5 s) would park the mission in standstill, which only a resume ends: a go at the
+# curb with the dog held there would end the test. Off in shadow mode; otherwise the repository's value (<conf>.repo).
+shadow_blocked() {
+  local conf=$1 repo_val
+  if [[ "$(env_get NAV_CW_SHADOW)" == on ]]; then
+    [[ -f "${conf}.repo" ]] || cp -p "${conf}" "${conf}.repo"
+    sed -i -E 's/^([[:space:]]*nav_blocked_enable:[[:space:]]*)true/\1false/' "${conf}"
+  elif [[ -f "${conf}.repo" ]]; then
+    repo_val="$(sed -n -E 's/^[[:space:]]*nav_blocked_enable:[[:space:]]*([a-z]+).*/\1/p' "${conf}.repo" | head -1)"
+    if [[ -n "${repo_val}" ]]; then
+      sed -i -E "s/^([[:space:]]*nav_blocked_enable:[[:space:]]*)[a-z]+/\1${repo_val}/" "${conf}"
+    fi
+  fi
+}
+blocked_state() {
+  local conf; conf="$(mission_conf)"
+  sed -n -E 's/^[[:space:]]*nav_blocked_enable:[[:space:]]*([a-z]+).*/\1/p' "${conf}" 2> /dev/null | head -1
+}
+
 speed() {   # speed <m/s> | off | show
   local conf
   conf="$(mission_conf)"
@@ -232,11 +255,13 @@ speed() {   # speed <m/s> | off | show
   if [[ "${1:-show}" == off ]]; then
     env_set NAV_CW_SPEED ""
     cap_speed "${conf}" off
+    shadow_blocked "${conf}"
     restart_if_active cw-planning.service
   elif [[ "${1:-show}" != show ]]; then
     [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "speed: a number in m/s (e.g. 0.8), off or show"; exit 2; }
     env_set NAV_CW_SPEED "$1"
     cap_speed "${conf}" "$1"
+    shadow_blocked "${conf}"
     restart_if_active cw-planning.service
   fi
   awk '/mppi_planner_conf/ { m = 1 } m && /^[[:space:]]*max_vx:/ && !a { print "  MPPI " $0; a = 1 }
@@ -257,7 +282,7 @@ set_topic_name() {   # set_topic_name <conf> <field> <name>
 
 # The switches are kept in nav_cw.env (NAV_CW_SHADOW=on, NAV_CW_APPMAP=follow, NAV_CW_SPEED=<m/s>; not set: off,
 # ignore, no cap) and written into the installed configs here: shadow and appmap in communication_conf, the speed cap
-# in mission_conf, appmap's launch argument for the localization in NAV_CW_SLAM_ARGS. A reinstall puts the
+# and shadow's nav_blocked off in mission_conf, appmap's launch argument for the localization in NAV_CW_SLAM_ARGS. A reinstall puts the
 # repository's configs back; use-new (and apply) write the switches in again, so they hold across installs.
 apply_switches() {
   local conf mission
@@ -279,6 +304,7 @@ apply_switches() {
     env_set NAV_CW_SLAM_ARGS ""
   fi
   cap_speed "${mission}" "$(env_get NAV_CW_SPEED | grep . || echo off)"
+  shadow_blocked "${mission}"
 }
 shadow_state() {
   local conf; conf="$(comm_conf)"
@@ -387,7 +413,7 @@ switches() {
   want_shadow="$(env_get NAV_CW_SHADOW | grep . || echo off)"
   wanted_appmap="$(want_appmap)"
   echo "switches (${ENVFILE}; installed: $(comm_conf)):"
-  echo "  shadow:           ${want_shadow}$([[ "${want_shadow}" == on ]] && echo " (commands to ${SHADOW_CMD}, ${SHADOW_MC})")"
+  echo "  shadow:           ${want_shadow}$([[ "${want_shadow}" == on ]] && echo " (commands to ${SHADOW_CMD}, ${SHADOW_MC}; nav_blocked $(blocked_state): a person drives)")"
   echo "  appmap:           ${wanted_appmap}$([[ "${wanted_appmap}" == ignore ]] && echo " (listening on ${OWN_SWITCH}; localization: $(env_get NAV_CW_SLAM_ARGS))")"
   if [[ "$(shadow_state)" != "${want_shadow}" || "$(appmap_state)" != "${wanted_appmap}" ]]; then
     echo "  NOT APPLIED: the installed config has shadow $(shadow_state), appmap $(appmap_state) (a reinstall?): nav_cw.sh apply"
@@ -502,5 +528,5 @@ case "${1:-status}" in
     switch "${NEW[@]}" -- "${ORIG[@]}" || { status || true; exit 1; }
     status ;;
   configure) shift; configure "$@" ;;
-  *) sed -n '2,58p' "$0"; exit 2 ;;
+  *) sed -n '2,60p' "$0"; exit 2 ;;
 esac

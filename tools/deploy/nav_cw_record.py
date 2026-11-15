@@ -14,7 +14,13 @@ It also prints every change of the motion control's state (/mc/state: mode, uuid
 commands it (/mc/motion_control: uuid, mode, motion): T57's dog stood in mode 3 (lower body) while the planner sent
 mode 2 (whole body) walks. --no-record only watches.
 
+Notes: a line typed in the terminal (Enter) is logged with the time ("note: car from the left, the go was early"; an
+empty line is "mark"). When the recording stops, the bag directory also gets record_log.txt (everything printed, the
+notes, the planner's last goal as "replay goal: x y" for replay_planning_check.sh) and journal_<unit>.txt (our units'
+journals over the recording: the planner's "Crosswalk yield:" lines to compare a replay with).
+
     sudo bash /opt/seres/nav_cw/nav_cw_record.sh                       # /home/nvidia/bags/<date>_cw_<n>
+    sudo bash /opt/seres/nav_cw/nav_cw_record.sh --tag cw13_watch      # /home/nvidia/bags/<date>_cw13_watch_<n>
     sudo bash /opt/seres/nav_cw/nav_cw_record.sh -o /home/nvidia/bags/x --radius 2 --hold 5 /more/topic ...
     sudo bash /opt/seres/nav_cw/nav_cw_record.sh --no-record      # only the motion-control lines (and the goal)
 """
@@ -23,6 +29,8 @@ import datetime
 import math
 import os
 import re
+import select
+import shutil
 import signal
 import subprocess
 import sys
@@ -112,13 +120,60 @@ class Arrival:
         return self.since is not None and now - self.since >= self.hold
 
 
-def default_output(directory, today=None):
-    """<directory>/<YYYYMMDD>_cw_<n>, n one more than the largest there for that day."""
+def default_output(directory, today=None, tag="cw"):
+    """<directory>/<YYYYMMDD>_<tag>_<n>, n one more than the largest there for that day and tag."""
     day = today or datetime.date.today().strftime("%Y%m%d")
-    pat = re.compile(r"^%s_cw_(\d+)$" % re.escape(day))
+    pat = re.compile(r"^%s_%s_(\d+)$" % (re.escape(day), re.escape(tag)))
     taken = [int(m.group(1)) for m in map(pat.match, os.listdir(directory) if os.path.isdir(directory) else [])
              if m]
-    return os.path.join(directory, "%s_cw_%d" % (day, max(taken, default=0) + 1))
+    return os.path.join(directory, "%s_%s_%d" % (day, tag, max(taken, default=0) + 1))
+
+
+class Notes:
+    """Lines typed on stdin, as notes in the log; off when stdin is closed (or /dev/null)."""
+
+    def __init__(self, stream, log):
+        self.log, self.buf = log, b""
+        try:
+            self.fd = stream.fileno() if stream is not None and not stream.closed else None
+        except (OSError, ValueError):
+            self.fd = None
+
+    def poll(self):
+        """Read what is there from the descriptor itself (a buffered readline would keep a second line back)."""
+        while self.fd is not None:
+            try:
+                ready, _, _ = select.select([self.fd], [], [], 0)
+                chunk = os.read(self.fd, 4096) if ready else None
+            except (OSError, ValueError):
+                self.fd = None
+                return
+            if chunk is None:
+                return
+            if not chunk:                     # EOF
+                self.fd = None
+                return
+            self.buf += chunk
+            *done, self.buf = self.buf.split(b"\n")
+            for line in done:
+                self.log("note: " + (line.decode(errors="replace").strip() or "mark"))
+
+
+def save_journals(out, start, end, log):
+    """journal_<unit>.txt in the bag directory: our units over [start, end] (wall clock)."""
+    jc = shutil.which(os.environ.get("NAV_CW_JOURNALCTL", "journalctl"))
+    if jc is None:
+        log("no journalctl: no journals saved")
+        return
+    fmt = "%Y-%m-%d %H:%M:%S"
+    since = time.strftime(fmt, time.localtime(start - 2))
+    until = time.strftime(fmt, time.localtime(end + 2))
+    for unit in os.environ.get("NAV_CW_RECORD_UNITS", "cw-planning cw-slam cw-nav-perception").split():
+        path = os.path.join(out, "journal_%s.txt" % unit)
+        with open(path, "w") as f:
+            subprocess.run([jc, "-u", unit, "--since", since, "--until", until, "--no-pager", "-o", "short-precise"],
+                           stdout=f, stderr=subprocess.STDOUT)
+    log("journals of our units saved beside the bag (journal_<unit>.txt)")
 
 
 class Stop(Exception):
@@ -221,9 +276,11 @@ def watch_only(log):
     for s in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(s, _raise_stop)
     log("watching, domain %s; Ctrl-C to stop" % os.environ.get("ROS_DOMAIN_ID", "0"))
+    notes = Notes(sys.stdin, log)
     try:
         while True:
             feed[0](0.1)
+            notes.poll()
     except Stop:
         pass
     finally:
@@ -236,6 +293,7 @@ def main(argv=None):
     ap.add_argument("topics", nargs="*", help="more topics to record")
     ap.add_argument("-o", "--output", help="the bag directory (must not exist; default <dir>/<date>_cw_<n>)")
     ap.add_argument("--dir", default=os.environ.get("NAV_CW_BAG_DIR", "/home/nvidia/bags"))
+    ap.add_argument("--tag", default="cw", help="the default name is <date>_<tag>_<n> (e.g. cw13_watch)")
     ap.add_argument("--radius", type=float, default=1.5, help="[m] the dog this close to the goal ...")
     ap.add_argument("--hold", type=float, default=5.0, help="[s] ... this long before the recording stops")
     ap.add_argument("--no-auto", action="store_true", help="only Ctrl-C stops it")
@@ -244,12 +302,19 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true", help="print the record command")
     args = ap.parse_args(argv)
 
+    lines = []
+
     def log(line):
-        print("[%s] %s" % (time.strftime("%H:%M:%S"), line), flush=True)
+        line = "[%s] %s" % (time.strftime("%H:%M:%S"), line)
+        lines.append(line)
+        print(line, flush=True)
 
     if args.no_record:
         return watch_only(log)
-    out = args.output or default_output(args.dir)
+    if not re.match(r"^[\w.-]+$", args.tag):
+        log("--tag: letters, digits, _ . - only")
+        return 2
+    out = args.output or default_output(args.dir, tag=args.tag)
     if os.path.exists(out):
         log("%s exists; ros2 bag record would refuse it" % out)
         return 2
@@ -264,19 +329,24 @@ def main(argv=None):
     for s in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(s, _raise_stop)
     log("recording %s, domain %s: %d topics" % (out, os.environ.get("ROS_DOMAIN_ID", "0"), len(topics)))
-    rec = subprocess.Popen(cmd, start_new_session=True)
+    started = time.time()
+    rec = subprocess.Popen(cmd, start_new_session=True, stdin=subprocess.DEVNULL)   # the notes are ours
     arrival = Arrival(args.radius, args.hold)
     feed = ros_feed(arrival, log)
     auto = feed is not None and not args.no_auto
+    notes = Notes(sys.stdin, log)
     why = None
     try:
         log("Ctrl-C to stop" + ("; or it stops %g s after the dog is within %.1f m of the planner's goal" % (
             args.hold, args.radius) if auto else ""))
+        if notes.fd is not None:
+            log("type a note and Enter to log it with the time (Enter alone: mark)")
         while rec.poll() is None:
             if feed is not None:
                 feed[0](0.1)
             else:
                 time.sleep(0.1)
+            notes.poll()
             if auto and arrival.due(time.monotonic()):
                 why = "at the goal"
                 break
@@ -294,6 +364,15 @@ def main(argv=None):
         log("stopping (%s)" % why)
         code = stop_recorder(rec, log)
         code = 0 if code in (0, -signal.SIGINT, 130) else code
+    ended = time.time()
+    if os.path.isdir(out):
+        save_journals(out, started, ended, log)
+        log("recorded %.0f s, %s to %s" % (ended - started, time.strftime("%H:%M:%S", time.localtime(started)),
+                                            time.strftime("%H:%M:%S", time.localtime(ended))))
+        if arrival.goal is not None:
+            log("replay goal: %.3f %.3f" % arrival.goal)      # replay_planning_check.sh <name> <x> <y>
+        with open(os.path.join(out, "record_log.txt"), "w") as f:
+            f.write("\n".join(lines) + "\n")
     uid, gid = os.environ.get("SUDO_UID"), os.environ.get("SUDO_GID")
     if uid and gid and os.path.isdir(out):
         chown_tree(out, int(uid), int(gid))           # the nvidia user can copy and delete it

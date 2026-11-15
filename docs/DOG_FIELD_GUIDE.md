@@ -264,7 +264,8 @@ Foxglove 只能发 `/goal_pose`。一层一层来，前一层过了再下一层�
    - Foxglove 速度曲线里绿线是规划想发的，和人走的比；
    - 遛到人行横道：状态应该 approach（快到停止点）→ 人在入口前停下 → align（人把狗转到面朝对面）→ wait / go；
      有车经过时看车框变红、`waiting for` 有它，车走 3 s 后放行；这一步不冒任何险就能验感知 + 门控；
-   - 狗没按指令动，规划可能判成被挡（`nav_blocked` → standstill），重发目标即可。
+   - 影子模式下规划的"被堵"检测是关的（`nav_cw.sh` 自动关、关影子时恢复）：狗被人按住不走，不会进 standstill；
+   - 逐个路口怎么调、每一层看什么：第 8.1 节。
 4. **限速实走**（`shadow off`，`speed 0.5`，再 `0.8`）：空场地、空的人行横道，急停在手：approach → align → go → cross → none，
    入口前停下、转向、走过去、中间不停。门控用的是"等"规则，只要看得到在动、可能经过的车就等，不靠狗的速度算来不来得及，
    所以限速不影响等不等车，只是过得慢。
@@ -278,6 +279,35 @@ Foxglove 只能发 `/goal_pose`。一层一层来，前一层过了再下一层�
 - 出错、收工都 `use-original`；狗重启也会回到原来的；
 - 不在狗的域 0 上发任何话题，回放只用域 42；
 - 改了代码或配置，先回到第 2 层。
+
+### 8.1 影子模式下逐个路口调（运控接上以前就能做）
+
+规划在真狗、真传感器上照常算，指令发到影子话题，狗由人遥控。**人当执行器**：规划让停就停、让转就转、放行才走，
+状态机就是闭环的，门控、局部路线、速度都能在真路口上看。`shadow on` 时被堵检测是关的，狗被人按住不走不会进 standstill。
+
+只看状态机不够。下面五层从上往下依赖，上一层错了，下一层看到的都不作数：
+
+| 层 | 看什么 | 在哪看 | 对的样子 | 不对就敲一行备注，记 |
+|---|---|---|---|---|
+| 1 定位 | 狗的箭头在路网的路上，朝向和真狗一样，不跳 | 3D：`/lightning/odom`、站点缩略图 | 平稳、贴着路 | 跳了多少、偏多少 m；偏 > 1 m，这个路口后面几层不看 |
+| 2 地图 | 人行横道白框和地上的斑马线重合；align 那一刻狗实际停在哪 | 3D：`/planning/debug/crosswalk`；人眼看地上 | 框盖住斑马线；狗中心在入口线前约 0.8 m（狗头约 0.3 m） | 框往哪边偏多少；狗停在线前（或线上）多少 |
+| 3 感知 | 车框贴在真车上（位置、大小、朝向）；在动的车有速度箭头，停着的没有；同一辆车 id 不变；车第一次出现在多远 | 3D 车框（蓝：看到，红：在等它，橙：看到但不停）；侧栏"感知的原始目标"（id、motion、age、速度） | 每辆车都有框；停着的车不动、没箭头 | 漏了哪辆（从哪来、多远）、假框、停着的车"在动"、id 换了 |
+| 4 门控 | 状态字的理由和 `waiting for N` / `going on with N`；车来 → wait (vehicle) → 车过去 → clearing 约 3 s → go；人行横道上 ahead 和 going on with | 3D 状态字；侧栏 `crosswalk_go`、`crosswalk_waiting_for`、`crosswalk_vehicles`、`crosswalk_stale`；终端 `journalctl -u cw-planning -f \| grep --line-buffered "Crosswalk yield"` | 在动、可能经过的车都等；最后一辆过去约 3 s 放行；停着的车只看 3 s（压着路 15 s）；不 stale | 空等（哪个框红）、不该放的放了（哪辆车、多远、多快）、stale |
+| 5 状态机和指令 | approach → align → wait / go → cross（→ cross_wait）→ none；approach 最后 3 m 速度降到两成；hold 时指令 (0, 0, ω)，align 的 ω 方向对、≤ 0.5 rad/s；全局路径穿过白框，局部路线（MPPI）跟着过，不绕 | 速度、角速度曲线（影子指令和实际）；3D `/planning/debug/path_tracking`（全局路径、局部参考、MPPI 路线）；侧栏 `crosswalk_mode`（0–6）、`crosswalk_s_stop`、`crosswalk_heading_error`、`crosswalk_hold` | 同左 | 卡在哪个状态、转反了、hold 时速度不是 0、路线绕开了人行横道 |
+
+顺带看：感知每秒一行、约 10 Hz（`journalctl -u cw-nav-perception -f`）；侧栏 `nav_blocked` 一直是 0；`mission_state` 是 active。
+
+**走一遍**（每个路口，人当执行器）：
+1. 在路线上离人行横道 10 m 以外起步。Foxglove 发对面的目标，全局路径要穿过白框。5 s 内 `mission_state` 不是 active 就再发一次
+   （还在跑的任务，第一下只会被停掉）；
+2. approach：沿局部路线走，速度跟着影子指令（限速 0.5 时约 0.5 m/s），最后 3 m 慢下来；
+3. 状态字一变 align（红）就停，看狗离斑马线多远（敲备注）；按 ω 的方向原地转，`crosswalk_heading_error` 到 10° 以内就变 wait 或 go；
+4. wait（红）站着；go（绿）沿路线走过去；
+5. 人行横道上 cross（绿）一直走；变 cross_wait（红，理由 ahead）就原地停，变回 cross 再走；
+6. 出了人行横道变 none，走到目标 1.5 m 内，录包 5 s 后自己停。
+
+**定点看**（一个路口 10 分钟，看门控在真车流里怎么判）：走到上面第 4 步就不动，狗面朝对面站在停止点，状态随车流在 wait / go
+之间变。每次变 go，人判断"这时候起步安全吗"，不安全就敲备注（"go 不安全：右边来车 20 m"）；没车也在等，敲"空等"。
 
 ---
 
@@ -293,7 +323,13 @@ sudo bash /opt/seres/nav_cw/nav_cw_record.sh          # → /home/nvidia/bags/<Y
 - 规划有目标点（`/planning/debug/goal_pose`，或者录的时候新发的 `/goal_pose`），狗（自己走或遥控）先在 1.5 m 外、再进到
   目标 1.5 m 内，5 s 后自己停；中途又出了 1.5 m 就不停了，再进来重新数。上一次测试留下的目标就在狗脚下：不会停，要先出去；
 - 没有目标、或想早点停：Ctrl-C。两种停法都只给录制进程发一次 SIGINT，等它把 `metadata.yaml` 写完；录的时候不碰 db3；
-- `-o <目录>` 换名字，`--radius 2 --hold 5` 改距离和时间，`--no-auto` 只认 Ctrl-C，后面跟话题名多录几个，`--dry-run` 只打印命令；
+- `--tag cw13_walk` 起名 `<日期>_cw13_walk_<n>`（一个路口、一种做法一个名字），`-o <目录>` 直接给名字，`--radius 2 --hold 5` 改距离和时间，
+  `--no-auto` 只认 Ctrl-C（定点看用），后面跟话题名多录几个，`--dry-run` 只打印命令；
+- 录的时候在同一个终端敲一行字、回车，就记一条带时间的备注（只回车记 "mark"）：人的判断（"go 不安全"、"空等"、"框偏了"）
+  回来能和包对上；
+- 停下以后包的目录里多三样：`record_log.txt`（屏幕上打的全部、备注、最后一行 `replay goal: x y` 是回灌用的目标）、
+  `journal_cw-planning.txt`、`journal_cw-slam.txt`、`journal_cw-nav-perception.txt`（录的这段时间我们三个服务的日志；
+  回灌时拿规划的 `Crosswalk yield:` 那几行对）；
 - 录完包归 nvidia（`sudo` 的那个人），打印 `ros2 bag info`。没有 `metadata.yaml`（录制进程被杀了）就照提示 `ros2 bag reindex`；
 - 录的时候运控一变就打一行：`/mc/state: mode 3 lower body (IMC), uuid '', 20:DONE`（模式、谁在控、每个动作的状态）、
   `/mc/motion_control: uuid 'planning', mode 2 whole body (WBMC), motion 20, para [...]`（谁在发、发的什么模式，开始动和停下各一行）。
