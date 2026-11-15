@@ -170,7 +170,7 @@
 | T61 | 重编规划和定位（定位发地图点云失败不退出；规划的全局栅格调试话题发 0.6 m 的缩略），configure 关定位的两个大发布，再演练（接 T59 第 5 步） | Agent | T59 续复核 | 1.5 小时 | 完成，已复核（2026-11-14）：定位不再因大消息退出，odom 约 100 Hz；缩略图一条、Foxglove 订了规划没重启；外参 OK。复核加了：use-new 等 odom（INS 30 s 没固定解定位起不来）、bag_to_mcap.py（狗上录的是 sqlite3） |
 | T62 | nav-dev 里规划只有约 8 Hz、感知 30 帧以后收不到云：数周期、比编译选项、看线程和 GPU；感知订 reliable（新参数 cloud_reliable）再放 1112 | Agent | T58 复核 | 2 小时 | 完成（2026-11-15）：/tmp 在 NFS 上，规划 glog 把线程打进 D，空闲 GPU 上中位 13 Hz；run.sh 给 /tmp 挂 tmpfs 以后中位 20 Hz，和 micromamba 一样。1112 reliable 不停，1653 条目标，外参 OK（−90°，漂移中位 0.13 m）。best effort 仍丢帧（skipped 中位 3）但这次没停死 |
 | T60 | 服务器上的 arm64 编译环境：狗的根文件系统只读拷回来做成镜像（去掉密钥、家目录、机器人团队的安装），QEMU 里用 build_stack.sh 编三个模块，和狗上编的对一遍 | Agent | 狗在线（只读拷一次） | 3 小时 | 完成，已复核（2026-11-15）：三个模块在狗的系统镜像里编过，ldd 0，增量 2.5 分钟。vfs 每次起容器 50 分钟，run_arm64.sh 改成留一个容器 exec。狗上的对照没做（隧道不回 SSH），放到 T63 |
-| T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 停在第 3 步：五个二进制的 NEEDED 一样；文件清单狗上多一份 model_switch_launch.py.t56。rsync dry-run 时隧道断了，没数成 |
+| T63 | 狗回来以后：服务器编的和狗上编的对一遍（NEEDED、文件清单、rsync dry-run，只读） | Agent | 狗在线 | 30 分钟 | 完成：NEEDED 一样。rsync -n 会换 13789 个文件（大小不同的 46 个，其余是时间和属主），删 3 个（.t56 和一份 pyc）。没装到狗上 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -10048,7 +10048,7 @@ aarch64、`ldd` 0 个 not found，`version.txt` 写了在哪编的。用时和�
 
 ### T63 结果
 
-五个二进制的 `NEEDED` 和狗上一样。文件清单去掉 `version.txt` 和 `__pycache__` 之后，只在狗上多一个 `./slam/lightning/share/lightning/launch/model_switch_launch.py.t56`（T56 留下的备份）。`rsync -n` 没跑完：文件清单读完以后隧道被对端重置，接着 banner 超时，没有会变的文件数。
+五个二进制的 `NEEDED` 和狗上一样。文件清单去掉 `version.txt` 和 `__pycache__` 之后，只在狗上多一个 `./slam/lightning/share/lightning/launch/model_switch_launch.py.t56`（T56 留下的备份）。`rsync -n` 会换 13789 个文件、删 3 个；大小不同的只有 46 个，五个二进制里只有 `lidar_3d_detection` 的大小不同。没装到狗上。
 
 **第 0 步。** `tegra-ubuntu`，`running: theirs`（他们四个导航 active，我们三个 inactive）。
 
@@ -10056,7 +10056,7 @@ aarch64、`ldd` 0 个 not found，`version.txt` 写了在哪编的。用时和�
 
 **第 2 步。** planning、mode_switch_node、lidar_seg、grid_map_memory_node、lidar_3d_detection 两边 `readelf -d` 的 NEEDED 逐条相同。安装文件狗上 14640、服务器 14638；排除 `version.txt` 和 `__pycache__` 后只在狗上有那一份 `.t56`，服务器没有多出来的。`data/reports/T63/needed_server.txt`、`files_only_dog.txt`。
 
-**第 3 步。** `rsync -n -a --delete --itemize-changes` 收到 `Connection reset by 127.0.0.1 port 5038`，随后 banner 超时。`data/reports/T63/rsync_dry_run.txt`。真装的步骤仍是 T60 第 7 步，要人定；这次没改狗上的东西。
+**第 3 步。** 隧道恢复后重跑 `rsync -n -a --delete --itemize-changes`（`running: theirs`）。会换 13789 个文件：其中 13743 个大小相同，差在时间、权限、属主；大小不同的 46 个，主要是 `version.txt`、`parent_prefix_path`、`SOURCES.txt`，加上 `lidar_3d_detection` 二进制、`lidar_3d_detection.launch.py`、规划的 `communication_conf.pb.txt` 和 `preprocess_conf.pb.txt`、定位的 `default_d20.yaml`。planning、mode_switch_node、lidar_seg、grid_map_memory_node 的二进制大小相同。会删 3 个：`model_switch_launch.py.t56` 和它的 `__pycache__`（一个目录、一个 `.pyc`）。全文 `data/reports/T63/rsync_dry_run.txt`。真装仍是 T60 第 7 步，要人定；这次没改狗上的东西。
 
 ---
 
