@@ -10132,6 +10132,40 @@ App 上的狗画在 c1adbe7b 上，位置不准，不用管；位置看 Foxglove
 7. 提交：报告（每次测试的状态序列、等了多久、人的判断、急停了没有）、录包的 viz，写进"T57 结果"。
 ```
 
+### T57 结果
+
+2026-11-15，8 号狗，停在第 2c 步。0、1、2、2b 做了。规划的速度运控收到了，狗没有迈步。影子模式开了，人用遥控走到目标附近，录了一包。第 4 步 a/b/c 没做，包还在狗上，没有换回。收工时 `running: ours`，shadow on，appmap ignore，限速 0.3 m/s。没有按急停。
+
+**第 0 步。** 本机 `ssh dog` 能上。`nav_cw.sh`、`nav_cw_foxglove.sh` 拷上以后是 CRLF，`set: pipefail` 报错，狗上 `sed` 去掉 `\r`。去掉以后 sha256：`nav_cw.sh` `92174deb4af1c80bf548ac3472102d0f8a2073cd4027353de50442c0db84dbd6`，`nav_cw_foxglove.sh` `ffc3c625136d12007202c4478435c583b0025c39ceda6dc989c53db922949653`。`grep -c NAV_CW_ODOM_WAIT` 是 2。狗上的规划、定位、感知仍是 T61 编的（`3af3220`），没有重编。笔记本代码是 `2e895f9`。
+
+**第 1 步。** 换之前 `running: theirs`。INS：`ins_status` 3，`pos_type` 56，纬度 29.737408886848204，经度 106.77960912364796，高 217.05 m，速度约 0。`speed 0.3`。开关：shadow off，appmap ignore，perception debug off，限速 0.3 m/s，没有 NOT APPLIED，没有 REHEARSAL ON。域 0。
+
+**第 2 步。** `use-new` 退出 0，大约 26 秒。图：planning 在 `/mc/motion_control` 上发，不订 `/map/switch`、`/map/file_update`，`mode_switch_node` 不订 `/map/switch`，`/lightning/odom` 在 45 秒内有。`running: ours`，他们四个导航 inactive，我们三个 active。
+
+- cw-slam：`Setting init pose from INS (RTK_FIXED, skip NDT)`，位姿大约 (−414.25, 665.56)。没有“定位初始化超时”，没有 `CHUNK_IS_TOO_LARGE`。
+- cw-planning：`startup map /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13, 5 crosswalks`，`Tracking: crosswalk yield on, rule wait`。之后没有 `Map switch`、`Map update`。
+- lidar-3d-detection：大约每秒一行，点云和帧都是 10–11 Hz，skipped 0。
+
+**第 2b 步。** Foxglove 桥 `ws://192.168.122.100:8765`，白名单那份。中间死过一次（iceoryx 那种不受限的起法这次没用），重新在后台拉起来，人要重连。布局是仓库里的 `planning_live.json`。人用 Publish pose 发了目标。站点缩略图 `/planning/debug/global_map_manager/occmap` 是 1716×1902、0.6 m，大约 99.8% 的格子是占据，把地面铺满；狗脚下那一格是空的。局部代价地图狗脚下也是空的，窗外大部分是静态图的红。感知栅格 200×200、0.05 m，4 万格里大约 274 格是障碍，空地按布局是透明的，所以几乎看不见。
+
+**第 2c 步，狗没有自己走。** 14:23 起 `mission_state: active`。指令大约 vx 0.27、vy 0.09，后来大约 0.28、0.06、0.16，都在 0.3 的限速里。`dist_to_end` 先停在大约 4.8 m，后来大约 2.9 m，`error_met` 0。`/mc/motion_control` 上是 `uuid:planning`、mode 2（全身）、motion 20（行走）。`zsibot_sdk_node` 每条都打 `onMcCommand`，mode 2 的 `dealWalk` 里速度不是 0，并写成摇杆量。`/mc/state` 一直是 mode 3（下肢）、motion 20、state 3（DONE）、fault 0。实际 `/lightning/odom` 2.5 秒里 vx 平均 0.003 m/s。从 13:00 到收工，`switch to gait` 一次都没有。
+
+另发了 2 秒下肢模式：停掉 cw-planning，mode 3、motion 20、`para [0.2, 0, 0]`，10 Hz、20 条，再发 0。`dealWalk` 记成 `x:0,y:0,z:0`。狗没迈步。之后 cw-planning 重新拉起。
+
+人确认狗是站着的，遥控能走，站着时有一点自己往后溜。运控日志里的 `motion_status` 几乎一直是 2（这份消息定义里是趴下）。14:25:23–33 是 4（锁定），14:25:33–35 是 1（站立中），14:25:36 回到 2。下午没有出现 5（通用）或 10（步态）。这个数和眼前站着的狗对不上，不能拿它当不走的原因。后溜也不是规划在发负速度：那 2.5 秒 vx 在 −0.01 到 0.01 之间。
+
+遥控走了几秒，ROS 这边没有痕迹。14:40 之后 `remote_control` 的状态全是 `control_source: DEFAULT`、`motion_state: IDLE`，`JOYSTICK` 是 0。`/mc/motion_control` 上没有 planning 以外的发送者。定位还在大约 (−413.7, 665.3)。手里的遥控器不经过 `remote_control` 这个节点，也不经过 `/mc/motion_control`。`robot_service` 的行走技能要令牌和焦点（`skillRequest` / `skillFocusRequest`，技能 Move 的参数是 vx、vy、vyaw）。规划没有走这条。
+
+所以第 2c 步前半没做成：狗没自己走起来，遥控接管、松手以后谁在发、`systemctl stop cw-planning` 是停下还是滑行、急停按下和松开，都没试。
+
+**影子和录包。** 15:14 `shadow on`，退出 0。前两次图还看得到 planning 在 `/mc/motion_control` 和 `/cmd_vel` 上（刚重启，发现还没掉），第三次六行都 ok：planning 不在这两个话题上，在 `/nav_cw/shadow/mc/motion_control` 上。appmap 仍是 ignore。cw-planning 重启过，人又发了目标。15:24 `mission_state: active`，`dist_to_end` 大约 0.71 m。
+
+录包 `/home/nvidia/bags/20261115_cw_1`（sqlite3，没有 `-s mcap`）。前两次没录上：`set -u` 让 `/opt/ros/humble/setup.bash` 的 `AMENT_TRACE_SETUP_FILES` 报未绑定；第二次 `mc_interface/msg/Motion` 的 typesupport 找不到（planning 的前缀被后面 source 的包盖掉）。第三次先 source slam、nav_perception，最后 source planning，录上了。话题是现场指南第 9 节那张表。
+
+人说已经到目标附近，去停的时候录制进程已经没了。日志是 `SQLite error (5): database is locked`：停之前为了数条数，用 sqlite 打开了还在写的 db3。`metadata.yaml` 没写出来。`ros2 bag reindex` 之后 `ros2 bag info` 能读：5.2 GiB，162.6 秒，15:23:31.315–15:26:13.892，89367 条。`/lightning/odom` 16243，影子的 cmd_vel 和 motion 各 3248，crosswalk / path_tracking / plotjuggler 各 3249，顶部点云、占据栅格、`/perception/lidar_3d/objects` 各 1625，INS 和 IMU 各 16259，`/tf` 19488。`/goal_pose` 和 `/mc/motion_control` 是 0 条（影子模式，规划不发原来的运控话题；`/goal_pose` 是易失的，录制开始前发的那次不在包里）。`/cmd_vel`、`/tf_static` 没有订上。15:26 之后站在终点附近的几分钟不在包里。15:29 `dist_to_end` 仍大约 0.69 m。人行横道的 approach → align → wait / go → cross 没有从日志里对出来。
+
+**没做。** 限速没改到 0.5。第 4 步 a/b/c 没做。包没拷到 `/public/zjst/robot/cp_data/`，没有转 mcap，没有 viz，没有 `objects_in_map.py`。没有 `use-original`。下次先处理运控：规划这条 `/mc/motion_control` 不切步态；遥控走的是另一条通道。
+
 
 ---
 
