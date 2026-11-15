@@ -283,7 +283,21 @@ Foxglove 只能发 `/goal_pose`。一层一层来，前一层过了再下一层�
 
 ## 9. 录包和回来分析
 
-狗上（域 0，录，不发）：
+狗上一条命令（域 0，只订不发；排练时自动用 nav_cw.env 里的域 42）。`nav_cw_record.sh` 和 `nav_cw_record.py` 一起拷到
+`/opt/seres/nav_cw/`：
+
+```bash
+sudo bash /opt/seres/nav_cw/nav_cw_record.sh          # → /home/nvidia/bags/<YYYYMMDD>_cw_<n>，n 自动加一
+```
+
+- 规划有目标点（`/planning/debug/goal_pose`，或者录的时候新发的 `/goal_pose`），狗（自己走或遥控）先在 1.5 m 外、再进到
+  目标 1.5 m 内，5 s 后自己停；中途又出了 1.5 m 就不停了，再进来重新数。上一次测试留下的目标就在狗脚下：不会停，要先出去；
+- 没有目标、或想早点停：Ctrl-C。两种停法都只给录制进程发一次 SIGINT，等它把 `metadata.yaml` 写完；录的时候不碰 db3；
+- `-o <目录>` 换名字，`--radius 2 --hold 5` 改距离和时间，`--no-auto` 只认 Ctrl-C，后面跟话题名多录几个，`--dry-run` 只打印命令；
+- 录完包归 nvidia（`sudo` 的那个人），打印 `ros2 bag info`。没有 `metadata.yaml`（录制进程被杀了）就照提示 `ros2 bag reindex`。
+
+它录的是下面这张表，再加 `/planning/debug/goal_pose`（`/goal_pose` 是易失的，录之前发的目标不在包里，T57）和 `/mc/state`
+（运控的状态）。手动录也行（同一张表）：
 
 ```bash
 ros2 bag record -o /home/nvidia/bags/<日期>_cw_<n> \

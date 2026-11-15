@@ -26,3 +26,7 @@ Nav_D20/seres_interface/third/protobuf/android/lib/*.a filter=lfs diff=lfs merge
 # planning_mcap_viz.py output: a few MB, kept as plain files so that a clone can open them without git lfs
 work_dirs/planning_io_*/viz/*.mcap !filter !diff !merge -text
 work_dirs/t61_rehearsal/**/viz/*.mcap !filter !diff !merge -text
+# scripts run on the dog: LF whatever the checkout (T57: copied from a Windows checkout with CRLF, bash failed on
+# "set: pipefail"). A checkout from before this line: delete them and git checkout -- them once
+*.sh text eol=lf
+tools/deploy/*.py text eol=lf
