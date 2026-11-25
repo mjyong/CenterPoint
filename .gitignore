@@ -73,3 +73,20 @@ deploy_deb/**/log/
 # CJGC.yaml, the localization and perception settings, build.sh). Its colcon build directories stay out.
 !Nav_D20/**/*.sh
 !Nav_D20/**/*.yaml
+
+# Local bags, build/runtime logs, caches, and untracked work_dirs / scratch report artifacts
+/bags1119/
+/cache/
+/log/
+Nav_D20/**/log/
+work_dirs/**
+!work_dirs/pretrained/
+!work_dirs/pretrained/nusc_pp.pth
+!work_dirs/pretrained/nusc_voxel.pth
+data/reports/T37/finish_t37.sh
+data/reports/T37/finish_t37_rest.sh
+data/reports/T37/relabel_dual.sh
+data/reports/T37/run_pillar_retry.sh
+data/reports/T37/pytest_cameras.txt
+data/reports/T37/serve.log
+data/reports/T65/
