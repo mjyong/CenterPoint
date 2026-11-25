@@ -117,6 +117,59 @@ Result Run(const std::string &mode) {
   return r;
 }
 
+// Standing just inside the entry line (as in 20261115_x6_all_1: 0.05 m onto the crosswalk in shadow mode), released
+// into kCross, then a centimetre odom jitter steps outside the entry edge and back in while a car crosses ahead:
+// must keep holding on the crosswalk, never drop to kNone via passed_.
+bool RunEdgeJitter() {
+  CrosswalkYieldConfig cfg;
+  cfg.enable = true;
+  CrosswalkYield cy;
+  cy.Configure(cfg);
+  cy.SetCrosswalks({{Vec2(-3, 10), Vec2(3, 10), Vec2(3, 18), Vec2(-3, 18)}});
+  const std::vector<Vec2> path{Vec2(0.3, 10.0), Vec2(0.3, 30.0)};
+  const double dt = 0.05, t0 = 2000.0, yaw = M_PI / 2;
+  Vec2 xy(0.3, 10.05);
+  bool entered_cross = false, dropped_to_none = false, unheld_during_car = false, resumed_after_car = false;
+  for (int k = 0; k < 400; ++k) {
+    const double t = t0 + k * dt;
+    const double elapsed = k * dt;
+    // Jitter 7 cm back across the entry line at t = 4.0..4.15 s, then 3 cm back onto the crosswalk at 4.15 s+
+    if (elapsed >= 4.0 && elapsed < 4.15) xy.y() = 9.98;
+    else if (elapsed >= 4.15 && elapsed < 12.0) xy.y() = 10.01;
+    cy.AddOdom(t, xy, yaw);
+    if (k % 2 == 0) {
+      std::vector<Object> objs;
+      // Car crosses x = 0 at elapsed = 4.5 s (active conflict around 2.0..5.5 s, plus 3 s clearing)
+      const double car_x = -27.0 + 6.0 * (elapsed - 0.1);
+      if (elapsed >= 2.0 && car_x < 40.0) {
+        Eigen::Matrix2d Rm, Rd;
+        Rm << std::cos(yaw), -std::sin(yaw), std::sin(yaw), std::cos(yaw);
+        Rd << 0, 1, -1, 0;
+        const Vec2 pb = Rm.transpose() * (Vec2(car_x, 14.0) - xy);
+        Object o;
+        o.id = 1354;
+        o.label = "vehicle";
+        o.motion = planning::algorithm::yield::Motion::kMoving;
+        o.position = Rd.transpose() * (pb - Vec2(0.319, 0.043));
+        o.velocity = Rd.transpose() * Rm.transpose() * Vec2(6.0, 0.0);
+        o.yaw = std::atan2(o.velocity.y(), o.velocity.x());
+        o.length = 12.0;
+        o.width = 3.0;
+        o.has_age = true;
+        o.age = 5.0;
+        objs.push_back(o);
+      }
+      cy.SetObjects(t - 0.1, objs);
+    }
+    const CrosswalkYieldOutput out = cy.Step(t, xy, yaw, 0.0, path);
+    if (out.mode == CrosswalkYieldOutput::kCross) entered_cross = true;
+    if (entered_cross && xy.y() < 18.0 && out.mode == CrosswalkYieldOutput::kNone) dropped_to_none = true;
+    if (elapsed >= 3.0 && elapsed <= 5.5 && !out.hold) unheld_during_car = true;
+    if (elapsed >= 12.0 && !out.hold && out.mode == CrosswalkYieldOutput::kCross) resumed_after_car = true;
+  }
+  return entered_cross && !dropped_to_none && !unheld_during_car && resumed_after_car;
+}
+
 }  // namespace
 
 int main() {
@@ -151,6 +204,8 @@ int main() {
   const Result bh = Run("behind");
   check(!bh.held_on_crosswalk && !bh.cross_wait && bh.reach_time > 0 && bh.reach_time < n.reach_time + 0.2,
         "a car seen on the crosswalk, in a lane behind: does not stop");
+  check(RunEdgeJitter(),
+        "entry-line pose jitter after go/cross: never drops to none, keeps holding for a crossing car");
   std::printf("crosswalk_sim: %d failed\n", bad);
   return bad == 0 ? 0 : 1;
 }

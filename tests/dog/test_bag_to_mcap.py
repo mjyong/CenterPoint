@@ -39,6 +39,13 @@ def test_every_topic_goes_over(tmp_path, tool, capsys):
         "/mc/motion_control": ("mc_interface/msg/Motion",
                                _make(ts, "mc_interface/msg/Motion", header=header, uuid="planning", mode=1, motion=2,
                                      para=np.array([0.4, 0.0, 0.1], dtype=np.float32))),
+        "/robot/topic/rdap/front_sensor_camera": (
+            "foxglove_msgs/msg/CompressedVideo",
+            _make(ts, "foxglove_msgs/msg/CompressedVideo", timestamp=stamp, frame_id="camera",
+                  data=np.array([0, 0, 1], dtype=np.uint8), format="h264")),
+        "/lidar_packets_loss": (
+            "hesai_ros_driver/msg/LossPacket",
+            _make(ts, "hesai_ros_driver/msg/LossPacket", total_packet_count=100, total_packet_loss_count=0)),
     }
     src = tmp_path / "rec"
     with Writer(src, version=8) as w:                       # sqlite3, as on the dog
@@ -46,8 +53,8 @@ def test_every_topic_goes_over(tmp_path, tool, capsys):
             c = w.add_connection(topic, msgtype, typestore=ts)
             for i in range(3):
                 w.write(c, 1700000000 * 10 ** 9 + i * 10 ** 8 + k, ts.serialize_cdr(m, msgtype))
-    assert bag_to_mcap.main([str(src), str(tmp_path / "out")]) == 0
-    assert "4 topics, 12 messages" in capsys.readouterr().out
+    assert bag_to_mcap.main([str(src), "-o", str(tmp_path / "out")]) == 0
+    assert "6 topics, 18 messages" in capsys.readouterr().out
     out = tmp_path / "out"
     assert any(f.suffix == ".mcap" for f in out.iterdir())
     with AnyReader([out]) as r:                              # the mcap carries its own definitions

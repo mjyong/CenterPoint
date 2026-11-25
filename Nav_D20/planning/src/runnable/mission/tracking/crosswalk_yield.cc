@@ -194,24 +194,37 @@ CrosswalkYieldOutput CrosswalkYield::Step(double now, const Vec2 &robot_xy, doub
   // and the robot was let cross with no perception): how far past the entry line
   bool unreleased = false;
   double depth = 0.0;
-  if (inside >= 0 && !(current_ == inside && (mode_ == CrosswalkYieldOutput::kGo ||
-                                              mode_ == CrosswalkYieldOutput::kCross))) {
-    double a = 0.0, b = 0.0;
+  double in_s = 0.0, out_s = 0.0;
+  const bool has_span =
+      inside >= 0 && algorithm::yield::CrosswalkSpan(ahead, crosswalks_[inside], &in_s, &out_s);
+  double entry_depth = 0.0;
+  if (inside >= 0) {
     Vec2 dir(std::cos(robot_yaw), std::sin(robot_yaw));
-    if (algorithm::yield::CrosswalkSpan(ahead, crosswalks_[inside], &a, &b)) {
-      const Vec2 exit = PointAt(ahead, b);
+    if (has_span) {
+      const Vec2 exit = PointAt(ahead, out_s);
       if ((exit - robot_xy).norm() > 0.2) dir = (exit - robot_xy).normalized();
     }
+    entry_depth = RayToOutline(robot_xy, -dir, crosswalks_[inside]);
+  }
+  if (inside >= 0 && !(current_ == inside && (mode_ == CrosswalkYieldOutput::kGo ||
+                                              mode_ == CrosswalkYieldOutput::kCross))) {
     unreleased = true;
-    depth = RayToOutline(robot_xy, -dir, crosswalks_[inside]);
+    depth = entry_depth;
     // shallow: as at the curb. The crosswalk is not passed, so below it is the next one, its entry 0 m ahead and
     // the stop point behind: align / wait / go as usual, and once released the robot crosses
-    if (depth <= cfg_.max_unreleased_depth) inside = -1;
+    if (depth <= cfg_.max_unreleased_depth) {
+      passed_.erase(inside);
+      inside = -1;
+    }
   }
   out.unreleased = unreleased;
   out.depth = depth;
   if (inside >= 0) {
-    if (mode_ != CrosswalkYieldOutput::kCross) passed_.insert(inside);
+    // Only mark as passed once past the shallow entry band (or near the exit of a short clip), so a centimetre pose
+    // jitter back across the entry line does not skip the crosswalk and drop to kNone with the crossing still ahead.
+    if (entry_depth > cfg_.max_unreleased_depth || !has_span || out_s <= 0.5) {
+      passed_.insert(inside);
+    }
     mode_ = CrosswalkYieldOutput::kCross;
     current_ = inside;
     out.mode = mode_;
@@ -219,11 +232,10 @@ CrosswalkYieldOutput CrosswalkYield::Step(double now, const Vec2 &robot_xy, doub
     // what is left of the crosswalk, plus the margin past the exit as at the curb: not the sidewalk beyond (a car
     // driving along it is not crossing ahead of the robot)
     algorithm::yield::YieldConfig c = cfg_.gate;
-    double a_in = 0.0, a_out = 0.0;
-    if (algorithm::yield::CrosswalkSpan(ahead, crosswalks_[inside], &a_in, &a_out)) {
-      out.s_in = a_in;
-      out.s_out = a_out;
-      c.path_length = a_out + cfg_.check_beyond_exit;
+    if (has_span) {
+      out.s_in = in_s;
+      out.s_out = out_s;
+      c.path_length = out_s + cfg_.check_beyond_exit;
     }
     const auto a = algorithm::yield::Assess(ahead, objs, now, stamp, c);
     out.decision = gate_.Update(a, now, moving, true);
@@ -288,7 +300,8 @@ CrosswalkYieldOutput CrosswalkYield::Step(double now, const Vec2 &robot_xy, doub
     mode_ = CrosswalkYieldOutput::kWait;
     if (out.decision.go) mode_ = CrosswalkYieldOutput::kGo;
   } else {
-    out.decision = gate_.Update(a, now, moving && mode_ == CrosswalkYieldOutput::kGo, false);
+    out.decision = gate_.Update(
+        a, now, moving && (mode_ == CrosswalkYieldOutput::kGo || mode_ == CrosswalkYieldOutput::kCross), false);
     mode_ = out.decision.go ? CrosswalkYieldOutput::kGo : CrosswalkYieldOutput::kWait;
   }
   out.mode = mode_;

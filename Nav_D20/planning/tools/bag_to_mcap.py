@@ -73,14 +73,18 @@ def _convert(src, dst):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("bag", help="a ros2 bag directory (sqlite3 or mcap)")
-    ap.add_argument("out", help="the mcap bag directory to write (must not exist)")
+    ap.add_argument("out", nargs="?", help="the mcap bag directory to write (must not exist)")
+    ap.add_argument("-o", "--output", dest="out_opt", help="the mcap bag directory to write (alternative to positional out)")
     args = ap.parse_args(argv)
-    written, left_out = convert(args.bag, args.out)
+    out_dir = args.out_opt or args.out
+    if not out_dir:
+        ap.error("an output directory is required (positional <out> or -o/--output <out>)")
+    written, left_out = convert(args.bag, out_dir)
     for topic in sorted(written):
         print("  %-50s %8d" % (topic, written[topic]))
     for topic, why in sorted(left_out.items()):
         print("  LEFT OUT %s: %s" % (topic, why))
-    print("%s: %d topics, %d messages%s" % (args.out, len(written), sum(written.values()),
+    print("%s: %d topics, %d messages%s" % (out_dir, len(written), sum(written.values()),
                                            ", %d topics left out" % len(left_out) if left_out else ""))
     return 1 if left_out else 0
 

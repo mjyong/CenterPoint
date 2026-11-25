@@ -54,6 +54,17 @@ def typestore(all_packages=False, quiet=False):
             except Exception as e:   # noqa: BLE001  (a message this tool does not need)
                 if not quiet:
                     print("  (type %s not registered: %s)" % (name, e))
+    if all_packages:
+        # Extra sensor messages recorded on dog 8 outside Nav_D20/seres_interface/ros (fisheye H.264 & Hesai packet loss)
+        extra_msgs = {
+            "foxglove_msgs/msg/CompressedVideo":
+                "builtin_interfaces/msg/Time timestamp\nstring frame_id\nuint8[] data\nstring format\n",
+            "hesai_ros_driver/msg/LossPacket":
+                "uint32 total_packet_count\nuint32 total_packet_loss_count\n",
+        }
+        for name, text in extra_msgs.items():
+            if name not in ts.types and name not in types:
+                types.update(get_types_from_msg(text, name))
     ts.register(types)
     return ts
 

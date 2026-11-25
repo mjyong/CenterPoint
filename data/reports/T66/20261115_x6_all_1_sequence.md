@@ -23,6 +23,7 @@
 | 20:10:38 | cross_wait；20:10:56 cross |
 | 20:11:11 | cross_wait；20:11:18 cross |
 | 20:11:25 | cross_wait；20:11:31 cross |
-| 20:12:06 | cross_wait，直到 20:12:55 Ctrl-C |
+| 20:12:06 | cross_wait（等横穿大车 1354） |
+| 20:12:12 | none (`crosswalk -1`, `unreleased = 1`, 过入口 0.007 m)：狗压边线微抖动触发 `passed_` 死区 Bug，最后 42 s 门控被旁路（已在 `crosswalk_yield.cc` 修复，详析与看板见 `data/reports/T66/x6_online_analysis/`） |
 
-20:08:57 之后出口距离停在 27.7 m。`Crosswalk yield` 99 行。MPPI 失败 7 行。standstill 0 行。「没有 go」8 行。`/goal_pose` 2 条，是中途改的那两次。`/mc/motion_control` 0 条。
+20:08:57 之后出口距离停在 27.7 m（`map` 真实终点 `(80.72, 216.44)`）。`Crosswalk yield` 99 行。MPPI 失败 7 行。standstill 0 行。「没有 go」8 行。`/goal_pose` 2 条，是中途改的那两次。`/mc/motion_control` 0 条。

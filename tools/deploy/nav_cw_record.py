@@ -276,20 +276,31 @@ def ros_feed(arrival, log, cues=True):
             set_goal((p.x, p.y))
 
     def goal_pose(msg):
-        p, frame = msg.pose.position, msg.header.frame_id
+        p = msg.pose.position
+        frame = (msg.header.frame_id or "").strip().lstrip("/")
         xy = (p.x, p.y)
         if frame not in ("", "map"):
-            if frame != "base_link" or "pose" not in latest:
+            if frame not in ("base_link", "body"):
                 log("goal in %s: not placed (only base_link, by the odometry); the planner's marker is used" % frame)
+                return
+            latest["sent"] = True
+            if "pose" not in latest:
+                latest["pending_base"] = xy
                 return
             xy = to_map(xy, latest["pose"])
             log("goal sent in base_link (%.2f, %.2f): (%.2f, %.2f) in map" % (p.x, p.y, xy[0], xy[1]))
         latest["sent"] = True
+        latest.pop("pending_base", None)
         set_goal(xy)
 
     def odom(msg):
         p = msg.pose.pose.position
         latest["pose"] = (p.x, p.y, yaw_of(msg.pose.pose.orientation))
+        if "pending_base" in latest:
+            bx, by = latest.pop("pending_base")
+            mx, my = to_map((bx, by), latest["pose"])
+            log("goal sent in base_link (%.2f, %.2f): (%.2f, %.2f) in map" % (bx, by, mx, my))
+            set_goal((mx, my))
         line = arrival.set_pose((p.x, p.y), time.monotonic())
         if line:
             log(line)

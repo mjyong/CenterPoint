@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>x6 路口 3D 点云车辆识别与让行规划在线测试分析看板</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-alt: #1e222b;
+    --border: #2b313e;
+    --text: #e6e9ef;
+    --muted: #9aa3b2;
+    --green: #30d158;
+    --blue: #0a84ff;
+    --orange: #ff9f0a;
+    --red: #ff453a;
+    --yellow: #ffd60a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 32px 48px;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  .container { max-width: 1320px; margin: 0 auto; }
+  .meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  h1 { font-size: 24px; margin: 0 0 8px; font-weight: 600; }
+  h2 { font-size: 17px; margin: 22px 0 10px; font-weight: 600; }
+  p.sub { color: var(--muted); margin: 0 0 16px; }
+  .tabs, .filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+  button.pill {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button.pill.active {
+    background: #1d3557;
+    color: #fff;
+    border-color: var(--blue);
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stat .val { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .stat .lbl { font-size: 12px; color: var(--muted); }
+  .c-green { color: var(--green); }
+  .c-blue { color: var(--blue); }
+  .c-orange { color: var(--orange); }
+  .c-red { color: var(--red); }
+  .callout {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--orange);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 16px 0;
+  }
+  .callout strong { display: block; margin-bottom: 6px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 15px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 9px 11px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--panel-alt); color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .b-green { background: rgba(48,209,88,0.16); color: var(--green); }
+  .b-blue { background: rgba(10,132,255,0.16); color: #64b5ff; }
+  .b-orange { background: rgba(255,159,10,0.16); color: var(--orange); }
+  .b-red { background: rgba(255,69,58,0.18); color: #ff7b72; }
+  .chart-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .caption { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .snap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 14px; margin-top: 12px; }
+  .snap-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+  .snap-card img { width: 100%; border-radius: 4px; display: block; }
+  .snap-card .cap { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  pre {
+    background: #111318;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    color: #d1d7e0;
+  }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="meta">20261115_x6_all_1_0.db3 · 8号狗在线影子测试 · 地图 ad68517c (6号路口 / crosswalk 0) · Cursor Canvas 同源看板</div>
+  <h1>x6 路口 3D 点云车辆识别与让行规划在线测试分析</h1>
+  <p class="sub">时长 394.1 s (20:06:20–20:12:54)，狗全程静止站在 6 号人行横道东侧入口线内侧 0.3–7.2 cm 处 (位移 0.24 m，影子模式开启，RTK 100% 固定解)。共采集激光雷达 3,941 帧 (10.0 Hz，0 丢帧)、四路环视鱼眼各 9,851 帧、规划周期 7,881 次 (20.0 Hz)。</p>
+
+  <div class="tabs">
+    <button class="pill active" onclick="switchTab('overview', this)">总览与核心结论</button>
+    <button class="pill" onclick="switchTab('perception', this)">3D 点云感知 (漏检 / 误检)</button>
+    <button class="pill" onclick="switchTab('planning', this)">路口让车规划状态机</button>
+    <button class="pill" onclick="switchTab('foxglove', this)">Foxglove 回放与 Layout 指南</button>
+  </div>
+  <hr />
+
+  <section id="tab-overview">
+    <div class="stats">
+      <div class="stat"><div class="val c-green">93.3% (14/15)</div><div class="lbl">主路口 35m 内过往真车召回 (14辆横穿车100%检出，仅末尾1辆慢速接近大车断续漏检)</div></div>
+      <div class="stat"><div class="val c-orange">5.4% 帧占比</div><div class="lbl">疑似误检框帧数占比 (468 / 8,603 框·帧，集中在 34–52m 建筑/灌木边缘)</div></div>
+      <div class="stat"><div class="val c-blue">26.5 ms</div><div class="lbl">Orin 端到端感知耗时中位数 (p99 39.7 ms，10.0 Hz 零丢帧)</div></div>
+      <div class="stat"><div class="val c-red">已修复边界死区</div><div class="lbl">352s 压线微抖动触发 passed_ 死区导致末段不让车，已在 crosswalk_yield.cc 修复</div></div>
+    </div>
+
+    <div class="callout">
+      <strong>核心结论速览</strong>
+      1. <b>3D 点云漏检与误检</b>：主干道近中距横穿真车近乎零漏检（14 辆横穿车连续跟踪最长达 82.9 m）；漏检仅出现在末尾右前方 19–41 m 慢速侧向接近大车（置信度跌破 0.40 断轨）及狗正后方 76° 机身遮挡盲区。帧级误检仅 5.4%，但 34–52 m 边缘有瞬态闪烁假框，且 3 辆停放重车因过往大车遮挡裂变为 18 个 ID。<br/>
+      2. <b>规划让车状态</b>：门控对真实过往车辆响应正常（准确触发 wait / cross_wait 并在清空 3 s 后放行），但实测暴露两处问题：① 27.7 m 纵向长横道放大了远端瞬态框的 young + 5s lost 空等（3 次各 5–6 s）；② 狗压入口线 0–7 cm 站立因厘米级定位微抖掉入 <code>passed_</code> 死区使最后 42 s 门控旁路（现已修复并通过闭环单测）。<br/>
+      3. <b>Foxglove 回放</b>：已将含完整四路鱼眼 + 自定义消息的 <code>20261115_x6_all_1.mcap</code> 与防闪烁精排包 <code>20261115_x6_planning_viz.mcap</code> 生成至 <code>/public/robot/</code>，配合 <code>Nav_D20/planning/script/planning_live.json</code> 与 <code>planning_viz.json</code> 即可直接查看。
+    </div>
+
+    <h2>全时段（每 20 秒窗口）每帧车辆跟踪构成与规划让行驻留率</h2>
+    <div class="chart-box">
+      <div class="caption">上：每帧平均目标数（绿=运动真车，蓝=停放真车，红=远距闪烁/误检框） · 下：规划 crosswalk_hold=1 驻留占比 (%) · 来源：20261115_x6_all_1 (394.1 s)</div>
+      <div id="svg-charts"></div>
+    </div>
+
+    <h2>关键时刻四路鱼眼 + BEV 激光 3D 框实拍对照</h2>
+    <div class="snap-grid">
+      <div class="snap-card"><img src="snap_t064.0s.jpg" alt="t=64s" /><div class="cap">t = 64.0 s：大车 ID 1265 从距狗 3.3 m 处横穿路口，点云框贴合，规划稳定保持 cross_wait</div></div>
+      <div class="snap-card"><img src="snap_t305.5s.jpg" alt="t=305.5s" /><div class="cap">t = 305.5 s：36.8 m 远处建筑边缘闪现 4 帧假框 ID 1352，因长横道 young + 5s lost 造成空等</div></div>
+      <div class="snap-card"><img src="snap_t353.0s.jpg" alt="t=353s" /><div class="cap">t = 353.0 s：大车 ID 1354 正在狗前 4.1 m 横穿，旧版规划因压线微抖掉入 passed_ 死区退回 none（已修复）</div></div>
+      <div class="snap-card"><img src="snap_t385.0s.jpg" alt="t=385s" /><div class="cap">t = 385.0 s：右前方慢速接近大车仅出现局部低分框 ID 1374 (score=0.36)，前后时段发生断轨漏检</div></div>
+    </div>
+  </section>
+
+  <section id="tab-perception" class="hidden">
+    <h2>1. 在线感知运行健康度</h2>
+    <table>
+      <thead><tr><th>指标项</th><th>实测数值</th><th>设计预期</th><th>结论</th></tr></thead>
+      <tbody>
+        <tr><td>激光与目标帧率</td><td>3,941 帧 / 394.1 s (10.00 Hz, max dt 101.5 ms)</td><td>10 Hz 稳定</td><td><span class="badge b-green">零丢帧 (skipped=0)</span></td></tr>
+        <tr><td>单帧总耗时 total_ms</td><td>p50 = 26.5 ms · p90 = 32.5 ms · p99 = 39.7 ms</td><td>&lt; 50 ms</td><td><span class="badge b-green">实时裕量充足</span></td></tr>
+        <tr><td>阶段耗时拆分 (p50)</td><td>预处理 10.9 ms + TRT GPU 13.2 ms + 后处理 2.0 ms + 跟踪 0.1 ms</td><td>Orin FP16</td><td><span class="badge b-green">推理极稳</span></td></tr>
+        <tr><td>候选框过滤比</td><td>底层候选 31.5 个/帧 (&gt;=0.2) -&gt; 确认航迹 2.0 条/帧 (&gt;=0.4, min_hits=3)</td><td>抑制地面灌木噪点</td><td><span class="badge b-blue">滤除 ~93% 低分噪点</span></td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. 代表航迹明细表（点击胶囊按类别筛选）</h2>
+    <div class="filters">
+      <button class="pill active" onclick="filterTracks('all', this)">全部代表航迹</button>
+      <button class="pill" onclick="filterTracks('moving', this)">运动真车</button>
+      <button class="pill" onclick="filterTracks('parked_tp', this)">停放真车 (含遮挡重开)</button>
+      <button class="pill" onclick="filterTracks('fp_flicker', this)">疑似误检 / 闪烁框</button>
+    </div>
+    <table>
+      <thead><tr><th>ID</th><th>时间窗</th><th>持续(帧)</th><th>类别判定</th><th>检测系坐标 (m)</th><th>距离</th><th>尺寸 LxWxH</th><th>峰值速度</th><th>均分</th><th>现象与对规划影响</th></tr></thead>
+      <tbody id="track-tbody"></tbody>
+    </table>
+  </section>
+
+  <section id="tab-planning" class="hidden">
+    <h2>1. 规划五阶段完整复盘（7,881 周期，20 Hz）</h2>
+    <table>
+      <thead><tr><th>阶段</th><th>时间段</th><th>状态机</th><th>路径几何</th><th>联动表现与根因</th><th>结论</th></tr></thead>
+      <tbody>
+        <tr><td>阶段 1</td><td>0.0 - 116.7 s</td><td>cross &lt;-&gt; cross_wait</td><td>exit = 2.2 m</td><td>狗静止站在 6 号横道东端内部，5 辆横穿车均准确触发 cross_wait (ahead)</td><td><span class="badge b-green">让车正常</span></td></tr>
+        <tr><td>阶段 2</td><td>116.7 - 157.0 s</td><td>Idle / off</td><td>点第一次目标</td><td>首次发 /goal_pose 先停止旧 Tracking 任务切回 Idle，无指令输出</td><td><span class="badge b-blue">符合交互设计</span></td></tr>
+        <tr><td>阶段 3</td><td>157.0 - 184.2 s</td><td>wait -&gt; go</td><td>exit = 27.7 m</td><td>第二次发目标 (base_link 27.0,4.0 -&gt; map 80.72,216.44)，压线 6cm 等 1304/1311 等通过后于 184.24s 放行</td><td><span class="badge b-green">门控正常</span></td></tr>
+        <tr><td>阶段 4</td><td>184.3 - 352.0 s</td><td>cross &lt;-&gt; cross_wait</td><td>查 28.7 m 路径</td><td>真车 1327/1333/1338/1354 均正确让行；但 30–46 m 远端瞬态假框命中 young+lost 导致 3 次 5–6s 空等</td><td><span class="badge b-orange">远端闪框空等</span></td></tr>
+        <tr><td>阶段 5</td><td>352.0 - 394.1 s</td><td>none (unreleased=1)</td><td>crosswalk -1</td><td>定位微抖几厘米出界 3 帧再抖回界内 7mm，旧逻辑因 passed_.count(0) 跳过横道锁死在 none（已在 crosswalk_yield.cc 修复）</td><td><span class="badge b-red">已定位并修复</span></td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. 全局规划复盘总览图（planning_mcap_viz.py 产物）</h2>
+    <div class="snap-card"><img src="planning_viz_overview.png" alt="planning_viz_overview" /><div class="cap">20261115_x6_planning_viz.png：左为 ad68517c 6号横道与全局路径，右为速度、角速度、偏离距离、脚下代价地图格数与任务状态时间序列</div></div>
+  </section>
+
+  <section id="tab-foxglove" class="hidden">
+    <h2>1. Layout 布局文件位置</h2>
+    <table>
+      <thead><tr><th>Layout 路径 (相对 d20car_predict/CenterPoint/)</th><th>适用数据文件</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>Nav_D20/planning/script/planning_live.json</code></td><td><code>/public/robot/20261115_x6_all_1.mcap</code> (或原始 .db3)</td><td>首选实时/原始复盘布局：含 /planning/debug/crosswalk 3D 车框、栅格、影子速度曲线、感知对象表；点 Add Panel -&gt; Image 即可并排看四路鱼眼</td></tr>
+        <tr><td><code>Nav_D20/planning/script/planning_viz.json</code></td><td><code>/public/robot/20261115_x6_planning_viz.mcap</code></td><td>41 MB 防闪烁精排复盘布局：带完整站点路网、编号斑马线与 /viz/events 结构化事件流</td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. 零报错一键生成与软链接命令</h2>
+    <pre>mkdir -p /public/robot
+rm -rf /public/robot/20261115_x6_all_1_mcap \
+       /public/robot/20261115_x6_all_1.mcap \
+       /public/robot/20261115_x6_planning_viz.mcap \
+       /public/robot/20261115_x6_planning_viz.png
+
+/home/engineers/junyongmou/robot/ultralytics/.venv/bin/python \
+  d20car_predict/CenterPoint/Nav_D20/planning/tools/bag_to_mcap.py \
+  /public/zjst/robot/cp_data/20261116_dog/20261115_x6_all_1 \
+  -o /public/robot/20261115_x6_all_1_mcap &amp;&amp; \
+ln -sfn /public/robot/20261115_x6_all_1_mcap/20261115_x6_all_1_mcap.mcap \
+  /public/robot/20261115_x6_all_1.mcap
+
+MPLCONFIGDIR=/tmp /home/engineers/junyongmou/robot/ultralytics/.venv/bin/python \
+  d20car_predict/CenterPoint/Nav_D20/planning/tools/planning_mcap_viz.py \
+  /public/robot/20261115_x6_all_1_mcap \
+  --map d20car_predict/CenterPoint/Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip \
+  -o /public/robot/20261115_x6_planning_viz.mcap</pre>
+  </section>
+</div>
+
+<script>
+const BINS = ["0-20s","20-40s","40-60s","60-80s","80-100s","100-120s","120-140s","140-160s","160-180s","180-200s","200-220s","220-240s","240-260s","260-280s","280-300s","300-320s","320-340s","340-360s","360-380s","380-394s"];
+const MOV = [0.28,0.01,0.39,0.88,1.11,1.49,0.57,0.98,1.53,0,0,0,0.63,1.22,0.01,0,0.01,1.28,0.10,0.18];
+const STA = [2.04,2.18,1.82,1.79,1.21,0.59,0.94,0.86,1.27,2,2,2,1.86,1.53,2,2,1.53,0.94,1.02,1.06];
+const FP  = [0,0,0,0,0.04,0.04,0,0,0.03,0,0,0.07,0.14,0.62,0.82,0.14,0,0.14,0.07,0];
+const HOLD= [24.3,25.5,36.8,60.8,70.0,78.8,0.0,100.0,100.0,21.0,0.0,26.0,58.0,82.0,30.5,27.0,0.0,31.0,0.0,0.0];
+
+const TRACKS = [
+  [1242,"0.0-55.1s","55.1s (545)","parked_tp","静止真车 (重车A)","(-39.6, 17.4)","43.3 m","14.8x2.8x4.3","0.0 m/s","0.48","左前停放重车，被过往大车遮挡后续裂变为 11 个 ID","b-blue"],
+  [1243,"0.0-57.7s","57.7s (578)","parked_tp","静止真车 (重车B)","(21.8, 25.9)","33.9 m","12.7x3.0x3.8","0.0 m/s","0.86","右前停放，t=85.3s 起步驶离变为 ID 1283","b-blue"],
+  [1256,"15.1-20.0s","4.9s (38)","moving","运动真车","(20.6,16.6)->(30.3,19.2)","26.5 m","4.6x2.0x1.8","2.6 m/s","0.43","触发首次 cross_wait (ahead) 及 5s lost 保持","b-green"],
+  [1257,"17.8-39.3s","21.5s (45)","fp_flicker","静态边缘断续框","(18.8, -19.7)","27.3 m","4.4x1.9x1.6","0.0 m/s","0.38","右后方低分框，刚出现 age<1s 时叠加等待","b-orange"],
+  [1259,"51.8-62.9s","11.1s (112)","moving","运动真车 (横穿)","(-38.7,-0.6)->(41.8,9.1)","4.3 m","11.2x2.9x3.6","8.7 m/s","0.68","距狗 4.3m 横穿路口，全程稳定跟踪 81.1m","b-green"],
+  [1265,"60.2-73.5s","13.3s (134)","moving","运动真车 (横穿)","(-38.3,-1.2)->(41.7,7.7)","3.3 m","12.8x3.0x3.8","8.2 m/s","0.66","近距 3.3m 横穿，门控正常维持 cross_wait","b-green"],
+  [1274,"78.2-89.2s","11.0s (111)","moving","运动真车 (横穿)","(-38.0,0.0)->(41.8,8.8)","4.4 m","11.6x2.9x3.7","8.9 m/s","0.68","稳定跟踪 80.3m，门控正常触发让行","b-green"],
+  [1283,"85.3-108.1s","22.8s (229)","moving","运动真车 (起步驶离)","(20.4,25.9)->(-17.6,14.1)","22.6 m","12.4x3.0x3.8","5.5 m/s","0.66","原右前停放重车起步左行，跟踪连续","b-green"],
+  [1293,"103.5-115.3s","11.8s (119)","moving","运动真车 (横穿)","(-38.4,-0.5)->(44.0,8.4)","3.9 m","12.0x2.9x3.7","8.6 m/s","0.72","距狗 3.9m 快速通过，跟踪完整 82.9m","b-green"],
+  [1304,"131.6-167.4s","35.8s (355)","moving","运动转停放真车","(-40.3,-0.3)->(16.0,24.2)","4.3 m","13.3x3.0x4.0","7.2 m/s","0.64","左来转入右前方停下，运动->静止切换准确","b-green"],
+  [1311,"165.0-175.9s","10.9s (109)","moving","运动真车 (右向左)","(36.6,13.9)->(-42.7,4.2)","8.6 m","12.9x3.0x3.9","9.1 m/s","0.57","新目标重发后处于 wait (vehicle) 阶段，正常等待","b-green"],
+  [1316,"170.6-264.3s","93.7s (925)","parked_tp","静止真车 (PosC)","(15.8, 24.2)","28.9 m","13.4x3.0x4.0","0.0 m/s","0.67","1304 停稳后被遮挡重开 ID (后续又裂变为 1342/1347/1364)","b-blue"],
+  [1325,"225.7-231.4s","5.7s (15)","fp_flicker","低分静态杂波","(10.3, 27.8)","29.7 m","2.3x1.9x2.5","0.9 m/s","0.39","距长横道路径 <30m，以 young 触发 5.2s 空等","b-red"],
+  [1327,"240.7-251.8s","11.1s (112)","moving","运动真车 (横穿)","(-38.0,-0.5)->(41.0,8.8)","4.3 m","12.1x2.9x3.7","8.5 m/s","0.68","0 coast 满帧跟踪 79.6m，让行正常","b-green"],
+  [1333,"257.9-270.8s","12.9s (130)","moving","运动真车 (横穿)","(-38.3,-0.8)->(41.7,8.7)","3.5 m","13.2x3.0x3.9","8.8 m/s","0.68","与 1338 连续两车通过，合并等待正常","b-green"],
+  [1344,"271.9-296.4s","24.5s (234)","fp_flicker","远距背景误检","(-30.2, 21.5)","37.1 m","2.3x1.4x2.6","1.1 m/s","0.61","左前 37m 绿化带设施小框，因距出口 <30m 延长等待","b-red"],
+  [1349,"291.6-292.6s","1.0s (11)","fp_flicker","远距瞬态误检","(31.8, 33.3)","46.0 m","5.9x2.4x3.2","1.2 m/s","0.41","46m 处闪烁 1s，触发 cross_wait + 5s lost 空等 6.1s","b-red"],
+  [1352,"305.3-305.6s","0.3s (4)","fp_flicker","远距建筑边缘闪框","(11.4, 34.9)","36.8 m","11.2x3.0x3.7","0.0 m/s","0.42","36.8m 闪现 4 帧，因 young 规则导致空等 5.4s","b-red"],
+  [1354,"339.5-359.1s","19.6s (195)","moving","运动真车 (横穿)","(-40.5,1.1)->(39.4,12.1)","4.1 m","12.8x3.0x3.8","7.5 m/s","0.57","横穿中途 352s 旧版规划因压线微抖退回 none (已修复)","b-orange"],
+  [1356,"350.7-354.3s","3.6s (37)","moving","运动真车 (绕狗后方)","(-36.9,-17.3)->(-13.8,-14.9)","20.3 m","9.8x2.8x3.4","9.5 m/s","0.57","进入狗正后方 76 度机身盲区断轨，2s 后重建为 ID 1365","b-orange"],
+  [1368,"372.8-375.0s","2.2s (23)","moving","慢速接近大车(漏检段)","(38.4,23.5)->(34.8,22.9)","41.5 m","10.2x2.9x3.6","2.9 m/s","0.45","驶近至 19.4m 过程中间断掉分漏检，仅 383.6-386.5s 重建为 1374","b-red"]
+];
+
+function switchTab(id, btn) {
+  document.querySelectorAll("section[id^='tab-']").forEach(s => s.classList.add("hidden"));
+  document.getElementById("tab-" + id).classList.remove("hidden");
+  btn.parentElement.querySelectorAll(".pill").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+}
+
+function filterTracks(cat, btn) {
+  if (btn) {
+    btn.parentElement.querySelectorAll(".pill").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  }
+  const tbody = document.getElementById("track-tbody");
+  tbody.innerHTML = TRACKS.filter(r => cat === "all" || r[3] === cat).map(r => `
+    <tr>
+      <td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td>
+      <td><span class="badge ${r[11]}">${r[4]}</span></td>
+      <td><code>${r[5]}</code></td><td>${r[6]}</td><td>${r[7]}</td><td>${r[8]}</td><td>${r[9]}</td><td>${r[10]}</td>
+    </tr>`).join("");
+}
+
+function renderCharts() {
+  const W = 1200, H1 = 170, H2 = 130, padL = 48, padR = 20, bw = 38;
+  const step = (W - padL - padR) / BINS.length;
+  let bars = "", labels = "", pts = [];
+  for (let i = 0; i < BINS.length; i++) {
+    const x = padL + i * step + (step - bw) / 2;
+    const hMov = (MOV[i] / 3.6) * (H1 - 30);
+    const hSta = (STA[i] / 3.6) * (H1 - 30);
+    const hFp  = (FP[i]  / 3.6) * (H1 - 30);
+    const y0 = H1 - 22;
+    bars += `<rect x="${x}" y="${y0 - hSta}" width="${bw}" height="${hSta}" fill="#0a84ff"/>`;
+    bars += `<rect x="${x}" y="${y0 - hSta - hMov}" width="${bw}" height="${hMov}" fill="#30d158"/>`;
+    bars += `<rect x="${x}" y="${y0 - hSta - hMov - hFp}" width="${bw}" height="${hFp}" fill="#ff453a"/>`;
+    labels += `<text x="${x + bw/2}" y="${H1 - 6}" fill="#9aa3b2" font-size="10" text-anchor="middle">${BINS[i].replace('s','')}</text>`;
+    const lx = x + bw / 2;
+    const ly = H1 + 20 + (1 - HOLD[i] / 100) * (H2 - 36);
+    pts.push(`${lx.toFixed(1)},${ly.toFixed(1)}`);
+  }
+  document.getElementById("svg-charts").innerHTML = `
+    <svg viewBox="0 0 ${W} ${H1 + H2}" width="100%">
+      <text x="6" y="16" fill="#9aa3b2" font-size="11">个/帧 (max 3.6)</text>
+      <line x1="${padL}" y1="${H1-22}" x2="${W-padR}" y2="${H1-22}" stroke="#2b313e"/>
+      ${bars}${labels}
+      <text x="6" y="${H1 + 26}" fill="#9aa3b2" font-size="11">Hold % (0-100%)</text>
+      <line x1="${padL}" y1="${H1 + H2 - 16}" x2="${W-padR}" y2="${H1 + H2 - 16}" stroke="#2b313e"/>
+      <polyline fill="none" stroke="#ff9f0a" stroke-width="2.5" points="${pts.join(' ')}"/>
+      ${pts.map(p => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="3" fill="#ff9f0a"/>`).join('')}
+    </svg>`;
+}
+
+filterTracks("all");
+renderCharts();
+</script>
+</body>
+</html>
