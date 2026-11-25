@@ -140,7 +140,7 @@ bool Lidar3dDetection::Init() {
   cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       nc.lidar_topic, cloud_qos, [this](sensor_msgs::msg::PointCloud2::SharedPtr msg) { OnCloud(msg); });
 
-  objects_pub_ = create_publisher<perception_interface::msg::LidarObjectArray>(objects_topic_, 5);
+  objects_pub_ = create_publisher<nav_interface::msg::LidarObjectArray>(objects_topic_, 5);
   tracks_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(tracks_topic_, 5);
   preds_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(predictions_topic_, 5);
   cloud_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(cloud_topic_, 2);

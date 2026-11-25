@@ -32,7 +32,7 @@ set -euo pipefail
 
 NODE=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)        # node_src/lidar_3d_detection
 WS=$(dirname "$(dirname "$NODE")")                               # perception_combo_ros
-# the interface packages (kygi665_msgs, perception_interface with our LidarObject* ...) are the robot team's
+# the interface packages (kygi665_msgs, nav_interface with our LidarObject* since 2026-11-25 ...) are the robot team's
 # perception copy, Nav_D20/perception_combo_ros/common_interface: our node is part of their perception (2026-11-14)
 MODEL="" OUT=$PWD PREFIX=/opt/seres/perception VERSION="" SERVICE_USER=$(id -un) ENABLE=yes PRECISION=fp16
 CUDA_ARCH=87 JOBS=$(nproc) WORK=$WS/build_deb SKIP_BUILD=0 DOMAIN_ID="" RMW="" CYCLONE_URI="" LOCK_CLOCKS=""
@@ -241,8 +241,8 @@ SIZE=$(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
   echo "Depends: $(join "${deps[@]}")"
   if [ ${#recommends[@]} -gt 0 ]; then echo "Recommends: $(join "${recommends[@]}")"; fi
   echo "Description: lidar 3D detection, tracking and prediction (ROS 2 node lidar_3d_detection)"
-  echo " lidar_3d_detection and its interface packages (common_interface, nav2_interface,"
-  echo " perception_interface, kygi665_msgs) installed in $PREFIX, with the model and the"
+  echo " lidar_3d_detection and its interface packages (common_interface, nav_interface,"
+  echo " kygi665_msgs) installed in $PREFIX, with the model and the"
   echo " TensorRT $PRECISION engines built on $(hostname)${L4T:+ ($L4T)}, and the systemd unit"
   echo " lidar-3d-detection.service (settings in /etc/default/lidar-3d-detection)."
 } > "$STAGE/DEBIAN/control"

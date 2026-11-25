@@ -29,7 +29,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <octomap_msgs/conversions.h>
 #include <octomap_msgs/msg/octomap.hpp>
-#include <perception_interface/msg/lidar_object_array.hpp>
+#include <nav_interface/msg/lidar_object_array.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
@@ -74,7 +74,7 @@ private:
   global_occupancy_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
 
   void map_switch_callback(const std_msgs::msg::String::SharedPtr msg);
-  void lidar_objects_callback(const perception_interface::msg::LidarObjectArray::SharedPtr msg);
+  void lidar_objects_callback(const nav_interface::msg::LidarObjectArray::SharedPtr msg);
   void
   map_update_callback(const common_interface::msg::PathFile::SharedPtr msg);
   // debug
@@ -102,7 +102,7 @@ private:
       sub_local_octomap_;
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr sub_global_occ_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_map_switch_;
-  rclcpp::Subscription<perception_interface::msg::LidarObjectArray>::SharedPtr sub_lidar_objects_;
+  rclcpp::Subscription<nav_interface::msg::LidarObjectArray>::SharedPtr sub_lidar_objects_;
   std::mutex lidar_objects_mutex_;
   double lidar_objects_stamp_ = -1.0;
   uint64_t lidar_objects_seq_ = 0;

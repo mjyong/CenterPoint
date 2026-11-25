@@ -21,6 +21,10 @@ find_package(rosidl_typesupport_c REQUIRED)
 #自定义消息接口添加部分
 rosidl_generate_interfaces(${PROJECT_NAME}
   "${PROJECT_SOURCE_DIR}:msg/FollowTarget.msg"
+  # ours: the perception's tracked objects for the crosswalks (were perception_interface/LidarObject*, moved 2026-11-25)
+  "${PROJECT_SOURCE_DIR}:msg/LidarPredictedPath.msg"
+  "${PROJECT_SOURCE_DIR}:msg/LidarObject.msg"
+  "${PROJECT_SOURCE_DIR}:msg/LidarObjectArray.msg"
   DEPENDENCIES rosidl_typesupport_c builtin_interfaces std_msgs action_msgs geometry_msgs sensor_msgs std_srvs
 )
 

@@ -33,8 +33,8 @@ def test_every_topic_goes_over(tmp_path, tool, capsys):
     header = _make(ts, "std_msgs/msg/Header", stamp=stamp, frame_id="x")
     msgs = {
         "/lightning/odom": ("nav_msgs/msg/Odometry", _make(ts, "nav_msgs/msg/Odometry", header=header)),
-        "/perception/lidar_3d/objects": ("perception_interface/msg/LidarObjectArray",
-                                         _make(ts, "perception_interface/msg/LidarObjectArray", header=header)),
+        "/perception/lidar_3d/objects": ("nav_interface/msg/LidarObjectArray",
+                                         _make(ts, "nav_interface/msg/LidarObjectArray", header=header)),
         "/rte/rdap/rtk/inspvax": ("kygi665_msgs/msg/INSPVAX", _make(ts, "kygi665_msgs/msg/INSPVAX")),
         "/mc/motion_control": ("mc_interface/msg/Motion",
                                _make(ts, "mc_interface/msg/Motion", header=header, uuid="planning", mode=1, motion=2,
@@ -84,3 +84,22 @@ def test_a_reindexed_bag_with_an_empty_storage_identifier_is_read_as_sqlite(tmp_
     assert (bag / "metadata.yaml").read_text() == meta                     # the bag itself is not touched
     (bag / "metadata.yaml").write_text(meta.replace("''", "sqlite3"))
     assert bag_to_mcap.readable(str(bag), str(tmp_path)) == bag
+
+
+def test_bags_from_before_the_move_still_convert(tmp_path, tool, capsys):
+    """Our LidarObject* moved from perception_interface to nav_interface (2026-11-25); the T57-T66 bags carry the old
+    name with the same fields (Nav_D20/planning/tools/legacy_msgs)."""
+    bag_to_mcap, bag_on_map = tool
+    from rosbags.rosbag2 import Writer
+    ts = bag_on_map.typestore(all_packages=True, quiet=True)
+    legacy = os.path.join(TOOLS, "legacy_msgs", "perception_interface", "msg")
+    nav = os.path.join(ROOT, "Nav_D20", "planning", "third_party", "nav_interface", "msg")
+    for name in ("LidarObject.msg", "LidarObjectArray.msg", "LidarPredictedPath.msg"):   # the same fields
+        assert open(os.path.join(legacy, name)).read() == open(os.path.join(nav, name)).read(), name
+    src = tmp_path / "old"
+    with Writer(src, version=8) as w:
+        c = w.add_connection("/perception/lidar_3d/objects", "perception_interface/msg/LidarObjectArray", typestore=ts)
+        m = _make(ts, "perception_interface/msg/LidarObjectArray")
+        w.write(c, 1700000000 * 10 ** 9, ts.serialize_cdr(m, "perception_interface/msg/LidarObjectArray"))
+    assert bag_to_mcap.main([str(src), str(tmp_path / "out")]) == 0
+    assert "LEFT OUT" not in capsys.readouterr().out

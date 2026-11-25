@@ -104,9 +104,9 @@ visualization_msgs::msg::Marker delete_all() {
 
 }  // namespace
 
-perception_interface::msg::LidarObjectArray object_array(const PerceptionPipeline& pipe, const PipelineOutput& out,
+nav_interface::msg::LidarObjectArray object_array(const PerceptionPipeline& pipe, const PipelineOutput& out,
                                                    const std::string& local_frame, const std::string& world_frame) {
-  perception_interface::msg::LidarObjectArray arr;
+  nav_interface::msg::LidarObjectArray arr;
   arr.header.stamp = stamp(out.stamp);
   arr.header.frame_id = local_frame;
   arr.world_frame = world_frame;
@@ -119,7 +119,7 @@ perception_interface::msg::LidarObjectArray object_array(const PerceptionPipelin
   arr.world_pose.orientation.w = q[3];
   for (const PlannerObject& po : planner_objects(pipe, out)) {
     const LocalTrack& t = po.track;
-    perception_interface::msg::LidarObject o;
+    nav_interface::msg::LidarObject o;
     o.id = static_cast<uint32_t>(t.id);
     o.label = static_cast<uint8_t>(t.label);
     o.label_name = kClasses[t.label];
@@ -134,7 +134,7 @@ perception_interface::msg::LidarObjectArray object_array(const PerceptionPipelin
     for (int k = 0; k < 16; ++k) o.covariance[k] = t.covariance(k / 4, k % 4);
     for (double s : po.times) o.prediction_times.push_back(static_cast<float>(s));
     for (const auto& path : po.paths) {
-      perception_interface::msg::LidarPredictedPath p;
+      nav_interface::msg::LidarPredictedPath p;
       p.probability = static_cast<float>(path.probability);
       for (size_t s = 0; s < path.xy.size(); ++s) {
         p.positions.push_back(point(path.xy[s][0], path.xy[s][1], 0.0));

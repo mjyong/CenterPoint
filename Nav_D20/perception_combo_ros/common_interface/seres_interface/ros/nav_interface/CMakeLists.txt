@@ -8,6 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(common_interface REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
@@ -86,10 +87,15 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/NavInfraredResult.msg"
   "msg/AbnormalCondition.msg"
   "msg/DiagInfo.msg"
+  # ours: lidar_3d_detection's tracked objects for the planner (were perception_interface/LidarObject*, 2026-11-25)
+  "msg/LidarPredictedPath.msg"
+  "msg/LidarObject.msg"
+  "msg/LidarObjectArray.msg"
 
   DEPENDENCIES
     "common_interface"
     "std_msgs"
+    "geometry_msgs"
 )
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

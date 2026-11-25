@@ -8,7 +8,7 @@ C++ 代码只有这一份：算法仓库（CenterPoint 仓库）的 Python 是�
 
 ```text
 perception_combo_ros/
-  common_interface/seres_interface/ros/   common_interface、nav2_interface、perception_interface（LidarObjectArray）
+  common_interface/seres_interface/ros/   common_interface、nav_interface（LidarObjectArray，2026-11-25 从 perception_interface 挪过来）
   node_src/lidar_3d_detection/
     include/lidar3d/, src/                库 lidar3d：预处理、检测、跟踪、预测，不依赖 ROS
     tests/                                对 Python 的逐段测试（GoogleTest，见"和算法仓库对齐"）
@@ -34,7 +34,7 @@ slam/interface/kygi665_msgs/              RTK 组合导航的 INSPVAX（定位�
 | 输入 | `/robot/topic/rdap/top_point_cloud2` | `sensor_msgs/PointCloud2`（XT32） |
 | 输入 | `/rte/rdap/rtk/imus/data_raw` | `sensor_msgs/Imu`（deg/s，kygi 约定） |
 | 输入 | `/rte/rdap/rtk/inspvax` | `kygi665_msgs/INSPVAX`（第一个好解定 ENU 原点） |
-| 输出 | `/perception/lidar_3d/objects` | `perception_interface/LidarObjectArray`，给规划 |
+| 输出 | `/perception/lidar_3d/objects` | `nav_interface/LidarObjectArray`（2026-11-25 以前是 `perception_interface/LidarObjectArray`，字段一样），给规划 |
 | 输出 | `/perception/lidar_3d/tracks`、`/perception/lidar_3d/predictions` | `visualization_msgs/MarkerArray`（世界系，调试用） |
 
 - 话题名都在配置的 `node:` 一节里。

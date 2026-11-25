@@ -19,7 +19,7 @@
   <depend>sensor_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>visualization_msgs</depend>
-  <depend>perception_interface</depend>
+  <depend>nav_interface</depend>
   <!-- INSPVAX localization of the kygi665 robot; declared so that colcon builds it first -->
   <depend>kygi665_msgs</depend>
   <depend>glog</depend>

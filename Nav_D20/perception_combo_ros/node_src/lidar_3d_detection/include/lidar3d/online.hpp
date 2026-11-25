@@ -110,7 +110,7 @@ class OnlineInputs {
   std::map<std::string, std::chrono::steady_clock::time_point> last_log_;
 };
 
-// one object of perception_interface/LidarObjectArray (src/ros_convert.cpp) in the det frame of the scan: gravity aligned,
+// one object of nav_interface/LidarObjectArray (src/ros_convert.cpp) in the det frame of the scan: gravity aligned,
 // yaw with the body, origin on the ground (PerceptionPipeline::to_local)
 struct PlannerObject {
   LocalTrack track;

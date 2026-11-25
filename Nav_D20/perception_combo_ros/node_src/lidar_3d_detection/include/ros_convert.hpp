@@ -3,7 +3,7 @@
 #pragma once
 
 #include <builtin_interfaces/msg/time.hpp>
-#include <perception_interface/msg/lidar_object_array.hpp>
+#include <nav_interface/msg/lidar_object_array.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/imu.hpp>
@@ -31,7 +31,7 @@ InsSample ins_sample(const kygi665_msgs::msg::INSPVAX& m);
 #endif
 
 // the planner's message: objects in the det frame of the scan (local_frame), its pose in world_frame
-perception_interface::msg::LidarObjectArray object_array(const PerceptionPipeline& pipe, const PipelineOutput& out,
+nav_interface::msg::LidarObjectArray object_array(const PerceptionPipeline& pipe, const PipelineOutput& out,
                                                    const std::string& local_frame, const std::string& world_frame);
 // RViz, in world_frame as the Python node draws them: boxes, ids, and one line per predicted mode
 visualization_msgs::msg::MarkerArray track_markers(const PipelineOutput& out, const std::string& world_frame);

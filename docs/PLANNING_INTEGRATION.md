@@ -40,7 +40,7 @@
 
 ## 2. 我们这边给什么
 
-`/perception/lidar_3d/objects`，`perception_interface/LidarObjectArray`，10 Hz：
+`/perception/lidar_3d/objects`，`nav_interface/LidarObjectArray`（2026-11-25 以前是 `perception_interface/LidarObjectArray`，字段一样），10 Hz：
 
 | 字段 | 内容 |
 |---|---|
@@ -62,6 +62,7 @@
 
 1. **消息包重名**。Nav_D20 里已经有一个 `perception_interface`（摄像头的 `Objects`，带人脸、手势，跟随任务在用），我们的 deb 也装一个同名的 `perception_interface`。同名包装在两个前缀下，后 source 的会把前面的盖掉。
    - 做法：把 `LidarObject.msg`、`LidarObjectArray.msg`、`LidarPredictedPath.msg` 合进 Nav_D20 的 `perception_interface`（机器人那一份为准），我们的 deb 改成依赖它，不再自带。
+   - 2026-11-25 人定：这三个挪到 `nav_interface`（感知那份 `perception_combo_ros/common_interface/.../nav_interface`、规划那份 `planning/third_party/nav_interface`），`perception_interface` 回到机器人团队原来的样子。
 2. **坐标系**。检测系是 x 右、y 前，规划的 `base_link` 是 x 前（TEB 的局部图前 10 m 是 +x；T42 的录包里 odom 航向和行进方向一致）。
    - 从检测系到 `base_link`：先绕 z 转 −90°（前 = 检测 +y = base +x），再平移雷达到 `base_link` 原点的那一段。
    - **默认值**在定位的配置里（`Nav_D20/slam/lightning-lm-master/config/default_d20.yaml`，现在生效的 "D20 A2" 那一组）：

@@ -25,7 +25,10 @@ sys.path.insert(0, ROOT)
 INSPVAX = "/rte/rdap/rtk/inspvax"
 OBJECTS = "/perception/lidar_3d/objects"
 KYGI_MSGS = os.path.join(ROOT, "kygi665_msgs", "msg")
-PERCEPTION_MSGS = os.path.join(ROOT, "Nav_D20", "seres_interface", "ros", "perception_interface", "msg")
+# our objects message: nav_interface/LidarObject* since 2026-11-25 (planning's copy of nav_interface), and the same
+# definitions under their old name perception_interface/LidarObject* for the bags recorded before (T57-T66)
+NAV_MSGS = os.path.join(ROOT, "Nav_D20", "planning", "third_party", "nav_interface", "msg")
+LEGACY_MSGS = os.path.join(HERE, "legacy_msgs", "perception_interface", "msg")
 # the robot team's other message packages (mc_interface/Motion, rhr_interface, nav2_interface ...): a bag recorded on
 # the dog carries them (T61: a conversion without them dropped those topics)
 SERES_MSGS = os.path.join(ROOT, "Nav_D20", "seres_interface", "ros")
@@ -33,15 +36,16 @@ LOC_CONFIG = os.path.join(ROOT, "Nav_D20", "slam", "lightning-lm-master", "confi
 
 
 def typestore(all_packages=False, quiet=False):
-    """ROS 2 Humble's types plus kygi665_msgs and perception_interface; with all_packages also every other package
-    under Nav_D20/seres_interface/ros (for converting a whole bag recorded on the dog)."""
+    """ROS 2 Humble's types plus kygi665_msgs and our objects message (nav_interface/LidarObject*, and under its old
+    name perception_interface/LidarObject* for older bags); with all_packages also every other package under
+    Nav_D20/seres_interface/ros (for converting a whole bag recorded on the dog)."""
     from rosbags.typesys import Stores, get_types_from_msg, get_typestore
     ts = get_typestore(Stores.ROS2_HUMBLE)
-    packages = [(KYGI_MSGS, "kygi665_msgs"), (PERCEPTION_MSGS, "perception_interface")]
+    packages = [(KYGI_MSGS, "kygi665_msgs"), (NAV_MSGS, "nav_interface"), (LEGACY_MSGS, "perception_interface")]
     if all_packages:
         for d in sorted(glob.glob(os.path.join(SERES_MSGS, "*", "msg"))):
             pkg = os.path.basename(os.path.dirname(d))
-            if pkg not in ("kygi665_msgs", "perception_interface"):
+            if pkg != "kygi665_msgs":
                 packages.append((d, pkg))
     types = {}
     for folder, pkg in packages:

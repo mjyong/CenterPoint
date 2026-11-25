@@ -16,7 +16,7 @@ Publishes (world = LIO odom frame, ``world_frame`` parameter):
     ~/cloud         sensor_msgs/PointCloud2         (debug) accumulated det-frame cloud
 Planner-facing data in the gravity-aligned local frame is available from
 ``PerceptionPipeline.to_local``; the C++ node (lidar_3d_detection in Nav_D20/perception_combo_ros/node_src, docs/DEPLOY_ORIN.md section 9)
-publishes it as perception_interface/LidarObjectArray. The message handling is ``dog_perception/online.py``, shared with
+publishes it as markers (the C++ node publishes nav_interface/LidarObjectArray). The message handling is ``dog_perception/online.py``, shared with
 the offline bag replay (tools/deploy/cpp_parity.py python --bag).
 """
 import os

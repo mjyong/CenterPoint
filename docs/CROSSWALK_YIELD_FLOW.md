@@ -17,7 +17,7 @@
  ① 感知 lidar_3d_detection（Nav_D20/perception_combo_ros/node_src/lidar_3d_detection，cw-nav-perception）
         │  检测（PointPillars，TensorRT）→ 跟踪（IMM）→ 运动状态 → 预测（3 s）
         ▼
- /perception/lidar_3d/objects   perception_interface/LidarObjectArray，10 Hz，lidar_det 系
+ /perception/lidar_3d/objects   nav_interface/LidarObjectArray，10 Hz，lidar_det 系
         │
  ② 规划收消息 RosBridge::lidar_objects_callback（ros_bridge.cc）→ yield::Object 列表 + 时间戳 + 序号
         │
@@ -58,8 +58,10 @@
 5. 预测：每条航迹几种模式（概率从高到低），0.5 s 一个点，到 3 s，每个点带 2x2 协方差；
 6. 每帧把航迹和预测转回这一帧的 `lidar_det` 系发出去。
 
-输出 `/perception/lidar_3d/objects`（`perception_interface/msg/LidarObjectArray`，消息定义在
-`Nav_D20/perception_combo_ros/common_interface/seres_interface/ros/perception_interface/msg/`，规划那份是同样的三个文件）：
+输出 `/perception/lidar_3d/objects`（`nav_interface/msg/LidarObjectArray`，消息定义在
+`Nav_D20/perception_combo_ros/common_interface/seres_interface/ros/nav_interface/msg/`，规划那份
+`Nav_D20/planning/third_party/nav_interface/msg/` 是同样的三个文件；2026-11-25 以前是 `perception_interface/msg/LidarObjectArray`，
+字段一样，以前录的包工具照样读，旧定义在 `Nav_D20/planning/tools/legacy_msgs/`）：
 
 | 字段 | 内容 | 规划用不用 |
 |---|---|---|

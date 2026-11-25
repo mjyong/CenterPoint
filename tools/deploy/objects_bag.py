@@ -1,4 +1,4 @@
-"""What the C++ node published: a rosbag2 of its objects (perception_interface/LidarObjectArray, recorded with
+"""What the C++ node published: a rosbag2 of its objects (nav_interface/LidarObjectArray, recorded with
 ``ros2 bag record``), summarized and checked against a replay of the same input (lidar_3d_bag_replay or
 lidar_3d_replay --messages, their .npz): one message per frame (none dropped), the same stamps, the same
 track ids in each frame.
@@ -20,8 +20,9 @@ The two world frames need not share an origin: online it is the node's first INS
 replay the bag's first (T40: 2.3 m apart). world_offset is the constant shift (replay - live, the median over
 frames with exactly one track of a class on both sides); the live tracks are moved by it before comparing.
 
-The message definitions are read from the perception's perception_interface package (Nav_D20/perception_combo_ros,
-rosbags, no ROS install).
+The message definitions are read from the perception's nav_interface package (Nav_D20/perception_combo_ros,
+rosbags, no ROS install); bags recorded before 2026-11-25 carry perception_interface/LidarObjectArray, the same fields,
+registered from the same files.
 Recordings of the earlier node (T29, T30) carry dog_perception_msgs/ObjectArray, the same fields under other names:
 registered from the same files.
 """
@@ -34,10 +35,13 @@ from pathlib import Path
 import numpy as np
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+# the perception's nav_interface (our LidarObject* moved there from perception_interface on 2026-11-25; bags recorded
+# before carry the old name with the same fields)
 MSG_DIR = os.path.join(ROOT, "Nav_D20", "perception_combo_ros", "common_interface", "seres_interface", "ros",
-                       "perception_interface", "msg")
+                       "nav_interface", "msg")
 NAMES = ("LidarPredictedPath", "LidarObject", "LidarObjectArray")
-ARRAYS = ("perception_interface/msg/LidarObjectArray", "dog_perception_msgs/msg/ObjectArray")
+ARRAYS = ("nav_interface/msg/LidarObjectArray", "perception_interface/msg/LidarObjectArray",
+          "dog_perception_msgs/msg/ObjectArray")
 TRACK_TOL = 0.5          # [m]
 
 
@@ -49,7 +53,8 @@ def typestore():
     for name in NAMES:
         with open(os.path.join(MSG_DIR, name + ".msg"), encoding="utf-8") as f:
             text = f.read()
-        types.update(get_types_from_msg(text, "perception_interface/msg/" + name))
+        for pkg in ("nav_interface", "perception_interface"):
+            types.update(get_types_from_msg(text.replace("perception_interface/", pkg + "/"), pkg + "/msg/" + name))
         # the earlier node's dog_perception_msgs: Lidar* without the prefix (LidarObjectArray -> ObjectArray)
         old = text.replace("LidarPredictedPath", "PredictedPath").replace("LidarObject", "Object")
         types.update(get_types_from_msg(old, "dog_perception_msgs/msg/" + name[len("Lidar"):]))

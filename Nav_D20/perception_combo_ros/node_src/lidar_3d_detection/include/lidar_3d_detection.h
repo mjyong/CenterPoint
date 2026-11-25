@@ -11,7 +11,7 @@
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
-#include "perception_interface/msg/lidar_object_array.hpp"
+#include "nav_interface/msg/lidar_object_array.hpp"
 
 #include "lidar3d/online.hpp"
 #include "lidar3d/pipeline.hpp"
@@ -66,7 +66,7 @@ class Lidar3dDetection : public rclcpp::Node {
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::SubscriptionBase::SharedPtr pose_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
-  rclcpp::Publisher<perception_interface::msg::LidarObjectArray>::SharedPtr objects_pub_;
+  rclcpp::Publisher<nav_interface::msg::LidarObjectArray>::SharedPtr objects_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr tracks_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr preds_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_pub_;

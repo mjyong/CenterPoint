@@ -407,7 +407,7 @@ T29–T31 时节点是 `deploy/ros2` 的 `dogperc_node`，发 `dog_perception_ms
 - 输入话题照配置订阅，输出话题也在配置里（`objects_topic`、`tracks_topic`、`predictions_topic`、`cloud_topic`）。
 
 **发布**：
-- `/perception/lidar_3d/objects`（`perception_interface/LidarObjectArray`），给规划：
+- `/perception/lidar_3d/objects`（`nav_interface/LidarObjectArray`；2026-11-25 以前是 `perception_interface/LidarObjectArray`），给规划：
   - 坐标系是这一帧的检测系：重力对齐，yaw 跟车体，原点在车下的地面上（`PerceptionPipeline::to_local`）；
   - `world_pose` 是这个坐标系在定位系里的位姿，要回到世界系就用它；
   - 每个目标：id、类别、运动状态（静止 / 在动 / 停下）、分数、是否这一帧没检测到（coasting）、年龄、框、速度、[x, y, vx, vy] 的协方差，以及预测：时刻表和每种模式的路径、概率、协方差，最可能的在前；
@@ -467,9 +467,9 @@ ros2 launch lidar_3d_detection lidar_3d_detection.launch.py model_dir:=$HOME/dog
 - 对 Python 的逐段测试和回放比较：在算法仓库里不带 ROS 编 `$L`、跑 CTest（第 7 节）；
 - `python tools/deploy/check_deploy_deb.py`，`test_deploy_deb_config_follows_python` 每次跑：
   - 配置除了末尾 7 个部署键（`model_dir`、四个话题名、8 号狗的天线接法 `ins_azimuth_offset_deg` 0 和 `ins_lever_arm`），等于 `export_cpp_config.py --robot kygi` 的输出（`kygi` 预设是 0921 天线接反时的 180，给金标准数据和那批包的回放用；狗上 1016 起接正，T40 在狗上改过，2026-11-13 起仓库里的部署配置也是接正的）。改了 Python 的参数就用 `--write` 重写；
-  - 规划那份 `perception_interface`（`Nav_D20/seres_interface`）和感知那份的 `LidarObject*` 一样（节点发、规划收）；
+  - 规划那份 `nav_interface`（`Nav_D20/planning/third_party`）和感知那份的 `LidarObject*` 一样（节点发、规划收）；
   - 感知那份 `kygi665_msgs` 的消息和仓库根目录的 `kygi665_msgs`（Python 读的）字段相同；
-- `objects_bag.py` 用 `perception_interface` 的消息文件读 `LidarObjectArray`（T29–T31 录的 `dog_perception_msgs/ObjectArray` 也还能读）。
+- `objects_bag.py` 用 `nav_interface` 的消息文件读 `LidarObjectArray`（以前的 `perception_interface/LidarObjectArray`、T29–T31 录的 `dog_perception_msgs/ObjectArray` 也还能读）。
 
 节点 `lidar_3d_detection` 是车上的写法：glog 日志、`Init()`、话题名在配置里；
 - 订阅的 QoS：IMU 400、INSPVAX 200、点云 SensorData 5；

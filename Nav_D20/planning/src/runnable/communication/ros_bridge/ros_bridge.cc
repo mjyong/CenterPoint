@@ -88,7 +88,7 @@ bool RosBridge::Init(PlanningEntry *planning_entry) {
   }
   if (config_.has_sub_lidar_objects()) {
     // perception's tracked vehicles for the crosswalks (Tracking, CrosswalkYield; T51 review)
-    sub_lidar_objects_ = node_->create_subscription<perception_interface::msg::LidarObjectArray>(
+    sub_lidar_objects_ = node_->create_subscription<nav_interface::msg::LidarObjectArray>(
         config_.sub_lidar_objects().name(), rclcpp::QoS(config_.sub_lidar_objects().queue_size()),
         std::bind(&RosBridge::lidar_objects_callback, this, std::placeholders::_1));
   }
@@ -504,7 +504,7 @@ void RosBridge::map_update_callback(
   }
 }
 
-void RosBridge::lidar_objects_callback(const perception_interface::msg::LidarObjectArray::SharedPtr msg) {
+void RosBridge::lidar_objects_callback(const nav_interface::msg::LidarObjectArray::SharedPtr msg) {
   using algorithm::yield::Mat2;
   using algorithm::yield::Motion;
   using algorithm::yield::Object;

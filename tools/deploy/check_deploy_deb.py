@@ -7,7 +7,7 @@ repository, checked (the name is from when it lived in deploy_deb/):
   they are);
 - the kygi665_msgs it builds against (the perception's common_interface) have the fields of this repository's
   kygi665_msgs (what the Python reads);
-- planning's perception_interface (Nav_D20/seres_interface) has the same LidarObject* messages as the perception's
+- planning's nav_interface (Nav_D20/planning/third_party) has the same LidarObject* messages as the perception's
   (what the node publishes and the planner subscribes).
 
     python tools/deploy/check_deploy_deb.py            # exit 1 when something differs
@@ -63,11 +63,12 @@ def fields(path):
     return out
 
 
-# the objects message our node publishes and the planner subscribes: planning's perception_interface
-# (Nav_D20/seres_interface) carries the same definitions as the perception's, which the node builds against
+# the objects message our node publishes and the planner subscribes (nav_interface since 2026-11-25): planning's
+# nav_interface (Nav_D20/planning/third_party) carries the same definitions as the perception's, which the node builds
+# against
 PERCEPTION_MSGS = ("LidarObject.msg", "LidarObjectArray.msg", "LidarPredictedPath.msg")
-PERCEPTION_DEPLOY = os.path.join(PERCEPTION, "common_interface", "seres_interface", "ros", "perception_interface", "msg")
-PERCEPTION_NAV = os.path.join(ROOT, "Nav_D20", "seres_interface", "ros", "perception_interface", "msg")
+PERCEPTION_DEPLOY = os.path.join(PERCEPTION, "common_interface", "seres_interface", "ros", "nav_interface", "msg")
+PERCEPTION_NAV = os.path.join(ROOT, "Nav_D20", "planning", "third_party", "nav_interface", "msg")
 
 
 def message_problems():
@@ -76,7 +77,7 @@ def message_problems():
         for f in PERCEPTION_MSGS:
             a, b = os.path.join(PERCEPTION_DEPLOY, f), os.path.join(PERCEPTION_NAV, f)
             if not (os.path.exists(a) and os.path.exists(b)) or fields(a) != fields(b):
-                out.append("planning's perception_interface/msg/%s differs from the perception's" % f)
+                out.append("planning's nav_interface/msg/%s differs from the perception's" % f)
     ref = os.path.join(ROOT, "kygi665_msgs", "msg")
     for f in sorted(set(os.listdir(ref)) | set(os.listdir(KYGI))):
         a, b = os.path.join(ref, f), os.path.join(KYGI, f)
