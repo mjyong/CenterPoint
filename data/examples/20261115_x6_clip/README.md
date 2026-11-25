@@ -52,3 +52,9 @@
 无需拉取 LFS 大文件，`git pull` 后直接在 Foxglove Desktop 中：
 - **Open local file** → 选择 `data/examples/20261115_x6_clip/viz/20261115_x6_clip_planning_viz.mcap`
 - **Layout → Import from file...** → 选择 `Nav_D20/planning/script/planning_viz.json`
+
+### 方式 C：只给规划调试的小包（`planning_debug/`，5.3 MB，免 Git LFS）
+
+规划的输入（里程计、感知栅格、感知目标、TF、map 里的终点）加上狗上规划当时的输出（改名到 `/field/…`）。感知目标已经是
+`nav_interface/msg/LidarObjectArray`。可以直接 `ros2 bag play` 给规划，也可以用 `replay_planning_check.sh … --planning-only`
+回灌。说明和这一段的分析见 `planning_debug/README.md`。

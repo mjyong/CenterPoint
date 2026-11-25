@@ -404,6 +404,9 @@ python Nav_D20/planning/tools/check_planning_mcap.py <包>_mcap     # 规划的�
 bash Nav_D20/planning/script/replay_dog_bag.sh <包> [名字]         # 读 replay goal，只放传感器和感知目标再跑整套；对照在 work_dirs/planning_io_<名字>/sequence.md
 python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip   # 9.1
 python Nav_D20/planning/tools/objects_in_map.py <包>               # sqlite 直接读；外参：要 extrinsic OK
+python Nav_D20/planning/tools/planning_debug_bag.py <包>_mcap -o <包>_planning_debug   # 只给规划调试的小包（输入 + /field/ 现场输出）
+#   回灌：PLANNING_STARTUP_MAP=<站点地图目录> bash Nav_D20/planning/script/replay_planning_check.sh <名字> <x> <y> \
+#           --bag <包>_planning_debug --planning-only     （例子：data/examples/20261115_x6_clip/planning_debug/README.md）
 journalctl -u cw-planning --since "<开始>" --until "<结束>" > planning.log   # 狗上，状态变化的那些行
 ```
 

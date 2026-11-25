@@ -2,8 +2,11 @@
 # 回放一份 bag 跑整套（run_planning_stack_debug.sh --once），录规划的输入输出，发一个目标点；
 # bag 放完以后查录包（tools/check_planning_mcap.py），数规划日志里的关键行。T41–T43 的手工步骤收在这里（T46 复核）。
 #
-#   bash Nav_D20/planning/script/replay_planning_check.sh <名字> <目标 x> <目标 y> [--bag BAG]
+#   bash Nav_D20/planning/script/replay_planning_check.sh <名字> <目标 x> <目标 y> [--bag BAG] [--planning-only]
 #   例：LOC_MAP_PATH=data/loc_maps/ad68517c-... bash Nav_D20/planning/script/replay_planning_check.sh t47_map 80.0 126.9
+#   只放规划（包里有规划的输入，planning_debug_bag.py 做的）：
+#     PLANNING_STARTUP_MAP=data/loc_maps/ad68517c-... bash Nav_D20/planning/script/replay_planning_check.sh x6_clip \
+#       80.725 216.437 --bag data/examples/20261115_x6_clip/planning_debug --planning-only
 #
 # 环境变量同 run_planning_stack_debug.sh：LOC_MAP_PATH、LOC_INS_ONLY、LOC_INS_YAW_OFFSET（不设按 bag 日期定）、PLANNING_VIN；ROS_DOMAIN_ID 默认 42（会发 /cmd_vel，不要用狗的域）。
 # MAP_SWITCH=<地图目录>（有 global_map.yaml 的）：发目标之前先发 /map/switch，规划换成这张图，读它的 semantic.osm。
@@ -20,6 +23,19 @@ if [[ $# -lt 3 ]]; then
 fi
 name=$1 goal_x=$2 goal_y=$3
 shift 3
+# --planning-only with a bag that has its own /goal_pose (planning_debug_bag.py writes it in map, with the heading): the
+# planner is up before that bag plays and takes the bag's goal; a second one from here (no heading) could come after it
+bag_arg="" planning_only=0 goal_from_bag=0
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  case "${args[i]}" in
+    --bag) bag_arg="${args[i + 1]:-}" ;;
+    --planning-only) planning_only=1 ;;
+  esac
+done
+if [[ ${planning_only} -eq 1 && -f "${bag_arg}/metadata.yaml" ]] && grep -q "name: /goal_pose$" "${bag_arg}/metadata.yaml"; then
+  goal_from_bag=1
+fi
 
 nav_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 repo_root="$(cd "${nav_root}/.." && pwd)"
@@ -67,9 +83,13 @@ for _ in $(seq 1 60); do
       timeout 30 ros2 topic pub --once -w 1 /map/switch std_msgs/msg/String "{data: '${MAP_SWITCH}'}" > /dev/null 2>&1 || true
       sleep 3
     fi
-    timeout 30 ros2 topic pub --once -w 2 /goal_pose geometry_msgs/msg/PoseStamped \
-      "{header: {frame_id: map}, pose: {position: {x: ${goal_x}, y: ${goal_y}, z: 0.0}, orientation: {w: 1.0}}}" \
-      > /dev/null 2>&1 && sent=1
+    if [[ ${goal_from_bag} -eq 1 ]]; then
+      sent=2
+    else
+      timeout 30 ros2 topic pub --once -w 2 /goal_pose geometry_msgs/msg/PoseStamped \
+        "{header: {frame_id: map}, pose: {position: {x: ${goal_x}, y: ${goal_y}, z: 0.0}, orientation: {w: 1.0}}}" \
+        > /dev/null 2>&1 && sent=1
+    fi
     break
   fi
   if ! kill -0 "${stack}" 2>/dev/null; then
@@ -77,7 +97,8 @@ for _ in $(seq 1 60); do
   fi
   sleep 1
 done
-echo "目标 (${goal_x}, ${goal_y}) $([[ ${sent} -eq 1 ]] && echo 已发 || echo 没发出去)"
+goal_note() { case ${sent} in 1) echo 已发 ;; 2) echo "用包里的 /goal_pose" ;; *) echo 没发出去 ;; esac; }
+echo "目标 (${goal_x}, ${goal_y}) $(goal_note)"
 
 wait "${stack}" || echo "整套退出码 $?"
 kill -INT "${rec}" "${rec_heavy}" 2>/dev/null || true
@@ -108,7 +129,7 @@ fi
 # 不带 ROS / conda 的 PYTHONPATH：那里的 numpy 会盖过 .venv 的（T54 的可视化就是这么失败的）；工具只要仓库在路径上
 py_clean() { env -u PYTHONPATH PYTHONPATH="${repo_root}" "${py}" "$@"; }
 {
-  echo "== ${name}: 目标 (${goal_x}, ${goal_y}) $([[ ${sent} -eq 1 ]] && echo 已发 || echo 没发出去)；LOC_MAP_PATH=${LOC_MAP_PATH:-} LOC_INS_ONLY=${LOC_INS_ONLY:-0} MAP_SWITCH=${MAP_SWITCH:-}"
+  echo "== ${name}: 目标 (${goal_x}, ${goal_y}) $(goal_note)；LOC_MAP_PATH=${LOC_MAP_PATH:-} LOC_INS_ONLY=${LOC_INS_ONLY:-0} MAP_SWITCH=${MAP_SWITCH:-}"
   py_clean "${nav_root}/planning/tools/check_planning_mcap.py" "${out}" \
     --layout "${nav_root}/planning/script/planning_io.json" || true
   if [[ -f "${out}/logs/planning.INFO" ]]; then

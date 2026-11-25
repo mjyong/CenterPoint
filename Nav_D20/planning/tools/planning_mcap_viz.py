@@ -1101,17 +1101,37 @@ class Converter:
 
     # -- goals
     def collect_goals(self):
-        goals = []
+        """The goals sent (/goal_pose) and the planner's goal marker. A marker more than 1 m from the goal sent before
+        it is left out: planners before the T66 review drew a goal sent in base_link at its base_link numbers in map
+        (20261115_x6: the marker at (27.0, 4.0), the goal at (80.7, 216.4)), and the marker, republished every cycle,
+        would win."""
+        sent, marks = [], []
         for log, stamp, frame, x, y, yaw, topic in self.rec["goals"]:
             t = self.data_time(stamp, log)
             p = self.to_fixed(frame, t, x, y, yaw)
             if p is not None:
-                goals.append((t, p[0], p[1], p[2]))
+                (sent if topic == self.topics["goal"] else marks).append((t, p[0], p[1], p[2]))
+        sent.sort()
+        goals, wrong = list(sent), []
+        sent_t = [g[0] for g in sent]
+        def ref(t):     # the goal sent before t, or the first one when t is before it (a clip re-stamps it)
+            return sent[max(latest(sent_t, t), 0)]
+        for g in sorted(marks):
+            if sent and math.hypot(g[1] - ref(g[0])[1], g[2] - ref(g[0])[2]) > 1.0:
+                wrong.append(g)
+            else:
+                goals.append(g)
+        if wrong:
+            self.notes.append("%d of %d goal markers (%s) are more than 1 m from /goal_pose, left out: the marker at "
+                              "(%.1f, %.1f), the goal at (%.1f, %.1f) (planner before the T66 review: a base_link "
+                              "goal drawn in map)" % (len(wrong), len(marks), self.topics["goal_marker"], wrong[0][1],
+                                                      wrong[0][2], ref(wrong[0][0])[1], ref(wrong[0][0])[2]))
         goals.sort()
+        self.goal_times = [g[0] for g in goals]
         return goals
 
     def goal_at(self, t):
-        i = latest([g[0] for g in self.goals], t) if self.goals else -1
+        i = latest(self.goal_times, t) if self.goals else -1
         return self.goals[i] if i >= 0 else None
 
     # -- markers

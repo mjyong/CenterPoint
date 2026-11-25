@@ -1,6 +1,9 @@
 #!/bin/bash
 # 用 lidar_3d_detection 同一份 bag，一起拉起地面分割、局部栅格、定位和规划。
 # 调试规划用。会发 /cmd_vel，默认 ROS_DOMAIN_ID=42，不要和狗用同一个域。
+# --planning-only：只起规划，bag 里已经有它的输入（planning/tools/planning_debug_bag.py 做的包：/lightning/odom、
+# /map/occupancy_grid、/perception/lidar_3d/objects、/tf、/goal_pose）。规划先起，读完站点地图（PLANNING_STARTUP_MAP，
+# 日志 "startup map"，二十多秒，T66）再放包：几十秒的切片开头不丢，包里带朝向的 /goal_pose 也收得到。
 
 set -euo pipefail
 
@@ -20,13 +23,15 @@ log_dir=/tmp/nav_stack_debug
 bag="${default_bag}"
 loop=1
 with_planning=1
+planning_only=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --once) loop=0; shift ;;
     --no-planning) with_planning=0; shift ;;
+    --planning-only) planning_only=1; shift ;;
     --bag) bag="$2"; shift 2 ;;
     -h|--help)
-      echo "用法: bash $0 [--bag BAG] [--once] [--no-planning]"
+      echo "用法: bash $0 [--bag BAG] [--once] [--no-planning | --planning-only]"
       echo "默认 bag: ${default_bag}"
       exit 0
       ;;
@@ -38,7 +43,12 @@ lidar_bin="$(nav_bin nav_perception lidar_seg lidar_seg)"
 grid_bin="$(nav_bin nav_perception grid_map_memory_node grid_map_memory_node)"
 loc_bin="$(nav_bin slam lightning run_loc_online)"
 plan_bin="$(nav_bin planning planning planning)"
-for f in "${lidar_bin}" "${grid_bin}" "${loc_bin}" "${bag}/metadata.yaml" "${loc_config}"; do
+needed=("${lidar_bin}" "${grid_bin}" "${loc_bin}" "${bag}/metadata.yaml" "${loc_config}")
+if [[ "${planning_only}" -eq 1 ]]; then
+  [[ "${with_planning}" -eq 1 ]] || { echo "--planning-only 和 --no-planning 不能一起用"; exit 2; }
+  needed=("${bag}/metadata.yaml")
+fi
+for f in "${needed[@]}"; do
   if [[ ! -e "${f}" ]]; then
     echo "缺少: ${f}"
     exit 1
@@ -109,6 +119,28 @@ if [[ -z "${NAV_ALLOW_SHARED_DOMAIN:-}" ]] && command -v ros2 > /dev/null; then
 fi
 echo "bag=${bag}"
 echo "日志 ${log_dir}"
+if [[ "${planning_only}" -eq 1 ]]; then
+  echo "链路: 只起规划；bag 里的 /lightning/odom、/map/occupancy_grid、/perception/lidar_3d/objects、/tf、/goal_pose 直接进规划"
+  touch "${log_dir}/planner_start"
+  ( nav_exec planning "${plan_bin}" ) >"${log_dir}/planning.log" 2>&1 &
+  pids+=($!)
+  planner_pid=$!
+  # 等规划读完站点地图（没给 PLANNING_STARTUP_MAP 就等它的调试服务），最多 NAV_PLANNER_WAIT 秒
+  ready=0
+  for ((i = 0; i < ${NAV_PLANNER_WAIT:-90}; i++)); do
+    kill -0 "${planner_pid}" 2>/dev/null || { echo "规划退出了，看 ${log_dir}/planning.log"; exit 1; }
+    if [[ -n "${PLANNING_STARTUP_MAP:-}" ]]; then
+      glogs="$(find /tmp -maxdepth 1 -name 'planning.*INFO*' -newer "${log_dir}/planner_start" 2>/dev/null)"
+      # shellcheck disable=SC2086
+      if grep -qs "startup map" "${log_dir}/planning.log" ${glogs}; then ready=1; break; fi
+    elif ros2 service list 2>/dev/null | grep -q '^/planning/debug/set_pub_flag$'; then
+      ready=1; break
+    fi
+    sleep 1
+  done
+  echo "规划$([[ ${ready} -eq 1 ]] && echo "起来了（${i} s）" || echo "${NAV_PLANNER_WAIT:-90} s 还没读完地图，照样放包")"
+  sleep 2
+else
 echo "链路: bag 的顶激光/IMU/INSPVAX -> lidar_seg -> /map/occupancy_grid，定位 -> /lightning/odom -> planning"
 
 ( nav_exec nav_perception "${lidar_bin}" ) >"${log_dir}/lidar_seg.log" 2>&1 &
@@ -132,6 +164,7 @@ pids+=($!)
 ( nav_exec slam "${loc_bin}" ) >"${log_dir}/loc.log" 2>&1 &
 pids+=($!)
 sleep 3
+fi
 
 # --clock 让 /clock 跟着 bag 时间走。RViz 必须开 use_sim_time，否则 9 月的 TF 会被当成过期数据丢掉。
 play_args=(--rate 1 --clock --read-ahead-queue-size 500 --delay 1)
@@ -168,7 +201,7 @@ ros2 bag play "${bag}" "${play_args[@]}" >"${log_dir}/bag.log" 2>&1 &
 bag_pid=$!
 pids+=("${bag_pid}")
 
-if [[ "${with_planning}" -eq 1 ]]; then
+if [[ "${with_planning}" -eq 1 && "${planning_only}" -eq 0 ]]; then
   sleep 2
   ( nav_exec planning "${plan_bin}" ) >"${log_dir}/planning.log" 2>&1 &
   pids+=($!)

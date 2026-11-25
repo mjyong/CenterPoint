@@ -10782,6 +10782,22 @@ standstill 0 行。四个包都有 record_log 和三份 journal。没做的：�
    事件里有两种提示："近处才出现的车"（可能漏检）、"不到 1 s 的目标"（可能误检）。回灌用 `--camera-from` 从现场的包里取鱼眼和激光。
    测试 `tests/dog/test_field_viz.py`。真包还没跑过（T69 第 3 步）。
 
+人推的 x6 切片（e66895a，`data/examples/20261115_x6_clip/`，原包 239.1–276.8 s，37.7 s）看过：
+- **复盘工具第一次在真包上跑**：16 s、24 MB，鱼眼 941 帧，激光 181 帧按 `/tf_static` 放。现场规划的目标标记是旧的
+  （base_link 的数画在 map），它每周期都重发，把复盘里的"到终点距离"带偏了。复盘已经不用离 `/goal_pose` 1 m 以上的标记。
+- **门控对**：
+  - cross → cross_wait 发生在 1.7 s（重卡 1327 从狗前方约 4 m 横穿）和 18.9 s（一波 4 辆车）；
+  - 各自在 11.25 s、37.35 s 放回 cross；
+  - 没有来回翻。cross 的时候狗前方 30 m 内没有在动的车。
+- **指令为 0 的周期全在 cross_wait**：一共 560 个，cross 的 194 个周期都有指令。
+- **感知**：15 条车的航迹，没有 12 m 内才出现的；两个远处闪框（46 m、38 m）。
+- **代价地图**：狗脚下一直有 32–36 格障碍。都在后半身，是入口处路网的边，感知栅格是空的。局部规划照样出指令。
+- **只给规划调试的小包** `planning_debug/`：5.3 MB，普通 git 文件。
+  - 内容：规划的输入，目标类型 `nav_interface/msg/LidarObjectArray`，终点放进 map；现场规划的输出放在 `/field/` 下。
+  - 回灌：`replay_planning_check.sh … --planning-only`，只起规划，等它读完站点地图再放包。
+  - 工具 `planning_debug_bag.py`，测试 `tests/dog/test_planning_debug_bag.py`。
+  - `--planning-only` 的先后只用假规划、假 ros2 跑过，真规划还没跑过。
+
 ---
 
 ## T68 回放里感知栅格为什么放到第 36 s 就断了（服务器）
