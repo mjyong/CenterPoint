@@ -402,10 +402,57 @@ mcap 插件，录出来是 sqlite3（`.db3`，T61），不要加 `-s mcap`。拷
 python Nav_D20/planning/tools/bag_to_mcap.py <包> <包>_mcap        # 每个话题都转（定义从仓库来）；有 LEFT OUT 就是还有不认的类型
 python Nav_D20/planning/tools/check_planning_mcap.py <包>_mcap     # 规划的输入输出、状态
 bash Nav_D20/planning/script/replay_dog_bag.sh <包> [名字]         # 读 replay goal，只放传感器和感知目标再跑整套；对照在 work_dirs/planning_io_<名字>/sequence.md
-python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
+python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip   # 9.1
 python Nav_D20/planning/tools/objects_in_map.py <包>               # sqlite 直接读；外参：要 extrinsic OK
 journalctl -u cw-planning --since "<开始>" --until "<结束>" > planning.log   # 狗上，状态变化的那些行
 ```
+
+### 9.1 在 Foxglove 里复盘：感知框、过马路的状态、前视鱼眼
+
+`planning_mcap_viz.py` 把狗上录的包转成一个给人看的 mcap（`<包>_mcap/viz/planning_viz.mcap`）。里面的东西都在包的时间轴上，
+都压平在地图上，看起来不闪。布局用 `Nav_D20/planning/script/field_review.json`。转完它会打印该用哪个布局。
+
+```bash
+python Nav_D20/planning/tools/bag_to_mcap.py <包> <包>_mcap                  # 狗上录的是 sqlite3，先转（已经转过就跳过）
+python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap \
+  --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip                 # 400 s 的包约 2 分钟
+# 回灌的结果也一样看，鱼眼和点云从现场的包里拿（回灌不留点云）：
+python Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/planning_io_<名字> \
+  --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip --camera-from <包>_mcap
+```
+
+打开：Foxglove 桌面版 → Open local file → 选 `viz/planning_viz.mcap`。然后 Layouts → Import from file → 选
+`field_review.json`。换了包不用重新导入布局。文件在服务器上就先拷到本机。网页版也能打开本机文件，但几百 MB 的文件桌面版快。
+
+布局里有这些面板：
+
+| 面板 | 看什么 |
+|---|---|
+| 左边 3D（俯视，跟着狗） | `/viz/objects`：感知的框，蓝 = 车、绿 = 人、紫 = 骑车，虚线 = 这一帧没检测到、外推的；箭头 = 1 s 后在哪；字 = `#航迹号 类 速度`。`/viz/lidar`：激光去掉地面，按离地高度着色。`/viz/crosswalk_gate`：规划自己画的门控，当前人行横道按状态着色，实心方块是门控看到的车（红 = 在等它，橙 = 有冲突但放行，蓝 = 不挡路）。还有路网、人行横道编号、全局/局部路径、狗和它的状态字（多一行"过马路 13 wait，等 1 辆"） |
+| 右上 前视鱼眼 | `/robot/topic/rdap/front_sensor_camera`，和 3D 同一个时间轴。是 H.264：跳到某一刻以后要等下一个关键帧才出画面，黑着就往后播一两秒。别的三路要看就加 `--camera front,left,right,rear`，Image 面板里换话题 |
+| 过马路状态 | `/viz/crosswalk.mode`（none / approach / align / wait / go / cross / cross_wait）、放行、感知过期、任务状态，一条一条的色带。点一下就跳到那一刻 |
+| 速度和车数 | 实际速度、规划指令（影子模式下是 `/nav_cw/shadow/cmd_vel`，不是机器人自己导航的 `/cmd_vel`）、门控在等几辆、感知在动的车 |
+| 右下的标签页 | 目标：这一帧每个目标离狗多远、在哪个方向（左正右负）、速度、外推没有。门控：这一周期的 mode、含义、哪个人行横道（站点地图的编号）、go、等几辆、stale、unreleased、到停止点多远、朝向差、门控自己的理由。事件：搜"人行横道"是每次状态变化，搜"感知"是两种提示（下面）。规划流程、图例 |
+
+**看漏检、误检**（3D 和鱼眼对着看）：
+- 有点没框：激光上有一团车大小的点，鱼眼里也有车，但没有框。可能漏检。
+- 有框没点：框里没有点，鱼眼里也没东西。可能误检。
+- 一辆车被跟成几段：框的航迹号在车开过去的途中换了，就是被跟成了几段。
+- 事件里两种提示，按时间跳过去看：
+  - `感知：#… 在 x m 处才出现`：离狗 12 m 以内才第一次出现的车，之前可能漏检；
+  - `感知：#… 只出现 n 帧`：活了不到 1 s 的目标，可能误检。
+- 只看前方的话，前视鱼眼够了。侧面、后面的车，对着激光看。
+
+**看过马路让停对不对**：
+- 在"过马路状态"上点每一段 wait / cross_wait，看 3D 里有没有红色方块（门控在等的车）、鱼眼里有没有那辆车；
+- 每次变成 go 的那一刻，看前方 30 m 内还有没有在动的车（有就是可疑的放行）；
+- 一直 wait 没有车：看门控标签页的 reason 和 stale。stale = 1 是规划收不到新的感知目标，比如感知和规划的消息类型对不上（PATCHES.md
+  2026-11-25 那一行），或者感知挂了；
+- 门控的红/蓝方块要和感知的框重合。不重合是外参不对，先跑 `objects_in_map.py`。
+
+**回灌分析**：现场的包和回灌的包各转一个 mcap，左右开两个 Foxglove 窗口，比同一时刻的过马路状态和门控理由。回灌用的是现场同样的激光和
+感知目标，不一样的地方就是规划改出来的（或者没改对）。转回灌的时候加 `--camera-from <包>_mcap`，鱼眼和激光就从现场的包里取，时间对齐
+用的是两个包各自的定位时间戳。
 
 ---
 

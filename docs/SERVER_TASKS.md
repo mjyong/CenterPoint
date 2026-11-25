@@ -175,8 +175,8 @@
 | T65 | 现场：他们的服务下看 App 怎么让狗走起来（只订不发：运控模式、谁在发、焦点、robot_service 和 zsibot 的日志），把表和五个问题给机器人团队；装 T64 编的规划 | 人 + Agent | T64 第 5 步 | 2 小时 | 做完了（人说，2026-11-15），结果还没推上来 |
 | T66 | 现场：影子模式下逐个路口调。人照规划的意思遥控狗（停、转、等、走），看五层：定位、白框对不对、感知、门控、状态机和指令；每个路口走一遍、定点看 10 分钟、同事开车（新门控才做），每次录包带备注；回来回灌，和现场的日志对 | 人 + Agent | 无（新门控要 T64 第 5 步） | 半天 | 部分完成，已复核（2026-11-15）：新门控在人行横道上会为前方来车停。目标是在 base_link 里发的，标记、录包脚本、回灌终点都当成了 map（已修，要重编规划）；人没跟上状态机，路边那一半几乎没测；cross / cross_wait 来回翻、车 id 一秒就换，交给 T69。下午域 0 上跑过假定位（fake_pose.py），收工没 use-original。T70 第二轮 |
 | T68 | 回放里感知栅格放到第 36 s 就断了（T64）：看 lidar_seg、grid_map 的日志，换几种放法找原因，修好再放 T57 的包；狗上录的包怎么回灌写成一条命令 | Agent | T64 复核 | 2 小时 | 完成，已复核（2026-11-15）：栅格 best_effort 订阅在容器 UDP 上 36 s 后收不到，回放改 reliable，1581 帧放到包尾。replay_dog_bag.sh 写好；复核修了现场日志的时间格式和两列对齐 |
-| T69 | T66 的包：从狗上的 journal 拿到 map 里的终点再回灌；逐段看人行横道上的停和走（等的是谁、车 id 是不是一辆车被跟成几段）；查定位 15:41、21:09 停的原因；arm64 重编规划（目标标记的修复） | Agent | T66 复核 | 3 小时 | 任务已写好 |
-| T70 | 现场 T66 第二轮：装 T69 编的规划；两个人（一个遥控、一个看屏幕喊和敲备注），录包窗口按状态响铃提示；13、32、38 号每个走一遍、定点看 10 分钟、同事开车；一个包 5 分钟以内；收工 use-original | 人 + Agent | T69 第 5 步 | 半天 | 任务已写好 |
+| T69 | T66 的包：从狗上的 journal 拿到 map 里的终点再回灌；每个包生成 Foxglove 复盘 mcap（感知框、门控、前视鱼眼）；逐段看人行横道上的停和走（等的是谁、车 id 是不是一辆车被跟成几段）；查定位 15:41、21:09 停的原因；arm64 重编规划和感知（目标标记、入口线抖动的修复，感知目标换成 nav_interface 的消息） | Agent | T66 复核 | 3.5 小时 | 任务已写好（2026-11-25 加了复盘 mcap、感知一起编） |
+| T70 | 现场 T66 第二轮：装 T69 编的规划和感知（一起装）；两个人（一个遥控、一个看屏幕喊和敲备注），录包窗口按状态响铃提示；13、32、38 号每个走一遍、定点看 10 分钟、同事开车；一个包 5 分钟以内；收工 use-original | 人 + Agent | T69 第 5 步 | 半天 | 任务已写好 |
 | T58 | 回放统一到一个环境：nav-dev 镜像（Ubuntu 22.04、apt 的 ROS Humble、CycloneDDS、CUDA 12.6、TensorRT 10.3，和狗一样），规划、定位、感知（我们的节点并进了机器人团队的感知）各编进自己的前缀；和 T54 对一次；1112 现场重算感知、验外参 | Agent | T54 | 3 小时 | 停在第 4 步，已复核（2026-11-14）：镜像能编，和 T54 的过马路对上了；规划只有约 8 Hz（T54 约 21 Hz），感知 30 帧以后收不到云（容器里 UDP、best effort）。外参 T61 在狗上做了。交给 T62 |
 
 - **2026-11-05 起的顺序**：两条线并行。
@@ -10754,6 +10754,34 @@ standstill 0 行。四个包都有 record_log 和三份 journal。没做的：�
 
 还要回的：T65 的结果（运控那张时间表、机器人团队的回答、新规划是不是 T65 装的、`fake_pose.py` 是怎么回事）。
 
+### x6 在线复盘和分支更新的复核（2026-11-25：306cd0a、be6fb9a）
+
+人推的两个提交。看过，没发现要改的：
+- **入口线抖动的死区**（`crosswalk_yield.cc`）：狗站在 6 号入口线上（压进 0.3–7.2 cm），旧代码一进 cross 就记成走过了。里程计抖出界
+  再抖回来，这个人行横道就被跳过，最后 42 s 一直是 none。现在要压进超过 `max_unreleased_depth`（或者离出口 0.5 m 以内）才记，
+  浅的 unreleased 还会把记录删掉。路边那道门也只在 moving 且已经 go / cross 时才算。和 PLANNING_INTEGRATION 的规则一致；
+  `crosswalk_sim` 加了 `RunEdgeJitter`。要重编规划才生效（T69 第 6 步编的就是带这个的）。
+- `bag_on_map.typestore(all_packages=True)` 认 `foxglove_msgs/msg/CompressedVideo` 和 `hesai_ros_driver/msg/LossPacket`：
+  `20261115_x6_all_1` 全包 0 LEFT OUT。录包脚本处理 body 系的目标、第一条里程计之前的 base_link 目标。都对。
+- `.gitignore`：本地的包、日志、`work_dirs/**`、`data/reports/T65/` 不进仓库。注意 T65 的结果因此也不会被提交：要留的结论写进本文档
+  "T65 结果"。
+
+同一天人定了两件事，已经做了：
+1. **感知目标的消息换成 `nav_interface/msg/LidarObjectArray`**（字段不变）。感知（`lidar_3d_detection`）发、规划（`ros_bridge`）收都
+   改了，两份 `nav_interface` 各加了三个消息，`perception_interface` 去掉这三个。旧包（T57–T66）里是 `perception_interface/...`，
+   工具两个名字都认（旧定义在 `planning/tools/legacy_msgs/`）。**感知和规划要一起重编、一起装**：类型名不同 DDS 不配对，新规划收不到
+   旧感知的目标，门控一直 stale，路边一直等。T69 第 6 步和 T70 第 0 步 c 已经改成两个一起。这里没有 ROS，C++ 没编过，T69 第 6 步是第一次编。
+   机器人团队要是已经有自己的 `nav_interface/LidarObjectArray`、定义不一样，要拿他们的 .msg 来对。
+2. **现场的包在 Foxglove 里复盘**：`planning_mcap_viz.py` 加了 `field_viz.py`，布局 `field_review.json`（现场指南 9.1）。能看到这些：
+   - 感知框，按门控的外参放进地图；
+   - 规划自己画的门控；
+   - 每周期过马路的状态（按站点地图的编号）；
+   - 去掉地面的激光；
+   - 前视鱼眼，原样转过去。
+
+   事件里有两种提示："近处才出现的车"（可能漏检）、"不到 1 s 的目标"（可能误检）。回灌用 `--camera-from` 从现场的包里取鱼眼和激光。
+   测试 `tests/dog/test_field_viz.py`。真包还没跑过（T69 第 3 步）。
+
 ---
 
 ## T68 回放里感知栅格为什么放到第 36 s 就断了（服务器）
@@ -10861,7 +10889,9 @@ T65 的结果还没推上来：仓库里没有 "T65 结果"，也没有 data/rep
    （第 1 步的文件，或者包里 journal_cw-planning.txt）。和包里第一条 /planning/debug/path_tracking 的全局路径终点对一下（差 < 1 m）。
    写进 data/reports/T69/goals.txt（包名、终点、来自哪一行、和路径终点差多少）。
 3. 拷包（只读，rsync -a --partial，隧道断了重跑）四个到 /public/zjst/robot/cp_data/；x22_all_3（67 GB，没有日志）不拷。
-   每个：bag_to_mcap.py（LEFT OUT 抄下来）、objects_in_map.py（要 extrinsic OK；狗动了的包才量得出来）。
+   每个：bag_to_mcap.py（LEFT OUT 抄下来）、objects_in_map.py（要 extrinsic OK；狗动了的包才量得出来）、
+   planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip（现场指南 9.1，布局 field_review.json；
+   打印的 notes 抄下来：perception tracks 那行、crosswalk gate 那行、/viz/lidar 和鱼眼各多少帧）。
 4. 回灌（nav-dev 容器里，同 T68）：NAV_REPLAY_GOAL="<第 2 步的终点>" bash Nav_D20/planning/script/replay_dog_bag.sh <包> t69_<包>。
    每个看：/map/occupancy_grid 放到包尾、check_planning_mcap.py 没有 "stops … before the end"、sequence.md。狗是人遥控的，回灌用的是同样的
    传感器和感知目标，状态应该和现场基本一样；不一样的地方列出来（时间、现场、回灌）。
@@ -10878,14 +10908,20 @@ T65 的结果还没推上来：仓库里没有 "T65 结果"，也没有 data/rep
    b. 等的车里几个是"被跟成几段"（id 没了、附近马上又冒出新 id）；
    c. 6 号上 49 s、54 s 那两段 cross_wait 是谁让它一直等；
    d. 有没有可疑的放行。
-   鱼眼（/robot/topic/rdap/*_sensor_camera）能在 Foxglove 里看的话（先看类型），挑 a、d 里的几段截图对照；看不了就写明。
-6. arm64 重编规划（这次的提交，有目标标记的修复；同 T64 第 5 步）：rsync 源码、build_stack.sh planning、ldd 0、
-   grep -ral "drawn as it came" install/planning/planning/lib（有一个文件：新的那行警告），version.txt，
-   打包 /public/zjst/robot/cp_data/nav_cw_planning_<sha 前 7 位>.tar.gz，sha256 抄下来（T70 装）。
+   a、d 里的几段在第 3 步的复盘 mcap 里看（前视鱼眼 + 感知框 + 激光 + 门控，现场指南 9.1），截图对照；回灌的结果也转一个
+   （planning_mcap_viz.py work_dirs/planning_io_t69_<包> --map … --camera-from <包>_mcap），和现场的比同一时刻的状态。
+6. arm64 重编规划和感知（这次的提交：目标标记的修复、入口线抖动的修复、感知目标的消息换成 nav_interface；同 T64 第 5 步）：
+   rsync 源码、build_stack.sh planning、build_stack.sh nav_perception、ldd 0、
+   grep -ral "drawn as it came" install/planning/planning/lib（有一个文件：新的那行警告），
+   两边都有 nav_interface 的 LidarObjectArray（find install -name "lidar_object_array.hpp" -path "*nav_interface*"，规划和感知各一个；
+   perception_interface 下面没有了），version.txt，打包 /public/zjst/robot/cp_data/nav_cw_planning_<sha 前 7 位>.tar.gz 和
+   nav_cw_perception_<sha 前 7 位>.tar.gz，sha256 抄下来（T70 一起装）。
 7. 提交：data/reports/T69/、crosswalk_episodes.py 和测试、本文档。
 
-停止条件：第 1 步狗连不上（跳过，只用包里的 journal）；第 4 步栅格又断；第 6 步编不过或 ldd 有 not found。
-报告（写进"T69 结果"）：两次定位停的原因；每个包的终点和来源；回灌和现场的差别；每个包的分段表和 a–d 的回答；规划包和 sha。
+停止条件：第 1 步狗连不上（跳过，只用包里的 journal）；第 4 步栅格又断；第 6 步编不过或 ldd 有 not found，或者规划和感知的
+LidarObjectArray 不是同一个包名。
+报告（写进"T69 结果"）：两次定位停的原因；每个包的终点和来源；每个包复盘 mcap 的 notes；回灌和现场的差别；每个包的分段表和 a–d 的
+回答；规划包、感知包和 sha。
 ```
 
 ---
@@ -10906,8 +10942,10 @@ align / wait / go 几乎没测，也没有定点看、同事开车和人的备�
    a. status：是 ours 就先 use-original（下面要换规划）。
    b. 脚本拷上去（同 T66 第 0 步 a，git archive 出 LF）；grep -c "crosswalk_mode" /opt/seres/nav_cw/nav_cw_record.py ≥ 1
       （响铃提示是新的）。
-   c. 装 T69 编的规划（同 T65 第 4 步：原来的挪到 /opt/seres/nav_cw/backup/、tar --no-same-owner、configure、apply、switches）；
-      grep -ral "drawn as it came" /opt/seres/nav_cw/install/planning/planning/lib 有一个文件。
+   c. 装 T69 编的规划和感知，两个一起（同 T65 第 4 步：原来的挪到 /opt/seres/nav_cw/backup/、tar --no-same-owner、configure、apply、
+      switches）；grep -ral "drawn as it came" /opt/seres/nav_cw/install/planning/planning/lib 有一个文件。只装一个不行：感知目标的
+      消息类型换了（nav_interface/msg/LidarObjectArray），一新一旧就收不到目标。use-new 以后
+      ros2 topic info -v /perception/lidar_3d/objects：类型是 nav_interface/msg/LidarObjectArray，发布者和订阅者都有；规划日志不刷 stale。
    d. INS 固定解；df -h /home/nvidia（每个包约 35 MB/s；剩 50 GB 以下就不再录，先拷走）。
    e. shadow on、speed 0.5、switches（shadow 那行有 nav_blocked false）；use-new（图都 ok；现在默认等到 60 s）。
    f. ssh dog 'sudo -n bash -c "source /opt/ros/humble/setup.bash; ros2 topic info -v /lightning/odom"'：只有一个发布者（我们的定位）。

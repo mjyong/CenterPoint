@@ -6,7 +6,14 @@
         [--overview OUT.png] [--glog planning.INFO]
 
 Writes <recording>/viz/planning_viz.mcap (and planning_viz.png): open it in Foxglove with the layout
-Nav_D20/planning/script/planning_viz.json.
+Nav_D20/planning/script/planning_viz.json, or for a bag recorded on the dog (perception, the crosswalk gate, the
+front fisheye) Nav_D20/planning/script/field_review.json:
+
+    python3 Nav_D20/planning/tools/bag_to_mcap.py <field bag> <field bag>_mcap
+    python3 Nav_D20/planning/tools/planning_mcap_viz.py <field bag>_mcap --map Nav_D20/map/ad68517c-...zip
+    # a replay of it (replay_dog_bag.sh) with the field bag's fisheye:
+    python3 Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/planning_io_<name> --map ... \
+        --camera-from <field bag>_mcap
 
 Why the raw recording blinks in Foxglove (T47 recordings):
 - planning's local costmap (20 Hz) and perception's /map/occupancy_grid (10 Hz) both hang on base_link. Foxglove
@@ -43,6 +50,8 @@ at its own height so that nothing fights for the same depth:
                          global path, occupied costmap cells under the dog, nearest obstacles, planning's raw keys
   /viz/events            rcl_interfaces/Log: mission changes, timeouts, stops, gaps, jumps, costmap under the dog,
                          goal, diagnostics, and planning's own warnings when its glog is there
+  /viz/objects, /viz/objects_table, /viz/crosswalk_gate, /viz/crosswalk, /viz/lidar, the fisheye's own topic
+                         the field review: field_viz.py
 
 Needs numpy, mcap, rosbags (and zstandard for compression, matplotlib for the overview).
 """
@@ -65,6 +74,7 @@ import numpy as np
 NAV_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 DEFAULT_MAP = os.path.join(NAV_ROOT, "planning", "robot_factory", "data", "astar_pgm", "CJGC.yaml")
 DEFAULT_LAYOUT = os.path.join(NAV_ROOT, "planning", "script", "planning_viz.json")
+FIELD_LAYOUT = os.path.join(NAV_ROOT, "planning", "script", "field_review.json")   # a bag recorded on the dog
 DEFAULT_LOC_CONFIG = os.path.join(NAV_ROOT, "slam", "lightning-lm-master", "config", "default_d20.yaml")
 
 TOPICS = dict(
@@ -76,7 +86,10 @@ TOPICS = dict(
     following="/planning/debug/following", cloud="/fused_point_cloud",
     # localization (lightning; loc_viz.py)
     scan_world="/lightning/current_scan_world", map_cloud="/lightning/map_cloud", inspvax="/rte/rdap/rtk/inspvax",
-    loc_event="/rhr/topic/event_info")
+    loc_event="/rhr/topic/event_info",
+    # the field review (field_viz.py): perception's tracks, the crosswalk gate's own drawing, the shadow commands, lidar
+    objects="/perception/lidar_3d/objects", gate="/planning/debug/crosswalk", shadow_cmd="/nav_cw/shadow/cmd_vel",
+    lidar="/robot/topic/rdap/top_point_cloud2")
 OTHER_MARKERS = (("collision", "/viz/collision"), ("teb", "/viz/teb"), ("following", "/viz/following"))
 
 # heights of the flattened layers [m]
@@ -258,17 +271,22 @@ def mcap_files(paths):
     return out
 
 
-def read_recording(path, ros, topics):
-    """One pass: light topics decoded, heavy ones (grids, marker arrays, clouds) kept as raw bytes."""
+def read_recording(path, ros, topics, lidar_rate=5.0, only=None):
+    """One pass: light topics decoded, heavy ones (grids, marker arrays, clouds, camera frames) kept as raw bytes; the
+    lidar reduced as it is read (field_viz.reduce_lidar). topics: key -> topic, the keys of TOPICS (missing ones are
+    not read) and camera_<name> for the fisheyes; only: the keys to read besides the fisheyes (all by default)."""
     from mcap.reader import make_reader
 
-    rec = dict(tf=defaultdict(list), odom=[], cmd=[], strings=[], goals=[], plans=[], grids=defaultdict(list),
-               markers=defaultdict(list), clouds=[], diagnostics=[], types={}, counts=defaultdict(int),
-               loc_raw=defaultdict(list), loc_raw_events=[])
+    rec = dict(tf=defaultdict(list), odom=[], cmd=[], shadow_cmd=[], strings=[], goals=[], plans=[],
+               grids=defaultdict(list), markers=defaultdict(list), clouds=[], diagnostics=[], types={},
+               counts=defaultdict(int), loc_raw=defaultdict(list), loc_raw_events=[], objects=[], gate=[], lidar=[],
+               cameras=defaultdict(list))
     from loc_viz import SCAN_RATE
     last_scan = -1e18
-    wanted = set(topics.values())
-    last_cloud = -1e18
+    cameras = {v for k, v in topics.items() if k.startswith("camera_") and v}
+    topics = dict(dict.fromkeys(TOPICS), **{k: v for k, v in topics.items() if not k.startswith("camera_")})
+    wanted = {v for k, v in topics.items() if v and (only is None or k in only)} | cameras
+    last_cloud = last_lidar = -1e18
     for f in mcap_files(path):
         with open(f, "rb") as fh:
             for schema, channel, message in make_reader(fh).iter_messages(topics=sorted(wanted),
@@ -284,6 +302,9 @@ def read_recording(path, ros, topics):
                     continue
                 rec["counts"][topic] += 1
                 data = message.data
+                if topic in cameras:
+                    rec["cameras"][topic].append((log, typ, data))
+                    continue
                 if typ == "tf2_msgs/msg/TFMessage":
                     m = ros.decode(data, typ)
                     for tr in m.transforms:
@@ -298,11 +319,24 @@ def read_recording(path, ros, topics):
                     rec["odom"].append((stamp_of(m.header), log, p.position.x, p.position.y, p.position.z,
                                         yaw_of(p.orientation), tw.linear.x, tw.linear.y, tw.angular.z,
                                         float(m.pose.covariance[1])))
-                elif topic == topics["cmd"]:
+                elif topic in (topics["cmd"], topics["shadow_cmd"]):
                     m = ros.decode(data, typ)
                     if typ.endswith("TwistStamped"):
                         m = m.twist
-                    rec["cmd"].append((log, m.linear.x, m.linear.y, m.angular.z))
+                    rec["cmd" if topic == topics["cmd"] else "shadow_cmd"].append(
+                        (log, m.linear.x, m.linear.y, m.angular.z))
+                elif topic == topics["objects"]:
+                    rec["objects"].append((log, typ, data))
+                elif topic == topics["gate"]:
+                    rec["gate"].append((log, typ, data))
+                elif topic == topics["lidar"]:
+                    if lidar_rate > 0 and log - last_lidar >= 1.0 / lidar_rate - 1e-3:
+                        from field_viz import reduce_lidar
+                        m = ros.decode(data, typ)
+                        red = reduce_lidar(m)
+                        if red is not None:
+                            rec["lidar"].append((log, stamp_of(m.header), m.header.frame_id.lstrip("/")) + red)
+                        last_lidar = log
                 elif topic == topics["string"]:
                     rec["strings"].append((log, parse_debug_string(ros.decode(data, typ).data)))
                 elif topic in (topics["goal_marker"], topics["goal"]):
@@ -721,21 +755,36 @@ class GridStats:
 # ---------------------------------------------------------------- output
 
 class Out:
+    SPILL = 32 * 1024     # [bytes] payloads bigger than this wait in a temporary file, not in memory (lidar, camera)
+
     def __init__(self, ros):
         self.ros = ros
         self.msgs = []
         self.channels = {}   # topic -> (kind, type, schema)
         self.seq = 0
+        self.spill = None
 
     def ros_msg(self, topic, typename, t, msg):
         self.channels.setdefault(topic, ("ros2", typename, None))
         self._add(topic, t, self.ros.encode(msg, typename))
+
+    def raw_msg(self, topic, typename, t, data):
+        """A recorded message as it is (CDR), retimed: the camera frames."""
+        self.channels.setdefault(topic, ("ros2", typename, None))
+        self._add(topic, t, bytes(data))
 
     def json_msg(self, topic, name, schema, t, obj):
         self.channels.setdefault(topic, ("json", name, schema))
         self._add(topic, t, json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
     def _add(self, topic, t, data):
+        if len(data) > self.SPILL:
+            if self.spill is None:
+                import tempfile
+                self.spill = tempfile.TemporaryFile()
+            off = self.spill.seek(0, 2)
+            self.spill.write(data)
+            data = (off, len(data))
         self.msgs.append((int(round(t * 1e9)), self.seq, topic, data))
         self.seq += 1
 
@@ -775,6 +824,9 @@ class Out:
                     channel_ids[topic] = w.register_channel(topic=topic, message_encoding="json", schema_id=sid)
             seqs = defaultdict(int)
             for t, _, topic, data in self.msgs:
+                if isinstance(data, tuple):
+                    self.spill.seek(data[0])
+                    data = self.spill.read(data[1])
                 w.add_message(channel_id=channel_ids[topic], log_time=t, publish_time=t, data=data,
                               sequence=seqs[topic])
                 seqs[topic] += 1
@@ -942,6 +994,7 @@ class Converter:
         self.events = []        # (t, level, name, text)
         self.notes = []         # summary lines
         self.fixed, self.base = args.fixed_frame, args.base_frame
+        self.camera_topics_written = False
 
     def event(self, t, level, text, name="viz"):
         self.events.append((float(t), LOG[level], name, text))
@@ -949,8 +1002,14 @@ class Converter:
     def run(self):
         a, ros = self.args, self.ros
         topics = dict(TOPICS)
-        topics.update(odom=a.odom_topic, cloud=a.cloud_topic)
-        rec = read_recording([a.recording] + list(a.extra), ros, topics)
+        topics.update(odom=a.odom_topic, cloud=a.cloud_topic, lidar=a.lidar_topic)
+        from field_viz import CAMERAS
+        self.camera_topics = {}
+        for name in [n for n in (a.camera or "").split(",") if n and n != "none"]:
+            self.camera_topics[name] = CAMERAS.get(name, name)
+        if not a.camera_from:
+            topics.update(("camera_" + k, v) for k, v in self.camera_topics.items())
+        rec = read_recording([a.recording] + list(a.extra), ros, topics, lidar_rate=a.lidar_rate)
         self.rec, self.topics = rec, topics
         self.build_clock_track()
         if self.track is None:
@@ -965,9 +1024,11 @@ class Converter:
         self.convert_other_markers()
         self.states = self.build_states()
         self.note_mppi()
+        self.write_static()
+        from field_viz import FieldLayers
+        self.field = FieldLayers(self).run()
         self.write_robot()
         self.write_trail()
-        self.write_static()
         self.write_legend()
         self.convert_cloud()
         self.loc = None
@@ -1250,7 +1311,12 @@ class Converter:
     # -- per-cycle state
     def build_states(self):
         rec = self.rec
-        cmd = sorted((self.clock(r[0]),) + tuple(r[1:]) for r in rec["cmd"])
+        rows = rec["cmd"]
+        if rec["shadow_cmd"]:      # shadow mode: our planner's commands; /cmd_vel is the robot's own navigation
+            rows = rec["shadow_cmd"]
+            self.notes.append("commands: %s (shadow mode; %s is the robot's own navigation, %d messages)" % (
+                self.topics["shadow_cmd"], self.topics["cmd"], len(rec["cmd"])))
+        cmd = sorted((self.clock(r[0]),) + tuple(r[1:]) for r in rows)
         cmd_t = [c[0] for c in cmd]
         strings = sorted((self.clock(log), d) for log, d in rec["strings"])
         cycle_times = [s[0] for s in strings] if strings else list(self.plan_times)
@@ -1406,6 +1472,16 @@ class Converter:
             lines.append("  ".join(bits))
         if (s["cost_map_footprint_cells"] or 0) >= self.limit:
             lines.append("!! 脚下是障碍（代价地图 %d 格）" % s["cost_map_footprint_cells"])
+        cw = self.field.crosswalk_state(s["raw"], t) if getattr(self, "field", None) else None
+        if cw and cw["mode_id"]:
+            line = "过马路 %s %s" % (cw["crosswalk"], cw["mode"])
+            if cw["waiting_for"]:
+                line += "，等 %d 辆" % cw["waiting_for"]
+            if cw["stale"]:
+                line += "  !! 感知过期"
+            if cw["unreleased"]:
+                line += "  !! 没放行就上了"
+            lines.append(line)
         if s["timeout_paused"]:
             lines.append("!! 输入超时，任务暂停")
         elif s["input_timeout"]:
@@ -1533,8 +1609,11 @@ class Converter:
                                          markers=self.crosswalk_markers(float(t), near)))
 
     def write_legend(self):
+        from field_viz import LEGEND as FIELD_LEGEND
+        legend = dict(LEGEND)
+        legend["现场复盘的图层（狗上录的包；布局 field_review.json）"] = FIELD_LEGEND
         for t in np.arange(self.t0, self.t1 + 1e-6, STATIC_PERIOD):
-            self.out.json_msg("/viz/legend", "planning_viz.Legend", FLOW_SCHEMA, float(t), LEGEND)
+            self.out.json_msg("/viz/legend", "planning_viz.Legend", FLOW_SCHEMA, float(t), legend)
 
     def crosswalk_markers(self, t, near):
         ros = self.ros
@@ -2012,7 +2091,21 @@ def main(argv=None):
     p.add_argument("--base-frame", default="base_link")
     p.add_argument("--odom-topic", default=TOPICS["odom"])
     p.add_argument("--cloud-topic", default=TOPICS["cloud"])
+    p.add_argument("--lidar-topic", default=TOPICS["lidar"],
+                   help="the lidar for /viz/lidar (ground removed, flattened); --lidar-rate 0 for none")
+    p.add_argument("--lidar-rate", type=float, default=5.0, help="[Hz] of /viz/lidar")
+    p.add_argument("--camera", default="front",
+                   help="fisheyes copied through: front, left, right, rear (comma separated), a topic, or none")
+    p.add_argument("--camera-from", nargs="+", metavar="FIELD_BAG",
+                   help="take the fisheyes from these recordings (the field bag a replay was made from, as mcap) "
+                        "instead of this one")
+    p.add_argument("--det-to-base", type=float, nargs=3, default=None, metavar=("X", "Y", "YAW_DEG"),
+                   help="perception's detection frame in base_link, as crosswalk_yield_conf det_to_base_* "
+                        "(default 0.319 0.043 -90)")
     args = p.parse_args(argv)
+    if args.det_to_base is None:
+        from field_viz import DET_TO_BASE
+        args.det_to_base = DET_TO_BASE
     if args.map and args.map.lower() == "none":
         args.map = None
     rec_dir = args.recording if os.path.isdir(args.recording) else os.path.dirname(os.path.abspath(args.recording))
@@ -2036,7 +2129,9 @@ def main(argv=None):
     print("  events: %d (%d warnings or errors) on /viz/events" % (len(conv.events), warn))
     for e in [e for e in conv.events if e[1] >= LOG["warn"]][:12]:
         print("    %7.2f s  %s" % (e[0] - conv.t0, e[3]))
-    print("  open in Foxglove with the layout %s" % os.path.relpath(DEFAULT_LAYOUT))
+    field = any(k in counts for k in ("/viz/objects", "/viz/crosswalk")) or conv.camera_topics_written
+    layout = FIELD_LAYOUT if field else DEFAULT_LAYOUT
+    print("  open in Foxglove with the layout %s" % os.path.relpath(layout, os.path.join(NAV_ROOT, "..")))
     return 0
 
 
