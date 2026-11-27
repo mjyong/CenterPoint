@@ -11,6 +11,7 @@ from .conftest import ROOT
 SCRIPT = os.path.join(ROOT, "tools", "deploy", "nav_cw.sh")
 ORIG = ["lidar-3d-detection.service", "nav_perception.service", "slam.service", "planning.service"]
 NEW = ["cw-nav-perception.service", "cw-slam.service", "cw-planning.service"]
+LIDAR3D = "cw-lidar3d.service"
 
 FAKE = r"""#!/bin/bash
 # fake systemctl: $STATE/<unit> holds active/inactive, $STATE/<unit>.restarts the restart count; a unit listed in
@@ -49,6 +50,16 @@ name() {
 }
 up() { "$SYSTEMCTL" is-active --quiet "$1"; }
 ep() { printf 'Node name: %s\nNode namespace: /\nEndpoint type: %s\n\n' "$1" "$2"; }
+# the objects: a detector per unit that is up; FAKE_LIDAR3D_TYPE: an old build in cw-lidar3d
+if [[ "$topic" == /perception/lidar_3d/objects ]]; then
+  types=()
+  if up cw-lidar3d.service; then types+=("${FAKE_LIDAR3D_TYPE:-nav_interface/msg/LidarObjectArray}"); fi
+  if up lidar-3d-detection.service; then types+=(perception_interface/msg/LidarObjectArray); fi
+  if up cw-nav-perception.service; then types+=(nav_interface/msg/LidarObjectArray); fi
+  (( ${#types[@]} )) && echo "Type: $(IFS=,; echo "${types[*]}")"
+  for t in "${types[@]}"; do ep lidar_3d_detection PUBLISHER; done
+  exit 0
+fi
 echo "Type: x"
 if up cw-planning.service; then
   pubs="$(name pub_cmd_vel /cmd_vel) $(name pub_motion /mc/motion_control)"
@@ -62,6 +73,14 @@ if up cw-slam.service; then
   if [[ "${sw:-/map/switch}" == "$topic" ]]; then ep mode_switch_node SUBSCRIPTION; fi
 fi
 exit 0
+"""
+
+
+# fake systemd-run: a transient unit is active from now on (failed when listed in $STATE/broken); logged
+SYSTEMD_RUN = r"""#!/bin/bash
+echo "systemd-run $*" >> "$STATE/log"
+for a in "$@"; do case "$a" in --unit=*) u="${a#--unit=}" ;; esac; done
+if grep -qx "$u" "$STATE/broken" 2>/dev/null; then echo failed > "$STATE/$u"; else echo active > "$STATE/$u"; fi
 """
 
 
@@ -106,20 +125,30 @@ def dog(tmp_path):
     graph = tmp_path / "ros2"
     graph.write_text(GRAPH)
     graph.chmod(0o755)
+    run_fake = tmp_path / "systemd-run"
+    run_fake.write_text(SYSTEMD_RUN)
+    run_fake.chmod(0o755)
+    start = tmp_path / "nav_cw" / "install" / "nav_perception" / "lidar_3d_detection" / "bin"
+    start.mkdir(parents=True)
+    (start / "start_lidar_3d_detection.sh").write_text("#!/bin/bash\n")
+    (start / "start_lidar_3d_detection.sh").chmod(0o755)
+    (tmp_path / "model").mkdir()
     for u in ORIG:
         (state / u).write_text("active")
     for u in NEW:
         (state / (u + ".unit")).write_text("")
     _install(tmp_path / "nav_cw")
 
-    def run(*args, broken=()):
+    def run(*args, broken=(), **extra):
         (state / "broken").write_text("".join(u + "\n" for u in broken))
         env = dict(os.environ, STATE=str(state), SYSTEMCTL=str(fake), JOURNALCTL="true", NAV_CW_WAIT="0",
-                   ROS2=str(graph), NAV_CW_VERIFY_WAIT="0", NAV_CW_ROOT=str(tmp_path / "nav_cw"))
+                   ROS2=str(graph), NAV_CW_VERIFY_WAIT="0", NAV_CW_ROOT=str(tmp_path / "nav_cw"),
+                   SYSTEMD_RUN=str(run_fake), NAV_CW_LIDAR3D_MODEL=str(tmp_path / "model"), **extra)
         return subprocess.run(["bash", SCRIPT, *args], env=env, capture_output=True, text=True)
 
     def states():
-        return {u: (state / u).read_text().strip() if (state / u).exists() else "inactive" for u in ORIG + NEW}
+        return {u: (state / u).read_text().strip() if (state / u).exists() else "inactive"
+                for u in ORIG + NEW + [LIDAR3D]}
 
     run.states = states
     run.log = lambda: (state / "log").read_text().splitlines()
@@ -509,3 +538,55 @@ def test_use_new_puts_theirs_back_without_odometry(dog, tmp_path):
     r = dog("use-new")
     assert r.returncode == 1 and "no /lightning/odom within" in r.stdout and "running: theirs" in r.stdout
     assert all(dog.states()[u] == "active" for u in ORIG) and all(dog.states()[u] == "inactive" for u in NEW)
+
+
+def test_only_the_detector_is_swapped_and_back(dog, tmp_path):
+    r = dog("lidar3d", "new")
+    assert r.returncode == 0, r.stdout + r.stderr
+    st = dog.states()
+    assert st[LIDAR3D] == "active" and st["lidar-3d-detection.service"] == "inactive"
+    assert all(st[u] == "active" for u in ORIG[1:]) and all(st[u] == "inactive" for u in NEW)
+    assert "ok    /perception/lidar_3d/objects: nav_interface/msg/LidarObjectArray" in r.stdout
+    assert "running: theirs with our lidar_3d_detection (cw-lidar3d.service)" in r.stdout
+    (call,) = [l for l in dog.log() if l.startswith("systemd-run")]
+    for want in ("--unit=cw-lidar3d.service", "--collect", "EnvironmentFile=-%s" % (tmp_path / "nav_cw" / "nav_cw.env"),
+                 "CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml", "LIDAR3D_MODEL_DIR=%s" % (tmp_path / "model"),
+                 "install/nav_perception/lidar_3d_detection/bin/start_lidar_3d_detection.sh", "lock_clocks.sh"):
+        assert want in call, (want, call)
+    log = dog.log()
+    assert log.index("stop lidar-3d-detection.service") < log.index(call)      # never two detectors
+    assert dog("status").returncode == 0
+    r = dog("lidar3d", "original")
+    assert r.returncode == 0, r.stdout
+    st = dog.states()
+    assert st[LIDAR3D] == "inactive" and st["lidar-3d-detection.service"] == "active" and "running: theirs" in r.stdout
+
+
+def test_an_old_build_of_the_detector_puts_the_debs_back(dog):
+    r = dog("lidar3d", "new", FAKE_LIDAR3D_TYPE="perception_interface/msg/LidarObjectArray")
+    assert r.returncode == 1 and "WRONG /perception/lidar_3d/objects" in r.stdout, r.stdout
+    st = dog.states()
+    assert st[LIDAR3D] == "inactive" and st["lidar-3d-detection.service"] == "active"
+
+
+def test_a_detector_that_dies_puts_the_debs_back(dog):
+    r = dog("lidar3d", "new", broken=[LIDAR3D])
+    assert r.returncode == 1, r.stdout
+    assert dog.states()["lidar-3d-detection.service"] == "active"
+
+
+def test_the_detector_alone_and_our_whole_stack_exclude_each_other(dog):
+    assert dog("use-new").returncode == 0
+    r = dog("lidar3d", "new")
+    assert r.returncode == 1 and "use-original first" in r.stdout
+    assert not [l for l in dog.log() if l.startswith("systemd-run")]
+    assert dog("use-original").returncode == 0
+    assert dog("lidar3d", "new").returncode == 0
+    r = dog("use-new")
+    assert r.returncode == 1 and "lidar3d original first" in r.stdout
+    assert dog.states()["cw-planning.service"] == "inactive"
+    # use-original (the end of the day) puts the .deb's detector back too
+    r = dog("use-original")
+    assert r.returncode == 0 and "stopped cw-lidar3d.service" in r.stdout, r.stdout
+    st = dog.states()
+    assert st[LIDAR3D] == "inactive" and all(st[u] == "active" for u in ORIG) and "running: theirs" in r.stdout

@@ -11,6 +11,8 @@
 #                                                /nav/navigation/_action/status; --dry-run prints the command)
 #   sudo bash /opt/seres/nav_cw/nav_cw_record.sh --tag cw13_watch  -> <date>_cw13_watch_<n> (one name per crosswalk)
 #   sudo bash /opt/seres/nav_cw/nav_cw_record.sh --no-record      only the motion-control lines, no bag
+#   sudo bash /opt/seres/nav_cw/nav_cw_record.sh --lidar3d        only lidar_3d_detection's inputs, the front fisheye,
+#                                                its output and the pose (-> <date>_lidar3d_<n>, Ctrl-C stops it)
 # A line typed while it records (Enter) is a note with the time. When it stops, the bag directory also gets
 # record_log.txt (the output, the notes, "replay goal: x y") and journal_<unit>.txt (our units over the recording).
 #   NAV_CW_PREFIX (/opt/seres/nav_cw: our installs give the message types), NAV_CW_BAG_DIR (/home/nvidia/bags).

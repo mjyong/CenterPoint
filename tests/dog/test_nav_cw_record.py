@@ -194,6 +194,24 @@ def test_the_topics_are_the_field_guides(dog):
     assert "/planning/debug/goal_pose" in rec.ADDED            # /goal_pose is volatile (T57: 0 messages)
 
 
+def test_the_detector_preset_is_the_field_guides_and_records_only_that(dog):
+    spec = importlib.util.spec_from_file_location("nav_cw_record", PY)
+    rec = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rec)
+    text = open(GUIDE, encoding="utf-8").read()
+    sec = text[text.index("## 20."):]
+    start = sec.index("ros2 bag record -o")
+    block = sec[start:sec.index("```", start)]
+    assert re.findall(r"(/[\w/]+)", block.split("\n", 1)[1]) == rec.LIDAR3D_TOPICS
+    assert "--lidar3d" in sec
+    r = subprocess.run(["bash", SH, "--dry-run", "--lidar3d"], env=dog.env(), capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    cmd = r.stdout.strip().splitlines()[-1]
+    assert re.search(r" -o \S+/\d{8}_lidar3d_1 ", cmd), cmd
+    assert cmd.split(" -o ")[1].split()[1:] == rec.LIDAR3D_TOPICS
+    assert "/planning/debug/crosswalk" not in cmd and "/robot/topic/rdap/left_sensor_camera" not in cmd
+
+
 def test_ctrl_c_stops_the_recorder_once_and_it_writes_metadata(dog):
     p = dog()
     dog.wait_recording(p)

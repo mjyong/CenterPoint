@@ -60,6 +60,15 @@ TOPICS = [
     "/tf", "/tf_static",
 ]
 ADDED = ["/planning/debug/goal_pose", "/mc/state"]
+# --lidar3d (DOG_FIELD_GUIDE.md section 20; the test checks the two agree): lidar_3d_detection's inputs (its README),
+# the front fisheye to check its boxes against, what it gave, and the pose and TF that place the boxes in the map
+# when reviewing (planning_mcap_viz.py); the lidar's packet loss
+LIDAR3D_TOPICS = [
+    "/robot/topic/rdap/top_point_cloud2", "/rte/rdap/rtk/imus/data_raw", "/rte/rdap/rtk/inspvax",
+    "/robot/topic/rdap/front_sensor_camera",
+    "/perception/lidar_3d/objects", "/lightning/odom", "/tf", "/tf_static", "/lidar_packets_loss",
+]
+LIDAR3D_UNITS = "cw-lidar3d lidar-3d-detection"
 GOAL_MARKER, GOAL_POSE, ODOM = "/planning/debug/goal_pose", "/goal_pose", "/lightning/odom"
 CACHE = 256 * 1024 * 1024        # [B] --max-cache-size (T35: the default dropped point clouds)
 MODES = {0: "unknown", 1: "debug", 2: "whole body (WBMC)", 3: "lower body (IMC)", 4: "teleop"}   # mc_interface/Mode
@@ -222,7 +231,7 @@ class Notes:
                 self.log("note: " + (line.decode(errors="replace").strip() or "mark"))
 
 
-def save_journals(out, start, end, log):
+def save_journals(out, start, end, log, units="cw-planning cw-slam cw-nav-perception"):
     """journal_<unit>.txt in the bag directory: our units over [start, end] (wall clock)."""
     jc = shutil.which(os.environ.get("NAV_CW_JOURNALCTL", "journalctl"))
     if jc is None:
@@ -231,7 +240,7 @@ def save_journals(out, start, end, log):
     fmt = "%Y-%m-%d %H:%M:%S"
     since = time.strftime(fmt, time.localtime(start - 2))
     until = time.strftime(fmt, time.localtime(end + 2))
-    for unit in os.environ.get("NAV_CW_RECORD_UNITS", "cw-planning cw-slam cw-nav-perception").split():
+    for unit in os.environ.get("NAV_CW_RECORD_UNITS", units).split():
         path = os.path.join(out, "journal_%s.txt" % unit)
         with open(path, "w") as f:
             subprocess.run([jc, "-u", unit, "--since", since, "--until", until, "--no-pager", "-o", "short-iso-precise"],
@@ -405,7 +414,15 @@ def main(argv=None):
     ap.add_argument("--hidden", action="store_true", help="also hidden topics (an action's _action/status, feedback)")
     ap.add_argument("--no-cues", action="store_true", help="no crosswalk cue lines and bell")
     ap.add_argument("--dry-run", action="store_true", help="print the record command")
+    ap.add_argument("--lidar3d", action="store_true",
+                    help="only lidar_3d_detection's inputs, the front fisheye, its output and the pose "
+                         "(LIDAR3D_TOPICS); default name <date>_lidar3d_<n>; only Ctrl-C stops it; the detector's "
+                         "journals")
     args = ap.parse_args(argv)
+    if args.lidar3d:
+        args.no_auto = True
+        if args.tag == "cw":
+            args.tag = "lidar3d"
 
     lines = []
 
@@ -423,7 +440,8 @@ def main(argv=None):
     if os.path.exists(out):
         log("%s exists; ros2 bag record would refuse it" % out)
         return 2
-    topics = TOPICS + ADDED + [t for t in args.topics if t not in TOPICS + ADDED]
+    base = LIDAR3D_TOPICS if args.lidar3d else TOPICS + ADDED
+    topics = base + [t for t in args.topics if t not in base]
     cmd = ["ros2", "bag", "record", "-s", "sqlite3", "--max-cache-size", str(CACHE), "-o", out]
     cmd += (["--include-hidden-topics"] if args.hidden else []) + topics
     if args.dry_run:
@@ -471,7 +489,8 @@ def main(argv=None):
         code = 0 if code in (0, -signal.SIGINT, 130) else code
     ended = time.time()
     if os.path.isdir(out):
-        save_journals(out, started, ended, log)
+        units = LIDAR3D_UNITS if args.lidar3d else "cw-planning cw-slam cw-nav-perception"
+        save_journals(out, started, ended, log, units)
         log("recorded %.0f s, %s to %s" % (ended - started, time.strftime("%H:%M:%S", time.localtime(started)),
                                             time.strftime("%H:%M:%S", time.localtime(ended))))
         if arrival.goal is not None:

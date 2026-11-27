@@ -16,6 +16,7 @@
 | 调 | 10 试的顺序 · 11 影子模式下逐个路口调 · 12 录包 |
 | 收工、回来 | 13 收工 · 14 回来分析（回灌、Foxglove 复盘、规划调试小包） |
 | 参考 | 15 开关和 Foxglove 的桥 · 16 调参 · 17 回放和演练（域 42） · 18 两套导航 · 19 出问题时 |
+| 只换感知检测 | 20 只换 lidar_3d_detection（机器人团队的导航不动），录它的输入和前视鱼眼 |
 
 相关文档：
 - 人行横道让行从感知到速度怎么算：[CROSSWALK_YIELD_FLOW.md](CROSSWALK_YIELD_FLOW.md)；
@@ -83,8 +84,12 @@ ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh'        # Foxglove �
 ssh dog "journalctl -u cw-planning -f | grep --line-buffered -E 'Crosswalk yield|nav_blocked|Navigation|standstill'"
 ssh -t dog                                                         # 录包：sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x13_walk
 
+# 只换感知检测（第 20 节）：机器人团队的导航不动，只把旧 deb 的 lidar_3d_detection 换成我们编的
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh lidar3d new'     # 换；lidar3d original 换回
+ssh -t dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --lidar3d'   # 录它的输入 + 前视鱼眼，Ctrl-C 停
+
 # 收工
-ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original'    # 换回（重启狗也是换回）
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original'    # 换回（重启狗也是换回；只换了感知检测的也一起换回）
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed off'
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow off'
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'          # running: theirs
@@ -585,6 +590,7 @@ sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x13_walk  # → /home/nvid
 | `--dry-run` | 只打印命令 |
 | `--no-record` | 只看提示和运控那几行，不录 |
 | `--hidden` | 录 action 的状态这类隐藏话题，再把话题名写上 |
+| `--lidar3d` | 只录感知检测要的：它的输入、前视鱼眼、它的输出和位姿（第 20 节），名字 `<日期>_lidar3d_<n>`，只认 Ctrl-C |
 
 **录的时候**：
 - 在同一个终端敲一行字、回车，就记一条带时间的备注（只回车记 `mark`）。人的判断（`go 不安全`、`空等`、`框偏了`）回来能和包对上。
@@ -650,6 +656,7 @@ ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'
 ```
 
 - `switches` 里 shadow off：下次 `use-new` 不会带着影子。
+- `use-original` 也会停掉只换感知检测时起的 `cw-lidar3d`，把旧 deb 的 `lidar-3d-detection.service` 起回来（第 20 节）。
 - `status` 是 `running: theirs`，App 里狗正常。
 - T66 收工时没换回：21:38 规划还在跑，里程计早就超时了。
 - Foxglove 的桥 Ctrl-C 停掉。
@@ -784,6 +791,7 @@ PLANNING_STARTUP_MAP=data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 \
 | `rehearsal on / off` | 演练（第 17 节）：on 在 `nav_cw.env` 写 `ROS_DOMAIN_ID=42`、`PLANNING_TIMEOUT_WALL_CLOCK=1`，停机器人团队的四个导航服务，起我们的三个，在域 42 上查图。要影子开着；我们的在域 0 上跑着时不肯。off 换回去 | 演练期间狗没有导航 |
 | `debug planning on / off` | 规划的调试话题（`/planning/debug/*`，`pub_flag`），马上生效（服务 `/planning/debug/set_pub_flag`）。`configure` 已经默认打开 | 规划多发几十 KB/s |
 | `debug perception on / off` | `lidar_3d_detection` 发调试点云 `/perception/lidar_3d/cloud`、TF `camera_init → lidar_det` | 重启 `cw-nav-perception`：栅格断几秒，规划暂停 1 s 后 3 s 恢复 |
+| `lidar3d new / original / status` | 只换感知检测（第 20 节）：停旧 deb 的 `lidar-3d-detection.service`，把我们编的 `lidar_3d_detection` 作为临时服务 `cw-lidar3d` 起来；`original` 换回。我们的三个服务在跑时不肯；它在跑时 `use-new`、`rehearsal on` 不肯 | 换的时候检测断几秒 |
 | `configure <前缀> <地图目录>` | 装的时候用（第 6 节）：定位的 `map_path`、规划的 `startup_map_dir` 指到站点地图，车型 d20/001，规划的调试话题打开 | 装完一定再 `apply` |
 
 Foxglove 的桥：`nav_cw_foxglove.sh`。它以 root 跑，带白名单（不限的话 iceoryx 的发布者表会满，桥退出，T40）。能从 Foxglove 发的只有
@@ -926,3 +934,110 @@ INS /rte/rdap/rtk/inspvax、IMU           │                                   
 | 录包窗口没了，包没 `metadata.yaml` | 第 12 节 | 用 `pkill -INT` 收尾；已经没了就 `ros2 bag reindex` |
 | Foxglove 连不上、桥退出 | 桥的输出 | 不是 root；白名单放太多（iceoryx）；端口被占（桥已经在跑） |
 | 看不到规划的调试话题 | `debug planning on` | `pub_flag` 关着 |
+
+---
+
+## 20. 只换 lidar_3d_detection（机器人团队的导航不动）
+
+什么时候用：只想在真狗上试新的感知检测（新的消息类型、模型、跟踪），机器人团队的感知、定位、规划照常跑，App 照常用。
+
+做了什么：
+- 机器人团队的四个服务里，只停 `lidar-3d-detection.service`（我们以前的 deb）。
+- 把我们编的 `lidar_3d_detection`（`/opt/seres/nav_cw/install/nav_perception`，仓库的代码和配置）起成临时服务 `cw-lidar3d`：
+  - 用 root、机器人的 CycloneDDS 配置，和 `cw-nav-perception` 里跑它一样；
+  - 读 `nav_cw.env`，所以 `debug perception` 也管它；
+  - 先锁频。
+- 引擎用狗上旧 deb 里的 `/opt/seres/perception/lidar_3d_detection/model`，只读。引擎只能在建它的那块板、那个 TensorRT 上用。换模型：
+  `sudo -n env NAV_CW_LIDAR3D_MODEL=<目录> bash /opt/seres/nav_cw/nav_cw.sh lidar3d new`。
+- 临时服务是 `systemd-run` 起的：不写任何文件，不 enable。**狗重启就回到旧 deb 的**。
+- 不装包。仓库里 `deploy/deb/r36.4.0/lidar-3d-detection_0.1.0+441.g580d3bf.dirty_arm64.deb` 是 deb 形式的同一套代码（580d3bf，新类型）。
+  装它要 `dpkg -i`，狗上我们不做（第 0 节）；要用 deb 换，人定，由机器人团队装。
+
+### 20.1 换之前
+
+1. `nav_cw.sh status` → `running: theirs`。我们的三个服务在跑时不能只换感知检测：`cw-nav-perception` 里已经有一个，两个会发同一个话题，
+   `lidar3d new` 也不肯。
+2. 装的感知是新的（第 6 节，只要感知那个包），`find /opt/seres/nav_cw/install/nav_perception -name lidar_object_array.hpp -path
+   '*nav_interface*'` 有一个文件。
+3. 看谁在订 `/perception/lidar_3d/objects`（第 2.4 节的办法）：`ros2 topic info -v /perception/lidar_3d/objects`。
+   - 类型从旧 deb 的 `perception_interface/msg/LidarObjectArray` 变成 `nav_interface/msg/LidarObjectArray`，还订旧类型的节点就收不到了。
+   - 订阅者里只有录包、Foxglove 的桥，没有机器人团队的节点，才往下做。有就先问机器人团队。
+4. 定位在发：`ros2 topic hz /lightning/odom`。录的包回来复盘时，要靠它和 `/tf` 把框放进地图。
+
+### 20.2 换、看、换回
+
+```text
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh lidar3d new'
+```
+
+- 要看到 `ok    /perception/lidar_3d/objects: nav_interface/msg/LidarObjectArray, published by lidar_3d_detection`，最后一行
+  `running: theirs with our lidar_3d_detection (cw-lidar3d.service)`。
+- 起来以后先等 15 s，再最多查 60 s。话题上不是正好一个发布者（我们的）、类型不是 `nav_interface/msg/LidarObjectArray`，或者
+  `cw-lidar3d` 起不来：它打出
+  `cw-lidar3d` 最后 20 行日志，把旧 deb 的起回来，退出 1。
+  - `WRONG … type 'perception_interface/msg/LidarObjectArray'`：装的感知是 2026-11-25 以前的，先装新的（第 6 节）。
+  - 日志里有找不到库、引擎读不了：库路径或者模型目录不对（`NAV_CW_LIDAR3D_MODEL`）。
+
+看它跑得对不对：
+
+```text
+ssh dog 'journalctl -u cw-lidar3d -f'                     # "lidar_3d_detection up: ..."，之后每秒一行：框数、轨迹数、各段 ms、clouds / frames / skipped
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh lidar3d status'
+```
+
+- 每秒那一行：`frames` 约 10，`skipped` 不涨，`callback_max_ms` 不接近 100。慢了先看锁频（`scripts/orin_clocks.sh`）。
+- Foxglove：桥照常开（第 8 节），布局 `planning_live.json`。机器人团队的规划不画我们的门控，`/planning/debug/crosswalk` 没有车框，看侧栏
+  "感知的原始目标"。要看感知自己的框和预测：`debug perception on`（`cw-lidar3d` 起的时候才读，要 `lidar3d original` 再 `lidar3d new`），
+  桥开 `NAV_CW_FOXGLOVE_LEVEL=full`，3D 面板的显示坐标系选 `camera_init`（第 8 节最后）。
+
+换回：
+
+```text
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh lidar3d original'    # running: theirs
+```
+
+收工的 `use-original` 也会换回（第 13 节）。`cw-lidar3d` 在跑时 `use-new`、`rehearsal on` 不肯执行，先 `lidar3d original`。
+
+### 20.3 录它的输入和前视鱼眼
+
+```text
+ssh -t dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --lidar3d'                 # → /home/nvidia/bags/<日期>_lidar3d_<n>
+ssh -t dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --lidar3d --tag lidar3d_x13'
+```
+
+- 只认 Ctrl-C，备注照常敲（第 12 节）。
+- 包目录里多 `record_log.txt`，`journal_cw-lidar3d.txt`、`journal_lidar-3d-detection.txt` 是录的这段时间两个检测服务的日志。
+- 每秒约 35 MB（点云 3.3 MB × 10 Hz），一个包 5 分钟以内。
+
+录的是下面这张表。手动录也行，同一张表（用 root，先 source ROS、`/opt/seres/nav_cw/install/nav_perception/setup.bash` 和 hesai 驱动的
+`setup.bash`，CycloneDDS 的环境同第 2.4 节；sqlite3，不加 `-s mcap`）：
+
+```bash
+ros2 bag record -o /home/nvidia/bags/<日期>_lidar3d_<n> \
+  /robot/topic/rdap/top_point_cloud2 /rte/rdap/rtk/imus/data_raw /rte/rdap/rtk/inspvax \
+  /robot/topic/rdap/front_sensor_camera \
+  /perception/lidar_3d/objects /lightning/odom /tf /tf_static /lidar_packets_loss
+```
+
+| 话题 | 为什么录 |
+|---|---|
+| `/robot/topic/rdap/top_point_cloud2` | 输入：XT32 点云 |
+| `/rte/rdap/rtk/imus/data_raw` | 输入：IMU（kygi 约定） |
+| `/rte/rdap/rtk/inspvax` | 输入：INS（第一个好解定 ENU 原点） |
+| `/robot/topic/rdap/front_sensor_camera` | 前视鱼眼 H.264：对着框看漏检、误检 |
+| `/perception/lidar_3d/objects` | 它的输出（`nav_interface/msg/LidarObjectArray`）：回来不用重算就能看现场的结果 |
+| `/lightning/odom`、`/tf`、`/tf_static` | 机器人团队定位的位姿和外参：复盘时把框、点云放进地图 |
+| `/lidar_packets_loss` | 雷达丢包计数：点云有没有洞 |
+
+### 20.4 回来
+
+```bash
+python Nav_D20/planning/tools/bag_to_mcap.py <包> <包>_mcap
+python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
+python Nav_D20/planning/tools/objects_in_map.py <包>             # 外参：狗动了的包才量得出来，要 extrinsic OK
+```
+
+- 复盘用 `field_review.json`（第 14.2 节）：感知框、去掉地面的激光、前视鱼眼、事件里的两种提示（近处才出现、不到 1 s）。包里没有我们的
+  规划，过马路状态那几块是空的。
+- 输入都在包里，换了代码或参数可以在服务器上用同一份输入重算感知，比新旧结果（`run_planning_stack_debug.sh` 的
+  `LIVE_PERCEPTION_MODEL`，nav-dev 镜像）。

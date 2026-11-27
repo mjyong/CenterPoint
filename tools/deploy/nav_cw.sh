@@ -56,6 +56,17 @@
 #                                           mission_conf.pb.txt.repo; off puts it back; restarts cw-planning)
 #   bash nav_cw.sh switches                 what is set
 #
+# Only the detector (the robot team's navigation stays; DOG_FIELD_GUIDE.md section 20):
+#   sudo bash nav_cw.sh lidar3d new         stop lidar-3d-detection.service (the old .deb) and run our build's
+#                                           lidar_3d_detection (<root>/install/nav_perception, the board's engines in
+#                                           NAV_CW_LIDAR3D_MODEL, default the .deb's model dir) as cw-lidar3d.service, a
+#                                           transient unit (systemd-run: nothing written, gone at a reboot, the .deb's
+#                                           comes back); then /perception/lidar_3d/objects has to have one publisher,
+#                                           ours, of nav_interface/msg/LidarObjectArray within NAV_CW_VERIFY_WAIT s,
+#                                           else the old one is started again (exit 1). Only while ours are not running
+#   sudo bash nav_cw.sh lidar3d original    stop cw-lidar3d, start lidar-3d-detection.service (use-original does too)
+#   sudo bash nav_cw.sh lidar3d status      which detector runs, the topic's type and publishers
+#
 # Nothing is enabled or disabled: after a reboot the robot team's services start (they are enabled, ours are not).
 # Their units are not edited; ours carry Conflicts= on theirs, so systemd never runs both.
 set -euo pipefail
@@ -77,6 +88,12 @@ VERIFY_WAIT="${NAV_CW_VERIFY_WAIT:-60}"   # [s] at most, for the restarted node 
 ODOM_WAIT="${NAV_CW_ODOM_WAIT:-45}"       # [s] for our localization's first odometry after use-new (0: do not wait)
 PERCEPTION_DEBUG_ARGS="-p publish_cloud:=true -p publish_tf:=true"
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"   # the tests put a fake one here
+SYSTEMD_RUN="${SYSTEMD_RUN:-systemd-run}"
+LIDAR3D_OLD=lidar-3d-detection.service
+LIDAR3D_UNIT=cw-lidar3d.service
+LIDAR3D_MODEL="${NAV_CW_LIDAR3D_MODEL:-/opt/seres/perception/lidar_3d_detection/model}"
+OBJECTS=/perception/lidar_3d/objects
+OBJECTS_TYPE=nav_interface/msg/LidarObjectArray
 JOURNALCTL="${JOURNALCTL:-journalctl}"
 
 is_active() { "${SYSTEMCTL}" is-active --quiet "$1"; }
@@ -88,22 +105,25 @@ show() {
   done
 }
 
-running() {   # -> theirs / ours / mixed
+running() {   # -> theirs / ours / theirs with our lidar_3d_detection / mixed
   local o=0 n=0 u
   for u in "${ORIG[@]}"; do if is_active "${u}"; then o=$((o + 1)); fi; done
   for u in "${NEW[@]}"; do if is_active "${u}"; then n=$((n + 1)); fi; done
-  if (( n == ${#NEW[@]} && o == 0 )); then echo ours
-  elif (( o == ${#ORIG[@]} && n == 0 )); then echo theirs
-  else echo "mixed (${o} of theirs, ${n} of ours active)"
+  if (( n == ${#NEW[@]} && o == 0 )) && ! is_active "${LIDAR3D_UNIT}"; then echo ours
+  elif (( o == ${#ORIG[@]} && n == 0 )) && ! is_active "${LIDAR3D_UNIT}"; then echo theirs
+  elif (( o == ${#ORIG[@]} - 1 && n == 0 )) && is_active "${LIDAR3D_UNIT}" && ! is_active "${LIDAR3D_OLD}"; then
+    echo "theirs with our lidar_3d_detection (${LIDAR3D_UNIT})"
+  else echo "mixed (${o} of theirs, ${n} of ours active$(is_active "${LIDAR3D_UNIT}" && echo ", and ${LIDAR3D_UNIT}"))"
   fi
 }
 
 status() {
   echo "robot team's:"; show "${ORIG[@]}"
   echo "ours (/opt/seres/nav_cw):"; show "${NEW[@]}"
+  if is_active "${LIDAR3D_UNIT}"; then echo "only the detector:"; show "${LIDAR3D_UNIT}"; fi
   local r; r="$(running)"
   echo "running: ${r}"
-  [[ "${r}" == ours || "${r}" == theirs ]]
+  [[ "${r}" != mixed* ]]
 }
 
 restarts() { "${SYSTEMCTL}" show -p NRestarts --value "$1" 2>/dev/null || echo 0; }
@@ -409,6 +429,76 @@ check_or_stop() {
   return 1
 }
 
+# -- only the detector: ours in place of the .deb's, the robot team's navigation untouched
+objects_type() { "${ROS2}" topic info "${OBJECTS}" 2> /dev/null | sed -n 's/^Type: //p' | head -1; }
+objects_publishers() { endpoints "${OBJECTS}" | awk '$1 == "PUBLISHER" { print $2 }'; }
+lidar3d_status() {
+  ros_env
+  show "${LIDAR3D_OLD}" "${LIDAR3D_UNIT}"
+  echo "  ${OBJECTS}: type $(objects_type | grep . || echo none), publishers: $(objects_publishers | tr '\n' ' ' | grep . || echo none)"
+}
+# lidar3d_check: one publisher of the objects, the detector, of the new type; retried for VERIFY_WAIT s
+lidar3d_check() {
+  ros_env
+  local t0=${SECONDS} pubs typ
+  while :; do
+    pubs="$(objects_publishers | tr '\n' ' ' | sed 's/ $//')"
+    typ="$(objects_type)"
+    if [[ "${pubs}" == lidar_3d_detection && "${typ}" == "${OBJECTS_TYPE}" ]]; then
+      echo "  ok    ${OBJECTS}: ${typ}, published by lidar_3d_detection"
+      return 0
+    fi
+    if (( SECONDS - t0 >= VERIFY_WAIT )); then
+      echo "  WRONG ${OBJECTS}: type '${typ}' (want ${OBJECTS_TYPE}), publishers '${pubs}' (want one, lidar_3d_detection)"
+      return 1
+    fi
+    sleep 2
+  done
+}
+lidar3d_new() {
+  local u start
+  if is_active "${LIDAR3D_UNIT}"; then echo "${LIDAR3D_UNIT} already runs"; lidar3d_status; return 0; fi
+  for u in "${NEW[@]}"; do
+    if is_active "${u}"; then echo "ours run (${u}), with our detector in cw-nav-perception: nav_cw.sh use-original first"; exit 1; fi
+  done
+  if [[ -n "$(env_get NAV_CW_REHEARSAL)" ]]; then echo "a rehearsal is on: nav_cw.sh rehearsal off first"; exit 1; fi
+  start="${ROOT}/install/nav_perception/lidar_3d_detection/bin/start_lidar_3d_detection.sh"
+  [[ -x "${start}" ]] || { echo "no ${start}: install our perception first (DOG_FIELD_GUIDE.md section 6)"; exit 1; }
+  [[ -d "${LIDAR3D_MODEL}" ]] || { echo "no model ${LIDAR3D_MODEL} (NAV_CW_LIDAR3D_MODEL)"; exit 1; }
+  echo "only the detector: stopping ${LIDAR3D_OLD}, starting ours as ${LIDAR3D_UNIT} (model ${LIDAR3D_MODEL})..."
+  "${SYSTEMCTL}" stop "${LIDAR3D_OLD}" || true
+  local d="${ROOT}/deps"
+  if ! "${SYSTEMD_RUN}" --unit="${LIDAR3D_UNIT}" --collect --quiet \
+      -p "Description=nav_cw: our lidar_3d_detection in place of ${LIDAR3D_OLD}" \
+      -p "EnvironmentFile=-${ENVFILE}" -p KillSignal=SIGINT -p TimeoutStopSec=10 -p SyslogIdentifier=cw-lidar3d \
+      --setenv=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp --setenv=CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml \
+      --setenv=LD_LIBRARY_PATH="${d}/usr/lib/aarch64-linux-gnu:${d}/usr/lib:${d}/lib:/usr/local/cuda/lib64" \
+      --setenv=LIDAR3D_MODEL_DIR="${LIDAR3D_MODEL}" --setenv=LIDAR3D_LOCK_CLOCKS=1 \
+      /bin/bash -c "'$(dirname "${start}")/lock_clocks.sh' || true; exec '${start}'"; then
+    echo "systemd-run failed: starting ${LIDAR3D_OLD} again"
+    "${SYSTEMCTL}" start "${LIDAR3D_OLD}" || true
+    exit 1
+  fi
+  sleep "${WAIT}"
+  if is_active "${LIDAR3D_UNIT}" && lidar3d_check; then
+    lidar3d_status
+    echo "running: $(running)"
+    return 0
+  fi
+  echo "ours did not come up as it should: last log lines"
+  "${JOURNALCTL}" -u "${LIDAR3D_UNIT}" -n 20 --no-pager 2>/dev/null || true
+  echo "putting ${LIDAR3D_OLD} back..."
+  lidar3d_original || true
+  exit 1
+}
+lidar3d_original() {
+  is_active "${LIDAR3D_UNIT}" && { "${SYSTEMCTL}" stop "${LIDAR3D_UNIT}" || true; }
+  "${SYSTEMCTL}" start "${LIDAR3D_OLD}" || { echo "start ${LIDAR3D_OLD} failed"; return 1; }
+  sleep "${WAIT}"
+  is_active "${LIDAR3D_OLD}" || { echo "${LIDAR3D_OLD} is not active after ${WAIT} s"; return 1; }
+  echo "${LIDAR3D_OLD} back"
+}
+
 switches() {
   local want_shadow wanted_appmap
   want_shadow="$(env_get NAV_CW_SHADOW | grep . || echo off)"
@@ -461,8 +551,13 @@ case "${1:-status}" in
       planning/on | planning/off)
         ros_env
         "${ROS2}" service call /planning/debug/set_pub_flag std_srvs/srv/SetBool "{data: $([[ $3 == on ]] && echo true || echo false)}" ;;
-      perception/on) env_set LIDAR3D_ARGS "${PERCEPTION_DEBUG_ARGS}"; restart_if_active cw-nav-perception.service; switches ;;
-      perception/off) env_set LIDAR3D_ARGS ""; restart_if_active cw-nav-perception.service; switches ;;
+      perception/on | perception/off)
+        env_set LIDAR3D_ARGS "$([[ $3 == on ]] && echo "${PERCEPTION_DEBUG_ARGS}")"
+        restart_if_active cw-nav-perception.service
+        if is_active "${LIDAR3D_UNIT}"; then
+          echo "${LIDAR3D_UNIT} reads it when it starts: nav_cw.sh lidar3d original, then nav_cw.sh lidar3d new"
+        fi
+        switches ;;
       *) echo "debug planning|perception on|off"; exit 2 ;;
     esac ;;
   speed) shift; speed "$@" ;;
@@ -473,6 +568,7 @@ case "${1:-status}" in
       on)
         need_units
         [[ "$(env_get NAV_CW_SHADOW)" == on ]] || { echo "rehearsal needs shadow on (nav_cw.sh shadow on)"; exit 1; }
+        ! is_active "${LIDAR3D_UNIT}" || { echo "our detector runs alone (${LIDAR3D_UNIT}): nav_cw.sh lidar3d original first"; exit 1; }
         [[ "$(running)" != ours ]] || { echo "ours run on the robot's domain: nav_cw.sh use-original first"; exit 1; }
         env_set ROS_DOMAIN_ID 42
         env_set PLANNING_TIMEOUT_WALL_CLOCK 1
@@ -505,6 +601,9 @@ case "${1:-status}" in
   use-new)
     need_units
     if [[ -n "$(env_get NAV_CW_REHEARSAL)" ]]; then echo "a rehearsal is on (domain 42): nav_cw.sh rehearsal off first"; exit 1; fi
+    if is_active "${LIDAR3D_UNIT}"; then
+      echo "our detector runs alone (${LIDAR3D_UNIT}); cw-nav-perception has its own: nav_cw.sh lidar3d original first"; exit 1
+    fi
     apply_switches || exit 1      # the switches into the installed configs before ours start
     switches
     echo "switching to ours..."
@@ -526,8 +625,16 @@ case "${1:-status}" in
     fi ;;
   use-original)
     echo "switching to the robot team's..."
+    if is_active "${LIDAR3D_UNIT}"; then "${SYSTEMCTL}" stop "${LIDAR3D_UNIT}" || true; echo "stopped ${LIDAR3D_UNIT}"; fi
     switch "${NEW[@]}" -- "${ORIG[@]}" || { status || true; exit 1; }
     status ;;
+  lidar3d)
+    case "${2:-}" in
+      new) lidar3d_new ;;
+      original) lidar3d_original || { lidar3d_status; exit 1; }; lidar3d_status; echo "running: $(running)" ;;
+      status) lidar3d_status; echo "running: $(running)" ;;
+      *) echo "lidar3d new|original|status"; exit 2 ;;
+    esac ;;
   configure) shift; configure "$@" ;;
-  *) sed -n '2,60p' "$0"; exit 2 ;;
+  *) sed -n '2,72p' "$0"; exit 2 ;;
 esac
