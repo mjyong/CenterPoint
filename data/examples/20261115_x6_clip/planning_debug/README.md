@@ -21,7 +21,7 @@ python3 Nav_D20/planning/tools/planning_debug_bag.py data/examples/20261115_x6_c
 | `/field/planning/debug/*`（plotjuggler/string、crosswalk、path_tracking、goal_pose、diagnostic、代价地图、全局栅格） | 同原来 | 各 754 | 狗上的规划当时算出来的，改了名，回灌时不和新规划发的撞 |
 | `/field/nav_cw/shadow/cmd_vel`、`/field/nav_cw/shadow/mc/motion_control` | 同原来 | 各 754 | 狗上的规划当时的影子指令 |
 
-激光、四路鱼眼、IMU、INS 都不在这里：要看去上一级的切片，或者 Foxglove 复盘（`docs/DOG_FIELD_GUIDE.md` 9.1）。
+激光、四路鱼眼、IMU、INS 都不在这里：要看去上一级的切片，或者 Foxglove 复盘（`docs/DOG_FIELD_GUIDE.md` 14.2）。
 
 **终点**：切片里的 `/goal_pose` 是 T66 那种在 base_link 里发的 (27.00, 4.03)，被切片重新打成了切片开头的时间。这里用切片开头
 狗的位姿转进 map，得到 (80.725, 216.437)。和现场规划的全局路径终点 (80.75, 216.45) 差 3 cm，和 T66 日志里规划自己转的

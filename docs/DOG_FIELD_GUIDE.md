@@ -1,320 +1,455 @@
-# 8 号狗上板指南：跑起来、调、看、安全地试
+# 8 号狗现场上板调试全流程
 
-这份是现场用的：我们的感知、定位、规划（`/opt/seres/nav_cw`）怎么在 8 号狗上起来、怎么换回机器人团队的、
-现场怎么和狗交互、各模块的参数在哪调、Foxglove 里看什么、调试开关、规划和运控怎么安全地试。
-装（编译、拷地图、写服务）是 T56 做的，步骤在 `docs/SERVER_TASKS.md` 的 T56；第一次现场过人行横道是 T57。
-T66 在现场按顺序做的命令、路口编号和五层怎么看，收在 [T66_FIELD.md](T66_FIELD.md)。
-人行横道让行从感知到规划的整个流程在 [CROSSWALK_YIELD_FLOW.md](CROSSWALK_YIELD_FLOW.md)。
+这一份从出发前到回来分析，按现场做事的顺序写：
+- 连上狗；
+- 把我们的感知、定位、规划（`/opt/seres/nav_cw`）装上、换上；
+- 开关和 Foxglove；
+- 影子模式下一个路口一个路口地调、录包；
+- 收工，回服务器回灌、复盘。
 
-规矩（一直有效）：
+后面几节是参考：开关、调参、演练、架构、出问题时查什么。
 
-- sudo 一律 `sudo -n`；密码不写进仓库、文档、`~/.ssh/config`；
-- 不用 `l4tbr0` 上的 192.168.55.1（down 的）；
-- 狗的 ROS 域 0 上只跑狗自己的服务和我们换上去的那三个；回放、演练一律 `ROS_DOMAIN_ID=42`；
-- 不 `apt install`，不改机器人团队的服务和它们的文件；我们的东西只在 `/opt/seres/nav_cw/`、`/etc/systemd/system/cw-*.service`；
-- 从狗上拷东西回来只读；
-- 狗在走的时候，旁边一定有人拿急停。
+| 阶段 | 节 |
+|---|---|
+| 出发前 | 0 规矩 · 1 一页纸 · 2 连接 · 3 地图和路口编号 · 4 出发前（服务器上） |
+| 上板 | 5 先看狗现在的状态 · 6 装新编的规划和感知 · 7 开关、换成我们的、起来以后查 · 8 窗口和 Foxglove · 9 和狗交互 |
+| 调 | 10 试的顺序 · 11 影子模式下逐个路口调 · 12 录包 |
+| 收工、回来 | 13 收工 · 14 回来分析（回灌、Foxglove 复盘、规划调试小包） |
+| 参考 | 15 开关和 Foxglove 的桥 · 16 调参 · 17 回放和演练（域 42） · 18 两套导航 · 19 出问题时 |
+
+相关文档：
+- 人行横道让行从感知到速度怎么算：[CROSSWALK_YIELD_FLOW.md](CROSSWALK_YIELD_FLOW.md)；
+- 装（编译、拷地图、写服务）的原始步骤：`docs/SERVER_TASKS.md` 的 T56；
+- 每次现场任务的原文、停止条件、报告要写什么：`docs/SERVER_TASKS.md` 里对应的 T 号（最近的是 T70）。
+
+2026-11-27 起，这一份合并了原来的 `T66_FIELD.md`（T66 现场手册）和 `COMMANDS.md`（常用命令）。旧文档、`SERVER_TASKS.md` 里写的
+旧节号对应到这里：
+
+| 旧节号 | 这里 |
+|---|---|
+| 0 | 1 |
+| 1 | 2、3 |
+| 2 | 18 |
+| 3.1 | 5–7 |
+| 3.2 | 17 |
+| 4 | 9 |
+| 5 | 15 |
+| 6 | 8 |
+| 7 | 16 |
+| 8 | 10 |
+| 8.1 | 11 |
+| 9 | 12、14 |
+| 9.1 | 14.2 |
+| 10 | 19 |
 
 ---
 
-## 0. 一页纸
+## 0. 规矩（一直有效）
+
+- sudo 一律 `sudo -n`。密码不写进仓库、文档、`~/.ssh/config`。
+- 不用 `l4tbr0` 上的 192.168.55.1（它是 down 的）。
+- 狗的 ROS 域 0 上只跑狗自己的服务和我们换上去的那三个。
+  - 回放、演练一律 `ROS_DOMAIN_ID=42`。
+  - 调试用的假数据（假定位、假目标）只放在域 42 或服务器上。T65 那天有个 `/tmp/fake_pose.py` 在域 0 上发假的 `/lightning/odom`，
+    不许再有。
+  - 域 0 上不 `ros2 topic pub`，也不发运控、焦点、模式。能从 Foxglove 发的只有 `/goal_pose`。
+- 不 `apt install`、不 `dpkg -i`，不改机器人团队的服务和它们的文件，不改 App 的数据库。
+  - 我们的东西只在 `/opt/seres/nav_cw/` 和 `/etc/systemd/system/cw-*.service`。
+  - 写只写 `/opt/seres/nav_cw/`、`/home/nvidia/`、`/tmp/`。
+- 从狗上拷东西回来只读。
+- 狗在走的时候，旁边一定有人拿急停，不干别的。
+- 影子模式下狗只由人遥控。同事开车：
+  - 不超过 10 km/h；
+  - 离狗至少 3 m；
+  - 不朝狗站的那条车道开。
+- 每一步 Agent 先说要做什么，人说可以再做。任何时候人觉得不安全：急停，记下时间。
+- 收工一定 `use-original`，`status` 看到 `running: theirs` 才算完。
+
+---
+
+## 1. 一页纸
 
 ```text
-# 服务器上（经隧道）
-ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'          # running: theirs
-ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches'        # 开关：影子、App 地图、限速、感知调试
-ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on'       # 第一次：先影子模式（狗不按规划走）
-#   App 地图：appmap ignore（默认，2026-11-14）：我们不听 App 的切图，一直用站点地图 ad68517c（App 的数据库只有 c1adbe7b）
+# 上板（笔记本或服务器上 ssh dog）
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'          # running: theirs（是 ours 就先 use-original）
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on'       # 影子：规划只算不发，狗由人遥控
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed 0.5'       # 限速
-ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'         # 换成我们的（15 s 内没起稳、或 ROS 图和开关对不上，自己换回）
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches'        # 看开关：shadow on、appmap ignore、限速，没有 NOT APPLIED
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'         # 换成我们的（INS 先要 RTK 固定解；图不对自己换回）
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh check'           # 谁在发狗的指令、谁在听 /map/switch，和开关对得上
 
-ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh'        # 另一个终端：Foxglove 的桥，前台留着
-#   笔记本 Foxglove：ws://<狗>:8765，Layout → Import Nav_D20/planning/script/planning_live.json
-#   3D 面板右上 "Publish pose" 点目标（只有 /goal_pose 能从 Foxglove 发）
-ssh dog 'journalctl -u cw-planning -f | grep -E "Crosswalk yield|Map switch|startup map|crosswalks in"'
+# 三个窗口
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh'        # Foxglove 的桥，前台留着；ws://192.168.122.100:8765，布局 planning_live.json
+ssh dog "journalctl -u cw-planning -f | grep --line-buffered -E 'Crosswalk yield|nav_blocked|Navigation|standstill'"
+ssh -t dog                                                         # 录包：sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x13_walk
+
+# 收工
 ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original'    # 换回（重启狗也是换回）
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed off'
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow off'
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'          # running: theirs
 ```
 
 ---
 
-## 1. 现场有什么
+## 2. 连接：服务器、隧道、笔记本
+
+### 2.1 谁在哪
 
 | 谁 / 什么 | 在哪 | 干什么 |
 |---|---|---|
-| 服务器 | `10.36.136.7` | `ssh dog` 经反向隧道到狗（`DEPLOY_ORIN.md` 第 1 节：端口 5038，用户 `nvidia`）；拷回录包，跑分析 |
-| 狗边上的本机 | 连着狗 | 维持隧道；跑 Foxglove 桌面版（连狗的 8765，不在一个网段就 `ssh -N -L 8765:127.0.0.1:8765 nvidia@<狗>`） |
-| 8 号狗 | Orin，L4T R36.4.0，`tegra-ubuntu` | 跑导航；CycloneDDS 只绑 eth1，域 0，`/opt/ros/cyclonedds.xml` |
-| App | 手机 | 看狗的状态、遥控。App 认的是它的数据库（`/userdata/config/robot_service/db/robot_service.db`），库里只有 c1adbe7b，它发的 `/map/switch`（latched）一直是 c1adbe7b；数据库我们不改。所以 `appmap ignore`（默认，2026-11-14）：我们的规划和定位不听 App 的 `/map/switch`、`/map/file_update`，一直用站点地图 ad68517c；App 目录里什么都不放。**App 上的狗画在 c1adbe7b 上，位置不准**，看 Foxglove。换回机器人团队的服务后一切照旧 |
-| 遥控器 | 人手里 | 人接管。和规划的指令谁优先由机器人团队的运控决定，第一次上板先试（第 8 节第 1 步） |
-| 急停 | 专人拿着 | 狗走的时候一直拿着，不干别的 |
-| Foxglove | 本机 | 看（第 6 节）、发目标；不能发别的 |
+| 服务器 | `junyongmou@10.36.136.7`。仓库在 `/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint`，包放 `/public/zjst/robot/cp_data/` | 经反向隧道 `ssh dog`；拷回录包，回灌、复盘；编 arm64（T60） |
+| 笔记本 | 狗边上，连着狗的网 | 维持隧道；`ssh dog` 直连；跑 Foxglove 桌面版 |
+| 8 号狗 | `nvidia@192.168.122.100`。Orin，L4T R36.4.0，`tegra-ubuntu` | 跑导航。CycloneDDS 只绑 eth1，域 0，`/opt/ros/cyclonedds.xml` |
+| App | 手机 | 看狗的状态、遥控（第 9 节） |
+| 遥控器 | 人 A 手里 | 影子模式下狗只由它走 |
+| 急停 | 专人拿着 | 狗走的时候一直拿着 |
 
-狗上看话题（读，不发）：
+连服务器用 IPv4（`-4`）：`gpu1` 会走到 IPv6，握手被关掉。
+
+### 2.2 隧道和 `ssh dog`
+
+在连得上狗的电脑（笔记本）上开反向隧道：服务器的 `127.0.0.1:5038` 接到狗的 22 端口。这个终端挂着别关：
+
+```bash
+autossh -M 0 -N -4 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+    -p 1222 -R 5038:192.168.122.100:22 junyongmou@10.36.136.7
+```
+
+没有 `autossh`（Windows），就用 `ssh -N -4 -o ServerAliveInterval=30 -p 1222 -R 5038:192.168.122.100:22 junyongmou@10.36.136.7`。
+它断了不会自己重连，要重开。
+
+- 服务器上：`~/.ssh/config` 里 `Host dog` 是 `localhost`、端口 `5038`、用户 `nvidia`。隧道开着时 `ssh dog`。
+- 笔记本上：`Host dog` 直接指 `nvidia@192.168.122.100`。
+
+下面的远程命令都写成 `ssh dog '…'`，两边一样用。
+
+**笔记本是 PowerShell 时**：
+- 引号里不要有 `$`。含 `$` 的命令（第 17 节演练那些）先 `ssh dog` 进去，在狗的 bash 里敲。
+- 拷脚本用 `git archive … | ssh dog "…"`（第 5 节），不要从 Windows 的工作区直接拷：CRLF 的脚本 bash 跑不了（T57）。
+
+### 2.3 笔记本上的 Foxglove
+
+- **连狗（实时）**：`ws://192.168.122.100:8765`，Layout → Import from file 选仓库里最新的
+  `Nav_D20/planning/script/planning_live.json`。不在一个网段就开 `ssh -N -L 8765:127.0.0.1:8765 nvidia@<狗>`，连
+  `ws://localhost:8765`。
+- **看服务器上的文件（复盘）**：Foxglove 只能打开本机磁盘上的文件。
+  - 本机是 Linux：把服务器的仓库挂上来，文件对话框里就能进 `work_dirs`。
+
+    ```bash
+    mkdir -p ~/centerpoint
+    sshfs -o reconnect,follow_symlinks -o ssh_command='ssh -4' \
+      junyongmou@10.36.136.7:/home/engineers/junyongmou/robot/ultralytics/d20car_predict/CenterPoint ~/centerpoint
+    fusermount -u ~/centerpoint          # 用完卸掉；没有 sshfs：sudo apt install sshfs
+    ```
+
+  - Windows：`scp -4 junyongmou@10.36.136.7:<路径> .` 拷下来再开。
+
+  打开的是 `viz/*.mcap`（几 MB 到几十 MB，不闪），不要打开同目录几百 MB 的 `*_0.mcap`。布局都在 `Nav_D20/planning/script/`：
+  - 狗上录的包：`field_review.json`（第 14.2 节）；
+  - 服务器上的回放：`planning_viz.json`；
+  - 定位：`loc_viz.json`。
+
+### 2.4 狗上只读看话题
 
 ```bash
 ssh dog
-source /opt/ros/humble/setup.bash && source /opt/seres/nav_cw/install/planning/setup.bash   # 我们的消息定义
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml ROS_DOMAIN_ID=0
-ros2 topic hz /perception/lidar_3d/objects       # 10 Hz 左右
-ros2 topic echo --once /lightning/odom
+sudo -n bash -c 'source /opt/ros/humble/setup.bash && source /opt/seres/nav_cw/install/planning/setup.bash &&
+  export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml ROS_DOMAIN_ID=0 &&
+  ros2 topic hz /perception/lidar_3d/objects'                 # 10 Hz 左右
 ```
 
-收不到大话题（点云）时用 root 跑（机器人的共享内存是 root 的，T40）。域 0 上**不要** `ros2 topic pub`。
+`source` 了 planning 的 `setup.bash` 才有我们的消息定义。用 root 跑：机器人的共享内存是 root 的，`nvidia` 的进程拿到的数据不全，
+大话题（点云）收不到（T40）。只读：`hz`、`echo --once`、`info -v`。
 
-仓库里两张站点地图（`Nav_D20/map/*.zip`）。白线是路，黄块是 `semantic.osm` 里的人行横道，数字是这张图自己的编号。两张图都有 13、32、38，不是同一个路口。
+---
 
-规划起来读的是 **ad68517c**（`startup_map_dir`，5 条）。北面 22、13 在主路上，6 在西边岔出去的短路上；南面 32、38。第一次现场（T57）走这张。
+## 3. 地图和路口编号
 
-规划日志的 `crosswalk N`、侧栏 `crosswalk_index` 是 OSM 里的顺序，不是图上的号：**规划 0 = 6，1 = 13，2 = 22，3 = 32，4 = 38**。
-路网在 13、32、38 处画宽了，全局路径从白框上过；22 只擦边，6 只有一端碰到路（PLANNING_INTEGRATION.md 第 4 节）。
+仓库里有两张站点地图（`Nav_D20/map/*.zip`）。图里白线是路，黄块是 `semantic.osm` 里的人行横道，数字是这张图自己的编号。
 
-**a70c6db6** 有 8 条（东边路口 7、13、20、26、32，南边 38、46，最西边单独一条 52）。规划不会自己切过去。等人带狗到这一片再走，不排在 T57 前面。
+规划起来读的是 **ad68517c**（`startup_map_dir`），5 条人行横道：
+- 北面 22、13 在主路上，6 在西边岔出去的短路上；
+- 南面 32、38。
 
 ![ad68517c 的五条人行横道](map_ad68517c_crosswalks.png)
+
+规划日志里的 `crosswalk N`、Foxglove 侧栏的 `crosswalk_index` 是 OSM 里的顺序，不是图上的号：
+
+| 规划 / 侧栏 | 图上的号 | 适不适合测 |
+|---|---|---|
+| 0 | 6 | 只有一端碰到路，多半走不出 approach（`20261115_x6` 是狗站在入口上看车流） |
+| 1 | 13 | 路网画宽了，全局路径从白框上过。先做 |
+| 2 | 22 | 路径只擦边 |
+| 3 | 32 | 先做 |
+| 4 | 38 | 先做 |
+
+- 包名、备注都用图上的号：`x13_walk`，不是 `x1_walk`。录包窗口和复盘的 mcap 里已经换成图上的号了。
+- 发目标之前看全局路径（蓝线）是不是穿过白框。
+- 至少测两个路口，其中一个有正常车流。
+
+另一张 **a70c6db6** 有 8 条：东边路口 7、13、20、26、32，南边 38、46，最西边单独一条 52。这张图也有 13、32、38，但不是同一个路口。
+规划不会自己切过去，现在不测这张。
 
 ![a70c6db6 的八条人行横道](map_a70c6db6_crosswalks.png)
 
 ---
 
-## 2. 两套导航
+## 4. 出发前（服务器上）
 
-| | 机器人团队的（默认，开机起） | 我们的（`/opt/seres/nav_cw`，不开机起） |
-|---|---|---|
-| 感知 | `nav_perception.service`（`lidar_seg`、`grid_map_memory_node`、云台检测、回充）+ `lidar-3d-detection.service`（我们以前的 deb） | `cw-nav-perception.service`：仓库的 `lidar_seg`、`grid_map_memory_node`、`lidar_3d_detection`（2026-11-14 并进感知），云台检测和回充照旧用 `/opt/seres/nav_perception` 的程序 |
-| 定位 | `slam.service` | `cw-slam.service`：仓库的 lightning（`mode_switch_node`），地图是仓库的 |
-| 规划 | `planning.service` | `cw-planning.service`：仓库的规划，人行横道让行打开，开机就读站点地图和 `semantic.osm` 里的人行横道（`startup_map_dir`） |
+1. `git pull`，跑现场工具的测试（都要过）：
 
-```text
-/opt/seres/nav_cw/
-  install/{nav_perception,slam,planning}/   各自的前缀（各用各的接口包，build_stack.sh）
-  deps/                                     编的依赖（g2o、acados、OsqpEigen），不进系统
-  maps/<id>/                                仓库的站点地图（Nav_D20/map/*.zip 解开）
-  start/                                    cw-nav-perception 的启动脚本
-  nav_cw.sh  nav_cw_foxglove.sh             换 / 换回 / 开关；Foxglove 的桥
-  nav_cw.env                                开关写在这里（三个 cw unit 用 EnvironmentFile= 读）
-```
+   ```bash
+   pytest tests/dog/test_nav_cw.py tests/dog/test_nav_cw_record.py tests/dog/test_replay_dog_bag.py \
+     tests/dog/test_bag_to_mcap.py tests/dog/test_field_viz.py tests/dog/test_planning_debug_bag.py
+   ```
 
-数据怎么走：
-
-```text
-激光 /robot/topic/rdap/top_point_cloud2 ─┬─ lidar_seg → grid_map_memory_node → /map/occupancy_grid（狗周围 10 x 10 m 障碍栅格）
-INS /rte/rdap/rtk/inspvax、IMU           │                                    /fused_point_cloud
-                                        ├─ lidar_3d_detection → /perception/lidar_3d/objects（车、人、骑车的：框、速度、预测）
-                                        └─ lightning（定位）→ /lightning/odom、TF map → base_link、/map（全局栅格）
-/goal_pose（Foxglove）→ 规划 → /mc/motion_control（MODE_WBMC、GAIT_WALK，para = [vx, vy, ω]：狗走的是这个）
-                              /cmd_vel（同一个速度）
-```
-
-换的时候 `nav_cw.sh` 先停原来的四个（含 `lidar-3d-detection.service`，不然两个节点发同一个话题），再起我们的三个，
-15 s 内三个都要 active 且没重启过，否则把原来的起回来、退出 1、打出我们三个服务最后 15 行日志。
-两套 unit 互相 `Conflicts=`，systemd 不会同时跑。什么都没 enable：**狗重启就回到机器人团队的**。
+2. 要换代码时，在服务器上的狗系统镜像里编 arm64（T60：`Nav_D20/docker/run_arm64.sh`，增量编规划约 2.5 分钟）。
+   **规划和感知一起编、一起装**：
+   - 2026-11-25 起，感知目标的类型是 `nav_interface/msg/LidarObjectArray`。以前是 `perception_interface/…`。
+   - 新规划配旧感知：类型名对不上，DDS 不配对，规划收不到目标，门控一直 stale，路边一直等。
+   - 怎么编、查什么、怎么打包：T69 第 6 步。要查的是：
+     - `ldd` 没有 not found；
+     - 两边都有 `nav_interface` 的 `lidar_object_array.hpp`；
+     - `version.txt`；
+     - 打成 `nav_cw_planning_<sha>.tar.gz`、`nav_cw_perception_<sha>.tar.gz`，sha256 抄下来。
+3. 带上要用的规划和感知包（scp 到狗上的 `/tmp/`），选好今天测哪几个路口（第 3 节）。
+4. 狗的盘：`ssh dog 'df -h /home/nvidia'`。包大约每秒 35 MB（大头是点云），剩 50 GB 以下就先拷走，不再录。
 
 ---
 
-## 3. 跑起来
+## 5. 上板：先看狗现在的状态
 
-### 3.1 每次上板
+```text
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'
+```
 
-1. 狗站着、在 ad68517c 那片、在空旷处；急停在人手里；`switches` 里 appmap 是 ignore。**INS 要先是 RTK 固定解**（`/rte/rdap/rtk/inspvax`
-   的 `ins_status` 3、`pos_type` 56）：我们的定位起来以后只等 30 s，等不到就从配置里的位姿起，对不上地图、没有 odom（T61）。
-2. `nav_cw.sh status` → `running: theirs`；`nav_cw.sh switches` 看开关（第 5 节），第一次上板要影子模式、限速。
-3. `nav_cw.sh use-new`。成功后看日志（`journalctl -u <服务> -n 50`）：
+- `running: theirs`：正常（狗重启过也是这样）。
+- `running: ours`：上次收工没换回。先 `use-original` 再往下做；装新包时我们的规划必须是停的。
+
+  ```text
+  ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original'
+  ```
+
+- 域 0 上有没有别的调试程序在发话题：`ssh dog 'ps -ef | grep -E "fake|pub" | grep -v grep'`。有就问清楚是谁的再停（停那个 python，
+  不要停 `cw-*`）。
+
+**拷脚本**（每次现场都拷一次，`git archive` 出来是 LF）：
+
+```text
+git archive HEAD tools/deploy/nav_cw.sh tools/deploy/nav_cw_foxglove.sh tools/deploy/nav_cw_record.sh tools/deploy/nav_cw_record.py | ssh dog "rm -rf /tmp/nav_cw_tools && mkdir -p /tmp/nav_cw_tools && tar -x -C /tmp/nav_cw_tools && sudo -n cp /tmp/nav_cw_tools/tools/deploy/* /opt/seres/nav_cw/"
+ssh dog "file /opt/seres/nav_cw/nav_cw.sh /opt/seres/nav_cw/nav_cw_foxglove.sh /opt/seres/nav_cw/nav_cw_record.sh /opt/seres/nav_cw/nav_cw_record.py"
+ssh dog "grep -c shadow_blocked /opt/seres/nav_cw/nav_cw.sh; grep -c crosswalk_mode /opt/seres/nav_cw/nav_cw_record.py"
+```
+
+- `file` 不能出现 `CRLF`。
+- `shadow_blocked` 至少 1 行：影子模式会把"被堵就 standstill"关掉。不关的话，人把狗按在路边、门控一放行，约 4.5 s 后规划进
+  standstill。
+- `crosswalk_mode` 至少 1 行：录包窗口按状态响铃提示。
+
+---
+
+## 6. 上板：装新编的规划和感知
+
+只在要换代码时做。我们的服务必须是停的（`running: theirs`）。原来的挪到 `install` 外面留着：`configure`、`apply` 在 `install` 下面按
+`find` 找配置，备份留在 `install` 里可能被改到。
+
+```text
+ssh dog 'sha256sum /tmp/nav_cw_planning_<sha>.tar.gz /tmp/nav_cw_perception_<sha>.tar.gz'      # 和服务器上抄的一样
+ssh dog 'sudo -n mkdir -p /opt/seres/nav_cw/backup &&
+  sudo -n mv /opt/seres/nav_cw/install/planning /opt/seres/nav_cw/backup/planning.<旧 sha> &&
+  sudo -n mv /opt/seres/nav_cw/install/nav_perception /opt/seres/nav_cw/backup/nav_perception.<旧 sha> &&
+  sudo -n tar --no-same-owner -xzf /tmp/nav_cw_planning_<sha>.tar.gz -C /opt/seres/nav_cw/install &&
+  sudo -n tar --no-same-owner -xzf /tmp/nav_cw_perception_<sha>.tar.gz -C /opt/seres/nav_cw/install'
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh configure /opt/seres/nav_cw /opt/seres/nav_cw/maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 &&
+  sudo -n bash /opt/seres/nav_cw/nav_cw.sh apply && sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches'
+```
+
+装完一定 `configure` + `apply`：重装把仓库的配置放回来了，路径和开关要再写进去（T63 复核）。
+
+`switches` 有 `NOT APPLIED` 就停下，把 `backup/` 里的挪回 `install/`。
+
+装好以后查版本：
+
+```text
+ssh dog 'cat /opt/seres/nav_cw/install/planning/version.txt'
+ssh dog "grep -ral 'stops for vehicles ahead' /opt/seres/nav_cw/install/planning/planning/lib"   # 新门控：人行横道上前方来车也停
+ssh dog "grep -ral 'drawn as it came' /opt/seres/nav_cw/install/planning/planning/lib"           # 目标标记转到 map 的修复（T66 复核）
+```
+
+每个 grep 都要有一个文件。没有新门控就不做第 11.4 节的"同事开车"。
+
+---
+
+## 7. 上板：开关、换成我们的、起来以后查
+
+1. **INS 先是 RTK 固定解**，狗放在 ad68517c 的路网上、空旷处，急停在人手里。
+   - 要看到 `/rte/rdap/rtk/inspvax` 的 `ins_status` 3、`pos_type` 56。
+   - 不是固定解就别 `use-new`：我们的定位只等 30 s，等不到就从配置里的位姿起，对不上地图，没有 odom（T61）。
+2. **开关**：
+
+   ```text
+   ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on'
+   ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed 0.5'
+   ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches'
+   ```
+
+   `switches` 要看到：
+   - shadow on，行尾有 `nav_blocked false: a person drives`；
+   - appmap ignore；
+   - 限速 0.5；
+   - 没有 `NOT APPLIED`，没有 `REHEARSAL ON`。
+3. **换成我们的**：
+
+   ```text
+   ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-new'
+   ```
+
+   - 它先停他们的四个服务，再起我们的三个。三个都要在 15 s 内 active、没重启过。
+   - 然后查 ROS 图，最多等 60 s。规划读两张站点栅格要二十多秒，这段里发布者还没出现。
+   - 最后等第一条 `/lightning/odom`，最多 45 s。
+   - 任何一步不对就把他们的起回来，退出 1，打出原因。退出 1 以后先 `status` 确认是 `running: theirs`，查清楚再重跑。
+   - 图要全是 ok：规划在 `/nav_cw/shadow/mc/motion_control` 上发，不在 `/mc/motion_control` 上。
+   - 规划发到了 `/mc/motion_control`：它会自己停掉 `cw-planning` 并退出 3。不要再起，查清楚（第 19 节）。
+4. **起来以后查**（`journalctl -u <服务> -n 50`）：
 
    | 服务 | 要看到 | 不对 |
    |---|---|---|
    | `cw-slam` | 收敛，没有 fault，不一直重定位；读的是 `/opt/seres/nav_cw/maps/...` | 换回 |
-   | `cw-planning` | `Tracking: crosswalk yield on, rule wait`；`startup map … 5 crosswalks`；之后没有 `Map switch`、`Map update`（appmap ignore） | 有切换：appmap 没生效（`check` 看图），换回 |
-   | `cw-nav-perception` | `lidar_3d_detection` 每秒一行、10 Hz 左右；`lidar_seg`、`grid_map_memory_node` 起来了 | 换回 |
+   | `cw-planning` | `Tracking: crosswalk yield on, rule wait, on the crosswalk stops for vehicles ahead`；`startup map … 5 crosswalks`；之后没有 `Map switch`、`Map update`（appmap ignore） | 有切换：appmap 没生效（`check` 看图），换回 |
+   | `cw-nav-perception` | `lidar_3d_detection` 每秒一行、约 10 Hz；`lidar_seg`、`grid_map_memory_node` 起来了 | 换回 |
 
-4. Foxglove（第 6 节）：狗在地图上的位置对、障碍栅格跟着狗、人行横道框在路上。
-5. 发目标（第 4 节），按第 8 节的顺序试。
-6. 完了 `nav_cw.sh use-original` → `running: theirs`，App 里狗正常。
-
-### 3.2 回放和演练（域 42，不碰狗的域 0）
-
-狗上演练用的就是现场那三个 `cw-*` 服务、机器人原来的 CycloneDDS 配置（开着共享内存），只是在域 42 上、喂的是包（T59 第 5 步是完整的做法）：
-
-```bash
-sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on           # 演练必须开着：规划不在 /mc/motion_control 上发
-sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal on        # nav_cw.env 写 ROS_DOMAIN_ID=42、PLANNING_TIMEOUT_WALL_CLOCK=1；
-                                                             # 停机器人团队的四个导航服务，起我们的三个，在域 42 上查图
-E='source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/planning/setup.bash; export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml ROS_DOMAIN_ID=42'
-sudo -n bash -c "$E; ros2 bag play <包> --clock --remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects /map/switch:=/bag/map/switch /cmd_vel:=/bag/cmd_vel /mc/motion_control:=/bag/mc/motion_control"
-sudo -n bash -c "$E; ros2 topic pub -w 0 --once /goal_pose geometry_msgs/msg/PoseStamped '{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}'"
-sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal off       # 我们的停、他们的起回来，nav_cw.env 里域 42 那两项去掉
-```
-
-- `rehearsal on` 以后 30 s 内就把包放起来：定位只等 30 s 的 INS 固定解，晚了它从配置里的位姿起、对不上（T61）；晚了就
-  `systemctl restart cw-slam cw-planning`，包放着的时候它们重新起；
-- `ros2 topic pub` 加 `-w 0`：`--once` 默认等到有订阅者才发，没人订的话题（比如 ignore 时的 `/map/switch`）会一直等（T61）；
-- 包里录的目标、地图切换、指令都改名避开：目标用我们现场重算的；切换和指令是录的时候的，不能当成现在的；
-- `PLANNING_TIMEOUT_WALL_CLOCK=1`：回放旧包时规划的超时按收到消息的时刻算（ONBOARDING.md），只在演练时设；
-- 用 root 跑 ros2 命令：机器人的共享内存是 root 的 `iox-roudi`，`nvidia` 的进程拿到的数据不全（T40）；
-- 第一次用共享内存演练前先验它不串域（T59 第 5 步 b：域 42 发、域 0 收不到）；
-- `rehearsal on` 开着时 `use-new` 不肯执行，`switches` 显示 REHEARSAL ON；我们的服务在域 0 上跑着时 `rehearsal on` 也不肯执行。
-
-Foxglove：`rehearsal on` 时 `sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh` 自己从 `nav_cw.env` 读到域 42；别的时候要看域 42 就
-`sudo -n env ROS_DOMAIN_ID=42 bash …`（变量写在 sudo 后面：sudo 会清掉前面设的环境变量）。服务器上回放：`Nav_D20/planning/script/replay_planning_check.sh`（nav-dev 镜像，T58）。
+   再用第 2.4 节的办法只读查两样：
+   - `ros2 topic info -v /lightning/odom`：只有一个发布者，就是我们的定位。不是就停下，查是谁。
+   - `ros2 topic info -v /perception/lidar_3d/objects`：类型是 `nav_interface/msg/LidarObjectArray`，规划在订阅者里。规划日志不刷 stale。
 
 ---
 
-## 4. 和狗交互
+## 8. 窗口和 Foxglove
 
-- **发目标**：Foxglove 3D 面板右上 "Publish pose"，在地图上点一下、拖出朝向，发的是 `/goal_pose`（`map` 系；别的系规划用 TF 转到 map）。
-  人行横道的测试点在对面路边。拖出的朝向就是到了以后狗面朝的方向：到终点 0.5 m 内、朝向差 0.2 rad 内才算到，
-  朝向拖反了狗会在终点原地转过来。App 的 `/nav/navigation` 我们不用（人定 2026-11-14）。
-- **停**：
-  - 硬的：急停；
-  - 遥控接管（第一次先确认接得过来）；
-  - 软的：在狗脚下发一个目标（到了就停）；`sudo -n systemctl stop cw-planning` 不再发指令——运控收不到指令时是停下还是保持最后的速度，
-    第一次上板狗站着、限速时先试清楚（第 8 节第 1 步），没试清楚前不当成停车手段；
-  - 收工、出错：`nav_cw.sh use-original`。
-- **看状态**：`journalctl -u cw-planning -f`。`mission_state: active / standstill / off` 每个周期打一行（要 grep）；
-  人行横道的状态每变一次打一行：
+三个窗口：
+
+```text
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw_foxglove.sh'
+ssh dog "journalctl -u cw-planning -f | grep --line-buffered -E 'Crosswalk yield|nav_blocked|Navigation|standstill'"
+ssh -t dog
+```
+
+- 第一个：Foxglove 的桥，留在前台。桥已经在跑（8765 被占）就不要再开，日志在 `/tmp/foxglove_bridge.log`。
+- 第二个：规划的状态变化，每变一次一行，例如：
 
   ```text
   Crosswalk yield: wait (vehicle) crosswalk 1, stop point in -0.02 m, entry 0.78 m, exit 7.9 m, heading error 3 deg, vehicles 2, waiting for 17
   ```
 
-- **App**：电量、遥控照旧，位置不准（画在 c1adbe7b 上）。`appmap follow` 时才跟 App：在 App 里切图，规划和定位都会跟着切
-  （`/map/switch`）；`appmap ignore`（默认）时 App 怎么切都不影响我们。
+- 第三个：录包窗口。要 `-t`，录的时候才能敲备注。人 B 拿着。
 
----
-
-## 5. 调试开关
-
-都在狗上用 `sudo -n bash /opt/seres/nav_cw/nav_cw.sh …`；开关存在 `/opt/seres/nav_cw/nav_cw.env`（三个 cw unit 读），程序从配置里读的再写进装好的那份配置（`communication_conf`、`mission_conf`），只重启相关的那个服务（没在跑就下次起来生效）；
-`switches` 看当前设了什么。不影响机器人团队的服务。
-
-| 开关 | 做什么 | 代价 |
-|---|---|---|
-| `shadow on / off` | 影子模式：规划照常算，`/cmd_vel` 和 `/mc/motion_control` 改发到 `/nav_cw/shadow/cmd_vel`、`/nav_cw/shadow/mc/motion_control`，**狗不按规划走**；人用遥控遛狗，Foxglove 里比。改的是装好的 `communication_conf` 里 `pub_cmd_vel`、`pub_motion` 的名字（规划不读命令行参数：`rclcpp::init(0, nullptr)`，`--ros-args -r` 没用）；重启后到 ROS 图里查，规划还在发 `/mc/motion_control` 就把 `cw-planning` 停掉、退出 3 | 重启 `cw-planning`（任务没了，重发目标） |
-| `appmap ignore / follow` | ignore（默认）：规划（`communication_conf` 的 `sub_map_switch`、`sub_map_update`）和定位（launch 参数 `map_switch_topic`）改听 `/nav_cw/map/switch`、`/nav_cw/map/file_update`，App 的切图不再让它们换图，一直在 `configure` 设的站点地图上。follow：跟 App（只在 App 的数据库里有站点地图时用；8 号狗的没有） | 重启 `cw-slam`（重新收敛）、`cw-planning` |
-| `apply` | 把 `nav_cw.env` 里的开关（`NAV_CW_SHADOW`、`NAV_CW_APPMAP`、`NAV_CW_SPEED`）再写进装好的配置：重装会把仓库的配置放回来，开关本身不会丢；`use-new` 换之前自己也写一遍；`switches` 里出现 NOT APPLIED 就是没写进去 | 重启我们在跑的 `cw-slam`、`cw-planning` |
-| `rehearsal on / off` | 演练：on 在 `nav_cw.env` 写 `ROS_DOMAIN_ID=42`、`PLANNING_TIMEOUT_WALL_CLOCK=1`，停机器人团队的四个导航服务，起我们的三个、在域 42 上查图（要影子模式开着；我们的在域 0 上跑着时不肯）；off 换回去、去掉那两项（第 3.2 节） | 演练期间狗没有导航 |
-| `check` | 查 ROS 图：谁在发 `/mc/motion_control`、`/cmd_vel`、影子话题，谁在听 `/map/switch`，和上面两个开关对不对；`use-new` 换完自己也查，对不上就换回 | 无 |
-| `speed <m/s> / off / show` | 限速：改装好的 `mission_conf` 里 MPPI 的 `max_vx`（仓库 3.0）和巡航 `reference_velocity`（仓库 1.5）；第一次限速时原文件存成 `mission_conf.pb.txt.repo`，`off` 放回 | 重启 `cw-planning` |
-| `debug planning on / off` | 规划的调试话题（`/planning/debug/*`，`pub_flag`），马上生效（服务 `/planning/debug/set_pub_flag`）。`configure` 已经默认打开（`NAV_CW_DEBUG=0` 装的时候不开） | 规划多发几十 KB/s |
-| `debug perception on / off` | `lidar_3d_detection` 发调试点云 `/perception/lidar_3d/cloud`、TF `camera_init → lidar_det`（`LIDAR3D_ARGS`） | 重启 `cw-nav-perception`：栅格断几秒，规划暂停 1 s 后 3 s 恢复 |
-
-Foxglove 的桥（`nav_cw_foxglove.sh`，以 root 跑，带白名单：不限的话 iceoryx 的发布者表会满，桥退出，T40）：
-
-| 变量 | 做什么 |
-|---|---|
-| 默认 | 布局里显示的：规划的调试话题、两张栅格、`/fused_point_cloud`、`/lightning/odom`、`/cmd_vel`、`/mc/motion_control`、影子的两个、目标、TF |
-| `NAV_CW_FOXGLOVE_LEVEL=full` | 再加重的：定位的 `current_scan_world`、`map_cloud`、`ins_path`、`lio_path`、`ins_pose`、`/map`；感知的 `tracks`、`predictions`、`cloud`；规划的 `teb_planner`、`following`、`gradient_vector`、`cost_map_production/grid_map`、`plotjuggler/data_points`。布局里这些层默认藏着，3D 面板里勾上。几分钟就关 |
-| `NAV_CW_FOXGLOVE_EXTRA="^/a$ ^/b$"` | 临时再放几个话题 |
-| `NAV_CW_FOXGLOVE_PORT` | 端口，默认 8765 |
-
-能从 Foxglove 发的只有 `/goal_pose`（`client_topic_whitelist`），所以 Foxglove 永远发不了速度。
-
----
-
-## 6. 可视化看什么（`Nav_D20/planning/script/planning_live.json`）
-
-布局：左边 3D（跟着 `base_link`），右边速度、角速度两张曲线，侧栏标签页里是规划的调试数、诊断、感知的原始目标。
+Foxglove：`ws://192.168.122.100:8765`，布局 `Nav_D20/planning/script/planning_live.json`。左边 3D 跟着 `base_link`，右边速度、角速度两张
+曲线，侧栏标签页是规划的数、诊断、感知的原始目标。
 
 | 层 / 面板 | 看什么 | 正常 | 不对说明 |
 |---|---|---|---|
-| `/planning/debug/global_map_manager/occmap` | 站点地图的缩略（规划载入时算，ad68517c 是 0.6 m；整张 0.1 m 有 117 MB，狗上的共享内存发不了） | 和路网对得上 | 地图不对 |
-| `/map/occupancy_grid` | 感知的局部障碍栅格 | 10 x 10 m 跟着狗，车、墙在对的地方 | 感知或外参问题；断流时规划会暂停 |
+| `/planning/debug/global_map_manager/occmap` | 站点地图的缩略（ad68517c 是 0.6 m） | 和路网对得上 | 地图不对。几乎整张是障碍，看局部时关掉，免得盖住白框 |
+| `/map/occupancy_grid` | 感知的局部障碍栅格 | 10 x 10 m 跟着狗，车、墙在对的地方 | 感知或外参；断流时规划暂停 |
 | `/planning/debug/cost_map_production/occmap` | 规划的代价地图 | 障碍外有膨胀 | |
-| `/planning/debug/path_tracking` | 全局路径、局部参考、MPPI 的优化路径 | 沿路，经过人行横道 | 路径穿墙：地图或定位 |
-| `/planning/debug/goal_pose` | 目标 | 在你点的地方 | |
-| `/planning/debug/collision_checker` | 碰撞检查的足迹 | | 一直红：被挡（nav_blocked） |
-| `/planning/debug/crosswalk` | 人行横道（80 m 内）：白框；正在处理的那个按状态变色：黄 approach、红 align / wait / cross_wait、绿 go / cross；车框：蓝 = 看到的车、红 = 门控在等的车、橙 = 门控看到冲突但不停（人行横道上从狗后面过的车、committed），箭头是速度；狗头上一行状态字 | 车框贴在真车上，停着的车在地图上不动 | 车框跟着狗转：外参不对（`objects_in_map.py`）；整体偏：定位或时间戳 |
+| `/planning/debug/path_tracking` | 蓝 = 整条全局路径；紫 = 从狗往前约 5 m 裁给局部规划的参考线；绿 = 局部规划（MPPI）要走的；箭头 = 终点（红 = 锁了到点朝向，Foxglove 点的目标就是红的） | 沿路，穿过人行横道的白框 | 路径穿墙：地图或定位 |
+| `/planning/debug/crosswalk` | 80 m 内的人行横道（白框）。正在处理的那个按状态变色：黄 approach，红 align / wait / cross_wait，绿 go / cross。车框：蓝 = 看到，红 = 门控在等它，橙 = 看到冲突但不停（人行横道上从狗后面过的、committed），箭头是速度。狗头上一行状态字 | 车框贴在真车上，停着的车在地图上不动 | 车框跟着狗转：外参不对（`objects_in_map.py`）；整体偏：定位或时间戳 |
 | `/lightning/odom` | 狗的位置和朝向 | 平稳，不跳 | 跳：定位，停下来查 |
-| 速度曲线 | 实际 vx、`/cmd_vel` 的 vx / vy、发给运控的 vx（`/mc/motion_control`）、影子模式的两条 | 实际跟着指令；限速时指令不超过限速 | 指令有、实际没有：运控没接（遥控接管了？） |
+| 速度曲线 | 实际 vx；`/cmd_vel` 的 vx、vy；`/mc/motion_control`；影子的两条 | 实际跟着指令；指令不超过限速 | 指令有、实际没有：运控没接 |
 | 角速度曲线 | 实际 ω、指令 ω | align 时指令 ω ≤ 0.5 rad/s | |
-| 侧栏 "规划的数"（`/planning/debug/plotjuggler/string`） | `crosswalk_mode`（0 none 1 approach 2 align 3 wait 4 go 5 cross 6 cross_wait：人行横道上为前方来车停着）、`crosswalk_index`、`crosswalk_s_stop`、`crosswalk_hold`、`crosswalk_go`、`crosswalk_vehicles`、`crosswalk_waiting_for`、`crosswalk_stale`、`crosswalk_unreleased`、`crosswalk_heading_error`；`cmd_vx` 等 | | `crosswalk_stale` 一直 1：感知断了或时间对不上 |
+| 侧栏"规划的数"（`/planning/debug/plotjuggler/string`） | 见下面的字段表；还有 `cmd_vx` 等 | | `crosswalk_stale` 一直 1：感知断了或时间对不上 |
 | 诊断 | 规划的 fault | 空 | |
-| 感知的原始目标（`/perception/lidar_3d/objects`） | 每个目标的 id、类别、motion、age、速度 | | |
+| 感知的原始目标（`/perception/lidar_3d/objects`） | 每个目标的 id、类别、motion、age、速度（检测系：雷达正下方地面，x 右 y 前） | | |
 
-full 级别多看的：
+"规划的数"里人行横道的字段：
 
-- 定位：`ins_path`（INS）和 `lio_path`（激光里程计）应该叠在一起；`current_scan_world` 应该贴着路网走。`map_cloud` 和 `/map` 在狗上不发（ad68517c 的分别是 18.6 MB、117 MB，超过共享内存 16 MB 一块，`configure` 关了，T59）；
-- 感知：`tracks` 和 `predictions` 是感知自己的框和预测（`camera_init` 系，不在狗的 TF 树里：3D 面板的显示坐标系选 `camera_init` 看；
-  开了 `debug perception` 也只有 `camera_init → lidar_det`）。规划实际用的车位置看 `/planning/debug/crosswalk`（已经转到 map）。
+| 字段 | 意思 |
+|---|---|
+| `crosswalk_mode` | 0 none，1 approach，2 align，3 wait，4 go，5 cross，6 cross_wait（人行横道上为前方来车停着） |
+| `crosswalk_index` | 规划的序号，按第 3 节的表换成图上的号 |
+| `crosswalk_s_stop` | 到停止点的距离 |
+| `crosswalk_hold` | 是不是在 hold |
+| `crosswalk_go` | 放没放行 |
+| `crosswalk_vehicles` | 门控看到几辆车 |
+| `crosswalk_waiting_for` | 在等几辆 |
+| `crosswalk_stale` | 感知过期 |
+| `crosswalk_unreleased` | 在人行横道上但没放行 |
+| `crosswalk_heading_error` | 朝向差 |
+| `nav_blocked` | 被堵，影子模式下一直 0 |
 
----
-
-## 7. 调参：在哪改、怎么生效
-
-**仓库是源头**。狗上改装好的那份只为现场快速试；试好的值抄下来（文件、行、旧值、新值、为什么）回来改仓库、提交，
-下次装（T56 的第 2、3、5 步）就带上了。狗站着的时候改，改完重启对应的服务。
-改了代码要重编：狗上编（T56 第 3 步，一个多小时，占狗的 CPU），或者在服务器上狗的系统镜像里编（T60：`Nav_D20/docker/dog_rootfs.sh`、`run_arm64.sh`，QEMU，不占狗；`run_arm64.sh` 留着一个容器反复用，增量重编规划约 2.5 分钟；第一次建容器在服务器的 vfs 上要约 50 分钟）。服务器编的第一次装到狗上之前先做 T63 的对照。重装会盖掉装好的配置：之后要重跑 `nav_cw.sh configure`、再 `nav_cw.sh apply` 把开关写回去（T60 第 7 步）。
-
-| 模块 | 文件（装好的；`find /opt/seres/nav_cw/install/<模块> -name <文件> -not -path '*/src/*'`） | 常调的 | 生效 |
-|---|---|---|---|
-| 规划 | `robot_factory/d20/001/planning_conf/mission_conf.pb.txt` | `crosswalk_yield_conf`（`enable`、`yield_rule`、`stop_margin`、`slow_distance`、`align_tolerance_deg`、`max_align_omega`、`stale_after`、外参 `det_to_base_*` 等，CROSSWALK_YIELD_FLOW.md 第 8 节）；`mppi_planner_conf` 的速度（用 `nav_cw.sh speed`） | `systemctl restart cw-planning`，重发目标 |
-| 规划 | `…/preprocess_conf.pb.txt` | `global_map_manager_conf.startup_map_dir`（`nav_cw.sh configure` 写的）、代价地图 | 同上 |
-| 规划 | `…/communication_conf.pb.txt` | `pub_flag`、`enable_global_map_pub`、话题名 | 同上（`pub_flag` 用 `debug planning` 不用重启） |
-| 定位 | `lightning/config/default_d20.yaml` | `map_path`（`configure` 写的） | `restart cw-slam`；狗要站着，等重新收敛；这期间规划暂停 |
-| 感知（我们的） | `lidar_3d_detection/config/lidar_3d_detection.yaml` | `score_thresholds`、`tracker`、`predictor`、`node.ins_azimuth_offset_deg`（INS 朝向偏置，现在 0） | `restart cw-nav-perception` |
-| 感知（机器人团队的） | `lidar_seg` 的 `lidar_seg.yaml`、`grid_map_memory_node.yaml` | 分割、栅格 | 同上 |
-
-注意：
-
-- `PLANNING_TIMEOUT_WALL_CLOCK` 狗上**不设**（只给回放旧包用）；
-- 改了外参（`det_to_base_*` 或感知的 `T_body_lidar` / `extrinsic_rpy`）一定录一段包跑 `objects_in_map.py`，要 "extrinsic OK"；
-- 门控的大多数参数（`YieldConfig`：`wait_clear`、`lost_hold`、`young_age` 等）不在配置文件里，是代码里的默认值，改要改代码重编（CROSSWALK_YIELD_FLOW.md 第 8 节）。
+桥开 `NAV_CW_FOXGLOVE_LEVEL=full` 才有的层（第 15 节），在 3D 面板里勾上：
+- 定位：`ins_path`（INS）和 `lio_path`（激光里程计）应该叠在一起；`current_scan_world` 应该贴着路网。`map_cloud`、`/map` 在狗上不发
+  （18.6 MB、117 MB，超过共享内存 16 MB 一块，T59）。
+- 感知：`tracks`、`predictions` 是感知自己的框和预测，在 `camera_init` 系，3D 面板的显示坐标系选 `camera_init` 才看得到。规划实际用的
+  车位置看 `/planning/debug/crosswalk`（已经转到 map）。
 
 ---
 
-## 8. 规划和运控怎么安全地试
+## 9. 和狗交互
 
-规划能动狗的只有两个话题：`/mc/motion_control`（运控实际执行的）和 `/cmd_vel`。有任务时每个周期都发 `/cmd_vel`，
-不在 standstill 时还发 `/mc/motion_control`；人行横道等车时发的是 (0, 0, 0) 或对朝向的原地转（任务没停，所以照样发）。
-Foxglove 只能发 `/goal_pose`。一层一层来，前一层过了再下一层：
+- **发目标**：Foxglove 3D 面板右上"Publish pose"，在地图上点一下、拖出朝向，发的是 `/goal_pose`。
+  - 布局跟着狗，所以目标是在 `base_link` 里发的。规划用 TF 转到 map。
+  - 录包窗口打 `goal sent in base_link (…): (x, y) in map`，下一行 `goal N m away` 应该是几十米。几百米就是没转对，别往下做。
+  - 测试点在人行横道对面的路边。拖出的朝向就是到了以后狗面朝的方向。到终点要 0.5 m 内、朝向差 0.2 rad 内才算到，朝向拖反了狗会在
+    终点原地转过来。
+  - 5 s 内 `mission_state` 不是 active 就再发一次：还在跑的任务，第一下只会被停掉。
+  - App 的 `/nav/navigation` 我们不用（人定 2026-11-14）。
+- **停**：
+  - 硬的：急停；
+  - 遥控接管；
+  - 软的：在狗脚下发一个目标（到了就停）；
+  - `sudo -n systemctl stop cw-planning`：运控收不到指令时是停下还是保持最后的速度，要在狗站着、限速时试清楚（第 10 节第 1 步）。
+    没试清楚前，不当成停车手段；
+  - 收工、出错：`nav_cw.sh use-original`。
+- **看状态**：
+  - `journalctl -u cw-planning -f`：`mission_state: active / standstill / off` 每个周期一行（要 grep）；人行横道的状态每变一次一行
+    （第 8 节）。
+  - 录包窗口（第 12 节）：状态一变就响一声、打一行该做什么。
+- **App**：电量、遥控照旧。App 认的是它的数据库（`/userdata/config/robot_service/db/robot_service.db`，只有 c1adbe7b），我们不改。
+  - `appmap ignore`（默认）：我们的规划和定位不听 App 的 `/map/switch`，一直用 ad68517c。**App 上的狗画在 c1adbe7b 上，位置不准**，
+    看 Foxglove。
+  - 换回机器人团队的服务后一切照旧。
 
-1. **狗站着，先摸清运控**（第一次上板，限速 `speed 0.3`，影子关，急停在手）：在 2 m 外发一个目标，狗开始走以后依次试：
-   - 遥控能不能接管、松手以后谁接着发；
-   - `systemctl stop cw-planning`：狗是停下还是继续按最后的速度走（决定它能不能当软停用）；
+---
+
+## 10. 试的顺序（一层一层来，前一层过了再下一层）
+
+规划能动狗的只有两个话题：`/mc/motion_control`（运控实际执行的）和 `/cmd_vel`。
+- 有任务时每个周期都发 `/cmd_vel`，不在 standstill 时还发 `/mc/motion_control`。
+- 人行横道等车时，发的是 (0, 0, 0) 或对朝向的原地转（任务没停，所以照样发）。
+
+1. **狗站着，先摸清运控**（第一次上板；`speed 0.3`，影子关，急停在手）。在 2 m 外发一个目标，狗开始走以后依次试：
+   - 遥控能不能接管，松手以后谁接着发；
+   - `systemctl stop cw-planning`：狗是停下还是按最后的速度走；
    - 急停按下、松开以后狗的状态。
-   结果写进 T57 的报告。
-2. **域 42 回放**（狗上或服务器上，第 3.2 节）：新的代码、新的配置先过一遍包，`check_planning_mcap.py`、`planning_mcap_viz.py` 看没问题。
-3. **影子模式**（`shadow on`，输出里图那几行都是 ok 才往下；`use-new` 以后再 `check` 一次）：规划在真狗、真传感器上跑，指令不执行。人用遥控按规划的意图遛狗：
-   - Foxglove 速度曲线里绿线是规划想发的，和人走的比；
-   - 遛到人行横道：状态应该 approach（快到停止点）→ 人在入口前停下 → align（人把狗转到面朝对面）→ wait / go；
-     有车经过时看车框变红、`waiting for` 有它，车走 3 s 后放行；这一步不冒任何险就能验感知 + 门控；
-   - 影子模式下规划的"被堵"检测是关的（`nav_cw.sh` 自动关、关影子时恢复）：狗被人按住不走，不会进 standstill；
-   - 逐个路口怎么调、每一层看什么：第 8.1 节。
-4. **限速实走**（`shadow off`，`speed 0.5`，再 `0.8`，人行横道用 ad68517c，见第 1 节的图）：空场地、空的人行横道，急停在手：approach → align → go → cross → none，
-   入口前停下、转向、走过去、中间不停。门控用的是"等"规则，只要看得到在动、可能经过的车就等，不靠狗的速度算来不来得及，
-   所以限速不影响等不等车，只是过得慢。
-5. **同事开车**（≤ 10 km/h，从左、从右）：车在可能经过的范围里时 wait（理由 vehicle），车过去 3 s 以后 go。
+
+   T57 看到：规划发的速度狗不走（`/mc/state` 一直 mode 3 下肢，规划发 mode 2 全身）。T65 在查 App 怎么让狗走。在那之前只做
+   第 3 层影子模式。
+2. **域 42 回放**（服务器或狗上，第 14、17 节）：新代码、新配置先过一遍包。
+3. **影子模式**（`shadow on`，`use-new` 的图全 ok 以后再 `check` 一次）：规划在真狗、真传感器上跑，指令不执行，人按规划的意图遛狗。
+   这是现在主要做的，第 11 节。
+4. **限速实走**（`shadow off`，`speed 0.5` 再 `0.8`）：空场地、空的人行横道，急停在手。
+   - 应该是 approach → align → go → cross → none：入口前停下、转向、走过去，中间不停。
+   - 门控用的是"等"规则，只要看得到在动、可能经过的车就等，不靠狗的速度算来不来得及。所以限速不影响等不等车，只是过得慢。
+5. **同事开车**（≤ 10 km/h，从左、从右）：车在可能经过的范围里时 wait（理由 vehicle），车过去约 3 s 以后 go。
 6. **正常车流**：人判断有没有不该放的时候放了。
 
-一直有效：
+改了代码或配置，先回到第 2 层。
 
-- 任何时候人觉得不对就急停，记下时间（回来对录包）；
-- 一次测试一个录包（第 9 节）；
-- 出错、收工都 `use-original`；狗重启也会回到原来的；
-- 不在狗的域 0 上发任何话题，回放只用域 42；
-- 改了代码或配置，先回到第 2 层。
+---
 
-### 8.1 影子模式下逐个路口调（运控接上以前就能做）
+## 11. 影子模式下逐个路口调
 
-现场按顺序做用 [T66_FIELD.md](T66_FIELD.md)（命令、路口编号、录包名、收工和回来回灌）。这一节是五层表和「走一遍」的判据。
+规划在真狗、真传感器上照常算，指令发到影子话题，狗由人遥控。**人当执行器**：规划让停就停、让转就转、放行才走，状态机就是闭环的，
+门控、局部路线、速度都能在真路口上看。影子模式下被堵检测是关的，狗被人按住不走，不会进 standstill。
 
-规划在真狗、真传感器上照常算，指令发到影子话题，狗由人遥控。**人当执行器**：规划让停就停、让转就转、放行才走，
-状态机就是闭环的，门控、局部路线、速度都能在真路口上看。`shadow on` 时被堵检测是关的，狗被人按住不走不会进 standstill。
+### 11.1 两个人
 
-只看状态机不够。下面五层从上往下依赖，上一层错了，下一层看到的都不作数：
+T66 一个人边遥控边看 Foxglove，两次在 align 没停住就走过了入口线，上了人行横道没有 go。所以分两个人：
+- A 只管遥控狗；
+- B 拿笔记本，看录包窗口和 Foxglove，喊"停 / 往左转 / 走"，敲备注。
 
-| 层 | 看什么 | 在哪看 | 对的样子 | 不对就敲一行备注，记 |
-|---|---|---|---|---|
-| 1 定位 | 狗的箭头在路网的路上，朝向和真狗一样，不跳 | 3D：`/lightning/odom`、站点缩略图 | 平稳、贴着路 | 跳了多少、偏多少 m；偏 > 1 m，这个路口后面几层不看 |
-| 2 地图 | 人行横道白框和地上的斑马线重合；align 那一刻狗实际停在哪 | 3D：`/planning/debug/crosswalk`；人眼看地上 | 框盖住斑马线；狗中心在入口线前约 0.8 m（狗头约 0.3 m） | 框往哪边偏多少；狗停在线前（或线上）多少 |
-| 3 感知 | 车框贴在真车上（位置、大小、朝向）；在动的车有速度箭头，停着的没有；同一辆车 id 不变；车第一次出现在多远 | 3D 车框（蓝：看到，红：在等它，橙：看到但不停）；侧栏"感知的原始目标"（id、motion、age、速度） | 每辆车都有框；停着的车不动、没箭头 | 漏了哪辆（从哪来、多远）、假框、停着的车"在动"、id 换了 |
-| 4 门控 | 状态字的理由和 `waiting for N` / `going on with N`；车来 → wait (vehicle) → 车过去 → clearing 约 3 s → go；人行横道上 ahead 和 going on with | 3D 状态字；侧栏 `crosswalk_go`、`crosswalk_waiting_for`、`crosswalk_vehicles`、`crosswalk_stale`；终端 `journalctl -u cw-planning -f \| grep --line-buffered "Crosswalk yield"` | 在动、可能经过的车都等；最后一辆过去约 3 s 放行；停着的车只看 3 s（压着路 15 s）；不 stale | 空等（哪个框红）、不该放的放了（哪辆车、多远、多快）、stale |
-| 5 状态机和指令 | approach → align → wait / go → cross（→ cross_wait）→ none；approach 最后 3 m 速度降到两成；hold 时指令 (0, 0, ω)，align 的 ω 方向对、≤ 0.5 rad/s；全局路径穿过白框，局部路线（MPPI）跟着过，不绕 | 速度、角速度曲线（影子指令和实际）；3D `/planning/debug/path_tracking`（全局路径、局部参考、MPPI 路线）；侧栏 `crosswalk_mode`（0–6）、`crosswalk_s_stop`、`crosswalk_heading_error`、`crosswalk_hold` | 同左 | 卡在哪个状态、转反了、hold 时速度不是 0、路线绕开了人行横道 |
-
-顺带看：感知每秒一行、约 10 Hz（`journalctl -u cw-nav-perception -f`）；侧栏 `nav_blocked` 一直是 0；`mission_state` 是 active。
-
-**两个人**（T66：一个人边遥控边看 Foxglove，两次在 align 没停住就走过了入口线，上了人行横道没有 go）：A 只管遥控狗；B 拿着笔记本，
-看录包窗口和 Foxglove，喊"停 / 往左转 / 走"，敲备注。录包窗口在规划的人行横道状态每变一次时响一声、打一行该做什么：
+录包窗口在规划的人行横道状态每变一次时响一声，打一行该做什么（路口用图上的号）：
 
 ```text
 == 图上 13 号 approach：慢下来，沿路线走到停止点
@@ -324,55 +459,153 @@ Foxglove 只能发 `/goal_pose`。一层一层来，前一层过了再下一层�
 == 图上 13 号 停！cross_wait：前方可能来车，原地站着
 ```
 
-**目标**：Foxglove 的 Publish pose 发在 base_link 里（布局跟着狗）；规划用 TF 转到 map，录包窗口打
-`goal sent in base_link (…): (x, y) in map`，下一行 `goal N m away` 应该是几十米。几百米就是没转对，别往下做。
+### 11.2 五层：上一层错了，下一层不作数
 
-**每次开始前**：域 0 上 `/lightning/odom` 只能是定位在发（`ros2 topic info -v /lightning/odom` 只有一个发布者）。
-T65 那天下午有个 `/tmp/fake_pose.py` 在域 0 上发假的 `/lightning/odom` 和 TF：调试用的假数据只放在域 42 或服务器上。
-`df -h /home/nvidia`：包大约每秒 35 MB（大头是点云），一个包 5 分钟以内（约 10 GB），一次一个做法。收工 `use-original`。
+只看状态机不够。下面五层从上往下依赖，上一层错了，下一层看到的都不作数。不对就在录包窗口敲一行备注。
 
-**走一遍**（每个路口，人当执行器）：
-1. 在路线上离人行横道 10 m 以外起步。Foxglove 发对面的目标，全局路径要穿过白框。5 s 内 `mission_state` 不是 active 就再发一次
-   （还在跑的任务，第一下只会被停掉）；
-2. approach：沿局部路线走，速度跟着影子指令（限速 0.5 时约 0.5 m/s），最后 3 m 慢下来；
-3. 状态字一变 align（红）就停，看狗离斑马线多远（敲备注）；按 ω 的方向原地转，`crosswalk_heading_error` 到 10° 以内就变 wait 或 go；
-4. wait（红）站着；go（绿）沿路线走过去；
-5. 人行横道上 cross（绿）一直走；变 cross_wait（红，理由 ahead）就原地停，变回 cross 再走；
-6. 出了人行横道变 none，走到目标 1.5 m 内，录包 5 s 后自己停。规划的影子指令这时还不是 0，正常：到达要离终点 0.5 m 内、
-   朝向差 0.2 rad 内，影子里狗没照它走就到不了（T64：狗停在终点侧边 0.7 m，vy 一直 −0.22 m/s）。
+| 层 | 看什么 | 在哪看 | 对的样子 | 不对就记 |
+|---|---|---|---|---|
+| 1 定位 | 狗的箭头在路网的路上，朝向和真狗一样，不跳 | 3D：`/lightning/odom`、站点缩略图 | 平稳、贴着路 | 跳了多少、偏多少 m。偏 > 1 m，这个路口不往下做，换下一个 |
+| 2 地图 | 人行横道白框和地上的斑马线重合；align 那一刻狗实际停在哪 | 3D：`/planning/debug/crosswalk`；人看地上 | 框盖住斑马线；狗中心在入口线前约 0.8 m（狗头约 0.3 m） | 框往哪边偏多少；狗停在线前（或线上）多少 |
+| 3 感知 | 车框贴在真车上（位置、大小、朝向）；在动的车有速度箭头，停着的没有；同一辆车 id 不变；车第一次出现在多远 | 3D 车框；侧栏"感知的原始目标" | 每辆车都有框；停着的车不动、没箭头 | 漏了哪辆（从哪来、多远）、假框、停着的车"在动"、id 换了 |
+| 4 门控 | 状态字的理由和 `waiting for N` / `going on with N`；车来 → wait (vehicle) → 车过去 → clearing 约 3 s → go；人行横道上的 ahead | 3D 状态字；侧栏 `crosswalk_go`、`crosswalk_waiting_for`、`crosswalk_vehicles`、`crosswalk_stale`；状态窗口的 `Crosswalk yield` | 在动、可能经过的车都等；最后一辆过去约 3 s 放行；停着的车只看 3 s（压着路 15 s）；不 stale | 空等（哪个框红）、不该放的放了（哪辆车、多远、多快）、stale |
+| 5 状态机和指令 | approach → align → wait / go → cross（→ cross_wait）→ none；approach 最后 3 m 速度降到两成；hold 时指令 (0, 0, ω)，align 的 ω 方向对、≤ 0.5 rad/s；全局路径穿过白框，局部路线跟着过，不绕 | 速度、角速度曲线；3D `/planning/debug/path_tracking`；侧栏 `crosswalk_mode`、`crosswalk_s_stop`、`crosswalk_heading_error`、`crosswalk_hold` | 同左 | 卡在哪个状态、转反了、hold 时速度不是 0、路线绕开了人行横道 |
 
-**定点看**（一个路口 10 分钟，看门控在真车流里怎么判）：走到上面第 4 步就不动，狗面朝对面站在停止点，状态随车流在 wait / go
-之间变。每次变 go，人判断"这时候起步安全吗"，不安全就敲备注（"go 不安全：右边来车 20 m"）；没车也在等，敲"空等"。
+顺带看：
+- 感知每秒一行、约 10 Hz（`journalctl -u cw-nav-perception -f`）；
+- 侧栏 `nav_blocked` 一直是 0；
+- `mission_state` 是 active。
+
+### 11.3 走一遍（每个路口先在空的时候做）
+
+录包窗口里，起步前：
+
+```text
+sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x13_walk
+```
+
+把 13 换成图上的号。到目标 1.5 m 以内、停 5 s，它自己停。
+
+1. 在路线上离人行横道 10 m 以外起步。Foxglove 发对面的目标，全局路径要穿过白框。5 s 内 `mission_state` 不是 active 就再发一次。
+2. approach：沿局部路线走，速度跟着影子指令（限速 0.5 时约 0.5 m/s），最后 3 m 慢下来。
+3. 状态字一变 align（红）就停，看狗离斑马线多远，敲备注。按 ω 的方向原地转，`crosswalk_heading_error` 到 10° 以内就变 wait 或 go。
+4. wait（红）站着；go（绿）沿路线走过去。
+5. 人行横道上 cross（绿）一直走。变 cross_wait（红，理由 ahead）就原地停，变回 cross 再走。
+6. 出了人行横道变 none，走到目标 1.5 m 内，录包 5 s 后自己停。
+   - 这时影子指令还不是 0，正常：到达要离终点 0.5 m 内、朝向差 0.2 rad 内，人遥控停在旁边就到不了。
+   - T64：狗停在终点侧边 0.7 m，vy 一直 −0.22 m/s。
+
+这一遍必须留下的备注：
+- align 那一刻狗头离斑马线入口线多远（`align：狗头离线 0.4 m`）；
+- 白框偏哪边、大约多少；
+- approach 最后 3 m 影子速度是不是降到大约两成（限速 0.5 时约 0.1 m/s）；
+- align 的角速度方向对不对；
+- 紫的参考线和绿的局部路线是不是跟着蓝的全局路径从白框上过；
+- 整个过程哪里不对。
+
+### 11.4 同一个路口接着做
+
+每个包一个做法、5 分钟以内。
+
+**a. 定点看**（有正常车流的路口一定做，10 分钟，录两个 5 分钟的包）：
+
+```text
+sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x13_watch --no-auto
+```
+
+照"走一遍"走到 wait 或 go，狗面朝对面站在停止点，人不再走。状态随车流在 wait / go 之间变。
+
+每次变成 go，B 判断这时候起步安不安全：
+- 不安全：敲 `go 不安全：右边来车 20 m`；
+- 没车也在等：敲 `空等`；
+- 车框不对也敲。
+
+到时间在这个窗口 Ctrl-C。
+
+**b. 有车的时候再走一遍**（人觉得安全才走）：`--tag x13_traffic`。wait 时站着，go 才走。
+
+**c. 同事开车**（人定做不做；要有新门控，第 6 节）：狗已经放行、走到人行横道中间，人把狗停住：
+
+```text
+sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x13_car --no-auto
+```
+
+- 车从狗前方的车道开过：应变 cross_wait，理由 ahead，车框红；车过去约 3 s 回到 cross。
+- 车从狗已经走过的那条车道开过：不停，车框橙（going on with）。
+- 车开过来之前敲一行：`前方，从左` 或 `后面，从右`。车不从狗站的那条车道开。
+
+### 11.5 每个包录完核对
+
+- 录包窗口最后要有 `done:` 和 `replay goal: x y`。
+- `ssh dog "ls /home/nvidia/bags/<包>"`：要有这些文件，没有 `metadata.yaml` 见第 12 节：
+  - `metadata.yaml`
+  - `record_log.txt`
+  - `journal_cw-planning.txt`
+  - `journal_cw-slam.txt`
+  - `journal_cw-nav-perception.txt`
+- B 说这个路口五层各一句，写进这次任务的 `data/reports/<T 号>/field_notes.md`：
+  - 定位；
+  - 白框偏多少、align 时狗头离线多远；
+  - 感知漏了或假了什么；
+  - 门控对不对；
+  - 状态机和指令。
 
 ---
 
-## 9. 录包和回来分析
+## 12. 录包
 
-狗上一条命令（域 0，只订不发；排练时自动用 nav_cw.env 里的域 42）。`nav_cw_record.sh` 和 `nav_cw_record.py` 一起拷到
-`/opt/seres/nav_cw/`：
+狗上一条命令（域 0，只订不发；演练时自动用 `nav_cw.env` 里的域 42）。`nav_cw_record.sh` 和 `nav_cw_record.py` 一起在
+`/opt/seres/nav_cw/`（第 5 节拷的）：
 
 ```bash
-sudo bash /opt/seres/nav_cw/nav_cw_record.sh          # → /home/nvidia/bags/<YYYYMMDD>_cw_<n>，n 自动加一
+sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh                # → /home/nvidia/bags/<YYYYMMDD>_cw_<n>，n 自动加一
+sudo -n bash /opt/seres/nav_cw/nav_cw_record.sh --tag x13_walk  # → /home/nvidia/bags/<YYYYMMDD>_x13_walk_<n>
 ```
 
-- 规划有目标点（`/planning/debug/goal_pose`，或者录的时候新发的 `/goal_pose`），狗（自己走或遥控）先在 1.5 m 外、再进到
-  目标 1.5 m 内，5 s 后自己停；中途又出了 1.5 m 就不停了，再进来重新数。上一次测试留下的目标就在狗脚下：不会停，要先出去；
-- 没有目标、或想早点停：在录包窗口 Ctrl-C。网线断了，笔记本重连后执行 `ssh dog "sudo -n pkill -INT -f '^python3 /opt/seres/nav_cw/nav_cw_record.py'"`（只中断 `nav_cw_record.py`，由它停 bag 并写 `metadata.yaml`）。不要 `kill -9`，也不要直接杀 `ros2 bag record`。录的时候不碰 db3；
-- `--tag cw13_walk` 起名 `<日期>_cw13_walk_<n>`（一个路口、一种做法一个名字），`-o <目录>` 直接给名字，`--radius 2 --hold 5` 改距离和时间，
-  `--no-auto` 只认 Ctrl-C（定点看用），后面跟话题名多录几个，`--dry-run` 只打印命令；
-- 录的时候在同一个终端敲一行字、回车，就记一条带时间的备注（只回车记 "mark"）：人的判断（"go 不安全"、"空等"、"框偏了"）
-  回来能和包对上；
-- 停下以后包的目录里多三样：`record_log.txt`（屏幕上打的全部、备注、最后一行 `replay goal: x y` 是回灌用的目标）、
-  `journal_cw-planning.txt`、`journal_cw-slam.txt`、`journal_cw-nav-perception.txt`（录的这段时间我们三个服务的日志；
-  回灌时拿规划的 `Crosswalk yield:` 那几行对）；
-- 录完包归 nvidia（`sudo` 的那个人），打印 `ros2 bag info`。没有 `metadata.yaml`（录制进程被杀了）就照提示 `ros2 bag reindex`；
-- 录的时候运控一变就打一行：`/mc/state: mode 3 lower body (IMC), uuid '', 20:DONE`（模式、谁在控、每个动作的状态）、
-  `/mc/motion_control: uuid 'planning', mode 2 whole body (WBMC), motion 20, para [...]`（谁在发、发的什么模式，开始动和停下各一行）。
-  T57 狗不走时就是这个样子：狗在 mode 3，规划发 mode 2。只想看这几行、不录：`--no-record`；要录 action 的状态（`/nav/navigation/_action/status`
-  这类隐藏话题）：`--hidden` 再把话题名写上。
+**什么时候停**：
+- 规划有目标点时：狗先在 1.5 m 外、再进到目标 1.5 m 内，5 s 后自己停。目标是 `/planning/debug/goal_pose`，或者录的时候新发的
+  `/goal_pose`。中途又出了 1.5 m 就重新数。上一次测试留下的目标就在狗脚下时不会停，要先走出去。
+- `--no-auto`：只认 Ctrl-C。定点看、一整趟（观察、看车、过马路都在一个包里）用它。
+- 想早点停：在录包窗口 Ctrl-C。
+- 网线断了、窗口没了：笔记本重连后执行下面这条。它只给 `nav_cw_record.py` 发一次中断，由它停 `ros2 bag record`、写
+  `metadata.yaml`。等十几秒，进程自己退出。不要 `kill -9`，不要直接杀 `ros2 bag record`，录的时候不碰 db3。
 
-它录的是下面这张表，再加 `/planning/debug/goal_pose`（`/goal_pose` 是易失的，录之前发的目标不在包里，T57）和 `/mc/state`
-（运控的状态）。手动录也行（同一张表）：
+  ```text
+  ssh dog "sudo -n pkill -INT -f '^python3 /opt/seres/nav_cw/nav_cw_record.py'"
+  ```
+
+**选项**：
+
+| 选项 | 做什么 |
+|---|---|
+| `--tag cw13_walk` | 起名，一个路口、一种做法一个名字 |
+| `-o <目录>` | 直接给名字 |
+| `--radius 2 --hold 5` | 改自动停的距离和时间 |
+| 后面跟话题名 | 多录几个 |
+| `--dry-run` | 只打印命令 |
+| `--no-record` | 只看提示和运控那几行，不录 |
+| `--hidden` | 录 action 的状态这类隐藏话题，再把话题名写上 |
+
+**录的时候**：
+- 在同一个终端敲一行字、回车，就记一条带时间的备注（只回车记 `mark`）。人的判断（`go 不安全`、`空等`、`框偏了`）回来能和包对上。
+- 人行横道状态一变就响一声、打一行该做什么（第 11.1 节）。
+- 运控一变就打一行。T57 狗不走时就是：狗在 mode 3，规划发 mode 2。
+  - `/mc/state: mode 3 lower body (IMC), uuid '', 20:DONE`：模式、谁在控、每个动作的状态；
+  - `/mc/motion_control: uuid 'planning', mode 2 whole body (WBMC), motion 20, para [...]`：谁在发、发的什么模式，开始动和停下各一行。
+
+**停下以后**：
+- 包目录里多出这些：
+  - `record_log.txt`：屏幕上打的全部、备注，最后一行 `replay goal: x y` 是回灌用的目标；
+  - `journal_cw-planning.txt`、`journal_cw-slam.txt`、`journal_cw-nav-perception.txt`：录的这段时间我们三个服务的日志，回灌时拿规划的
+    `Crosswalk yield:` 那几行对。
+- 包归 nvidia，打印 `ros2 bag info`。
+- 没有 `metadata.yaml`（录制进程被杀了）：照提示 `ros2 bag reindex`。
+
+**录什么**：下面这张表，再加两个：
+- `/planning/debug/goal_pose`：`/goal_pose` 是易失的，录之前发的目标不在包里（T57）；
+- `/mc/state`：运控的状态。
+
+手动录也行，同一张表：
 
 ```bash
 ros2 bag record -o /home/nvidia/bags/<日期>_cw_<n> \
@@ -389,90 +622,307 @@ ros2 bag record -o /home/nvidia/bags/<日期>_cw_<n> \
   /tf /tf_static
 ```
 
-四路 `*_sensor_camera` 是鱼眼的 H.264，给人审核 `lidar_3d_detection` 的框时对照，不进网络。`/lidar_packets_loss` 是雷达丢包计数，用来确认点云没有洞。未压缩图、Livox 和另一套空的 `h264_*` 话题不录（SENSORS.md 第 7 节）。
+- **激光和 INS**：要录上，回来才能重算感知。
+- **四路 `*_sensor_camera`**：鱼眼的 H.264，给人审核感知框时对照，不进网络。未压缩图、Livox 和另一套空的 `h264_*` 不录（SENSORS.md
+  第 7 节）。
+- **`/lidar_packets_loss`**：雷达丢包计数，确认点云没有洞。
+- **定位精度**：看这三个：
+  - `/lightning/odom`（激光定位）；
+  - `/rte/rdap/rtk/inspvax`（组合导航）；
+  - 1 Hz 的 `/nav/location`（在哪张图、定位成功还是失败、经纬度和地图位姿）。
 
-定位精度看 `/lightning/odom`（激光定位结果）和 `/rte/rdap/rtk/inspvax`（组合导航），再加上 1 Hz 的 `/nav/location`（在哪张图、定位成功还是失败、经纬度和地图位姿）。`/lightning/ins_path` 是同一条组合导航画成的长轨迹，100 Hz 整条重发，不录。`/lightning/map_cloud` 和 `/map` 超过狗上共享内存一块的大小，定位本来就不发。
+  `/lightning/ins_path` 100 Hz 整条重发，不录。
+- **规划**：人行横道、全局/局部路径、每周期的数、碰撞接触点、诊断、局部代价图、站点地图缩略。距离场、TEB、跟随的调试图不录：这台狗用
+  MPPI，数在 `plotjuggler/string` 里。
+- **用 root 录**：机器人的共享内存是 root 的（T40）。
+- **格式**：狗上的 ros2 bag 没有 mcap 插件，录出来是 sqlite3（`.db3`，T61），不要加 `-s mcap`。
 
-规划再录：人行横道、全局/局部路径、每周期的数、碰撞接触点、诊断、局部代价图、站点地图缩略。代价图的距离场、TEB 和跟随的调试图不录，这台狗走路用的是 MPPI，数已经在 `plotjuggler/string` 里。
+---
 
-（激光和 INS 要录上，回来才能重算感知。用 root 录：机器人的共享内存是 root 的，T40。）狗上的 ros2 bag 没有
-mcap 插件，录出来是 sqlite3（`.db3`，T61），不要加 `-s mcap`。拷回服务器 `/public/zjst/robot/cp_data/`，然后：
+## 13. 收工
 
-```bash
-python Nav_D20/planning/tools/bag_to_mcap.py <包> <包>_mcap        # 每个话题都转（定义从仓库来）；有 LEFT OUT 就是还有不认的类型
-python Nav_D20/planning/tools/check_planning_mcap.py <包>_mcap     # 规划的输入输出、状态
-bash Nav_D20/planning/script/replay_dog_bag.sh <包> [名字]         # 读 replay goal，只放传感器和感知目标再跑整套；对照在 work_dirs/planning_io_<名字>/sequence.md
-python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip   # 9.1
-python Nav_D20/planning/tools/objects_in_map.py <包>               # sqlite 直接读；外参：要 extrinsic OK
-python Nav_D20/planning/tools/planning_debug_bag.py <包>_mcap -o <包>_planning_debug   # 只给规划调试的小包（输入 + /field/ 现场输出）
-#   回灌：PLANNING_STARTUP_MAP=<站点地图目录> bash Nav_D20/planning/script/replay_planning_check.sh <名字> <x> <y> \
-#           --bag <包>_planning_debug --planning-only     （例子：data/examples/20261115_x6_clip/planning_debug/README.md）
-journalctl -u cw-planning --since "<开始>" --until "<结束>" > planning.log   # 狗上，状态变化的那些行
+```text
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh use-original'
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh speed off'
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow off'
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh switches'
+ssh dog 'sudo -n bash /opt/seres/nav_cw/nav_cw.sh status'
 ```
 
-### 9.1 在 Foxglove 里复盘：感知框、过马路的状态、前视鱼眼
+- `switches` 里 shadow off：下次 `use-new` 不会带着影子。
+- `status` 是 `running: theirs`，App 里狗正常。
+- T66 收工时没换回：21:38 规划还在跑，里程计早就超时了。
+- Foxglove 的桥 Ctrl-C 停掉。
 
-`planning_mcap_viz.py` 把狗上录的包转成一个给人看的 mcap（`<包>_mcap/viz/planning_viz.mcap`）。里面的东西都在包的时间轴上，
-都压平在地图上，看起来不闪。布局用 `Nav_D20/planning/script/field_review.json`。转完它会打印该用哪个布局。
+---
+
+## 14. 回来分析（服务器）
+
+### 14.1 拷包、转、查、回灌
 
 ```bash
-python Nav_D20/planning/tools/bag_to_mcap.py <包> <包>_mcap                  # 狗上录的是 sqlite3，先转（已经转过就跳过）
-python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap \
-  --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip                 # 400 s 的包约 2 分钟
-# 回灌的结果也一样看，鱼眼和点云从现场的包里拿（回灌不留点云）：
+rsync -a --partial dog:/home/nvidia/bags/<包>/ /public/zjst/robot/cp_data/<包>/      # 只读；隧道断了重跑
+python Nav_D20/planning/tools/bag_to_mcap.py <包> <包>_mcap        # sqlite3 → mcap，定义从仓库来；有 LEFT OUT 就是还有不认的类型
+python Nav_D20/planning/tools/check_planning_mcap.py <包>_mcap     # 规划的输入输出、状态
+python Nav_D20/planning/tools/objects_in_map.py <包>               # 外参：每个包都要 extrinsic OK，不是 OK 门控的结论不作数
+bash Nav_D20/planning/script/replay_dog_bag.sh <包> [名字]         # 回灌（nav-dev 容器），对照在 work_dirs/planning_io_<名字>/sequence.md
+python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip   # 14.2
+python Nav_D20/planning/tools/planning_debug_bag.py <包>_mcap -o <包>_planning_debug   # 14.3
+ssh dog 'journalctl -u cw-planning --since "<开始>" --until "<结束>"' > planning.log  # 包里的 journal 不够时
+```
+
+`replay_dog_bag.sh`：
+- 只放传感器和感知目标，跑整套。
+- 终点按这个顺序取：
+  1. `NAV_REPLAY_GOAL="x y"`；
+  2. 包里 journal 的最后一条 `Transformed goal … to map`；
+  3. `record_log.txt` 的 `replay goal`。
+
+   现场的目标是在 base_link 里发的，`record_log` 里的数在 T66 的修复以前不对。
+- 回灌用的是现场同样的激光和感知目标，状态应该和现场基本一样。不一样的地方列出来：时间、现场、回灌。
+- 人和现场日志对不上的、定点看的统计，写进这次任务的 `data/reports/<T 号>/<包>_sequence.md`：
+  - wait 几次、多久；
+  - go 几次；
+  - `go 不安全`、`空等` 各几次，对着哪辆车。
+
+### 14.2 在 Foxglove 里复盘：感知框、过马路的状态、前视鱼眼
+
+`planning_mcap_viz.py` 把包转成给人看的 mcap，在 `<包>_mcap/viz/planning_viz.mcap`。所有东西都在包的时间轴上，压平在地图上，不闪。
+转完它会打印该用哪个布局，现场的包用 `Nav_D20/planning/script/field_review.json`。400 s 的包约 2 分钟。
+
+```bash
+python Nav_D20/planning/tools/planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip
+# 回灌的结果：鱼眼和激光从现场的包里拿（回灌不留点云）
 python Nav_D20/planning/tools/planning_mcap_viz.py work_dirs/planning_io_<名字> \
   --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip --camera-from <包>_mcap
 ```
 
-打开：Foxglove 桌面版 → Open local file → 选 `viz/planning_viz.mcap`。然后 Layouts → Import from file → 选
-`field_review.json`。换了包不用重新导入布局。文件在服务器上就先拷到本机。网页版也能打开本机文件，但几百 MB 的文件桌面版快。
-
-布局里有这些面板：
+打开：
+1. Foxglove 桌面版 → Open local file → `viz/planning_viz.mcap`（文件在服务器上就按第 2.3 节挂上或拷下来）；
+2. Layouts → Import from file → `field_review.json`。换了包不用重新导入。
 
 | 面板 | 看什么 |
 |---|---|
-| 左边 3D（俯视，跟着狗） | `/viz/objects`：感知的框，蓝 = 车、绿 = 人、紫 = 骑车，虚线 = 这一帧没检测到、外推的；箭头 = 1 s 后在哪；字 = `#航迹号 类 速度`。`/viz/lidar`：激光去掉地面，按离地高度着色。`/viz/crosswalk_gate`：规划自己画的门控，当前人行横道按状态着色，实心方块是门控看到的车（红 = 在等它，橙 = 有冲突但放行，蓝 = 不挡路）。还有路网、人行横道编号、全局/局部路径、狗和它的状态字（多一行"过马路 13 wait，等 1 辆"） |
-| 右上 前视鱼眼 | `/robot/topic/rdap/front_sensor_camera`，和 3D 同一个时间轴。是 H.264：跳到某一刻以后要等下一个关键帧才出画面，黑着就往后播一两秒。别的三路要看就加 `--camera front,left,right,rear`，Image 面板里换话题 |
-| 过马路状态 | `/viz/crosswalk.mode`（none / approach / align / wait / go / cross / cross_wait）、放行、感知过期、任务状态，一条一条的色带。点一下就跳到那一刻 |
-| 速度和车数 | 实际速度、规划指令（影子模式下是 `/nav_cw/shadow/cmd_vel`，不是机器人自己导航的 `/cmd_vel`）、门控在等几辆、感知在动的车 |
-| 右下的标签页 | 目标：这一帧每个目标离狗多远、在哪个方向（左正右负）、速度、外推没有。门控：这一周期的 mode、含义、哪个人行横道（站点地图的编号）、go、等几辆、stale、unreleased、到停止点多远、朝向差、门控自己的理由。事件：搜"人行横道"是每次状态变化，搜"感知"是两种提示（下面）。规划流程、图例 |
+| 左边 3D（俯视，跟着狗） | 见下面的图层表 |
+| 右上 前视鱼眼 | `/robot/topic/rdap/front_sensor_camera`，和 3D 同一个时间轴。H.264：跳到某一刻以后要等下一个关键帧才出画面，黑着就往后播一两秒。别的三路加 `--camera front,left,right,rear`，Image 面板里换话题 |
+| 过马路状态 | `/viz/crosswalk.mode`（none / approach / align / wait / go / cross / cross_wait）、放行、感知过期、任务状态，一条一条的色带，点一下就跳到那一刻 |
+| 速度和车数 | 实际速度、规划指令（影子模式下是 `/nav_cw/shadow/cmd_vel`）、门控在等几辆、感知在动的车 |
+| 右下的标签页 | 见下面的标签页表 |
+
+3D 里的图层：
+
+| 图层 | 画的是什么 |
+|---|---|
+| `/viz/objects` | 感知的框。蓝 = 车、绿 = 人、紫 = 骑车；虚线 = 这一帧没检测到、外推的；箭头 = 1 s 后在哪；字 = `#航迹号 类 速度` |
+| `/viz/lidar` | 激光去掉地面，按离地高度着色 |
+| `/viz/crosswalk_gate` | 规划自己画的门控。实心方块是门控看到的车：红 = 在等它，橙 = 有冲突但放行，蓝 = 不挡路 |
+| 其余 | 路网、人行横道编号、全局/局部路径、狗和它的状态字（多一行"过马路 13 wait，等 1 辆"） |
+
+右下的标签页：
+
+| 标签页 | 内容 |
+|---|---|
+| 目标 | 这一帧每个目标离狗多远、在哪个方向（左正右负）、速度、外推没有 |
+| 门控 | 这一周期的 mode 和含义、哪个人行横道（图上的号）、go、等几辆、stale、unreleased、到停止点多远、朝向差、门控自己的理由 |
+| 事件 | 搜"人行横道"是每次状态变化，搜"感知"是两种提示（下面） |
+| 规划流程、图例 | |
 
 **看漏检、误检**（3D 和鱼眼对着看）：
-- 有点没框：激光上有一团车大小的点，鱼眼里也有车，但没有框。可能漏检。
-- 有框没点：框里没有点，鱼眼里也没东西。可能误检。
-- 一辆车被跟成几段：框的航迹号在车开过去的途中换了，就是被跟成了几段。
-- 事件里两种提示，按时间跳过去看：
+- 有点没框：激光上有一团车大小的点，鱼眼里也有车，可能漏检。
+- 有框没点：框里没有点，鱼眼里也没东西，可能误检。
+- 一辆车被跟成几段：航迹号在车开过去的途中换了。
+- 事件里的两种提示，按时间跳过去看：
   - `感知：#… 在 x m 处才出现`：离狗 12 m 以内才第一次出现的车，之前可能漏检；
-  - `感知：#… 只出现 n 帧`：活了不到 1 s 的目标，可能误检。
-- 只看前方的话，前视鱼眼够了。侧面、后面的车，对着激光看。
+  - `感知：#… 只出现 n 帧`：活了不到 1 s，可能误检。
+- 前视鱼眼只看得到前方，侧面、后面的车对着激光看。
 
 **看过马路让停对不对**：
-- 在"过马路状态"上点每一段 wait / cross_wait，看 3D 里有没有红色方块（门控在等的车）、鱼眼里有没有那辆车；
-- 每次变成 go 的那一刻，看前方 30 m 内还有没有在动的车（有就是可疑的放行）；
-- 一直 wait 没有车：看门控标签页的 reason 和 stale。stale = 1 是规划收不到新的感知目标，比如感知和规划的消息类型对不上（PATCHES.md
-  2026-11-25 那一行），或者感知挂了；
-- 门控的红/蓝方块要和感知的框重合。不重合是外参不对，先跑 `objects_in_map.py`。
+- 点每一段 wait / cross_wait：3D 里有没有红色方块，鱼眼里有没有那辆车。
+- 每次变成 go 的那一刻：前方 30 m 内还有没有在动的车（有就是可疑的放行）。
+- 一直 wait 没有车：看门控标签页的 reason 和 stale。stale = 1 是规划收不到新的感知目标（感知和规划的消息类型对不上，或者感知挂了）。
+- 门控的方块要和感知的框重合。不重合是外参不对，先跑 `objects_in_map.py`。
 
-**回灌分析**：现场的包和回灌的包各转一个 mcap，左右开两个 Foxglove 窗口，比同一时刻的过马路状态和门控理由。回灌用的是现场同样的激光和
-感知目标，不一样的地方就是规划改出来的（或者没改对）。转回灌的时候加 `--camera-from <包>_mcap`，鱼眼和激光就从现场的包里取，时间对齐
-用的是两个包各自的定位时间戳。
+**回灌分析**：现场和回灌各转一个 mcap，开两个 Foxglove 窗口，比同一时刻的过马路状态和门控理由。不一样的地方就是规划改出来的（或者
+没改对）。`--camera-from` 按两个包各自的定位时间戳对齐鱼眼和激光。
+
+### 14.3 只给规划调试的小包
+
+```bash
+python Nav_D20/planning/tools/planning_debug_bag.py <包>_mcap -o <包>_planning_debug [--start S --end E] [--goal X Y [YAW]]
+PLANNING_STARTUP_MAP=data/loc_maps/ad68517c-e845-42a4-b5dd-a6b7c6d2af13 \
+  bash Nav_D20/planning/script/replay_planning_check.sh <名字> <x> <y> --bag <包>_planning_debug --planning-only
+```
+
+**包里有什么**：
+- 规划的输入，用原名：里程计、感知栅格、TF、目标、感知目标。感知目标是 `nav_interface/msg/LidarObjectArray`；目标已经放进 map。
+- 现场规划的输出改名到 `/field/…`，回灌时不和新规划发的撞。
+- 几 MB，没有激光和鱼眼。
+
+**`--planning-only`**：
+- 只起规划，等它读完站点地图（`startup map`）再放包；
+- 用包里带朝向的目标，脚本不再另发。
+
+例子和这段数据的分析：`data/examples/20261115_x6_clip/planning_debug/README.md`（这里还有一个比较狗上规划和回灌规划的 Foxglove 布局）。
 
 ---
 
-## 10. 出问题时
+## 15. 开关和 Foxglove 的桥
+
+都在狗上用 `sudo -n bash /opt/seres/nav_cw/nav_cw.sh …`。
+- 开关存在 `/opt/seres/nav_cw/nav_cw.env`，三个 cw unit 读它。
+- 程序从配置文件里读的，再写进装好的那份配置（`communication_conf`、`mission_conf`）。
+- 只重启相关的那个服务，没在跑就下次起来生效。
+- 不影响机器人团队的服务。`switches` 看当前设了什么。
+
+| 开关 | 做什么 | 代价 |
+|---|---|---|
+| `shadow on / off` | 影子模式：规划照常算，`/cmd_vel`、`/mc/motion_control` 改发到 `/nav_cw/shadow/…`，**狗不按规划走**。改的是装好的 `communication_conf` 里 `pub_cmd_vel`、`pub_motion` 的名字（规划不读命令行参数：`rclcpp::init(0, nullptr)`）。同时关掉被堵检测。重启后到 ROS 图里查，规划还在发 `/mc/motion_control` 就停掉 `cw-planning`、退出 3 | 重启 `cw-planning`（任务没了，重发目标） |
+| `appmap ignore / follow` | ignore（默认）：规划和定位改听 `/nav_cw/map/switch`、`/nav_cw/map/file_update`，App 的切图不再让它们换图，一直在 `configure` 设的站点地图上。follow：跟 App（只在 App 的数据库里有站点地图时用，8 号狗的没有） | 重启 `cw-slam`（重新收敛）、`cw-planning` |
+| `speed <m/s> / off / show` | 限速：改装好的 `mission_conf` 里 MPPI 的 `max_vx`（仓库 3.0）和巡航 `reference_velocity`（仓库 1.5）。第一次限速时原文件存成 `mission_conf.pb.txt.repo`，`off` 放回 | 重启 `cw-planning` |
+| `apply` | 把 `nav_cw.env` 里的开关再写进装好的配置（重装以后）；`use-new` 换之前自己也写一遍。`switches` 里 NOT APPLIED 就是没写进去 | 重启我们在跑的 `cw-slam`、`cw-planning` |
+| `check` | 查 ROS 图：谁在发 `/mc/motion_control`、`/cmd_vel`、影子话题，谁在听 `/map/switch`，和开关对不对；`use-new` 换完自己也查 | 无 |
+| `rehearsal on / off` | 演练（第 17 节）：on 在 `nav_cw.env` 写 `ROS_DOMAIN_ID=42`、`PLANNING_TIMEOUT_WALL_CLOCK=1`，停机器人团队的四个导航服务，起我们的三个，在域 42 上查图。要影子开着；我们的在域 0 上跑着时不肯。off 换回去 | 演练期间狗没有导航 |
+| `debug planning on / off` | 规划的调试话题（`/planning/debug/*`，`pub_flag`），马上生效（服务 `/planning/debug/set_pub_flag`）。`configure` 已经默认打开 | 规划多发几十 KB/s |
+| `debug perception on / off` | `lidar_3d_detection` 发调试点云 `/perception/lidar_3d/cloud`、TF `camera_init → lidar_det` | 重启 `cw-nav-perception`：栅格断几秒，规划暂停 1 s 后 3 s 恢复 |
+| `configure <前缀> <地图目录>` | 装的时候用（第 6 节）：定位的 `map_path`、规划的 `startup_map_dir` 指到站点地图，车型 d20/001，规划的调试话题打开 | 装完一定再 `apply` |
+
+Foxglove 的桥：`nav_cw_foxglove.sh`。它以 root 跑，带白名单（不限的话 iceoryx 的发布者表会满，桥退出，T40）。能从 Foxglove 发的只有
+`/goal_pose`（`client_topic_whitelist`），所以 Foxglove 永远发不了速度。
+
+| 变量 | 做什么 |
+|---|---|
+| 默认 | 布局里显示的：规划的调试话题、两张栅格、`/fused_point_cloud`、`/lightning/odom`、`/cmd_vel`、`/mc/motion_control`、影子的两个、目标、TF |
+| `NAV_CW_FOXGLOVE_LEVEL=full` | 再加重的：定位的 `current_scan_world`、`map_cloud`、`ins_path`、`lio_path`、`ins_pose`、`/map`；感知的 `tracks`、`predictions`、`cloud`；规划的 `teb_planner`、`following`、`gradient_vector`、`cost_map_production/grid_map`、`plotjuggler/data_points`。几分钟就关 |
+| `NAV_CW_FOXGLOVE_EXTRA="^/a$ ^/b$"` | 临时再放几个话题 |
+| `NAV_CW_FOXGLOVE_PORT` | 端口，默认 8765 |
+
+`sudo` 会清掉前面设的环境变量，变量写在 `sudo -n` 后面：
+
+```text
+sudo -n env NAV_CW_FOXGLOVE_LEVEL=full bash /opt/seres/nav_cw/nav_cw_foxglove.sh
+```
+
+---
+
+## 16. 调参：在哪改、怎么生效
+
+**仓库是源头**。
+- 狗上改装好的那份，只为现场快速试。
+- 试好的值抄下来（文件、行、旧值、新值、为什么），回来改仓库、提交，下次装就带上了。
+- 狗站着的时候改，改完重启对应的服务。
+- 改了代码要重编（第 4 节），重装以后 `configure` + `apply`（第 6 节）。
+
+| 模块 | 文件（装好的；`find /opt/seres/nav_cw/install/<模块> -name <文件> -not -path '*/src/*'`） | 常调的 | 生效 |
+|---|---|---|---|
+| 规划 | `robot_factory/d20/001/planning_conf/mission_conf.pb.txt` | `crosswalk_yield_conf`（`enable`、`yield_rule`、`stop_margin`、`slow_distance`、`align_tolerance_deg`、`max_align_omega`、`stale_after`、外参 `det_to_base_*` 等，CROSSWALK_YIELD_FLOW.md 第 8 节）；速度用 `nav_cw.sh speed` | `systemctl restart cw-planning`，重发目标 |
+| 规划 | `…/preprocess_conf.pb.txt` | `global_map_manager_conf.startup_map_dir`（`configure` 写的）、代价地图 | 同上 |
+| 规划 | `…/communication_conf.pb.txt` | `pub_flag`、`enable_global_map_pub`、话题名 | 同上（`pub_flag` 用 `debug planning`，不用重启） |
+| 定位 | `lightning/config/default_d20.yaml` | `map_path`（`configure` 写的） | `restart cw-slam`；狗要站着，等重新收敛，这期间规划暂停 |
+| 感知（我们的） | `lidar_3d_detection/config/lidar_3d_detection.yaml` | `score_thresholds`、`tracker`、`predictor`、`node.ins_azimuth_offset_deg`（INS 朝向偏置，现在 0） | `restart cw-nav-perception` |
+| 感知（机器人团队的） | `lidar_seg.yaml`、`grid_map_memory_node.yaml` | 分割、栅格 | 同上 |
+
+- `PLANNING_TIMEOUT_WALL_CLOCK` 狗上**不设**，只给回放旧包用。
+- 改了外参（`det_to_base_*` 或感知的 `T_body_lidar` / `extrinsic_rpy`），一定录一段包跑 `objects_in_map.py`，要 extrinsic OK。
+- 门控的大多数参数（`YieldConfig`：`wait_clear`、`lost_hold`、`young_age` 等）不在配置文件里，是代码里的默认值，改要改代码重编
+  （CROSSWALK_YIELD_FLOW.md 第 8 节）。
+
+---
+
+## 17. 回放和演练（域 42，不碰狗的域 0）
+
+**服务器上**（nav-dev 镜像，T58）：`replay_dog_bag.sh`、`replay_planning_check.sh`（第 14 节）。
+
+**狗上演练**：用的就是现场那三个 `cw-*` 服务、机器人原来的 CycloneDDS 配置（开着共享内存），只是在域 42 上、喂的是包（T59 第 5 步）。
+命令里有 `$`，先 `ssh dog` 进去在狗的 bash 里敲：
+
+```bash
+sudo -n bash /opt/seres/nav_cw/nav_cw.sh shadow on           # 演练必须开着：规划不在 /mc/motion_control 上发
+sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal on        # 停机器人团队的四个导航服务，起我们的三个，在域 42 上查图
+E='source /opt/ros/humble/setup.bash; source /opt/seres/nav_cw/install/planning/setup.bash; export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file:///opt/ros/cyclonedds.xml ROS_DOMAIN_ID=42'
+sudo -n bash -c "$E; ros2 bag play <包> --clock --remap /perception/lidar_3d/objects:=/bag/perception/lidar_3d/objects /map/switch:=/bag/map/switch /cmd_vel:=/bag/cmd_vel /mc/motion_control:=/bag/mc/motion_control"
+sudo -n bash -c "$E; ros2 topic pub -w 0 --once /goal_pose geometry_msgs/msg/PoseStamped '{header: {frame_id: map}, pose: {position: {x: X, y: Y}, orientation: {w: 1.0}}}'"
+sudo -n bash /opt/seres/nav_cw/nav_cw.sh rehearsal off       # 我们的停、他们的起回来，nav_cw.env 里域 42 那两项去掉
+```
+
+- `rehearsal on` 以后 30 s 内就把包放起来。定位只等 30 s 的 INS 固定解，晚了从配置里的位姿起、对不上。晚了就
+  `systemctl restart cw-slam cw-planning`，包放着的时候它们重新起。
+- `ros2 topic pub` 加 `-w 0`：`--once` 默认等到有订阅者才发，没人订的话题会一直等（T61）。
+- 包里录的目标、地图切换、指令都改名避开。目标用现场重算的；切换和指令是录的时候的，不能当成现在的。
+- 用 root 跑 ros2 命令（共享内存，T40）。第一次用共享内存演练前，先验它不串域（T59 第 5 步 b：域 42 发、域 0 收不到）。
+- `rehearsal on` 开着时 `use-new` 不肯执行，`switches` 显示 REHEARSAL ON；我们的服务在域 0 上跑着时 `rehearsal on` 也不肯执行。
+- Foxglove：`rehearsal on` 时 `nav_cw_foxglove.sh` 自己从 `nav_cw.env` 读到域 42。别的时候要看域 42：
+  `sudo -n env ROS_DOMAIN_ID=42 bash /opt/seres/nav_cw/nav_cw_foxglove.sh`。
+
+---
+
+## 18. 两套导航：装在哪、数据怎么走
+
+| | 机器人团队的（默认，开机起） | 我们的（`/opt/seres/nav_cw`，不开机起） |
+|---|---|---|
+| 感知 | `nav_perception.service`（`lidar_seg`、`grid_map_memory_node`、云台检测、回充）+ `lidar-3d-detection.service`（我们以前的 deb） | `cw-nav-perception.service`：仓库的 `lidar_seg`、`grid_map_memory_node`、`lidar_3d_detection`，云台检测和回充照旧用 `/opt/seres/nav_perception` 的程序 |
+| 定位 | `slam.service` | `cw-slam.service`：仓库的 lightning（`mode_switch_node`），地图是仓库的 |
+| 规划 | `planning.service` | `cw-planning.service`：仓库的规划，人行横道让行打开，开机就读站点地图和 `semantic.osm` 里的人行横道 |
+
+```text
+/opt/seres/nav_cw/
+  install/{nav_perception,slam,planning}/   各自的前缀（各用各的接口包，build_stack.sh）
+  backup/                                   装新版本时挪出来的旧版本（第 6 节）
+  deps/                                     编的依赖（g2o、acados、OsqpEigen），不进系统
+  maps/<id>/                                仓库的站点地图（Nav_D20/map/*.zip 解开）
+  start/                                    cw-nav-perception 的启动脚本
+  nav_cw.sh  nav_cw_foxglove.sh  nav_cw_record.sh  nav_cw_record.py
+  nav_cw.env                                开关（三个 cw unit 用 EnvironmentFile= 读）
+```
+
+数据怎么走：
+
+```text
+激光 /robot/topic/rdap/top_point_cloud2 ─┬─ lidar_seg → grid_map_memory_node → /map/occupancy_grid（狗周围 10 x 10 m 障碍栅格）
+INS /rte/rdap/rtk/inspvax、IMU           │                                    /fused_point_cloud
+                                        ├─ lidar_3d_detection → /perception/lidar_3d/objects（nav_interface/msg/LidarObjectArray：
+                                        │                        车、人、骑车的框、速度、预测）
+                                        └─ lightning（定位）→ /lightning/odom、TF map → base_link
+/goal_pose（Foxglove）→ 规划 → /mc/motion_control（MODE_WBMC、GAIT_WALK，para = [vx, vy, ω]：狗走的是这个）
+                              /cmd_vel（同一个速度）
+                              影子模式下这两个改发到 /nav_cw/shadow/…
+```
+
+- 换的时候，`nav_cw.sh` 先停原来的四个（含 `lidar-3d-detection.service`，不然两个节点发同一个话题），再起我们的三个。
+- 两套 unit 互相 `Conflicts=`，systemd 不会同时跑。
+- 什么都没 enable：**狗重启就回到机器人团队的**。
+
+---
+
+## 19. 出问题时
+
+**什么时候停下**：
+
+| 看到 | 做什么 |
+|---|---|
+| `shadow on` 或 `use-new` 的图不是全 ok | 停下，不往下做。规划还在 `/mc/motion_control` 上时，脚本会自己停掉 `cw-planning` |
+| 域 0 上 `/lightning/odom` 不止一个发布者 | 停下，查是谁 |
+| 装完 `switches` 有 NOT APPLIED | 把 `backup/` 里的挪回去 |
+| 定位偏超过 1 m，或一直跳 | 这个路口不测 |
+| 发完目标 `goal N m away` 是几百米 | 目标没转对，别往下做 |
+| 人觉得不安全 | 急停，记下时间 |
+| 回来 `objects_in_map.py` 不是 extrinsic OK | 先查外参，门控的结论不作数 |
+
+**现象 → 先看 → 多半是**：
 
 | 现象 | 先看 | 多半是 |
 |---|---|---|
-| `use-new` 退出 1，`no /lightning/odom within 45 s` | 它打出的 cw-slam 那几行（"定位初始化超时"、NDT） | INS 不是 RTK 固定解：等到固定解（`ins_status` 3、`pos_type` 56）再 `use-new`；它已经换回原来的了 |
-| `use-new` 退出 1 | 它打出的三个服务最后 15 行 | 库没找到（`LD_LIBRARY_PATH`）、配置读不到；它已经换回原来的了 |
+| `use-new` 退出 1，`no /lightning/odom within 45 s` | 它打出的 cw-slam 那几行（"定位初始化超时"、NDT） | INS 不是 RTK 固定解：等到固定解再 `use-new`；它已经换回原来的了 |
+| `use-new` 退出 1 | 它打出的三个服务最后 15 行 | 库没找到（`LD_LIBRARY_PATH`）、配置读不到；已经换回了 |
+| `use-new` 退出 1，图那几行有 WRONG | 哪一行 | 开关和实际不符（launch 是旧的、没读 `nav_cw.env`）；已经换回了 |
+| `shadow on` 退出 3，`SHADOW NOT IN EFFECT` | 它打出的图 | 装的规划没按配置改话题名（版本不对？）；它已经停了 `cw-planning`，别再起，查清楚 |
 | `startup map … 0 crosswalks` 或 `Map switch` 到别的图 | `switches` 的 appmap；`check` | appmap 是 follow（App 发的是 c1adbe7b），或者 ignore 没写进装好的配置（NOT APPLIED：`apply`）；换回 |
-| `shadow on` 退出 3，`SHADOW NOT IN EFFECT` | 它打出的图 | 装的规划没按配置改话题名（版本不对？）；它已经把 `cw-planning` 停了，别再起，查清楚 |
-| `use-new` 退出 1，图那几行有 WRONG | 哪一行 | 开关和实际不符（launch 是旧的、没读 `nav_cw.env`）；它已经换回了 |
-| 狗不走、`mission_state: standstill` | `journalctl` 里的超时、`nav_blocked` | 里程计或栅格断流（暂停 1 s、恢复 3 s）；被挡；影子模式没关；限速设成了 0 |
+| 狗不走、`mission_state: standstill` | `journalctl` 里的超时、`nav_blocked` | 里程计或栅格断流（暂停 1 s、恢复 3 s）；被挡；限速设成了 0 |
 | 狗不走、`mission_state: active`、`/mc/motion_control` 上有规划的速度 | `nav_cw_record.sh --no-record` 打的 `/mc/state` 那行 | T57：运控在 mode 3（下肢），规划发 mode 2（全身）；App 那一路在规划之前多做的事（焦点、切模式）我们没做。还在查（T65），别自己发切模式的指令 |
-| 人行横道上停住、`cross_wait (ahead)` | Foxglove 里红框在哪、在不在狗前方 | 按设计：前方有车可能过来（2026-11-15）；车过去 3 s 后接着走。后面过的车是橙框，不停 |
-| 一直 `wait (stale)` | `ros2 topic hz /perception/lidar_3d/objects`；`crosswalk_stale` | 感知没起来；感知和里程计的时间对不上（`max_pose_gap` 0.3 s） |
+| 人行横道上停住、`cross_wait (ahead)` | Foxglove 里红框在哪、在不在狗前方 | 按设计：前方有车可能过来；车过去约 3 s 后接着走。后面过的车是橙框，不停 |
+| 一直 `wait (stale)` | `ros2 topic hz /perception/lidar_3d/objects`；`ros2 topic info -v` 的类型；`crosswalk_stale` | 感知没起来；感知和规划一新一旧（消息类型不同，第 4 节）；感知和里程计的时间对不上（`max_pose_gap` 0.3 s） |
 | 一直 `wait (vehicle)`，路上没车 | Foxglove 里红框在哪 | 停着的车被当成在动（速度噪声、INS 朝向不对）；路边的车被预测"可能拐过来" |
 | 车框跟着狗转 | `objects_in_map.py` | 外参不对 |
-| Foxglove 连不上、桥退出 | 桥的输出 | 不是 root；白名单放太多（iceoryx）；端口 |
+| 规划起步就卡住、代价地图里狗脚下是障碍 | 复盘的事件"代价地图里狗脚下是障碍" | 狗站在路网边上（人行横道入口常见）；MPPI 一般照样出指令（T51 的脱困），一直 0 才是问题 |
+| 录包窗口没了，包没 `metadata.yaml` | 第 12 节 | 用 `pkill -INT` 收尾；已经没了就 `ros2 bag reindex` |
+| Foxglove 连不上、桥退出 | 桥的输出 | 不是 root；白名单放太多（iceoryx）；端口被占（桥已经在跑） |
 | 看不到规划的调试话题 | `debug planning on` | `pub_flag` 关着 |

@@ -1,5 +1,5 @@
 #!/bin/bash
-# One command to record a bag on dog 8: the field guide's topics (DOG_FIELD_GUIDE.md section 9), the planner's goal
+# One command to record a bag on dog 8: the field guide's topics (DOG_FIELD_GUIDE.md section 12), the planner's goal
 # and /mc/state, sqlite3, as root (the robot's shared memory is root's, T40). It stops by itself 5 s after the dog
 # (walking or remote-controlled) has come within 1.5 m of the planner's goal; otherwise Ctrl-C. Either way the
 # recorder gets one SIGINT and writes metadata.yaml. Meanwhile it prints each change of /mc/state (mode, uuid, motion

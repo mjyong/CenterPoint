@@ -319,7 +319,7 @@ MPPI 算出 (vx, vy, ω) 以后：
 | C++ 和 Python 一样 | `Nav_D20/planning/tools/yield_gate_parity/run.sh`（`parity.cc` 逐帧对；`crosswalk_sim.cc` 闭环走一遍 `CrosswalkYield`，有人行横道上前方来车、后面来车两个） | 每帧 go / 理由 / ahead 一样；闭环状态序列对 |
 | 外参 | `Nav_D20/planning/tools/objects_in_map.py <包>` | extrinsic OK |
 | 回放 | `Nav_D20/planning/script/replay_planning_check.sh`（服务器 nav-dev 镜像，T58；狗上域 42，T56） | 日志里的状态序列；`check_planning_mcap.py`、`planning_mcap_viz.py` |
-| 真狗 | T57（DOG_FIELD_GUIDE.md 第 8 节） | 空人行横道 → 同事开车 → 正常车流 |
+| 真狗 | T57、T66、T70（DOG_FIELD_GUIDE.md 第 10、11 节） | 空人行横道 → 同事开车 → 正常车流 |
 | 单元测试 | `tests/dog/test_yield_gate.py`、`test_yield_gate_cpp.py`、`test_objects_in_map.py` | |
 
 ---

@@ -10721,7 +10721,7 @@ standstill 0 行。四个包都有 record_log 和三份 journal。没做的：�
 
 复核找到的问题，按要紧排：
 
-1. **域 0 上跑过一个假定位。** T66_FIELD.md 开头写着：下午有个 `/tmp/fake_pose.py` 在发 `/lightning/odom` 和 `map → base_link`，点在
+1. **域 0 上跑过一个假定位。** T66_FIELD.md（2026-11-27 并进 DOG_FIELD_GUIDE.md）开头写着：下午有个 `/tmp/fake_pose.py` 在发 `/lightning/odom` 和 `map → base_link`，点在
    (−56.15, −228.26)。这违反了"域 0 上除了我们的服务不发别的"：假里程计会喂给在跑的那套导航，影子关着的时候能带着狗走。
    T66 开工前停掉了。以后调试用的假数据只放在域 42（rehearsal）或服务器上。是谁、为什么起的，在 T65 的结果里写清楚
    （T65 的结果还没推上来）。现场指南 8.1 加了开工前查一下 `/lightning/odom` 只有一个发布者。
@@ -10772,7 +10772,7 @@ standstill 0 行。四个包都有 record_log 和三份 journal。没做的：�
    工具两个名字都认（旧定义在 `planning/tools/legacy_msgs/`）。**感知和规划要一起重编、一起装**：类型名不同 DDS 不配对，新规划收不到
    旧感知的目标，门控一直 stale，路边一直等。T69 第 6 步和 T70 第 0 步 c 已经改成两个一起。这里没有 ROS，C++ 没编过，T69 第 6 步是第一次编。
    机器人团队要是已经有自己的 `nav_interface/LidarObjectArray`、定义不一样，要拿他们的 .msg 来对。
-2. **现场的包在 Foxglove 里复盘**：`planning_mcap_viz.py` 加了 `field_viz.py`，布局 `field_review.json`（现场指南 9.1）。能看到这些：
+2. **现场的包在 Foxglove 里复盘**：`planning_mcap_viz.py` 加了 `field_viz.py`，布局 `field_review.json`（现场指南 14.2）。能看到这些：
    - 感知框，按门控的外参放进地图；
    - 规划自己画的门控；
    - 每周期过马路的状态（按站点地图的编号）；
@@ -10906,7 +10906,7 @@ T65 的结果还没推上来：仓库里没有 "T65 结果"，也没有 data/rep
    写进 data/reports/T69/goals.txt（包名、终点、来自哪一行、和路径终点差多少）。
 3. 拷包（只读，rsync -a --partial，隧道断了重跑）四个到 /public/zjst/robot/cp_data/；x22_all_3（67 GB，没有日志）不拷。
    每个：bag_to_mcap.py（LEFT OUT 抄下来）、objects_in_map.py（要 extrinsic OK；狗动了的包才量得出来）、
-   planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip（现场指南 9.1，布局 field_review.json；
+   planning_mcap_viz.py <包>_mcap --map Nav_D20/map/ad68517c-e845-42a4-b5dd-a6b7c6d2af13.zip（现场指南 14.2，布局 field_review.json；
    打印的 notes 抄下来：perception tracks 那行、crosswalk gate 那行、/viz/lidar 和鱼眼各多少帧）。
 4. 回灌（nav-dev 容器里，同 T68）：NAV_REPLAY_GOAL="<第 2 步的终点>" bash Nav_D20/planning/script/replay_dog_bag.sh <包> t69_<包>。
    每个看：/map/occupancy_grid 放到包尾、check_planning_mcap.py 没有 "stops … before the end"、sequence.md。狗是人遥控的，回灌用的是同样的
@@ -10924,7 +10924,7 @@ T65 的结果还没推上来：仓库里没有 "T65 结果"，也没有 data/rep
    b. 等的车里几个是"被跟成几段"（id 没了、附近马上又冒出新 id）；
    c. 6 号上 49 s、54 s 那两段 cross_wait 是谁让它一直等；
    d. 有没有可疑的放行。
-   a、d 里的几段在第 3 步的复盘 mcap 里看（前视鱼眼 + 感知框 + 激光 + 门控，现场指南 9.1），截图对照；回灌的结果也转一个
+   a、d 里的几段在第 3 步的复盘 mcap 里看（前视鱼眼 + 感知框 + 激光 + 门控，现场指南 14.2），截图对照；回灌的结果也转一个
    （planning_mcap_viz.py work_dirs/planning_io_t69_<包> --map … --camera-from <包>_mcap），和现场的比同一时刻的状态。
 6. arm64 重编规划和感知（这次的提交：目标标记的修复、入口线抖动的修复、感知目标的消息换成 nav_interface；同 T64 第 5 步）：
    rsync 源码、build_stack.sh planning、build_stack.sh nav_perception、ldd 0、
@@ -10947,7 +10947,7 @@ LidarObjectArray 不是同一个包名。
 ```text
 任务 T70（T69 第 6 步编好以后，人在现场，Agent 在笔记本上连着狗）。为什么：T66 复核。T66 只测到了人行横道上那一半，路边的
 align / wait / go 几乎没测，也没有定点看、同事开车和人的备注。这次两个人：A 只管遥控狗；B 拿笔记本看录包窗口和 Foxglove，
-喊"停 / 往左转 / 走"，敲备注。录包窗口在规划的人行横道状态每变一次时响一声，打出该做什么（现场指南 8.1）。
+喊"停 / 往左转 / 走"，敲备注。录包窗口在规划的人行横道状态每变一次时响一声，打出该做什么（现场指南第 11 节）。
 规矩同 T66（影子一直开、只由人遥控、急停在手、同事开车 ≤ 10 km/h 离狗 ≥ 3 m 不朝狗站的车道开、域 0 上不发运控焦点模式、
 只写 /opt/seres/nav_cw/ /home/nvidia/ /tmp/、sudo -n），再加两条：
   - 域 0 上不起任何自己发话题的调试程序（Foxglove 发的 /goal_pose 除外；T65 那天的 fake_pose.py 不许再有）；
@@ -10968,7 +10968,7 @@ align / wait / go 几乎没测，也没有定点看、同事开车和人的备�
       不是就停下。
    g. 三个窗口同 T66 第 0 步 f；录包窗口 ssh -t dog，B 拿着。
 1. 路口：13、32、38 号（图上的号；规划日志 1、3、4）。每个路口按顺序做三个包，每个包一个做法、5 分钟以内：
-   a. --tag x<N>_walk：路口空的时候，现场指南 8.1"走一遍"。B 照响铃那行喊，A 照做。B 必须敲的备注：
+   a. --tag x<N>_walk：路口空的时候，现场指南 11.3"走一遍"。B 照响铃那行喊，A 照做。B 必须敲的备注：
       align 那一刻狗头离斑马线入口线多远（"align：狗头离线 0.4 m"）、白框和斑马线偏多少、整个过程哪里不对；
    b. --tag x<N>_watch --no-auto：走到 wait / go 不动，10 分钟（5 分钟一个包，录两个）。每次响铃变 go，B 判断"这时候起步安全吗"，
       不安全敲 "go 不安全：<哪来的车、多远、多快>"，没车在等敲 "空等"，框不对也敲；

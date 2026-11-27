@@ -1,6 +1,6 @@
 """One command to record a bag on dog 8 (started by nav_cw_record.sh, which sets up ROS as root).
 
-Records DOG_FIELD_GUIDE.md section 9's topics, plus the planner's goal marker (/goal_pose is volatile: a goal sent
+Records DOG_FIELD_GUIDE.md section 12's topics, plus the planner's goal marker (/goal_pose is volatile: a goal sent
 before the recording started is not in the bag, T57) and the robot's motion state, as sqlite3 (the dog's ros2 bag has
 no mcap plugin, T61). It stops by itself once the planner has a goal and the dog, walking or remote-controlled, has
 come within --radius (1.5 m) of it: --hold (5 s) later. Otherwise Ctrl-C stops it. Either way the recorder gets one
@@ -43,7 +43,7 @@ import subprocess
 import sys
 import time
 
-# DOG_FIELD_GUIDE.md section 9 (tests/dog/test_nav_cw_record.py checks the two agree), then what this adds
+# DOG_FIELD_GUIDE.md section 12 (tests/dog/test_nav_cw_record.py checks the two agree), then what this adds
 TOPICS = [
     "/robot/topic/rdap/top_point_cloud2",
     # four fisheyes for reviewing lidar_3d_detection labels (SENSORS.md §7); H.264, not the raw images
@@ -490,7 +490,7 @@ def main(argv=None):
     else:
         log("nothing recorded")
         code = code or 1
-    log("copy to the server: /public/zjst/robot/cp_data/; then bag_to_mcap.py (DOG_FIELD_GUIDE.md section 9)")
+    log("copy to the server: /public/zjst/robot/cp_data/; then bag_to_mcap.py (DOG_FIELD_GUIDE.md section 14)")
     return code
 
 

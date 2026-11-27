@@ -187,7 +187,7 @@ def test_the_topics_are_the_field_guides(dog):
     rec = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(rec)
     text = open(GUIDE, encoding="utf-8").read()
-    sec = text[text.index("## 9."):text.index("## 10.")]
+    sec = text[text.index("## 12. 录包"):text.index("## 13.")]
     start = sec.index("ros2 bag record -o")                   # the command block, not a mention in the text
     block = sec[start:sec.index("```", start)]
     assert re.findall(r"(/[\w/]+)", block.split("\n", 1)[1]) == rec.TOPICS
